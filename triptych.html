@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#fafafa">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>鏡</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Source+Sans+Pro:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --text: #333333;
+            --text-light: #555555;
+            --text-whisper: #888888;
+            --bg-light: #fafafa;
+            --accent: #c4a35a;
+            --accent-glow: rgba(196, 163, 90, 0.4);
+            --order-color: rgba(123, 163, 201, 0.85);
+            --order-glow: rgba(123, 163, 201, 0.3);
+            --chaos-color: rgba(201, 123, 123, 0.85);
+            --chaos-glow: rgba(201, 123, 123, 0.3);
+            --font-display: 'Cormorant Garamond', Georgia, serif;
+            --font-caption: 'EB Garamond', Georgia, serif;
+            --font-body: 'Source Sans Pro', -apple-system, sans-serif;
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+            --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html {
+            scroll-snap-type: x mandatory;
+            scroll-behavior: smooth;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        html::-webkit-scrollbar { display: none; }
+        html { scrollbar-width: none; }
+
+        body {
+            display: flex;
+            width: 500vw;
+            height: 100vh;
+            height: 100dvh;
+            font-family: var(--font-body);
+            color: var(--text);
+            font-size: clamp(16px, 2.5vw, 18px);
+            line-height: 1.9;
+            font-weight: 300;
+            -webkit-font-smoothing: antialiased;
+            overscroll-behavior-x: contain;
+        }
+
+        /* === PANELS === */
+        .panel {
+            flex: 0 0 100vw;
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            scroll-snap-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .panel-scroll {
+            height: 100vh;
+            height: 100dvh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+            z-index: 2;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .panel-scroll::-webkit-scrollbar { width: 3px; }
+        .panel-scroll::-webkit-scrollbar-track { background: transparent; }
+        .panel-scroll::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.2); border-radius: 3px; }
+
+        /* === BACKGROUNDS === */
+        .panel-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .panel-bg canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #intro { background: var(--bg-light); }
+        #order { background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f4 100%); }
+        #center { background: linear-gradient(180deg, #1a1510 0%, #0d0b08 50%, #0a0908 100%); }
+        #chaos { background: linear-gradient(180deg, #12080a 0%, #0d0606 50%, #0a0505 100%); }
+        #closing { background: var(--bg-light); }
+
+        #center, #chaos { color: #f4f1ea; }
+        #center .text-light, #chaos .text-light { color: rgba(244, 241, 234, 0.75); }
+        #center .text-whisper, #chaos .text-whisper { color: rgba(244, 241, 234, 0.45); }
+        #center .divider, #chaos .divider { background: rgba(244, 241, 234, 0.2); }
+
+        /* === CONTENT === */
+        .content {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .section {
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 4rem 2rem;
+        }
+
+        .section-short { min-height: 70vh; }
+
+        /* === TYPOGRAPHY === */
+        h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 6vw, 3.5rem);
+            font-weight: 300;
+            letter-spacing: 0.15em;
+            margin-bottom: 1rem;
+        }
+
+        /* Section titles - refined */
+        .section-title {
+            font-family: var(--font-display);
+            font-size: clamp(2.2rem, 5vw, 3.2rem);
+            font-weight: 300;
+            font-style: italic;
+            letter-spacing: 0.08em;
+            margin-bottom: 1.5rem;
+            line-height: 1.2;
+        }
+
+        #order .section-title { color: var(--order-color); }
+        #center .section-title { color: var(--accent); }
+        #chaos .section-title { color: var(--chaos-color); }
+
+        /* Epigraph - the soul of each section */
+        .epigraph {
+            font-family: var(--font-caption);
+            font-size: clamp(1rem, 2.5vw, 1.15rem);
+            font-style: italic;
+            font-weight: 400;
+            letter-spacing: 0.04em;
+            line-height: 1.7;
+            max-width: 400px;
+            margin: 0 auto;
+            opacity: 0.7;
+        }
+
+        .epigraph em {
+            font-style: normal;
+            opacity: 0.9;
+        }
+
+        p { margin-bottom: 1.5rem; }
+        p:last-child { margin-bottom: 0; }
+
+        .text-light { color: var(--text-light); }
+        .text-whisper { color: var(--text-whisper); font-size: 0.95rem; }
+
+        .japanese {
+            font-size: clamp(2.5rem, 8vw, 3.5rem);
+            letter-spacing: 0.2em;
+            margin-bottom: 0.5rem;
+        }
+
+        #center .japanese { color: var(--accent); }
+
+        em { font-style: italic; }
+
+        .divider {
+            width: 40px;
+            height: 1px;
+            background: var(--text-whisper);
+            margin: 2rem auto;
+            transform: scaleX(0);
+            transition: transform 1.2s var(--ease-out-expo);
+        }
+        .divider.visible { transform: scaleX(1); }
+
+        /* === REVEAL ANIMATIONS === */
+        .reveal {
+            opacity: 0;
+            transform: translateY(35px);
+            transition: opacity 1s var(--ease-out-expo), transform 1s var(--ease-out-expo);
+        }
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .reveal-delay-1 { transition-delay: 0.1s; }
+        .reveal-delay-2 { transition-delay: 0.25s; }
+        .reveal-delay-3 { transition-delay: 0.4s; }
+        .reveal-delay-4 { transition-delay: 0.55s; }
+        .reveal-delay-5 { transition-delay: 0.7s; }
+
+        /* === IMAGES === */
+        .image-container {
+            margin: 2.5rem 0;
+            position: relative;
+        }
+
+        .image-wrapper {
+            position: relative;
+            display: inline-block;
+            overflow: hidden;
+            border-radius: 3px;
+            cursor: pointer;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+            transition: box-shadow 0.6s var(--ease-out-quint), transform 0.6s var(--ease-out-quint);
+        }
+
+        .image-wrapper:hover {
+            box-shadow: 0 16px 60px rgba(0,0,0,0.25);
+            transform: translateY(-4px);
+        }
+
+        .image-wrapper:active {
+            transform: scale(0.98);
+            transition: transform 0.1s ease;
+        }
+
+        .image-container img {
+            max-width: 100%;
+            max-height: 50vh;
+            object-fit: contain;
+            display: block;
+            opacity: 0;
+            transform: translateY(25px) scale(0.98);
+            transition: opacity 1.2s var(--ease-out-expo), transform 1.2s var(--ease-out-expo), filter 0.5s ease;
+            filter: brightness(0.96) saturate(0.94);
+        }
+
+        .image-container img.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        .image-wrapper:hover img {
+            filter: brightness(1.02) saturate(1.05);
+        }
+
+        /* Tap hint */
+        .image-wrapper::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .image-wrapper:active::after {
+            opacity: 1;
+        }
+
+        /* === IMAGE CAPTIONS === */
+        .image-caption {
+            margin-top: 1.2rem;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.8s var(--ease-out-expo) 0.3s, transform 0.8s var(--ease-out-expo) 0.3s;
+        }
+        .image-caption.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .caption-title {
+            font-family: var(--font-caption);
+            font-size: clamp(1rem, 2.5vw, 1.1rem);
+            font-style: italic;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+            margin-bottom: 0.1rem;
+        }
+
+        .caption-meta {
+            font-family: var(--font-body);
+            font-size: 0.7rem;
+            font-weight: 300;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            opacity: 0.55;
+        }
+
+        #order .caption-title { color: var(--order-color); }
+        #center .caption-title { color: var(--accent); }
+        #chaos .caption-title { color: var(--chaos-color); }
+
+        /* === FULLSCREEN LIGHTBOX === */
+        .lightbox {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.96);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.4s var(--ease-out-quint), visibility 0.4s;
+            cursor: pointer;
+            padding: 2rem;
+        }
+
+        .lightbox.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .lightbox-content {
+            position: relative;
+            max-width: 95vw;
+            max-height: 90vh;
+            transform: scale(0.9) translateY(20px);
+            transition: transform 0.5s var(--ease-out-expo);
+        }
+
+        .lightbox.active .lightbox-content {
+            transform: scale(1) translateY(0);
+        }
+
+        .lightbox-image {
+            max-width: 95vw;
+            max-height: 85vh;
+            object-fit: contain;
+            border-radius: 2px;
+            box-shadow: 0 20px 80px rgba(0,0,0,0.5);
+        }
+
+        .lightbox-caption {
+            position: absolute;
+            bottom: -3rem;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: rgba(255,255,255,0.8);
+            white-space: nowrap;
+        }
+
+        .lightbox-caption .caption-title {
+            color: rgba(255,255,255,0.9);
+            font-size: 1.1rem;
+        }
+
+        .lightbox-caption .caption-meta {
+            color: rgba(255,255,255,0.5);
+        }
+
+        .lightbox-close {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            width: 44px;
+            height: 44px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s ease, transform 0.3s ease;
+        }
+
+        .lightbox-close:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.1);
+        }
+
+        .lightbox-close::before,
+        .lightbox-close::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 1.5px;
+            background: rgba(255,255,255,0.8);
+        }
+
+        .lightbox-close::before { transform: rotate(45deg); }
+        .lightbox-close::after { transform: rotate(-45deg); }
+
+        .lightbox-hint {
+            position: absolute;
+            bottom: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: var(--font-body);
+            font-size: 0.75rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.3);
+        }
+
+        /* === NAVIGATION === */
+        .nav-hint {
+            margin-top: 2rem;
+            font-family: var(--font-caption);
+            font-size: 1.2rem;
+            letter-spacing: 0.4em;
+            opacity: 0;
+            transition: opacity 0.8s var(--ease-out-expo) 0.5s;
+        }
+        .nav-hint.visible {
+            opacity: 0.3;
+            animation: pulseArrow 2.5s ease-in-out infinite;
+        }
+        @keyframes pulseArrow {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 0.45; }
+        }
+
+        .nav-dots {
+            position: fixed;
+            bottom: max(1.5rem, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 1rem;
+            z-index: 100;
+            padding: 0.6rem 1rem;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 2rem;
+            border: 1px solid rgba(255,255,255,0.15);
+            box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+            transition: transform 0.4s var(--ease-out-quint), opacity 0.4s ease;
+        }
+
+        .nav-dots.hide {
+            transform: translateX(-50%) translateY(80px);
+            opacity: 0;
+        }
+
+        .nav-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(128,128,128,0.4);
+            cursor: pointer;
+            transition: all 0.4s var(--spring);
+        }
+
+        .nav-dot:hover { transform: scale(1.3); background: rgba(128,128,128,0.6); }
+        .nav-dot.active {
+            transform: scale(1.5);
+            box-shadow: 0 0 0 2px currentColor, 0 0 16px currentColor;
+        }
+
+        .nav-dot[data-panel="0"].active { background: var(--text-whisper); color: var(--text-whisper); }
+        .nav-dot[data-panel="1"].active { background: var(--order-color); color: var(--order-color); }
+        .nav-dot[data-panel="2"].active { background: var(--accent); color: var(--accent); }
+        .nav-dot[data-panel="3"].active { background: var(--chaos-color); color: var(--chaos-color); }
+        .nav-dot[data-panel="4"].active { background: var(--text-whisper); color: var(--text-whisper); }
+
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--order-color), var(--accent), var(--chaos-color));
+            z-index: 200;
+            transition: width 0.15s ease-out;
+            box-shadow: 0 0 10px rgba(196,163,90,0.3);
+        }
+
+        /* === MOBILE === */
+        @media (max-width: 768px) {
+            .section { padding: 2.5rem 1.25rem; }
+            .section-short { min-height: 60vh; }
+            .content { padding: 0 1.25rem; }
+            .nav-dots { gap: 0.6rem; padding: 0.5rem 0.8rem; }
+            .nav-dot { width: 10px; height: 10px; }
+            .image-container { margin: 1.5rem 0; }
+            .image-container img { max-height: 35vh; }
+            .section-title { letter-spacing: 0.04em; }
+            .japanese { font-size: clamp(2rem, 12vw, 3rem); letter-spacing: 0.1em; }
+            .lightbox { padding: 1rem; }
+            .lightbox-image { max-height: 75vh; }
+            .lightbox-caption { bottom: -2.5rem; }
+        }
+
+        @media (max-width: 480px) {
+            .section { padding: 2rem 1rem; }
+            .content { padding: 0 1rem; }
+            .image-container img { max-height: 30vh; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+            html { scroll-behavior: auto; }
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root { --text: #e0e0e0; --text-light: #b0b0b0; --text-whisper: #808080; --bg-light: #1a1a1a; }
+            #intro, #closing { background: #1a1a1a; }
+            #order { background: linear-gradient(135deg, #1e2025 0%, #15171a 100%); }
+            .nav-dots { background: rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.1); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="progress-bar" id="progress"></div>
+
+    <div class="nav-dots" id="navDots">
+        <div class="nav-dot" data-panel="0"></div>
+        <div class="nav-dot" data-panel="1"></div>
+        <div class="nav-dot active" data-panel="2"></div>
+        <div class="nav-dot" data-panel="3"></div>
+        <div class="nav-dot" data-panel="4"></div>
+    </div>
+
+    <!-- LIGHTBOX -->
+    <div class="lightbox" id="lightbox">
+        <button class="lightbox-close" aria-label="Close"></button>
+        <div class="lightbox-content">
+            <img class="lightbox-image" id="lightboxImage" src="" alt="">
+            <div class="lightbox-caption">
+                <p class="caption-title" id="lightboxTitle"></p>
+                <p class="caption-meta" id="lightboxMeta"></p>
+            </div>
+        </div>
+        <p class="lightbox-hint">tap anywhere to close</p>
+    </div>
+
+    <!-- PANEL 0: INTRO -->
+    <section class="panel" id="intro">
+        <div class="panel-bg"><canvas id="intro-canvas"></canvas></div>
+        <div class="panel-scroll" data-panel="0">
+            <div class="section">
+                <div class="content">
+                    <p class="japanese reveal reveal-delay-1">鏡</p>
+                    <h1 class="reveal reveal-delay-2">A mirror</h1>
+                    <div class="divider reveal reveal-delay-3"></div>
+                    <p class="text-whisper reveal reveal-delay-4">for Jill</p>
+                </div>
+            </div>
+            <div class="section">
+                <div class="content">
+                    <p class="text-light reveal">In Japanese literature, there's a word: <em>iyashikei</em>.</p>
+                    <p class="text-light reveal">Healing stories. Quiet cafes that appear only when you need them. A cat that finds you at just the right moment.</p>
+                    <p class="text-light reveal">Places that exist in the space between.</p>
+                    <div class="divider reveal"></div>
+                    <p class="text-whisper reveal">This gallery is that kind of place.</p>
+                </div>
+            </div>
+            <div class="section">
+                <div class="content">
+                    <p class="text-light reveal">I wanted to show you something.</p>
+                    <p class="text-light reveal">A triptych.</p>
+                    <p class="text-light reveal">Three rooms in a shop you didn't know you were looking for.</p>
+                    <div class="divider reveal"></div>
+                    <p class="text-whisper reveal">We'll start at the center.</p>
+                    <p class="nav-hint reveal">→</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PANEL 1: STRUCTURE -->
+    <section class="panel" id="order">
+        <div class="panel-bg"><canvas id="order-canvas"></canvas></div>
+        <div class="panel-scroll" data-panel="1">
+            <div class="section">
+                <div class="content">
+                    <h2 class="section-title reveal reveal-delay-1">Structure</h2>
+                    <p class="epigraph reveal reveal-delay-2">The same ratio in a nautilus shell,<br>a Renaissance drawing, and a Greek temple.<br><em>Beauty discovered, not invented.</em></p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="Vitruvian Man" data-meta="Leonardo da Vinci · c. 1490">
+                        <div class="image-wrapper">
+                            <img src="order/01_vitruvian_man.jpg" alt="Vitruvian Man" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">Vitruvian Man</p>
+                            <p class="caption-meta">Leonardo da Vinci · c. 1490</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">The human body fits both circle and square. Navel at the circle's center, groin at the square's. Two geometries, unified.</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="The Parthenon" data-meta="Athens · 447–432 BCE">
+                        <div class="image-wrapper">
+                            <img src="order/04_parthenon.jpg" alt="The Parthenon" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">The Parthenon</p>
+                            <p class="caption-meta">Athens · 447–432 BCE</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">Almost nothing here is straight. The columns lean inward. The platform curves upward. These "refinements" use math to defeat math.</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="North Rose Window" data-meta="Notre-Dame de Paris · c. 1250">
+                        <div class="image-wrapper">
+                            <img src="order/03_rose_window.jpg" alt="Rose Window" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">North Rose Window</p>
+                            <p class="caption-meta">Notre-Dame de Paris · c. 1250</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">Theology made visible. Light transformed by glass into narrative. The window survived the fire.</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="Romanesco Broccoli" data-meta="Fibonacci spirals">
+                        <div class="image-wrapper">
+                            <img src="order/05_romanesco.jpg" alt="Romanesco Broccoli" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">Romanesco Broccoli</p>
+                            <p class="caption-meta">Fibonacci spirals</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">Each floret is a smaller copy of the whole. Structure without architect.</p>
+                    <p class="text-whisper reveal">And yet: we're the ones who noticed. Does that count for something?</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="Composition II" data-meta="Piet Mondrian · 1930">
+                        <div class="image-wrapper">
+                            <img src="order/06_mondrian.jpg" alt="Mondrian Composition" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">Composition II in Red, Blue, and Yellow</p>
+                            <p class="caption-meta">Piet Mondrian · 1930</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">Universal harmony through elimination of the particular. But look: the asymmetry is deliberate. Even in pursuit of the universal, the hand shows through.</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="Chenrezig Sand Mandala" data-meta="Tibetan Buddhist monks">
+                        <div class="image-wrapper">
+                            <img src="order/07_sand_mandala.jpg" alt="Sand Mandala" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">Chenrezig Sand Mandala</p>
+                            <p class="caption-meta">Tibetan Buddhist monks</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">Weeks to create. Swept away when finished. The destruction embodies the teaching.</p>
+                    <p class="nav-hint reveal">← →</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PANEL 2: RECURSION -->
+    <section class="panel" id="center">
+        <div class="panel-bg"><canvas id="center-canvas"></canvas></div>
+        <div class="panel-scroll" data-panel="2">
+            <div class="section">
+                <div class="content">
+                    <h2 class="section-title reveal reveal-delay-1">Recursion</h2>
+                    <p class="epigraph reveal reveal-delay-2">She painted things she couldn't have known,<br>then asked that no one see them for twenty years.<br><em>The world wasn't ready.</em></p>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="content">
+                    <p class="text-light reveal">In 1906, a Swedish woman began painting abstractions.</p>
+                    <p class="text-light reveal">Kandinsky's first abstract watercolor: 1910. Mondrian was still painting trees. Malevich had not yet conceived the Black Square.</p>
+                    <div class="divider reveal"></div>
+                    <p class="text-whisper reveal">Hilma af Klint was first. Yet she remained unknown until 2018.</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="Primordial Chaos, No. 16" data-meta="Hilma af Klint · 1906–07">
+                        <div class="image-wrapper">
+                            <img src="klimt/06_primordial_chaos.jpg" alt="Primordial Chaos" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">Primordial Chaos, No. 16</p>
+                            <p class="caption-meta">Hilma af Klint · 1906–07</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">This is where her abstract work began. Spiraling forms against deep blue, suggesting cosmic generation before form crystallizes.</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="The Dove, No. 1" data-meta="Hilma af Klint · 1915">
+                        <div class="image-wrapper">
+                            <img src="klimt/03_the_dove_no1.jpg" alt="The Dove No. 1" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">The Dove, No. 1</p>
+                            <p class="caption-meta">Hilma af Klint · 1915</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">Two spirals descending through a white circle. The correspondence to the DNA helix is uncanny—but she could not have known.</p>
+                    <p class="text-whisper reveal">Watson and Crick: 1953. She painted this thirty-eight years early.</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="The Evolution, No. 13" data-meta="Hilma af Klint · 1908">
+                        <div class="image-wrapper">
+                            <img src="klimt/02_evolution_no13.jpg" alt="Evolution No. 13" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">The Evolution, No. 13</p>
+                            <p class="caption-meta">Hilma af Klint · 1908</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">An ouroboros—the snake eating its tail. The process that produces itself. The loop never opens.</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="The Key to All Works to Date" data-meta="Hilma af Klint · 1907">
+                        <div class="image-wrapper">
+                            <img src="klimt/04_key_to_all_works.jpg" alt="The Key to All Works" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">The Key to All Works to Date</p>
+                            <p class="caption-meta">Hilma af Klint · 1907</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">A meta-painting: a work that explains other works. A decoder ring for her symbolic language.</p>
+                    <p class="text-whisper reveal">And now you have the key.</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="Altarpiece, No. 1" data-meta="Hilma af Klint · 1915">
+                        <div class="image-wrapper">
+                            <img src="klimt/01_altarpiece_no1.jpg" alt="Altarpiece No. 1" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">Altarpiece, No. 1</p>
+                            <p class="caption-meta">Hilma af Klint · 1915</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">The largest work she ever made, intended for a spiral temple never built. A map of ascent. We start in the body. We end in light.</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="Buddha's Standpoint in Earthly Life" data-meta="Hilma af Klint · 1920">
+                        <div class="image-wrapper">
+                            <img src="klimt/07_buddha_standpoint.jpg" alt="Buddha's Standpoint" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">Buddha's Standpoint in Earthly Life</p>
+                            <p class="caption-meta">Hilma af Klint · 1920</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">A circle divided exactly in half. White and black. After all the spirals and emanations, she arrived here: duality in equilibrium.</p>
+                    <p class="text-whisper reveal">Neither side wins. Neither side needs to.</p>
+                    <p class="nav-hint reveal">← →</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PANEL 3: TURBULENCE -->
+    <section class="panel" id="chaos">
+        <div class="panel-bg"><canvas id="chaos-canvas"></canvas></div>
+        <div class="panel-scroll" data-panel="3">
+            <div class="section">
+                <div class="content">
+                    <h2 class="section-title reveal reveal-delay-1">Turbulence</h2>
+                    <p class="epigraph reveal reveal-delay-2">These paintings share something hard to name:<br><em>they feel alive.</em><br>The moment before structure emerges or collapses.</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="Under the Wave off Kanagawa" data-meta="Katsushika Hokusai · c. 1831">
+                        <div class="image-wrapper">
+                            <img src="chaos/01_great_wave.jpg" alt="The Great Wave" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">Under the Wave off Kanagawa</p>
+                            <p class="caption-meta">Katsushika Hokusai · c. 1831</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">The most reproduced image in Japanese art. Hokusai was in his seventies. Look at the foam: each tendril fractalizes into smaller tendrils.</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="The Starry Night" data-meta="Vincent van Gogh · June 1889">
+                        <div class="image-wrapper">
+                            <img src="chaos/03_starry_night.jpg" alt="Starry Night" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">The Starry Night</p>
+                            <p class="caption-meta">Vincent van Gogh · June 1889</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">Painted at the asylum. In 2008, physicists found his brushwork shows statistical similarities to turbulent flow.</p>
+                    <p class="text-whisper reveal">He painted chaos correctly, by instinct.</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="The Garden of Earthly Delights" data-meta="Hieronymus Bosch · c. 1490–1510">
+                        <div class="image-wrapper">
+                            <img src="chaos/02_garden_of_delights.jpg" alt="Garden of Earthly Delights" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">The Garden of Earthly Delights</p>
+                            <p class="caption-meta">Hieronymus Bosch · c. 1490–1510</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">A triptych within this triptych. Paradise, earthly pleasures, Hell. The painting is dense enough to get lost in for hours.</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="The Scream" data-meta="Edvard Munch · 1893">
+                        <div class="image-wrapper">
+                            <img src="chaos/04_the_scream.jpg" alt="The Scream" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">The Scream</p>
+                            <p class="caption-meta">Edvard Munch · 1893</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">The figure is sexless, ageless. Munch wrote of feeling <em>"a great, unending scream piercing through nature."</em></p>
+                    <p class="text-whisper reveal">The observer and the observed becoming indistinguishable.</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="The Kiss" data-meta="Gustav Klimt · 1907–08">
+                        <div class="image-wrapper">
+                            <img src="chaos/06_the_kiss.jpg" alt="The Kiss" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">The Kiss</p>
+                            <p class="caption-meta">Gustav Klimt · 1907–08</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">Two lovers dissolved into one gilded form. His robe is rectangles; her dress is flowers and circles. Their bodies merge at the edge of a cliff.</p>
+                </div>
+            </div>
+
+            <div class="section section-short">
+                <div class="content">
+                    <div class="image-container" data-title="The Fall of the Rebel Angels" data-meta="Pieter Bruegel the Elder · 1562">
+                        <div class="image-wrapper">
+                            <img src="chaos/07_rebel_angels.jpg" alt="Fall of the Rebel Angels" loading="lazy">
+                        </div>
+                        <div class="image-caption">
+                            <p class="caption-title">The Fall of the Rebel Angels</p>
+                            <p class="caption-meta">Pieter Bruegel the Elder · 1562</p>
+                        </div>
+                    </div>
+                    <p class="text-light reveal">Angels become demons become insects become unnameable things. The transformation is the fall. Almost entirely about becoming something else.</p>
+                    <p class="nav-hint reveal">← →</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PANEL 4: CLOSING -->
+    <section class="panel" id="closing">
+        <div class="panel-bg"><canvas id="closing-canvas"></canvas></div>
+        <div class="panel-scroll" data-panel="4">
+            <div class="section">
+                <div class="content">
+                    <p class="text-whisper reveal reveal-delay-1">Structure · Recursion · Turbulence</p>
+                    <div class="divider reveal reveal-delay-2"></div>
+                    <p class="text-light reveal reveal-delay-3">The triptych is complete.</p>
+                    <p class="text-light reveal reveal-delay-4">Three ways of seeing. Three doorways into the same room.</p>
+                </div>
+            </div>
+            <div class="section">
+                <div class="content">
+                    <p class="japanese reveal reveal-delay-1" style="color: var(--accent);">鏡</p>
+                    <p class="reveal reveal-delay-2"><em>Kagami.</em></p>
+                    <p class="text-light reveal reveal-delay-3">The mirror that equals its reflection.</p>
+                </div>
+            </div>
+            <div class="section">
+                <div class="content">
+                    <p class="text-light reveal">This was never about the paintings.</p>
+                    <p class="text-light reveal">It was about what they show you.</p>
+                    <div class="divider reveal"></div>
+                    <p class="text-light reveal">Something you already knew,</p>
+                    <p class="text-light reveal">but hadn't seen yet.</p>
+                </div>
+            </div>
+            <div class="section">
+                <div class="content">
+                    <p class="text-whisper reveal reveal-delay-1">The shop was always there.</p>
+                    <p class="text-whisper reveal reveal-delay-2">You just needed to be ready to find it.</p>
+                    <div class="divider reveal reveal-delay-3"></div>
+                    <p class="japanese reveal reveal-delay-4" style="font-size: 1.5rem; color: var(--text-whisper);">∎</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // === STATE ===
+        let currentPanel = 2;
+        const isMobile = 'ontouchstart' in window;
+
+        // === ELEMENTS ===
+        const dots = document.querySelectorAll('.nav-dot');
+        const panelScrolls = document.querySelectorAll('.panel-scroll');
+        const progress = document.getElementById('progress');
+        const navDots = document.getElementById('navDots');
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImage = document.getElementById('lightboxImage');
+        const lightboxTitle = document.getElementById('lightboxTitle');
+        const lightboxMeta = document.getElementById('lightboxMeta');
+
+        // === INIT ===
+        window.addEventListener('load', () => {
+            document.documentElement.scrollLeft = 2 * window.innerWidth;
+            initCanvases();
+            initScrollytelling();
+            initLightbox();
+            setTimeout(() => triggerReveal(2), 150);
+        });
+
+        // === LIGHTBOX ===
+        function initLightbox() {
+            document.querySelectorAll('.image-container').forEach(container => {
+                const wrapper = container.querySelector('.image-wrapper');
+                const img = container.querySelector('img');
+                const title = container.dataset.title || '';
+                const meta = container.dataset.meta || '';
+
+                wrapper.addEventListener('click', () => {
+                    lightboxImage.src = img.src;
+                    lightboxImage.alt = img.alt;
+                    lightboxTitle.textContent = title;
+                    lightboxMeta.textContent = meta;
+                    lightbox.classList.add('active');
+                    document.body.style.overflow = 'hidden';
+                });
+            });
+
+            lightbox.addEventListener('click', (e) => {
+                if (e.target === lightbox || e.target.classList.contains('lightbox-close')) {
+                    closeLightbox();
+                }
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && lightbox.classList.contains('active')) {
+                    closeLightbox();
+                }
+            });
+        }
+
+        function closeLightbox() {
+            lightbox.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // === SCROLLYTELLING ===
+        function initScrollytelling() {
+            panelScrolls.forEach(scroll => {
+                const elements = scroll.querySelectorAll('.reveal, .divider, .nav-hint, .image-container img, .image-caption');
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) entry.target.classList.add('visible');
+                    });
+                }, { threshold: 0.1, root: scroll, rootMargin: '0px 0px -5% 0px' });
+                elements.forEach(el => observer.observe(el));
+            });
+        }
+
+        function triggerReveal(panelIndex) {
+            const scroll = document.querySelector(`[data-panel="${panelIndex}"]`);
+            if (!scroll) return;
+            const firstSection = scroll.querySelector('.section');
+            if (firstSection) {
+                firstSection.querySelectorAll('.reveal, .divider').forEach(el => el.classList.add('visible'));
+            }
+        }
+
+        // === NAVIGATION ===
+        document.addEventListener('scroll', () => {
+            const scrollLeft = document.documentElement.scrollLeft;
+            const maxScroll = document.documentElement.scrollWidth - window.innerWidth;
+            const panelIndex = Math.round(scrollLeft / window.innerWidth);
+
+            if (panelIndex !== currentPanel) {
+                currentPanel = panelIndex;
+                triggerReveal(panelIndex);
+                const colors = ['#fafafa', '#f8f9fa', '#0d0b08', '#0d0606', '#fafafa'];
+                document.querySelector('meta[name="theme-color"]').content = colors[panelIndex];
+            }
+
+            dots.forEach((d, i) => d.classList.toggle('active', i === panelIndex));
+            progress.style.width = (scrollLeft / maxScroll) * 100 + '%';
+        });
+
+        dots.forEach((dot, i) => {
+            dot.addEventListener('click', () => {
+                document.documentElement.scrollTo({ left: i * window.innerWidth, behavior: 'smooth' });
+            });
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (lightbox.classList.contains('active')) return;
+            const panel = Math.round(document.documentElement.scrollLeft / window.innerWidth);
+            if (e.key === 'ArrowLeft' && panel > 0) {
+                document.documentElement.scrollTo({ left: (panel - 1) * window.innerWidth, behavior: 'smooth' });
+            } else if (e.key === 'ArrowRight' && panel < 4) {
+                document.documentElement.scrollTo({ left: (panel + 1) * window.innerWidth, behavior: 'smooth' });
+            }
+        });
+
+        let scrollTimeout;
+        panelScrolls.forEach(scroll => {
+            scroll.addEventListener('scroll', () => {
+                navDots.classList.add('hide');
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(() => navDots.classList.remove('hide'), 800);
+            });
+        });
+
+        // === CANVAS ===
+        function initCanvases() {
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+            const introCanvas = document.getElementById('intro-canvas');
+            const introCtx = introCanvas.getContext('2d');
+            resizeCanvas(introCanvas, dpr);
+            const introParticles = createParticles(introCanvas, isMobile ? 25 : 40, 0.1);
+
+            const orderCanvas = document.getElementById('order-canvas');
+            const orderCtx = orderCanvas.getContext('2d');
+            resizeCanvas(orderCanvas, dpr);
+
+            const centerCanvas = document.getElementById('center-canvas');
+            const centerCtx = centerCanvas.getContext('2d');
+            resizeCanvas(centerCanvas, dpr);
+
+            const chaosCanvas = document.getElementById('chaos-canvas');
+            const chaosCtx = chaosCanvas.getContext('2d');
+            resizeCanvas(chaosCanvas, dpr);
+            const chaosParticles = createParticles(chaosCanvas, isMobile ? 45 : 80, 0.35);
+
+            const closingCanvas = document.getElementById('closing-canvas');
+            const closingCtx = closingCanvas.getContext('2d');
+            resizeCanvas(closingCanvas, dpr);
+
+            function createParticles(canvas, count, speed) {
+                return Array.from({ length: count }, () => ({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    r: Math.random() * 1.8 + 0.5,
+                    vx: (Math.random() - 0.5) * speed,
+                    vy: (Math.random() - 0.5) * speed,
+                    alpha: Math.random() * 0.08 + 0.02,
+                    phase: Math.random() * Math.PI * 2
+                }));
+            }
+
+            function getPanelScroll(idx) {
+                const panel = document.querySelector(`[data-panel="${idx}"]`);
+                return panel ? panel.scrollTop : 0;
+            }
+
+            let time = 0;
+            function animate() {
+                time += 0.016;
+                const scrollX = document.documentElement.scrollLeft;
+                const vw = window.innerWidth;
+                const visiblePanel = Math.round(scrollX / vw);
+
+                // Intro
+                if (visiblePanel <= 1) {
+                    introCtx.clearRect(0, 0, introCanvas.width, introCanvas.height);
+                    introParticles.forEach(p => {
+                        p.x += p.vx + Math.sin(time * 0.3 + p.phase) * 0.03;
+                        p.y += p.vy;
+                        wrap(p, introCanvas);
+                        introCtx.beginPath();
+                        introCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                        introCtx.fillStyle = `rgba(100,100,100,${p.alpha})`;
+                        introCtx.fill();
+                    });
+                }
+
+                // Order
+                if (visiblePanel >= 0 && visiblePanel <= 2) {
+                    orderCtx.clearRect(0, 0, orderCanvas.width, orderCanvas.height);
+                    const scroll = getPanelScroll(1);
+                    const spacing = isMobile ? 42 : 52;
+                    const offset = scroll * 0.03;
+                    orderCtx.strokeStyle = 'rgba(123,163,201,0.06)';
+                    orderCtx.lineWidth = 1;
+                    for (let y = -spacing; y < orderCanvas.height + spacing; y += spacing * 0.866) {
+                        for (let x = -spacing; x < orderCanvas.width + spacing; x += spacing * 1.5) {
+                            const ox = x + (Math.floor(y / (spacing * 0.866)) % 2) * spacing * 0.75;
+                            drawHex(orderCtx, ox + offset * 0.25, y + offset * 0.15, spacing * 0.3);
+                        }
+                    }
+                }
+
+                // Center
+                if (visiblePanel >= 1 && visiblePanel <= 3) {
+                    centerCtx.clearRect(0, 0, centerCanvas.width, centerCanvas.height);
+                    const scroll = getPanelScroll(2);
+                    const cx = centerCanvas.width / 2;
+                    const cy = centerCanvas.height / 2;
+                    const radius = Math.min(centerCanvas.width, centerCanvas.height) * (isMobile ? 0.2 : 0.26);
+                    const breathe = Math.sin(time * 0.4) * 0.1 + 0.9;
+
+                    const fanoPoints = [];
+                    for (let i = 0; i < 7; i++) {
+                        const angle = (i * 2 * Math.PI / 7) - Math.PI / 2 + scroll * 0.0001;
+                        fanoPoints.push({ x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) });
+                    }
+
+                    [[0,1,3],[1,2,4],[2,0,5],[0,4,6],[1,5,6],[2,3,6],[3,4,5]].forEach((line, idx) => {
+                        drawHelix(centerCtx, fanoPoints[line[0]], fanoPoints[line[1]], time + idx * 0.3, breathe * 0.08);
+                    });
+
+                    fanoPoints.forEach((p, i) => {
+                        const pulse = Math.sin(time * 0.5 + i * 0.9) * 0.3 + 0.7;
+                        const grad = centerCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 9 * pulse);
+                        grad.addColorStop(0, `rgba(196,163,90,${0.18 * breathe})`);
+                        grad.addColorStop(1, 'transparent');
+                        centerCtx.fillStyle = grad;
+                        centerCtx.beginPath();
+                        centerCtx.arc(p.x, p.y, 9 * pulse, 0, Math.PI * 2);
+                        centerCtx.fill();
+                    });
+
+                    const cr = 16 * breathe;
+                    centerCtx.save();
+                    centerCtx.globalAlpha = 0.05 * breathe;
+                    centerCtx.beginPath();
+                    centerCtx.arc(cx, cy, cr, Math.PI * 0.5, Math.PI * 1.5);
+                    centerCtx.fillStyle = '#f4f1ea';
+                    centerCtx.fill();
+                    centerCtx.beginPath();
+                    centerCtx.arc(cx, cy, cr, Math.PI * 1.5, Math.PI * 0.5);
+                    centerCtx.fillStyle = '#1a1510';
+                    centerCtx.fill();
+                    centerCtx.restore();
+                }
+
+                // Chaos
+                if (visiblePanel >= 2 && visiblePanel <= 4) {
+                    chaosCtx.clearRect(0, 0, chaosCanvas.width, chaosCanvas.height);
+                    const scroll = getPanelScroll(3);
+                    chaosParticles.forEach(p => {
+                        const noise = Math.sin(p.x * 0.006 + time) * Math.cos(p.y * 0.006 + time * 0.5);
+                        p.x += p.vx + noise * 0.4 + scroll * 0.0001;
+                        p.y += p.vy + Math.sin(time + p.phase + p.x * 0.002) * 0.3;
+                        wrap(p, chaosCanvas);
+                        const pulseAlpha = p.alpha * (0.8 + Math.sin(time * 1.5 + p.phase) * 0.2);
+                        chaosCtx.beginPath();
+                        chaosCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                        chaosCtx.fillStyle = `rgba(201,123,123,${pulseAlpha})`;
+                        chaosCtx.fill();
+                    });
+                }
+
+                // Closing
+                if (visiblePanel >= 3) {
+                    closingCtx.clearRect(0, 0, closingCanvas.width, closingCanvas.height);
+                    const pulse = Math.sin(time * 0.25) * 0.01 + 0.018;
+                    const grad = closingCtx.createRadialGradient(
+                        closingCanvas.width / 2, closingCanvas.height / 2, 0,
+                        closingCanvas.width / 2, closingCanvas.height / 2, closingCanvas.width * 0.4
+                    );
+                    grad.addColorStop(0, `rgba(196,163,90,${pulse})`);
+                    grad.addColorStop(1, 'transparent');
+                    closingCtx.fillStyle = grad;
+                    closingCtx.fillRect(0, 0, closingCanvas.width, closingCanvas.height);
+                }
+
+                requestAnimationFrame(animate);
+            }
+            requestAnimationFrame(animate);
+
+            let resizeTimer;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => {
+                    const newDpr = Math.min(window.devicePixelRatio || 1, 2);
+                    [introCanvas, orderCanvas, centerCanvas, chaosCanvas, closingCanvas].forEach(c => resizeCanvas(c, newDpr));
+                }, 150);
+            });
+        }
+
+        function wrap(p, canvas) {
+            if (p.x < -10) p.x = canvas.width + 10;
+            if (p.x > canvas.width + 10) p.x = -10;
+            if (p.y < -10) p.y = canvas.height + 10;
+            if (p.y > canvas.height + 10) p.y = -10;
+        }
+
+        function resizeCanvas(canvas, dpr) {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+            canvas.getContext('2d').scale(dpr, dpr);
+        }
+
+        function drawHex(ctx, x, y, r) {
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle = Math.PI / 3 * i - Math.PI / 6;
+                ctx.lineTo(x + r * Math.cos(angle), y + r * Math.sin(angle));
+            }
+            ctx.closePath();
+            ctx.stroke();
+        }
+
+        function drawHelix(ctx, p1, p2, time, alpha) {
+            const segments = isMobile ? 16 : 24;
+            const amp = 4;
+            const dx = p2.x - p1.x, dy = p2.y - p1.y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            if (len < 1) return;
+            const nx = -dy / len, ny = dx / len;
+
+            ctx.beginPath();
+            for (let i = 0; i <= segments; i++) {
+                const t = i / segments;
+                const wave = Math.sin(t * Math.PI * 2.5 + time * 0.4) * amp;
+                const px = p1.x + dx * t + nx * wave;
+                const py = p1.y + dy * t + ny * wave;
+                i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+            }
+            ctx.strokeStyle = `rgba(196,163,90,${alpha})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.beginPath();
+            for (let i = 0; i <= segments; i++) {
+                const t = i / segments;
+                const wave = Math.sin(t * Math.PI * 2.5 + time * 0.4 + Math.PI) * amp;
+                const px = p1.x + dx * t + nx * wave;
+                const py = p1.y + dy * t + ny * wave;
+                i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+            }
+            ctx.strokeStyle = `rgba(196,163,90,${alpha * 0.6})`;
+            ctx.stroke();
+        }
+    </script>
+</body>
+</html>
