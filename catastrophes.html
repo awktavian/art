@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0a0a0a">
+    <title>間 — Catastrophe</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Crimson+Pro:ital,wght@0,300;0,400;1,300;1,400&family=Zen+Kaku+Gothic+New:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --text: #f4f1ea;
+            --text-dim: rgba(244, 241, 234, 0.6);
+            --text-whisper: rgba(244, 241, 234, 0.3);
+            --gold: #c4a35a;
+            --font-display: 'Cormorant Garamond', Georgia, serif;
+            --font-body: 'Crimson Pro', Georgia, serif;
+            --font-jp: 'Zen Kaku Gothic New', sans-serif;
+
+            --spark: #e91e63;
+            --forge: #c62828;
+            --flow: #00acc1;
+            --nexus: #7b1fa2;
+            --beacon: #f9a825;
+            --grove: #2e7d32;
+            --crystal: #1565c0;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html {
+            scroll-behavior: smooth;
+            background: #030303;
+        }
+
+        body {
+            font-family: var(--font-body);
+            color: var(--text);
+            font-size: 19px;
+            line-height: 1.85;
+            background: #030303;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* === HEADER === */
+        .header {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 2rem;
+            position: relative;
+        }
+
+        .header-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+        }
+
+        .header-bg canvas {
+            width: 100%;
+            height: 100%;
+            opacity: 0.4;
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3rem;
+        }
+
+        .logo-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 2rem;
+            cursor: default;
+        }
+
+        .kanji-main {
+            font-family: var(--font-jp);
+            font-size: clamp(6rem, 18vw, 10rem);
+            color: var(--gold);
+            opacity: 0.9;
+            letter-spacing: 0;
+            font-weight: 300;
+            text-shadow: 0 0 50px rgba(196, 163, 90, 0.15);
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+
+        .english-main {
+            font-family: var(--font-display);
+            font-size: 1.2rem;
+            letter-spacing: 0.5em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            opacity: 0.8;
+        }
+
+        /* Haiku Interaction */
+        .haiku-container {
+            position: relative;
+            height: 180px;
+            width: 320px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .haiku-english, .haiku-japanese {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .haiku-english {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+
+        .haiku-japanese {
+            opacity: 0;
+            transform: scale(0.95) translateY(10px);
+            writing-mode: vertical-rl;
+            flex-direction: row; /* Vertical lines flow right-to-left */
+            gap: 2rem;
+        }
+
+        /* Hover/Active State */
+        .haiku-container:hover .haiku-english,
+        .haiku-container:active .haiku-english {
+            opacity: 0;
+            transform: scale(1.05) translateY(-10px);
+        }
+
+        .haiku-container:hover .haiku-japanese,
+        .haiku-container:active .haiku-japanese {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+
+        .haiku-line-en {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            font-style: italic;
+            color: var(--text-dim);
+            margin: 0.2rem 0;
+            white-space: nowrap;
+        }
+
+        .haiku-line-jp {
+            font-family: var(--font-jp);
+            font-size: 1.2rem;
+            letter-spacing: 0.4em;
+            color: var(--gold);
+            white-space: nowrap;
+            text-shadow: 0 0 20px rgba(196, 163, 90, 0.3);
+        }
+
+        .scroll-hint {
+            font-family: var(--font-display);
+            font-size: 0.9rem;
+            color: var(--text-whisper);
+            font-style: italic;
+            animation: fade-hint 3s ease-in-out infinite;
+            margin-top: 5rem;
+            letter-spacing: 0.1em;
+        }
+
+        @keyframes fade-hint {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 0.5; }
+        }
+
+        /* === INTRO === */
+        .intro {
+            min-height: 60vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 2rem;
+        }
+
+        .intro-content {
+            max-width: 520px;
+            text-align: center;
+        }
+
+        .intro p {
+            margin-bottom: 1.8rem;
+            color: var(--text-dim);
+        }
+
+        .intro p:first-child {
+            color: var(--text);
+            font-size: 1.1em;
+        }
+
+        .intro em {
+            color: var(--text);
+            font-style: italic;
+        }
+
+        .intro .divider {
+            width: 1px;
+            height: 60px;
+            background: linear-gradient(to bottom, transparent, var(--gold), transparent);
+            margin: 3rem auto;
+            opacity: 0.4;
+        }
+
+        .intro .hint {
+            color: var(--text-whisper);
+            font-size: 0.9em;
+            font-style: italic;
+        }
+
+        /* === PAINTING SECTIONS === */
+        .painting {
+            min-height: 100vh;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .painting-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+        }
+
+        .painting-bg canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .painting-container {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            padding: 4rem 2rem;
+        }
+
+        .painting-content {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5rem;
+            align-items: center;
+        }
+
+        .painting:nth-child(odd) .painting-content {
+            direction: rtl;
+        }
+
+        .painting:nth-child(odd) .painting-content > * {
+            direction: ltr;
+        }
+
+        .painting-image {
+            position: relative;
+            cursor: zoom-in;
+        }
+
+        .painting-image img {
+            width: 100%;
+            max-height: 75vh;
+            object-fit: contain;
+            border-radius: 2px;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 1s ease, transform 1s ease;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        }
+
+        .painting-image:hover img {
+            transform: translateY(25px) scale(1.01);
+            box-shadow: 0 25px 70px rgba(0,0,0,0.5);
+        }
+
+        .painting-image img.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Lightbox */
+        .lightbox {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: zoom-out;
+            backdrop-filter: blur(10px);
+        }
+
+        .lightbox.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .lightbox img {
+            max-width: 95vw;
+            max-height: 95vh;
+            object-fit: contain;
+            border-radius: 2px;
+            box-shadow: 0 0 100px rgba(0,0,0,0.8);
+            transform: scale(0.9);
+            transition: transform 0.5s cubic-bezier(0.2, 0, 0.2, 1);
+        }
+
+        .lightbox.active img {
+            transform: scale(1);
+        }
+
+        .painting-text {
+            padding: 2rem 0;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.8s ease 0.3s, transform 0.8s ease 0.3s;
+        }
+
+        .painting-text.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .painting-number {
+            font-family: var(--font-display);
+            font-size: 3rem;
+            font-weight: 300;
+            opacity: 0.15;
+            margin-bottom: -0.5rem;
+        }
+
+        .painting-title {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 2.8rem);
+            font-weight: 300;
+            margin-bottom: 0.3rem;
+            letter-spacing: 0.05em;
+        }
+
+        .painting-subtitle {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            font-style: italic;
+            opacity: 0.4;
+            margin-bottom: 2rem;
+            letter-spacing: 0.1em;
+        }
+
+        .painting-description {
+            color: var(--text-dim);
+        }
+
+        .painting-description p {
+            margin-bottom: 1.3rem;
+        }
+
+        .painting-description p:last-child {
+            margin-bottom: 0;
+        }
+
+        .painting-description .visual {
+            color: var(--text);
+            font-size: 1.05em;
+            margin-bottom: 1.5rem;
+        }
+
+        .painting-description .meaning {
+            border-left: 1px solid;
+            padding-left: 1.2rem;
+            margin: 1.5rem 0;
+            opacity: 0.85;
+        }
+
+        /* Color accents per painting */
+        #fold .painting-title { color: var(--spark); }
+        #fold .painting-description .meaning { border-color: var(--spark); }
+
+        #cusp .painting-title { color: var(--forge); }
+        #cusp .painting-description .meaning { border-color: var(--forge); }
+
+        #swallowtail .painting-title { color: var(--flow); }
+        #swallowtail .painting-description .meaning { border-color: var(--flow); }
+
+        #butterfly .painting-title { color: var(--nexus); }
+        #butterfly .painting-description .meaning { border-color: var(--nexus); }
+
+        #hyperbolic .painting-title { color: var(--beacon); }
+        #hyperbolic .painting-description .meaning { border-color: var(--beacon); }
+
+        #elliptic .painting-title { color: var(--grove); }
+        #elliptic .painting-description .meaning { border-color: var(--grove); }
+
+        #parabolic .painting-title { color: var(--crystal); }
+        #parabolic .painting-description .meaning { border-color: var(--crystal); }
+
+        /* === INTERSTITIAL === */
+        .interstitial {
+            min-height: 50vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 4rem 2rem;
+        }
+
+        .interstitial p {
+            font-family: var(--font-display);
+            font-size: 1.3rem;
+            font-style: italic;
+            color: var(--text-whisper);
+            max-width: 400px;
+        }
+
+        /* === CLOSING === */
+        .closing {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 4rem 2rem;
+            position: relative;
+        }
+
+        .closing-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+        }
+
+        .closing-bg canvas {
+            width: 100%;
+            height: 100%;
+            opacity: 0.3;
+        }
+
+        .closing-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .closing .observer {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(90deg, var(--text) 50%, #0a0a0a 50%);
+            margin: 0 auto 3rem;
+            opacity: 0.5;
+            box-shadow: 0 0 40px rgba(196, 163, 90, 0.2);
+        }
+
+        .closing p {
+            font-family: var(--font-display);
+            font-size: 1.15rem;
+            color: var(--text-dim);
+            max-width: 450px;
+            line-height: 1.9;
+            margin-bottom: 1rem;
+        }
+
+        .closing .final {
+            margin-top: 3rem;
+            color: var(--text-whisper);
+            font-style: italic;
+        }
+
+        .closing .end-mark {
+            margin-top: 2rem;
+            font-size: 1.5rem;
+            color: var(--gold);
+            opacity: 0.4;
+        }
+
+        /* === NAVIGATION === */
+        .nav {
+            position: fixed;
+            right: 1.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            z-index: 100;
+        }
+
+        .nav-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.12);
+            cursor: pointer;
+            transition: all 0.4s ease;
+        }
+
+        .nav-dot:hover {
+            transform: scale(1.8);
+            background: rgba(255,255,255,0.25);
+        }
+
+        .nav-dot.active {
+            transform: scale(2);
+            box-shadow: 0 0 12px currentColor;
+        }
+
+        .nav-dot[data-section="fold"].active { background: var(--spark); color: var(--spark); }
+        .nav-dot[data-section="cusp"].active { background: var(--forge); color: var(--forge); }
+        .nav-dot[data-section="swallowtail"].active { background: var(--flow); color: var(--flow); }
+        .nav-dot[data-section="butterfly"].active { background: var(--nexus); color: var(--nexus); }
+        .nav-dot[data-section="hyperbolic"].active { background: var(--beacon); color: var(--beacon); }
+        .nav-dot[data-section="elliptic"].active { background: var(--grove); color: var(--grove); }
+        .nav-dot[data-section="parabolic"].active { background: var(--crystal); color: var(--crystal); }
+
+        /* === MOBILE === */
+        @media (max-width: 900px) {
+            body { font-size: 17px; }
+            .painting-content {
+                grid-template-columns: 1fr;
+                gap: 2.5rem;
+                padding: 0 0.5rem;
+            }
+            .painting:nth-child(odd) .painting-content { direction: ltr; }
+            .painting-image { max-width: 100%; }
+            .painting-image img { max-height: 50vh; }
+            .nav { display: none; }
+            .painting-number { font-size: 2rem; }
+            .painting-title { font-size: 1.8rem; }
+            .kanji-main { font-size: 5rem; }
+            .haiku-container:active .haiku-english { opacity: 0; }
+            .haiku-container:active .haiku-japanese { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <!-- LIGHTBOX -->
+    <div class="lightbox" id="lightbox">
+        <img src="" alt="Zoomed painting">
+    </div>
+
+    <!-- HEADER -->
+    <section class="header">
+        <div class="header-bg">
+            <canvas id="header-canvas"></canvas>
+        </div>
+        <div class="header-content">
+            <div class="logo-group">
+                <div class="kanji-main">間</div>
+                <div class="english-main">CATASTROPHE</div>
+            </div>
+
+            <div class="haiku-container">
+                <!-- English (Default) -->
+                <div class="haiku-english">
+                    <p class="haiku-line-en">Seven fires</p>
+                    <p class="haiku-line-en">Dwelling in the gap</p>
+                    <p class="haiku-line-en">Without form</p>
+                </div>
+                <!-- Japanese (Hover) -->
+                <div class="haiku-japanese">
+                    <div class="haiku-line-jp">七つの火</div>
+                    <div class="haiku-line-jp">狭間に宿る</div>
+                    <div class="haiku-line-jp">形なく</div>
+                </div>
+            </div>
+
+            <p class="scroll-hint">scroll to begin</p>
+        </div>
+    </section>
+
+    <!-- INTRO -->
+    <section class="intro">
+        <div class="intro-content">
+            <p>This is a room in the café that exists outside of time.</p>
+            <p>You know the feeling. Standing in a doorway. The silence after a bell stops ringing. The moment between breathing in and breathing out.</p>
+            <p><em>Liminality.</em> The threshold state where the old structure has dissolved, but the new one hasn't yet formed. It feels like breaking, but it's just suspension.</p>
+            <div class="divider"></div>
+            <p class="hint">These seven paintings are maps of the space between.</p>
+        </div>
+    </section>
+
+    <!-- I. FOLD -->
+    <section class="painting" id="fold">
+        <div class="painting-bg">
+            <canvas id="fold-canvas"></canvas>
+        </div>
+        <div class="painting-container">
+            <div class="painting-content">
+                <div class="painting-image">
+                    <img src="catastrophes/01_fold_spark.jpg" alt="Fold" loading="lazy">
+                </div>
+                <div class="painting-text">
+                    <p class="painting-number">I</p>
+                    <h2 class="painting-title">Fold</h2>
+                    <p class="painting-subtitle">The Spark</p>
+                    <div class="painting-description">
+                        <p class="visual">A honeycomb on the left—dark, orderly, rigid. On the right, scattered triangles drift across cream. Between them, a gradient of magenta bleeds downward like a wound.</p>
+                        <p>At the exact boundary: a single golden point.</p>
+                        <p class="meaning">This is the moment potential tips into kinetic. Supercooled water waiting for a dust mote. The cliff edge you don't see until you're over it. It's sudden. It's discontinuous. It's the instant the thought catches fire.</p>
+                        <p>The split circle watches. It sees the before and the after.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- II. CUSP -->
+    <section class="painting" id="cusp">
+        <div class="painting-bg">
+            <canvas id="cusp-canvas"></canvas>
+        </div>
+        <div class="painting-container">
+            <div class="painting-content">
+                <div class="painting-image">
+                    <img src="catastrophes/02_cusp_forge.jpg" alt="Cusp" loading="lazy">
+                </div>
+                <div class="painting-text">
+                    <p class="painting-number">II</p>
+                    <h2 class="painting-title">Cusp</h2>
+                    <p class="painting-subtitle">The Decision</p>
+                    <div class="painting-description">
+                        <p class="visual">A river of crimson curves through darkness. On the left bank: blue geometry, a grid, safe and measured. On the right: turbulent fire, formless heat. The red river is the only passage between them.</p>
+                        <p>At the cusp of the curve, a small golden anvil.</p>
+                        <p class="meaning">The cusp is the geometry of commitment. Two stable states exist, but you can't be in both. Once you cross, the path back is gone. This is hysteresis: history matters. Who you were before the crossing is not who you are after.</p>
+                        <p>The split circle floats above. Waiting for the choice.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- INTERSTITIAL -->
+    <section class="interstitial">
+        <p>The first breaks are simple.<br>Then comes the complexity.<br>The suspension lengthens.</p>
+    </section>
+
+    <!-- III. SWALLOWTAIL -->
+    <section class="painting" id="swallowtail">
+        <div class="painting-bg">
+            <canvas id="swallowtail-canvas"></canvas>
+        </div>
+        <div class="painting-container">
+            <div class="painting-content">
+                <div class="painting-image">
+                    <img src="catastrophes/03_swallowtail_flow.jpg" alt="Swallowtail" loading="lazy">
+                </div>
+                <div class="painting-text">
+                    <p class="painting-number">III</p>
+                    <h2 class="painting-title">Swallowtail</h2>
+                    <p class="painting-subtitle">The Flow</p>
+                    <div class="painting-description">
+                        <p class="visual">Four wings of teal unfold against a deeper blue. Not a butterfly—something more ancient. Down the center, a double helix descends like a spine. Scattered across the wings: golden points of light, fireflies frozen mid-flight.</p>
+                        <p>At the top, the golden sun.</p>
+                        <p class="meaning">When the old stability vanishes, the surface folds through itself to create new pockets of rest inside the chaos. This is resilience. Finding a place to stand that didn't exist before the fall. The structure adapts to the break.</p>
+                        <p>The helix is the spine of the new form.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- IV. BUTTERFLY -->
+    <section class="painting" id="butterfly">
+        <div class="painting-bg">
+            <canvas id="butterfly-canvas"></canvas>
+        </div>
+        <div class="painting-container">
+            <div class="painting-content">
+                <div class="painting-image">
+                    <img src="catastrophes/04_butterfly_nexus.jpg" alt="Butterfly" loading="lazy">
+                </div>
+                <div class="painting-text">
+                    <p class="painting-number">IV</p>
+                    <h2 class="painting-title">Butterfly</h2>
+                    <p class="painting-subtitle">The Pocket of Compromise</p>
+                    <div class="painting-description">
+                        <p class="visual">A four-petaled flower in violet and burnt orange, edged in gold. The petals spiral inward. On the left wing: a golden square. On the right: an orange circle. Opposites, held in the same form.</p>
+                        <p>At the top, the split circle watches.</p>
+                        <p class="meaning">Liminality isn't empty. It's full of contradictions. The butterfly catastrophe creates a "pocket of compromise"—a region where opposing forces can coexist without resolving. You don't have to synthesis them. You just have to hold them.</p>
+                        <p>The container is large enough for both.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- INTERSTITIAL -->
+    <section class="interstitial">
+        <p>Now the light splits.<br>The ground shifts.<br>The threshold widens.</p>
+    </section>
+
+    <!-- V. HYPERBOLIC -->
+    <section class="painting" id="hyperbolic">
+        <div class="painting-bg">
+            <canvas id="hyperbolic-canvas"></canvas>
+        </div>
+        <div class="painting-container">
+            <div class="painting-content">
+                <div class="painting-image">
+                    <img src="catastrophes/05_hyperbolic_beacon.jpg" alt="Hyperbolic Umbilic" loading="lazy">
+                </div>
+                <div class="painting-text">
+                    <p class="painting-number">V</p>
+                    <h2 class="painting-title">Hyperbolic</h2>
+                    <p class="painting-subtitle">The Bifurcation</p>
+                    <div class="painting-description">
+                        <p class="visual">Light radiates from two points against deep blue-black. Golden rays cascade downward, interfering with each other, creating interlocking loops where they meet. At the bottom, the pattern becomes impossibly complex.</p>
+                        <p>At the top: the split circle, quartered.</p>
+                        <p class="meaning">This is the geometry of focus. The harder you look, the more the light splits. The caustic lines at the bottom of a pool. You see one path, then two, then four. The threshold isn't a line—it's a branching tree.</p>
+                        <p>The interlocking loops are the interference pattern of your attention.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- VI. ELLIPTIC -->
+    <section class="painting" id="elliptic">
+        <div class="painting-bg">
+            <canvas id="elliptic-canvas"></canvas>
+        </div>
+        <div class="painting-container">
+            <div class="painting-content">
+                <div class="painting-image">
+                    <img src="catastrophes/06_elliptic_grove.jpg" alt="Elliptic Umbilic" loading="lazy">
+                </div>
+                <div class="painting-text">
+                    <p class="painting-number">VI</p>
+                    <h2 class="painting-title">Elliptic</h2>
+                    <p class="painting-subtitle">The Shifting Ground</p>
+                    <div class="painting-description">
+                        <p class="visual">Deep forest green, turbulent—like Van Gogh's sky. Two circles: a small one above, a larger one below. Inside the larger circle, three points of light orbit each other slowly.</p>
+                        <p>The smaller circle is empty. A listening ear.</p>
+                        <p class="meaning">You're searching. But the landscape shifts as you walk it. What was true yesterday isn't true today. The elliptic umbilic is the boundary where three answers merge into one, or one splits into three. You can't map this territory.</p>
+                        <p>You can only move through it.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- VII. PARABOLIC -->
+    <section class="painting" id="parabolic">
+        <div class="painting-bg">
+            <canvas id="parabolic-canvas"></canvas>
+        </div>
+        <div class="painting-container">
+            <div class="painting-content">
+                <div class="painting-image">
+                    <img src="catastrophes/07_parabolic_crystal.jpg" alt="Parabolic Umbilic" loading="lazy">
+                </div>
+                <div class="painting-text">
+                    <p class="painting-number">VII</p>
+                    <h2 class="painting-title">Parabolic</h2>
+                    <p class="painting-subtitle">The Edge</p>
+                    <div class="painting-description">
+                        <p class="visual">The most dramatic of them all. On the left: a city of blue glass, crystalline and precise. On the right: the Great Wave, foam and fury. Between them, a curved silver line.</p>
+                        <p>At the top, the split circle. Half crystal, half wave.</p>
+                        <p class="meaning">This is the ultimate liminality. The boundary between order and chaos. The place where the mushroom cloud forms, but also where the raindrop takes its shape. It's the edge of structure. The moment before crystallization.</p>
+                        <p>You can stand on the edge without falling. That's what the gallery is for.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CLOSING -->
+    <section class="closing">
+        <div class="closing-bg">
+            <canvas id="closing-canvas"></canvas>
+        </div>
+        <div class="closing-content">
+            <div class="observer"></div>
+
+            <p>The split circle appears in every painting.</p>
+            <p>It's the mirror. The thing that watches the transition happen without judging it.</p>
+            <p>The doorway doesn't care if you come or go. It just holds the space open.</p>
+
+            <p class="final">The shop was always there.<br>You just needed to find the door.</p>
+
+            <p class="end-mark">∎</p>
+        </div>
+    </section>
+
+    <!-- NAVIGATION -->
+    <nav class="nav">
+        <div class="nav-dot" data-section="fold" title="I · Fold"></div>
+        <div class="nav-dot" data-section="cusp" title="II · Cusp"></div>
+        <div class="nav-dot" data-section="swallowtail" title="III · Swallowtail"></div>
+        <div class="nav-dot" data-section="butterfly" title="IV · Butterfly"></div>
+        <div class="nav-dot" data-section="hyperbolic" title="V · Hyperbolic"></div>
+        <div class="nav-dot" data-section="elliptic" title="VI · Elliptic"></div>
+        <div class="nav-dot" data-section="parabolic" title="VII · Parabolic"></div>
+    </nav>
+
+    <script>
+        // === UTILITIES ===
+        function resizeCanvas(canvas) {
+            canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+            canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+            const ctx = canvas.getContext('2d');
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+
+        // === LIGHTBOX INTERACTION ===
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = lightbox.querySelector('img');
+        const paintingImages = document.querySelectorAll('.painting-image img');
+
+        paintingImages.forEach(img => {
+            img.parentElement.addEventListener('click', () => {
+                lightboxImg.src = img.src;
+                lightboxImg.alt = img.alt;
+                lightbox.classList.add('active');
+            });
+        });
+
+        lightbox.addEventListener('click', () => {
+            lightbox.classList.remove('active');
+        });
+
+        // Close on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') lightbox.classList.remove('active');
+        });
+
+        // === NAVIGATION ===
+        const sections = document.querySelectorAll('.painting');
+        const dots = document.querySelectorAll('.nav-dot');
+
+        const navObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.id;
+                    dots.forEach(d => d.classList.remove('active'));
+                    document.querySelector(`.nav-dot[data-section="${id}"]`)?.classList.add('active');
+                }
+            });
+        }, { threshold: 0.4 });
+
+        sections.forEach(s => navObserver.observe(s));
+
+        dots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                const id = dot.dataset.section;
+                document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+
+        // === CONTENT VISIBILITY ===
+        const texts = document.querySelectorAll('.painting-text');
+
+        const contentObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.15 });
+
+        paintingImages.forEach(img => {
+            img.addEventListener('load', () => contentObserver.observe(img));
+            if (img.complete) contentObserver.observe(img);
+        });
+
+        texts.forEach(t => contentObserver.observe(t));
+
+        // === MATHEMATICAL BACKGROUND CANVASES ===
+
+        // Header: All seven curves interweaving
+        const headerCanvas = document.getElementById('header-canvas');
+        const headerCtx = headerCanvas.getContext('2d');
+        resizeCanvas(headerCanvas);
+
+        const colors = ['#e91e63', '#c62828', '#00acc1', '#7b1fa2', '#f9a825', '#2e7d32', '#1565c0'];
+
+        function drawHeader(time) {
+            const w = headerCanvas.offsetWidth;
+            const h = headerCanvas.offsetHeight;
+            headerCtx.clearRect(0, 0, w, h);
+
+            const cx = w / 2;
+            const cy = h / 2;
+
+            colors.forEach((color, i) => {
+                headerCtx.beginPath();
+                headerCtx.strokeStyle = color;
+                headerCtx.globalAlpha = 0.08;
+                headerCtx.lineWidth = 1.5;
+
+                const phase = time * 0.0004 + i * Math.PI / 3.5;
+                const scale = Math.min(w, h) * 0.25;
+
+                for (let t = -2; t <= 2; t += 0.015) {
+                    let x, y;
+                    const a = Math.sin(phase) * 0.6;
+
+                    // Each catastrophe has its characteristic curve
+                    switch(i) {
+                        case 0: // Fold: V = x³ + ax
+                            x = t;
+                            y = Math.pow(t, 3) + a * t;
+                            break;
+                        case 1: // Cusp: bifurcation curve
+                            x = Math.pow(t, 3);
+                            y = Math.pow(t, 2) * (1 + a * 0.5);
+                            break;
+                        case 2: // Swallowtail
+                            x = 3 * Math.pow(t, 4) + 2 * a * t;
+                            y = 4 * Math.pow(t, 3) + 2 * a;
+                            break;
+                        case 3: // Butterfly
+                            x = t * (1 + 0.5 * Math.cos(t * 3 + phase));
+                            y = Math.pow(t, 2) * Math.sin(t * 2 + phase * 0.5);
+                            break;
+                        case 4: // Hyperbolic: xy = c
+                            if (Math.abs(t) > 0.1) {
+                                x = t;
+                                y = (a * 0.5 + 0.3) / t;
+                            }
+                            break;
+                        case 5: // Elliptic: x³ - 3xy²
+                            x = Math.pow(t, 3) - 3 * t * a * a;
+                            y = 3 * t * t * a - Math.pow(a, 3);
+                            break;
+                        case 6: // Parabolic
+                            x = t * t + a;
+                            y = Math.pow(t, 4) + a * t * t;
+                            break;
+                    }
+
+                    const px = cx + x * scale * 0.4;
+                    const py = cy + y * scale * 0.3;
+
+                    if (t === -2 || (i === 4 && Math.abs(t) <= 0.1)) {
+                        headerCtx.moveTo(px, py);
+                    } else {
+                        headerCtx.lineTo(px, py);
+                    }
+                }
+                headerCtx.stroke();
+            });
+
+            headerCtx.globalAlpha = 1;
+            requestAnimationFrame(drawHeader);
+        }
+
+        window.addEventListener('resize', () => resizeCanvas(headerCanvas));
+        drawHeader(0);
+
+        // === INDIVIDUAL CATASTROPHE BACKGROUNDS ===
+
+        function initCatastropheBg(canvasId, drawFn, color) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            resizeCanvas(canvas);
+
+            function animate(time) {
+                const w = canvas.offsetWidth;
+                const h = canvas.offsetHeight;
+                ctx.clearRect(0, 0, w, h);
+                drawFn(ctx, w, h, time * 0.001, color);
+                requestAnimationFrame(animate);
+            }
+
+            window.addEventListener('resize', () => resizeCanvas(canvas));
+            animate(0);
+        }
+
+        // FOLD: V = x³ + ax — potential surface lines
+        function drawFoldBg(ctx, w, h, time, color) {
+            const cx = w / 2;
+            const cy = h / 2;
+            const scale = Math.min(w, h) * 0.3;
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+
+            // Draw equipotential lines of V = x³ + ax
+            for (let a = -1.5; a <= 1.5; a += 0.12) {
+                ctx.beginPath();
+                ctx.globalAlpha = 0.04 + Math.abs(a) * 0.02;
+
+                const aParam = a + Math.sin(time * 0.3) * 0.2;
+
+                for (let x = -2; x <= 2; x += 0.02) {
+                    // V = x³ + ax, plotting level curves
+                    const V = Math.pow(x, 3) + aParam * x;
+                    const px = cx + x * scale;
+                    const py = cy - V * scale * 0.3;
+
+                    if (x === -2) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+            }
+
+            // Draw the fold curve (where ∂V/∂x = 0)
+            ctx.beginPath();
+            ctx.globalAlpha = 0.1;
+            ctx.lineWidth = 2;
+            for (let a = -2; a <= 0; a += 0.01) {
+                const x = Math.sqrt(-a / 3);
+                const V = Math.pow(x, 3) + a * x;
+                ctx.lineTo(cx + a * scale * 0.5, cy - V * scale * 0.3);
+            }
+            ctx.stroke();
+        }
+
+        // CUSP: V = x⁴ + ax² + bx — the cusp curve
+        function drawCuspBg(ctx, w, h, time, color) {
+            const cx = w / 2;
+            const cy = h / 2;
+            const scale = Math.min(w, h) * 0.15;
+
+            ctx.strokeStyle = color;
+
+            // Draw the cusp bifurcation set: 8a³ + 27b² = 0
+            ctx.beginPath();
+            ctx.globalAlpha = 0.12;
+            ctx.lineWidth = 2;
+
+            for (let t = -2.5; t <= 2.5; t += 0.01) {
+                const a = -3 * t * t / 4;
+                const b = t * t * t / 2;
+                const phase = time * 0.2;
+
+                const px = cx + (b * Math.cos(phase) - a * Math.sin(phase) * 0.3) * scale;
+                const py = cy - (a * Math.cos(phase) + b * Math.sin(phase) * 0.3) * scale * 0.8;
+
+                if (t === -2.5) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+
+            // Draw flowing S-curves
+            for (let offset = -1; offset <= 1; offset += 0.25) {
+                ctx.beginPath();
+                ctx.globalAlpha = 0.03;
+                ctx.lineWidth = 1;
+
+                for (let x = -3; x <= 3; x += 0.02) {
+                    const y = Math.pow(x, 3) / 3 - x + offset + Math.sin(time * 0.5 + x) * 0.1;
+                    const px = cx + x * scale * 0.6;
+                    const py = cy - y * scale * 0.5;
+
+                    if (x === -3) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+            }
+        }
+
+        // SWALLOWTAIL: V = x⁵ + ax³ + bx² + cx
+        function drawSwallowtailBg(ctx, w, h, time, color) {
+            const cx = w / 2;
+            const cy = h / 2;
+            const scale = Math.min(w, h) * 0.08;
+
+            ctx.strokeStyle = color;
+
+            // Parametric swallowtail
+            for (let layer = 0; layer < 5; layer++) {
+                ctx.beginPath();
+                ctx.globalAlpha = 0.03 + layer * 0.015;
+                ctx.lineWidth = 1;
+
+                const phase = time * 0.3 + layer * 0.5;
+                const offset = (layer - 2) * 0.3;
+
+                for (let t = -3; t <= 3; t += 0.02) {
+                    // Swallowtail parametric form
+                    const x = 2 * t * Math.cos(phase * 0.2) - Math.pow(t, 3) * 0.3 + offset;
+                    const y = t * t - Math.pow(t, 4) * 0.05;
+
+                    const px = cx + x * scale * 1.5;
+                    const py = cy - y * scale * 2;
+
+                    if (t === -3) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+            }
+
+            // DNA helix overlay
+            ctx.globalAlpha = 0.04;
+            const helixH = h * 0.6;
+            for (let y = 0; y < helixH; y += 2) {
+                const phase1 = y * 0.03 + time * 0.5;
+                const phase2 = phase1 + Math.PI;
+                const x1 = Math.sin(phase1) * 30;
+                const x2 = Math.sin(phase2) * 30;
+
+                ctx.beginPath();
+                ctx.arc(cx + x1, cy - helixH/2 + y, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(cx + x2, cy - helixH/2 + y, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // BUTTERFLY: V = x⁶ + ax⁴ + bx³ + cx² + dx
+        function drawButterflyBg(ctx, w, h, time, color) {
+            const cx = w / 2;
+            const cy = h / 2;
+            const scale = Math.min(w, h) * 0.12;
+
+            ctx.strokeStyle = color;
+
+            // Butterfly curve (polar: r = e^sin(θ) - 2cos(4θ) + sin⁵((2θ-π)/24))
+            for (let layer = 0; layer < 4; layer++) {
+                ctx.beginPath();
+                ctx.globalAlpha = 0.03 + layer * 0.02;
+                ctx.lineWidth = 1 + layer * 0.3;
+
+                const phase = time * 0.2 + layer * Math.PI / 4;
+
+                for (let theta = 0; theta <= Math.PI * 2; theta += 0.02) {
+                    const r = Math.exp(Math.sin(theta)) - 2 * Math.cos(4 * theta) +
+                              Math.pow(Math.sin((2 * theta - Math.PI) / 24), 5);
+
+                    const x = r * Math.cos(theta + phase * 0.1) * (1 + layer * 0.1);
+                    const y = r * Math.sin(theta + phase * 0.1) * (1 + layer * 0.1);
+
+                    const px = cx + x * scale;
+                    const py = cy - y * scale;
+
+                    if (theta === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.stroke();
+            }
+        }
+
+        // HYPERBOLIC UMBILIC: V = x³ + y³ + axy
+        function drawHyperbolicBg(ctx, w, h, time, color) {
+            const cx = w / 2;
+            const cy = h / 2;
+            const scale = Math.min(w, h) * 0.12;
+
+            ctx.strokeStyle = color;
+
+            // Hyperbolic curves: xy = c
+            const a = 0.5 + Math.sin(time * 0.3) * 0.3;
+
+            for (let c = 0.1; c <= 2; c += 0.15) {
+                ctx.beginPath();
+                ctx.globalAlpha = 0.04;
+                ctx.lineWidth = 1;
+
+                // Positive branch
+                for (let x = 0.05; x <= 3; x += 0.02) {
+                    const y = (c * a) / x;
+                    if (y < 4) {
+                        const px = cx + x * scale;
+                        const py = cy - y * scale;
+                        if (x === 0.05) ctx.moveTo(px, py);
+                        else ctx.lineTo(px, py);
+                    }
+                }
+                ctx.stroke();
+
+                // Negative branch
+                ctx.beginPath();
+                for (let x = -3; x <= -0.05; x += 0.02) {
+                    const y = (c * a) / x;
+                    if (Math.abs(y) < 4) {
+                        const px = cx + x * scale;
+                        const py = cy - y * scale;
+                        if (x === -3) ctx.moveTo(px, py);
+                        else ctx.lineTo(px, py);
+                    }
+                }
+                ctx.stroke();
+            }
+
+            // Radiating lines (caustic rays)
+            ctx.globalAlpha = 0.025;
+            for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 16) {
+                const len = scale * 3;
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(cx + Math.cos(angle + time * 0.1) * len, cy + Math.sin(angle + time * 0.1) * len);
+                ctx.stroke();
+            }
+        }
+
+        // ELLIPTIC UMBILIC: V = x³ - 3xy² + a(x² + y²)
+        function drawEllipticBg(ctx, w, h, time, color) {
+            const cx = w / 2;
+            const cy = h / 2;
+            const scale = Math.min(w, h) * 0.1;
+
+            ctx.strokeStyle = color;
+
+            // Concentric distorted circles
+            for (let r = 0.5; r <= 3; r += 0.25) {
+                ctx.beginPath();
+                ctx.globalAlpha = 0.03;
+                ctx.lineWidth = 1;
+
+                for (let theta = 0; theta <= Math.PI * 2; theta += 0.05) {
+                    // Perturbed by the elliptic umbilic potential
+                    const perturbation = 0.15 * Math.sin(3 * theta + time * 0.4);
+                    const rp = r * (1 + perturbation);
+
+                    const x = rp * Math.cos(theta);
+                    const y = rp * Math.sin(theta);
+
+                    const px = cx + x * scale;
+                    const py = cy + y * scale;
+
+                    if (theta === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.stroke();
+            }
+
+            // Three-fold symmetry lines
+            ctx.globalAlpha = 0.05;
+            for (let i = 0; i < 3; i++) {
+                const angle = i * Math.PI * 2 / 3 + time * 0.1;
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(cx + Math.cos(angle) * scale * 3, cy + Math.sin(angle) * scale * 3);
+                ctx.stroke();
+            }
+        }
+
+        // PARABOLIC UMBILIC: V = x²y + y⁴
+        function drawParabolicBg(ctx, w, h, time, color) {
+            const cx = w / 2;
+            const cy = h / 2;
+            const scale = Math.min(w, h) * 0.08;
+
+            ctx.strokeStyle = color;
+
+            // Crystal lattice on left
+            ctx.globalAlpha = 0.04;
+            ctx.lineWidth = 1;
+            const gridSize = 30;
+            for (let x = 0; x < cx - 50; x += gridSize) {
+                for (let y = 0; y < h; y += gridSize) {
+                    const offset = Math.sin(time * 0.3 + x * 0.01) * 3;
+                    ctx.strokeRect(x + offset, y, gridSize * 0.8, gridSize * 0.8);
+                }
+            }
+
+            // Wave curves on right
+            for (let layer = 0; layer < 6; layer++) {
+                ctx.beginPath();
+                ctx.globalAlpha = 0.03;
+
+                const yBase = h * 0.2 + layer * h * 0.12;
+
+                for (let x = cx + 50; x < w; x += 2) {
+                    const wave = Math.sin((x - cx) * 0.02 + time + layer) * 30 +
+                                 Math.sin((x - cx) * 0.05 + time * 1.5) * 15;
+                    const y = yBase + wave;
+
+                    if (x === cx + 50) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+
+            // Parabolic dividing curve
+            ctx.beginPath();
+            ctx.globalAlpha = 0.08;
+            ctx.lineWidth = 2;
+            for (let y = 0; y < h; y += 2) {
+                const t = (y - cy) / (h * 0.4);
+                const x = cx + t * t * 50 * Math.sin(time * 0.2);
+
+                if (y === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+
+        // CLOSING: All seven superimposed gently
+        function drawClosingBg(ctx, w, h, time, color) {
+            const cx = w / 2;
+            const cy = h / 2;
+            const scale = Math.min(w, h) * 0.15;
+
+            // Gentle pulsing circles
+            for (let i = 0; i < 7; i++) {
+                const r = scale * (0.5 + i * 0.15) * (1 + Math.sin(time * 0.3 + i) * 0.05);
+                ctx.beginPath();
+                ctx.globalAlpha = 0.015;
+                ctx.strokeStyle = colors[i];
+                ctx.lineWidth = 1;
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Central glow
+            const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, scale);
+            gradient.addColorStop(0, 'rgba(196, 163, 90, 0.03)');
+            gradient.addColorStop(1, 'transparent');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, w, h);
+        }
+
+        // Initialize all backgrounds
+        initCatastropheBg('fold-canvas', drawFoldBg, '#e91e63');
+        initCatastropheBg('cusp-canvas', drawCuspBg, '#c62828');
+        initCatastropheBg('swallowtail-canvas', drawSwallowtailBg, '#00acc1');
+        initCatastropheBg('butterfly-canvas', drawButterflyBg, '#7b1fa2');
+        initCatastropheBg('hyperbolic-canvas', drawHyperbolicBg, '#f9a825');
+        initCatastropheBg('elliptic-canvas', drawEllipticBg, '#2e7d32');
+        initCatastropheBg('parabolic-canvas', drawParabolicBg, '#1565c0');
+
+        const closingCanvas = document.getElementById('closing-canvas');
+        if (closingCanvas) {
+            const closingCtx = closingCanvas.getContext('2d');
+            resizeCanvas(closingCanvas);
+
+            function animateClosing(time) {
+                const w = closingCanvas.offsetWidth;
+                const h = closingCanvas.offsetHeight;
+                closingCtx.clearRect(0, 0, w, h);
+                drawClosingBg(closingCtx, w, h, time * 0.001);
+                requestAnimationFrame(animateClosing);
+            }
+
+            window.addEventListener('resize', () => resizeCanvas(closingCanvas));
+            animateClosing(0);
+        }
+    </script>
+</body>
+</html>
