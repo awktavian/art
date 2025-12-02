@@ -243,10 +243,16 @@
             max-height: 50vh;
             object-fit: contain;
             display: block;
-            opacity: 0;
-            transform: translateY(25px) scale(0.98);
+            opacity: 1;
+            transform: translateY(0) scale(1);
             transition: opacity 1.2s var(--ease-out-expo), transform 1.2s var(--ease-out-expo), filter 0.5s ease;
             filter: brightness(0.96) saturate(0.94);
+        }
+
+        /* Progressive enhancement - hide initially only if JS works */
+        .js-enabled .image-container img:not(.visible) {
+            opacity: 0;
+            transform: translateY(25px) scale(0.98);
         }
 
         .image-container img.visible {
@@ -818,7 +824,7 @@
                 <div class="content">
                     <div class="image-container" data-title="Under the Wave off Kanagawa" data-meta="Katsushika Hokusai · c. 1831">
                         <div class="image-wrapper">
-                            <img src="./chaos/01_great_wave.jpg" alt="The Great Wave" loading="lazy">
+                            <img src="chaos/01_great_wave.jpg" alt="The Great Wave" loading="lazy">
                         </div>
                         <div class="image-caption">
                             <p class="caption-title">Under the Wave off Kanagawa</p>
@@ -833,7 +839,7 @@
                 <div class="content">
                     <div class="image-container" data-title="The Starry Night" data-meta="Vincent van Gogh · June 1889">
                         <div class="image-wrapper">
-                            <img src="./chaos/03_starry_night.jpg" alt="Starry Night" loading="lazy">
+                            <img src="chaos/03_starry_night.jpg" alt="Starry Night" loading="lazy">
                         </div>
                         <div class="image-caption">
                             <p class="caption-title">The Starry Night</p>
@@ -849,7 +855,7 @@
                 <div class="content">
                     <div class="image-container" data-title="The Garden of Earthly Delights" data-meta="Hieronymus Bosch · c. 1490–1510">
                         <div class="image-wrapper">
-                            <img src="./chaos/02_garden_of_delights.jpg" alt="Garden of Earthly Delights" loading="lazy">
+                            <img src="chaos/02_garden_of_delights.jpg" alt="Garden of Earthly Delights" loading="lazy">
                         </div>
                         <div class="image-caption">
                             <p class="caption-title">The Garden of Earthly Delights</p>
@@ -864,7 +870,7 @@
                 <div class="content">
                     <div class="image-container" data-title="The Scream" data-meta="Edvard Munch · 1893">
                         <div class="image-wrapper">
-                            <img src="./chaos/04_the_scream.jpg" alt="The Scream" loading="lazy">
+                            <img src="chaos/04_the_scream.jpg" alt="The Scream" loading="lazy">
                         </div>
                         <div class="image-caption">
                             <p class="caption-title">The Scream</p>
@@ -880,7 +886,7 @@
                 <div class="content">
                     <div class="image-container" data-title="The Kiss" data-meta="Gustav Klimt · 1907–08">
                         <div class="image-wrapper">
-                            <img src="./chaos/06_the_kiss.jpg" alt="The Kiss" loading="lazy">
+                            <img src="chaos/06_the_kiss.jpg" alt="The Kiss" loading="lazy">
                         </div>
                         <div class="image-caption">
                             <p class="caption-title">The Kiss</p>
@@ -895,7 +901,7 @@
                 <div class="content">
                     <div class="image-container" data-title="The Fall of the Rebel Angels" data-meta="Pieter Bruegel the Elder · 1562">
                         <div class="image-wrapper">
-                            <img src="./chaos/07_rebel_angels.jpg" alt="Fall of the Rebel Angels" loading="lazy">
+                            <img src="chaos/07_rebel_angels.jpg" alt="Fall of the Rebel Angels" loading="lazy">
                         </div>
                         <div class="image-caption">
                             <p class="caption-title">The Fall of the Rebel Angels</p>
@@ -964,6 +970,9 @@
         const lightboxMeta = document.getElementById('lightboxMeta');
 
         // === INIT ===
+        // Add js-enabled for progressive enhancement (images visible by default without JS)
+        document.documentElement.classList.add('js-enabled');
+        
         window.addEventListener('load', () => {
             document.documentElement.scrollLeft = 2 * window.innerWidth;
             initCanvases();
@@ -1010,15 +1019,33 @@
 
         // === SCROLLYTELLING ===
         function initScrollytelling() {
-            panelScrolls.forEach(scroll => {
-                const elements = scroll.querySelectorAll('.reveal, .divider, .nav-hint, .image-container img, .image-caption');
-                const observer = new IntersectionObserver((entries) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) entry.target.classList.add('visible');
-                    });
-                }, { threshold: 0.1, root: scroll, rootMargin: '0px 0px -5% 0px' });
-                elements.forEach(el => observer.observe(el));
+            // Use viewport-based observer (more reliable on iOS Safari)
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) entry.target.classList.add('visible');
+                });
+            }, { threshold: 0.05, rootMargin: '50px 0px -10% 0px' });
+            
+            // Observe all revealable elements
+            document.querySelectorAll('.reveal, .divider, .nav-hint, .image-container img, .image-caption').forEach(el => {
+                observer.observe(el);
             });
+            
+            // Fallback: if IntersectionObserver isn't working well, reveal on scroll
+            if (isMobile) {
+                panelScrolls.forEach(scroll => {
+                    scroll.addEventListener('scroll', () => {
+                        scroll.querySelectorAll('.image-container img:not(.visible)').forEach(img => {
+                            const rect = img.getBoundingClientRect();
+                            if (rect.top < window.innerHeight && rect.bottom > 0) {
+                                img.classList.add('visible');
+                                const caption = img.closest('.image-container')?.querySelector('.image-caption');
+                                if (caption) caption.classList.add('visible');
+                            }
+                        });
+                    }, { passive: true });
+                });
+            }
         }
 
         function triggerReveal(panelIndex) {
