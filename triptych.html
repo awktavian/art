@@ -1072,42 +1072,100 @@
             });
         });
 
-        // === CANVAS ===
+        // === CANVAS - ROBUST PARTICLE SYSTEM ===
         function initCanvases() {
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
-
+            
+            // Get all canvases with null checks
             const introCanvas = document.getElementById('intro-canvas');
-            const introCtx = introCanvas.getContext('2d');
-            resizeCanvas(introCanvas, dpr);
-            const introParticles = createParticles(introCanvas, isMobile ? 25 : 40, 0.1);
-
             const orderCanvas = document.getElementById('order-canvas');
-            const orderCtx = orderCanvas.getContext('2d');
-            resizeCanvas(orderCanvas, dpr);
-
             const centerCanvas = document.getElementById('center-canvas');
-            const centerCtx = centerCanvas.getContext('2d');
-            resizeCanvas(centerCanvas, dpr);
-
             const chaosCanvas = document.getElementById('chaos-canvas');
-            const chaosCtx = chaosCanvas.getContext('2d');
-            resizeCanvas(chaosCanvas, dpr);
-            const chaosParticles = createParticles(chaosCanvas, isMobile ? 45 : 80, 0.35);
-
             const closingCanvas = document.getElementById('closing-canvas');
+            
+            if (!introCanvas || !orderCanvas || !centerCanvas || !chaosCanvas || !closingCanvas) {
+                console.warn('Canvas elements not found');
+                return;
+            }
+            
+            const introCtx = introCanvas.getContext('2d');
+            const orderCtx = orderCanvas.getContext('2d');
+            const centerCtx = centerCanvas.getContext('2d');
+            const chaosCtx = chaosCanvas.getContext('2d');
             const closingCtx = closingCanvas.getContext('2d');
-            resizeCanvas(closingCanvas, dpr);
+            
+            // Initialize canvases
+            [introCanvas, orderCanvas, centerCanvas, chaosCanvas, closingCanvas].forEach(c => resizeCanvas(c, dpr));
 
-            function createParticles(canvas, count, speed) {
-                return Array.from({ length: count }, () => ({
-                    x: Math.random() * canvas.width,
-                    y: Math.random() * canvas.height,
-                    r: Math.random() * 1.8 + 0.5,
-                    vx: (Math.random() - 0.5) * speed,
-                    vy: (Math.random() - 0.5) * speed,
-                    alpha: Math.random() * 0.08 + 0.02,
-                    phase: Math.random() * Math.PI * 2
-                }));
+            // Create intro particles (gentle, light)
+            const introParticles = createParticles(window.innerWidth, window.innerHeight, isMobile ? 30 : 50, {
+                speedRange: [0.05, 0.15],
+                sizeRange: [0.8, 2.5],
+                alphaRange: [0.03, 0.12]
+            });
+
+            // Create chaos particles (turbulent, glowing, varied)
+            const chaosParticles = createTurbulentParticles(window.innerWidth, window.innerHeight, isMobile ? 60 : 120);
+
+            function createParticles(w, h, count, opts) {
+                const particles = [];
+                for (let i = 0; i < count; i++) {
+                    const speed = opts.speedRange[0] + Math.random() * (opts.speedRange[1] - opts.speedRange[0]);
+                    particles.push({
+                        x: Math.random() * w,
+                        y: Math.random() * h,
+                        r: opts.sizeRange[0] + Math.random() * (opts.sizeRange[1] - opts.sizeRange[0]),
+                        vx: (Math.random() - 0.5) * speed,
+                        vy: (Math.random() - 0.5) * speed,
+                        alpha: opts.alphaRange[0] + Math.random() * (opts.alphaRange[1] - opts.alphaRange[0]),
+                        phase: Math.random() * Math.PI * 2,
+                        life: 1
+                    });
+                }
+                return particles;
+            }
+
+            function createTurbulentParticles(w, h, count) {
+                const particles = [];
+                for (let i = 0; i < count; i++) {
+                    // Varied particle types for visual richness
+                    const type = Math.random();
+                    let size, alpha, speed;
+                    
+                    if (type < 0.6) {
+                        // Small, fast particles (60%)
+                        size = 0.5 + Math.random() * 1.5;
+                        alpha = 0.08 + Math.random() * 0.15;
+                        speed = 0.2 + Math.random() * 0.4;
+                    } else if (type < 0.85) {
+                        // Medium glowing particles (25%)
+                        size = 2 + Math.random() * 2;
+                        alpha = 0.04 + Math.random() * 0.08;
+                        speed = 0.1 + Math.random() * 0.2;
+                    } else {
+                        // Large, slow, faint particles (15%)
+                        size = 3 + Math.random() * 3;
+                        alpha = 0.02 + Math.random() * 0.04;
+                        speed = 0.05 + Math.random() * 0.1;
+                    }
+                    
+                    particles.push({
+                        x: Math.random() * w,
+                        y: Math.random() * h,
+                        r: size,
+                        baseR: size,
+                        vx: (Math.random() - 0.5) * speed,
+                        vy: (Math.random() - 0.5) * speed,
+                        alpha: alpha,
+                        baseAlpha: alpha,
+                        phase: Math.random() * Math.PI * 2,
+                        freq: 0.5 + Math.random() * 1.5,
+                        // Color variation: warm reds to coral
+                        hue: 0 + Math.random() * 20,
+                        sat: 50 + Math.random() * 30
+                    });
+                }
+                return particles;
             }
 
             function getPanelScroll(idx) {
@@ -1115,76 +1173,104 @@
                 return panel ? panel.scrollTop : 0;
             }
 
+            function wrapParticle(p, w, h) {
+                if (p.x < -20) p.x = w + 20;
+                if (p.x > w + 20) p.x = -20;
+                if (p.y < -20) p.y = h + 20;
+                if (p.y > h + 20) p.y = -20;
+            }
+
             let time = 0;
-            function animate() {
-                time += 0.016;
+            let lastTime = performance.now();
+            
+            function animate(currentTime) {
+                const delta = Math.min((currentTime - lastTime) / 1000, 0.1); // Cap delta to prevent jumps
+                lastTime = currentTime;
+                time += delta;
+                
                 const scrollX = document.documentElement.scrollLeft;
                 const vw = window.innerWidth;
+                const vh = window.innerHeight;
                 const visiblePanel = Math.round(scrollX / vw);
 
-                // Intro
+                // === INTRO PARTICLES ===
                 if (visiblePanel <= 1) {
                     introCtx.clearRect(0, 0, introCanvas.width, introCanvas.height);
                     introParticles.forEach(p => {
-                        p.x += p.vx + Math.sin(time * 0.3 + p.phase) * 0.03;
-                        p.y += p.vy;
-                        wrap(p, introCanvas);
+                        // Gentle floating motion
+                        p.x += p.vx + Math.sin(time * 0.5 + p.phase) * 0.08;
+                        p.y += p.vy + Math.cos(time * 0.3 + p.phase) * 0.05;
+                        wrapParticle(p, vw, vh);
+                        
+                        // Subtle pulse
+                        const pulse = 0.8 + Math.sin(time * 0.8 + p.phase) * 0.2;
+                        
                         introCtx.beginPath();
-                        introCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-                        introCtx.fillStyle = `rgba(100,100,100,${p.alpha})`;
+                        introCtx.arc(p.x, p.y, p.r * pulse, 0, Math.PI * 2);
+                        introCtx.fillStyle = `rgba(120, 120, 120, ${p.alpha * pulse})`;
                         introCtx.fill();
                     });
                 }
 
-                // Order
+                // === ORDER HEX GRID ===
                 if (visiblePanel >= 0 && visiblePanel <= 2) {
                     orderCtx.clearRect(0, 0, orderCanvas.width, orderCanvas.height);
                     const scroll = getPanelScroll(1);
-                    const spacing = isMobile ? 42 : 52;
+                    const spacing = isMobile ? 45 : 55;
                     const offset = scroll * 0.03;
-                    orderCtx.strokeStyle = 'rgba(123,163,201,0.06)';
+                    const breathe = Math.sin(time * 0.3) * 2;
+                    
+                    orderCtx.strokeStyle = 'rgba(123, 163, 201, 0.07)';
                     orderCtx.lineWidth = 1;
-                    for (let y = -spacing; y < orderCanvas.height + spacing; y += spacing * 0.866) {
-                        for (let x = -spacing; x < orderCanvas.width + spacing; x += spacing * 1.5) {
+                    
+                    for (let y = -spacing; y < vh + spacing; y += spacing * 0.866) {
+                        for (let x = -spacing; x < vw + spacing; x += spacing * 1.5) {
                             const ox = x + (Math.floor(y / (spacing * 0.866)) % 2) * spacing * 0.75;
-                            drawHex(orderCtx, ox + offset * 0.25, y + offset * 0.15, spacing * 0.3);
+                            drawHex(orderCtx, ox + offset * 0.25 + breathe, y + offset * 0.15, spacing * 0.32);
                         }
                     }
                 }
 
-                // Center
+                // === CENTER FANO PLANE ===
                 if (visiblePanel >= 1 && visiblePanel <= 3) {
                     centerCtx.clearRect(0, 0, centerCanvas.width, centerCanvas.height);
                     const scroll = getPanelScroll(2);
-                    const cx = centerCanvas.width / 2;
-                    const cy = centerCanvas.height / 2;
-                    const radius = Math.min(centerCanvas.width, centerCanvas.height) * (isMobile ? 0.2 : 0.26);
+                    const cx = vw / 2;
+                    const cy = vh / 2;
+                    const radius = Math.min(vw, vh) * (isMobile ? 0.22 : 0.28);
                     const breathe = Math.sin(time * 0.4) * 0.1 + 0.9;
 
                     const fanoPoints = [];
                     for (let i = 0; i < 7; i++) {
-                        const angle = (i * 2 * Math.PI / 7) - Math.PI / 2 + scroll * 0.0001;
-                        fanoPoints.push({ x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) });
+                        const angle = (i * 2 * Math.PI / 7) - Math.PI / 2 + scroll * 0.00012;
+                        fanoPoints.push({ 
+                            x: cx + radius * Math.cos(angle), 
+                            y: cy + radius * Math.sin(angle) 
+                        });
                     }
 
+                    // Draw helix connections
                     [[0,1,3],[1,2,4],[2,0,5],[0,4,6],[1,5,6],[2,3,6],[3,4,5]].forEach((line, idx) => {
-                        drawHelix(centerCtx, fanoPoints[line[0]], fanoPoints[line[1]], time + idx * 0.3, breathe * 0.08);
+                        drawHelix(centerCtx, fanoPoints[line[0]], fanoPoints[line[1]], time + idx * 0.3, breathe * 0.09);
                     });
 
+                    // Draw glowing points
                     fanoPoints.forEach((p, i) => {
                         const pulse = Math.sin(time * 0.5 + i * 0.9) * 0.3 + 0.7;
-                        const grad = centerCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 9 * pulse);
-                        grad.addColorStop(0, `rgba(196,163,90,${0.18 * breathe})`);
+                        const grad = centerCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 11 * pulse);
+                        grad.addColorStop(0, `rgba(196, 163, 90, ${0.22 * breathe})`);
+                        grad.addColorStop(0.5, `rgba(196, 163, 90, ${0.08 * breathe})`);
                         grad.addColorStop(1, 'transparent');
                         centerCtx.fillStyle = grad;
                         centerCtx.beginPath();
-                        centerCtx.arc(p.x, p.y, 9 * pulse, 0, Math.PI * 2);
+                        centerCtx.arc(p.x, p.y, 11 * pulse, 0, Math.PI * 2);
                         centerCtx.fill();
                     });
 
-                    const cr = 16 * breathe;
+                    // Central yin-yang
+                    const cr = 18 * breathe;
                     centerCtx.save();
-                    centerCtx.globalAlpha = 0.05 * breathe;
+                    centerCtx.globalAlpha = 0.06 * breathe;
                     centerCtx.beginPath();
                     centerCtx.arc(cx, cy, cr, Math.PI * 0.5, Math.PI * 1.5);
                     centerCtx.fillStyle = '#f4f1ea';
@@ -1196,32 +1282,79 @@
                     centerCtx.restore();
                 }
 
-                // Chaos
+                // === CHAOS/TURBULENCE PARTICLES - ENHANCED ===
                 if (visiblePanel >= 2 && visiblePanel <= 4) {
                     chaosCtx.clearRect(0, 0, chaosCanvas.width, chaosCanvas.height);
                     const scroll = getPanelScroll(3);
+                    
+                    // Draw connections between nearby particles first (underneath)
+                    chaosCtx.strokeStyle = 'rgba(201, 123, 123, 0.03)';
+                    chaosCtx.lineWidth = 0.5;
+                    for (let i = 0; i < chaosParticles.length; i++) {
+                        const p1 = chaosParticles[i];
+                        for (let j = i + 1; j < chaosParticles.length; j++) {
+                            const p2 = chaosParticles[j];
+                            const dx = p2.x - p1.x;
+                            const dy = p2.y - p1.y;
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            if (dist < 80 && dist > 0) {
+                                const alpha = (1 - dist / 80) * 0.04;
+                                chaosCtx.strokeStyle = `rgba(201, 123, 123, ${alpha})`;
+                                chaosCtx.beginPath();
+                                chaosCtx.moveTo(p1.x, p1.y);
+                                chaosCtx.lineTo(p2.x, p2.y);
+                                chaosCtx.stroke();
+                            }
+                        }
+                    }
+                    
+                    // Draw particles with turbulent motion
                     chaosParticles.forEach(p => {
-                        const noise = Math.sin(p.x * 0.006 + time) * Math.cos(p.y * 0.006 + time * 0.5);
-                        p.x += p.vx + noise * 0.4 + scroll * 0.0001;
-                        p.y += p.vy + Math.sin(time + p.phase + p.x * 0.002) * 0.3;
-                        wrap(p, chaosCanvas);
-                        const pulseAlpha = p.alpha * (0.8 + Math.sin(time * 1.5 + p.phase) * 0.2);
+                        // Perlin-like noise for organic turbulence
+                        const noiseX = Math.sin(p.x * 0.008 + time * 0.7) * Math.cos(p.y * 0.006 + time * 0.5);
+                        const noiseY = Math.cos(p.x * 0.006 + time * 0.6) * Math.sin(p.y * 0.008 + time * 0.8);
+                        
+                        // Apply turbulent motion
+                        p.x += p.vx + noiseX * 0.8 + scroll * 0.00008;
+                        p.y += p.vy + noiseY * 0.6 + Math.sin(time * p.freq + p.phase) * 0.4;
+                        
+                        wrapParticle(p, vw, vh);
+                        
+                        // Pulsing size and alpha
+                        const pulse = 0.7 + Math.sin(time * p.freq + p.phase) * 0.3;
+                        const currentAlpha = p.baseAlpha * pulse;
+                        const currentR = p.baseR * (0.8 + pulse * 0.4);
+                        
+                        // Draw glow for larger particles
+                        if (p.baseR > 2) {
+                            const glow = chaosCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, currentR * 3);
+                            glow.addColorStop(0, `hsla(${p.hue}, ${p.sat}%, 65%, ${currentAlpha * 0.5})`);
+                            glow.addColorStop(0.5, `hsla(${p.hue}, ${p.sat}%, 55%, ${currentAlpha * 0.2})`);
+                            glow.addColorStop(1, 'transparent');
+                            chaosCtx.fillStyle = glow;
+                            chaosCtx.beginPath();
+                            chaosCtx.arc(p.x, p.y, currentR * 3, 0, Math.PI * 2);
+                            chaosCtx.fill();
+                        }
+                        
+                        // Draw particle core
                         chaosCtx.beginPath();
-                        chaosCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-                        chaosCtx.fillStyle = `rgba(201,123,123,${pulseAlpha})`;
+                        chaosCtx.arc(p.x, p.y, currentR, 0, Math.PI * 2);
+                        chaosCtx.fillStyle = `hsla(${p.hue}, ${p.sat}%, 65%, ${currentAlpha})`;
                         chaosCtx.fill();
                     });
                 }
 
-                // Closing
+                // === CLOSING GLOW ===
                 if (visiblePanel >= 3) {
                     closingCtx.clearRect(0, 0, closingCanvas.width, closingCanvas.height);
-                    const pulse = Math.sin(time * 0.25) * 0.01 + 0.018;
+                    const pulse = Math.sin(time * 0.25) * 0.012 + 0.02;
                     const grad = closingCtx.createRadialGradient(
-                        closingCanvas.width / 2, closingCanvas.height / 2, 0,
-                        closingCanvas.width / 2, closingCanvas.height / 2, closingCanvas.width * 0.4
+                        vw / 2, vh / 2, 0,
+                        vw / 2, vh / 2, vw * 0.45
                     );
-                    grad.addColorStop(0, `rgba(196,163,90,${pulse})`);
+                    grad.addColorStop(0, `rgba(196, 163, 90, ${pulse})`);
+                    grad.addColorStop(0.5, `rgba(196, 163, 90, ${pulse * 0.3})`);
                     grad.addColorStop(1, 'transparent');
                     closingCtx.fillStyle = grad;
                     closingCtx.fillRect(0, 0, closingCanvas.width, closingCanvas.height);
@@ -1229,32 +1362,44 @@
 
                 requestAnimationFrame(animate);
             }
+            
             requestAnimationFrame(animate);
 
+            // Handle resize with particle redistribution
             let resizeTimer;
             window.addEventListener('resize', () => {
                 clearTimeout(resizeTimer);
                 resizeTimer = setTimeout(() => {
                     const newDpr = Math.min(window.devicePixelRatio || 1, 2);
-                    [introCanvas, orderCanvas, centerCanvas, chaosCanvas, closingCanvas].forEach(c => resizeCanvas(c, newDpr));
+                    const newW = window.innerWidth;
+                    const newH = window.innerHeight;
+                    
+                    [introCanvas, orderCanvas, centerCanvas, chaosCanvas, closingCanvas].forEach(c => {
+                        resizeCanvas(c, newDpr);
+                    });
+                    
+                    // Redistribute particles to new dimensions
+                    introParticles.forEach(p => {
+                        p.x = Math.random() * newW;
+                        p.y = Math.random() * newH;
+                    });
+                    chaosParticles.forEach(p => {
+                        p.x = Math.random() * newW;
+                        p.y = Math.random() * newH;
+                    });
                 }, 150);
             });
         }
 
-        function wrap(p, canvas) {
-            if (p.x < -10) p.x = canvas.width + 10;
-            if (p.x > canvas.width + 10) p.x = -10;
-            if (p.y < -10) p.y = canvas.height + 10;
-            if (p.y > canvas.height + 10) p.y = -10;
-        }
-
         function resizeCanvas(canvas, dpr) {
+            if (!canvas || !canvas.parentElement) return;
             const rect = canvas.parentElement.getBoundingClientRect();
             canvas.width = rect.width * dpr;
             canvas.height = rect.height * dpr;
             canvas.style.width = rect.width + 'px';
             canvas.style.height = rect.height + 'px';
-            canvas.getContext('2d').scale(dpr, dpr);
+            const ctx = canvas.getContext('2d');
+            if (ctx) ctx.scale(dpr, dpr);
         }
 
         function drawHex(ctx, x, y, r) {
@@ -1268,8 +1413,8 @@
         }
 
         function drawHelix(ctx, p1, p2, time, alpha) {
-            const segments = isMobile ? 16 : 24;
-            const amp = 4;
+            const segments = isMobile ? 18 : 26;
+            const amp = 5;
             const dx = p2.x - p1.x, dy = p2.y - p1.y;
             const len = Math.sqrt(dx * dx + dy * dy);
             if (len < 1) return;
@@ -1278,24 +1423,24 @@
             ctx.beginPath();
             for (let i = 0; i <= segments; i++) {
                 const t = i / segments;
-                const wave = Math.sin(t * Math.PI * 2.5 + time * 0.4) * amp;
+                const wave = Math.sin(t * Math.PI * 2.5 + time * 0.45) * amp;
                 const px = p1.x + dx * t + nx * wave;
                 const py = p1.y + dy * t + ny * wave;
                 i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
             }
-            ctx.strokeStyle = `rgba(196,163,90,${alpha})`;
+            ctx.strokeStyle = `rgba(196, 163, 90, ${alpha})`;
             ctx.lineWidth = 1;
             ctx.stroke();
 
             ctx.beginPath();
             for (let i = 0; i <= segments; i++) {
                 const t = i / segments;
-                const wave = Math.sin(t * Math.PI * 2.5 + time * 0.4 + Math.PI) * amp;
+                const wave = Math.sin(t * Math.PI * 2.5 + time * 0.45 + Math.PI) * amp;
                 const px = p1.x + dx * t + nx * wave;
                 const py = p1.y + dy * t + ny * wave;
                 i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
             }
-            ctx.strokeStyle = `rgba(196,163,90,${alpha * 0.6})`;
+            ctx.strokeStyle = `rgba(196, 163, 90, ${alpha * 0.6})`;
             ctx.stroke();
         }
     </script>
