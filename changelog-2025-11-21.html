@@ -486,45 +486,91 @@
     <nav id="nav"></nav>
     
     <script>
-    const sections = ['intro', 'built', 'cleaned', 'timeline', 'summary'];
-    
-    // Navigation
-    const nav = document.getElementById('nav');
-    sections.forEach(id => {
-        const dot = document.createElement('div');
-        dot.className = 'nav-dot';
-        dot.dataset.section = id;
-        dot.onclick = () => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-        nav.appendChild(dot);
-    });
-    
-    // Observer
-    const observer = new IntersectionObserver(entries => {
-        entries.forEach(e => {
-            if (e.isIntersecting) {
-                e.target.querySelector('.section-inner')?.classList.add('visible');
-                document.querySelectorAll('.nav-dot').forEach(d => 
-                    d.classList.toggle('active', d.dataset.section === e.target.id));
-                
-                if (e.target.id === 'timeline') {
-                    document.querySelectorAll('.timeline-entry').forEach((entry, i) => {
-                        setTimeout(() => entry.classList.add('visible'), 100 + i * 100);
-                    });
-                }
+    (function() {
+        'use strict';
+        
+        const sections = ['intro', 'built', 'cleaned', 'timeline', 'summary'];
+        
+        // Build navigation dots
+        const nav = document.getElementById('nav');
+        if (nav) {
+            sections.forEach(function(id) {
+                const dot = document.createElement('div');
+                dot.className = 'nav-dot';
+                dot.setAttribute('data-section', id);
+                dot.addEventListener('click', function() {
+                    const target = document.getElementById(id);
+                    if (target) target.scrollIntoView({ behavior: 'smooth' });
+                });
+                nav.appendChild(dot);
+            });
+        }
+        
+        // Make section visible
+        function showSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            if (!section) return;
+            
+            const inner = section.querySelector('.section-inner');
+            if (inner) inner.classList.add('visible');
+            
+            // Update nav dots
+            document.querySelectorAll('.nav-dot').forEach(function(d) {
+                d.classList.toggle('active', d.getAttribute('data-section') === sectionId);
+            });
+            
+            // Timeline animation
+            if (sectionId === 'timeline') {
+                const entries = document.querySelectorAll('.timeline-entry');
+                entries.forEach(function(entry, i) {
+                    setTimeout(function() {
+                        entry.classList.add('visible');
+                    }, 100 + i * 100);
+                });
             }
+        }
+        
+        // Intersection Observer for scroll-triggered animations
+        if ('IntersectionObserver' in window) {
+            const observer = new IntersectionObserver(function(entries) {
+                entries.forEach(function(e) {
+                    if (e.isIntersecting) {
+                        showSection(e.target.id);
+                    }
+                });
+            }, { threshold: 0.15, rootMargin: '0px 0px -10% 0px' });
+            
+            sections.forEach(function(id) {
+                const el = document.getElementById(id);
+                if (el) observer.observe(el);
+            });
+        } else {
+            // Fallback: show all sections
+            sections.forEach(showSection);
+        }
+        
+        // Show first section immediately on load
+        document.addEventListener('DOMContentLoaded', function() {
+            showSection('intro');
         });
-    }, { threshold: 0.3 });
-    
-    sections.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) observer.observe(el);
-    });
-    
-    // Progress
-    window.addEventListener('scroll', () => {
-        const p = (document.documentElement.scrollTop / (document.documentElement.scrollHeight - window.innerHeight)) * 100;
-        document.getElementById('progress').style.width = p + '%';
-    });
+        
+        // Also trigger on window load as backup
+        window.addEventListener('load', function() {
+            showSection('intro');
+        });
+        
+        // Progress bar
+        function updateProgress() {
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const progress = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+            const progressBar = document.getElementById('progress');
+            if (progressBar) progressBar.style.width = progress + '%';
+        }
+        
+        window.addEventListener('scroll', updateProgress, { passive: true });
+        updateProgress();
+    })();
     </script>
 </body>
 </html>
