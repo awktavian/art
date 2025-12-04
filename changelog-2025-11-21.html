@@ -8,15 +8,15 @@
         @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=IBM+Plex+Mono:wght@300;400;500&family=Inter:wght@300;400;500;600&display=swap');
         
         :root {
-            --void: #0a0a0c;
-            --obsidian: #111114;
-            --surface: #16161a;
-            --surface-2: #1c1c22;
+            --void: #08080a;
+            --obsidian: #0e0e12;
+            --surface: #14141a;
+            --surface-2: #1a1a22;
             
             --mirror: #e8e8f0;
-            --reflection: #b8b8c8;
-            --dim: #68687a;
-            --faint: #3a3a48;
+            --reflection: #a8a8b8;
+            --dim: #606070;
+            --faint: #303040;
             
             --spark: #ff6b9d;
             --forge: #ff5252;
@@ -29,197 +29,414 @@
             --font-serif: 'Newsreader', Georgia, serif;
             --font-sans: 'Inter', system-ui, sans-serif;
             --font-mono: 'IBM Plex Mono', monospace;
+            
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html { font-size: clamp(15px, 1.5vw, 18px); scroll-behavior: smooth; }
+        html { font-size: clamp(14px, 1.4vw, 17px); scroll-behavior: smooth; }
         
         body {
             font-family: var(--font-sans);
             background: var(--void);
             color: var(--mirror);
             line-height: 1.7;
+            overflow-x: hidden;
         }
         
-        .mirror-bg {
+        /* ANIMATED BACKGROUND */
+        #canvas {
             position: fixed;
             inset: 0;
+            z-index: 0;
+        }
+        
+        .bg-gradient {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
             background: 
-                radial-gradient(ellipse 50% 30% at 50% 50%, rgba(168, 85, 247, 0.06), transparent 60%),
-                radial-gradient(ellipse 40% 50% at 30% 30%, rgba(56, 189, 248, 0.04), transparent 50%);
+                radial-gradient(ellipse 60% 40% at 50% 50%, rgba(168, 85, 247, 0.08), transparent 60%),
+                radial-gradient(ellipse 50% 60% at 20% 20%, rgba(56, 189, 248, 0.06), transparent 50%),
+                radial-gradient(ellipse 40% 50% at 80% 80%, rgba(255, 107, 157, 0.05), transparent 50%);
+            animation: bgPulse 15s ease-in-out infinite alternate;
+        }
+        
+        @keyframes bgPulse {
+            0% { opacity: 1; }
+            100% { opacity: 0.6; }
         }
         
         .grain {
             position: fixed;
             inset: 0;
-            z-index: 9999;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-            opacity: 0.025;
+            z-index: 9998;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            opacity: 0.03;
             pointer-events: none;
         }
         
-        main { position: relative; z-index: 3; }
+        main { position: relative; z-index: 10; }
         
+        /* PROGRESS BAR */
+        .progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--crystal), var(--nexus), var(--spark));
+            width: 0%;
+            z-index: 10000;
+            box-shadow: 0 0 20px var(--crystal), 0 0 40px var(--nexus);
+        }
+        
+        /* SECTIONS */
         section {
             min-height: 100vh;
-            padding: 18vh 12vw;
+            padding: 15vh 10vw;
             display: flex;
             align-items: center;
             justify-content: center;
+            position: relative;
         }
         
         .section-inner {
-            max-width: 680px;
+            max-width: 720px;
             width: 100%;
-            opacity: 0;
-            transform: translateY(40px);
-            transition: opacity 0.8s ease-out, transform 1s ease-out;
         }
         
-        .section-inner.visible {
+        /* Scroll animations */
+        .fade-up {
+            opacity: 0;
+            transform: translateY(60px);
+            transition: opacity 0.8s var(--ease-out), transform 1s var(--ease-out);
+        }
+        
+        .fade-up.visible {
             opacity: 1;
             transform: translateY(0);
         }
         
+        .stagger { transition-delay: calc(var(--i, 0) * 0.1s); }
+        
+        /* TYPOGRAPHY */
         .kanji {
+            font-family: var(--font-mono);
             font-size: 0.65rem;
             letter-spacing: 0.5em;
-            color: var(--dim);
+            color: var(--crystal);
             margin-bottom: 1.5rem;
-            font-family: var(--font-mono);
+            position: relative;
+            display: inline-block;
         }
+        
+        .kanji::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 1px;
+            background: var(--crystal);
+            transition: width 0.8s var(--ease-out) 0.3s;
+        }
+        
+        .visible .kanji::after { width: 100%; }
         
         h1 {
             font-family: var(--font-serif);
-            font-size: clamp(2.8rem, 7vw, 4.5rem);
+            font-size: clamp(3rem, 8vw, 5rem);
             font-weight: 400;
             letter-spacing: -0.03em;
             line-height: 1;
             margin-bottom: 2rem;
+            background: linear-gradient(135deg, var(--mirror) 0%, var(--crystal) 50%, var(--nexus) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
         
         h2 {
             font-family: var(--font-serif);
-            font-size: clamp(1.6rem, 4vw, 2.4rem);
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
             font-weight: 400;
             margin-bottom: 1.5rem;
         }
         
         .lead {
             font-family: var(--font-serif);
-            font-size: 1.2rem;
+            font-size: 1.25rem;
             color: var(--reflection);
             margin-bottom: 3rem;
             line-height: 1.6;
         }
         
-        p { margin-bottom: 1rem; font-size: 0.9rem; color: var(--reflection); }
+        p { margin-bottom: 1rem; font-size: 0.92rem; color: var(--reflection); }
         strong { font-weight: 500; color: var(--mirror); }
         
         .quote {
             font-family: var(--font-serif);
-            font-size: 1.2rem;
+            font-size: 1.3rem;
             font-style: italic;
             color: var(--reflection);
             text-align: center;
-            padding: 2.5rem 0;
-            border-top: 1px solid var(--faint);
+            padding: 3rem 0;
             margin-top: 3rem;
+            position: relative;
         }
         
-        /* Stats */
-        .stat-row {
-            display: flex;
-            gap: 2rem;
+        .quote::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--faint), transparent);
+        }
+        
+        /* COUNTER STATS */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background: var(--faint);
+            border-radius: 16px;
+            overflow: hidden;
             margin: 3rem 0;
         }
         
-        .stat-item {
-            flex: 1;
+        .stat-cell {
+            background: var(--obsidian);
+            padding: 2rem 1.5rem;
             text-align: center;
-            padding: 1.5rem;
+            transition: background 0.3s, transform 0.3s var(--ease-spring);
+            cursor: default;
+        }
+        
+        .stat-cell:hover {
             background: var(--surface);
-            border-radius: 8px;
+            transform: scale(1.02);
+            z-index: 2;
         }
         
-        .stat-item .value {
+        .stat-cell .value {
             font-family: var(--font-mono);
-            font-size: 2rem;
-            color: var(--mirror);
+            font-size: 2.2rem;
+            font-weight: 500;
+            color: var(--crystal);
             display: block;
+            margin-bottom: 0.5rem;
         }
         
-        .stat-item .label {
+        .stat-cell .label {
             font-family: var(--font-mono);
             font-size: 0.55rem;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.12em;
             text-transform: uppercase;
             color: var(--dim);
-            margin-top: 0.5rem;
         }
         
-        /* New systems */
-        .new-systems {
+        /* ANIMATED BARS */
+        .bar-chart {
             margin: 3rem 0;
         }
         
-        .system-row {
-            display: flex;
-            justify-content: space-between;
+        .bar-row {
+            display: grid;
+            grid-template-columns: 140px 1fr 100px;
             align-items: center;
+            gap: 1rem;
             padding: 1rem 0;
             border-bottom: 1px solid rgba(255,255,255,0.03);
         }
         
-        .system-row:last-child { border-bottom: none; }
+        .bar-row:last-child { border-bottom: none; }
         
-        .system-name {
+        .bar-label {
             font-family: var(--font-mono);
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--reflection);
         }
         
-        .system-stat {
-            font-family: var(--font-mono);
-            font-size: 0.8rem;
-        }
-        
-        .system-stat.positive { color: var(--grove); }
-        .system-stat.negative { color: var(--spark); }
-        
-        /* Card */
-        .card {
+        .bar-track {
+            height: 8px;
             background: var(--surface);
-            border: 1px solid rgba(255,255,255,0.03);
-            border-radius: 10px;
-            padding: 1.5rem 2rem;
-            margin: 2rem 0;
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
         }
         
-        .card h3 {
-            font-size: 0.95rem;
+        .bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 1.2s var(--ease-out);
+        }
+        
+        .bar-fill.added { background: linear-gradient(90deg, var(--grove), var(--flow)); }
+        .bar-fill.removed { background: linear-gradient(90deg, var(--spark), var(--forge)); }
+        
+        .visible .bar-fill { transform: scaleX(1); }
+        
+        .bar-value {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--dim);
+            text-align: right;
+        }
+        
+        /* SYSTEM CARDS */
+        .system-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin: 3rem 0;
+        }
+        
+        .system-card {
+            --card-color: var(--crystal);
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            cursor: default;
+            transition: transform 0.4s var(--ease-spring), box-shadow 0.4s;
+        }
+        
+        .system-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--card-color);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.6s var(--ease-out);
+        }
+        
+        .visible .system-card::before { transform: scaleX(1); }
+        
+        .system-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 20px 40px -20px var(--card-color);
+        }
+        
+        .system-card .name {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--card-color);
+            margin-bottom: 0.5rem;
+        }
+        
+        .system-card .lines {
+            font-family: var(--font-mono);
+            font-size: 1.8rem;
             font-weight: 500;
-            margin-bottom: 0.75rem;
+            color: var(--mirror);
         }
         
-        /* Timeline */
-        .timeline {
+        .system-card .files {
+            font-size: 0.7rem;
+            color: var(--dim);
+            margin-top: 0.25rem;
+        }
+        
+        /* DELETED ITEMS */
+        .deleted-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
             margin: 2.5rem 0;
-            padding-left: 1.5rem;
-            border-left: 1px solid var(--faint);
         }
         
-        .timeline-entry {
-            margin-bottom: 1.5rem;
+        .deleted-item {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--dim);
+            text-decoration: line-through;
+            background: var(--surface);
+            padding: 0.6rem 1rem;
+            border-radius: 6px;
             opacity: 0;
-            transform: translateX(-10px);
-            transition: all 0.4s ease-out;
+            transform: scale(0.8);
+            transition: all 0.4s var(--ease-spring), background 0.2s, color 0.2s;
         }
         
-        .timeline-entry.visible {
+        .deleted-item.visible {
+            opacity: 1;
+            transform: scale(1);
+        }
+        
+        .deleted-item:hover {
+            background: var(--surface-2);
+            color: var(--spark);
+        }
+        
+        /* TIMELINE */
+        .timeline {
+            margin: 3rem 0;
+            position: relative;
+            padding-left: 2rem;
+        }
+        
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 4px;
+            top: 8px;
+            bottom: 8px;
+            width: 2px;
+            background: linear-gradient(to bottom, var(--crystal), var(--nexus), var(--spark), var(--beacon), var(--grove));
+            transform: scaleY(0);
+            transform-origin: top;
+            transition: transform 1.5s var(--ease-out);
+        }
+        
+        .timeline.visible::before { transform: scaleY(1); }
+        
+        .timeline-item {
+            position: relative;
+            margin-bottom: 2rem;
+            padding-left: 1.5rem;
+            opacity: 0;
+            transform: translateX(-20px);
+            transition: all 0.5s var(--ease-out);
+        }
+        
+        .timeline-item.visible {
             opacity: 1;
             transform: translateX(0);
         }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -2rem;
+            top: 6px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--crystal);
+            box-shadow: 0 0 15px var(--crystal);
+            transition: transform 0.3s var(--ease-spring), box-shadow 0.3s;
+        }
+        
+        .timeline-item:hover::before {
+            transform: scale(1.4);
+            box-shadow: 0 0 25px var(--crystal);
+        }
+        
+        .timeline-item:nth-child(2)::before { background: var(--nexus); box-shadow: 0 0 15px var(--nexus); }
+        .timeline-item:nth-child(3)::before { background: var(--spark); box-shadow: 0 0 15px var(--spark); }
+        .timeline-item:nth-child(4)::before { background: var(--beacon); box-shadow: 0 0 15px var(--beacon); }
+        .timeline-item:nth-child(5)::before { background: var(--grove); box-shadow: 0 0 15px var(--grove); }
         
         .timeline-date {
             font-family: var(--font-mono);
@@ -230,7 +447,8 @@
         
         .timeline-title {
             font-weight: 500;
-            margin: 0.2rem 0;
+            margin: 0.3rem 0;
+            font-size: 1.05rem;
         }
         
         .timeline-desc {
@@ -238,25 +456,70 @@
             color: var(--dim);
         }
         
-        /* Deleted */
-        .deleted-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin: 2rem 0;
-        }
-        
-        .deleted-item {
-            font-family: var(--font-mono);
-            font-size: 0.7rem;
-            color: var(--dim);
-            text-decoration: line-through;
+        /* CARD */
+        .card {
             background: var(--surface);
-            padding: 0.5rem 0.75rem;
-            border-radius: 4px;
+            border: 1px solid rgba(255,255,255,0.04);
+            border-radius: 14px;
+            padding: 1.75rem 2rem;
+            margin: 2rem 0;
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.3s, box-shadow 0.3s;
         }
         
-        /* Navigation */
+        .card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 0% 0%, rgba(56, 189, 248, 0.08), transparent 50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .card:hover {
+            border-color: rgba(255,255,255,0.08);
+            box-shadow: 0 10px 40px -15px rgba(56, 189, 248, 0.15);
+        }
+        
+        .card:hover::before { opacity: 1; }
+        
+        .card h3 {
+            font-size: 0.95rem;
+            font-weight: 500;
+            margin-bottom: 0.75rem;
+            position: relative;
+        }
+        
+        /* SUMMARY NUMBERS */
+        .summary-row {
+            display: flex;
+            justify-content: center;
+            gap: 4rem;
+            margin: 3rem 0;
+        }
+        
+        .summary-item {
+            text-align: center;
+        }
+        
+        .summary-item .value {
+            font-family: var(--font-mono);
+            font-size: 2.5rem;
+            font-weight: 500;
+            background: linear-gradient(135deg, var(--crystal), var(--nexus));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .summary-item .label {
+            font-size: 0.8rem;
+            color: var(--dim);
+            margin-top: 0.5rem;
+        }
+        
+        /* NAVIGATION */
         nav {
             position: fixed;
             right: 2rem;
@@ -264,34 +527,48 @@
             transform: translateY(-50%);
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            z-index: 100;
+            gap: 12px;
+            z-index: 9999;
         }
         
         .nav-dot {
-            width: 6px;
-            height: 6px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             background: var(--faint);
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.3s var(--ease-spring);
+            position: relative;
         }
         
-        .nav-dot:hover { background: var(--reflection); }
-        .nav-dot.active { background: var(--mirror); box-shadow: 0 0 10px rgba(255,255,255,0.3); }
+        .nav-dot::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 1px solid var(--crystal);
+            opacity: 0;
+            transform: scale(0.5);
+            transition: all 0.3s var(--ease-out);
+        }
         
-        .progress {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 1px;
-            background: linear-gradient(90deg, var(--crystal), var(--nexus));
-            width: 0%;
-            z-index: 1000;
+        .nav-dot:hover {
+            background: var(--reflection);
+            transform: scale(1.3);
+        }
+        
+        .nav-dot.active {
+            background: var(--crystal);
+            box-shadow: 0 0 15px var(--crystal);
+        }
+        
+        .nav-dot.active::before {
+            opacity: 0.5;
+            transform: scale(1);
         }
         
         footer {
-            padding: 4rem;
+            padding: 5rem;
             text-align: center;
             border-top: 1px solid rgba(255,255,255,0.02);
         }
@@ -300,25 +577,30 @@
             font-family: var(--font-mono);
             font-size: 0.5rem;
             color: var(--faint);
-            letter-spacing: 0.2em;
+            letter-spacing: 0.25em;
         }
         
         @media (max-width: 768px) {
-            section { padding: 12vh 8vw; }
-            .stat-row { flex-direction: column; gap: 1rem; }
+            section { padding: 12vh 7vw; }
+            .stat-grid { grid-template-columns: 1fr; }
+            .system-grid { grid-template-columns: 1fr; }
+            .bar-row { grid-template-columns: 1fr; gap: 0.5rem; }
+            .bar-label { margin-bottom: 0.25rem; }
+            .summary-row { flex-direction: column; gap: 2rem; }
             nav { display: none; }
         }
     </style>
 </head>
 <body>
     <div class="progress" id="progress"></div>
-    <div class="mirror-bg"></div>
+    <canvas id="canvas"></canvas>
+    <div class="bg-gradient"></div>
     <div class="grain"></div>
     
     <main>
         <!-- INTRO -->
         <section id="intro">
-            <div class="section-inner">
+            <div class="section-inner fade-up">
                 <div class="kanji">鏡 · KAGAMI</div>
                 <h1>Two Weeks</h1>
                 <p class="lead">
@@ -326,17 +608,17 @@
                     The numbers don't tell the story—the architecture does.
                 </p>
                 
-                <div class="stat-row">
-                    <div class="stat-item">
-                        <span class="value">283K</span>
-                        <span class="label">Python SLOC</span>
+                <div class="stat-grid">
+                    <div class="stat-cell">
+                        <span class="value" data-count="283">0</span>
+                        <span class="label">Python SLOC (K)</span>
                     </div>
-                    <div class="stat-item">
-                        <span class="value">2,128</span>
+                    <div class="stat-cell">
+                        <span class="value" data-count="2128">0</span>
                         <span class="label">Python Files</span>
                     </div>
-                    <div class="stat-item">
-                        <span class="value">+10.6K</span>
+                    <div class="stat-cell">
+                        <span class="value" data-count="10620" data-prefix="+">0</span>
                         <span class="label">Net Lines</span>
                     </div>
                 </div>
@@ -347,33 +629,33 @@
         
         <!-- WHAT WAS BUILT -->
         <section id="built">
-            <div class="section-inner">
+            <div class="section-inner fade-up">
                 <div class="kanji">NEW</div>
                 <h2>What Was Built</h2>
                 <p class="lead">
                     Four core systems. Built from scratch. These didn't exist before Nov 21.
                 </p>
                 
-                <div class="new-systems">
-                    <div class="system-row">
-                        <span class="system-name">kairos/core/world_model/</span>
-                        <span class="system-stat positive">+30,020 lines · 65 files</span>
+                <div class="system-grid">
+                    <div class="system-card" style="--card-color: var(--nexus);">
+                        <div class="name">kairos/core/world_model/</div>
+                        <div class="lines">+30,020</div>
+                        <div class="files">65 files</div>
                     </div>
-                    <div class="system-row">
-                        <span class="system-name">kairos/api/</span>
-                        <span class="system-stat positive">+28,286 lines · 174 files</span>
+                    <div class="system-card" style="--card-color: var(--crystal);">
+                        <div class="name">kairos/api/</div>
+                        <div class="lines">+28,286</div>
+                        <div class="files">174 files</div>
                     </div>
-                    <div class="system-row">
-                        <span class="system-name">kairos/core/safety/</span>
-                        <span class="system-stat positive">+9,195 lines · 28 files</span>
+                    <div class="system-card" style="--card-color: var(--spark);">
+                        <div class="name">kairos/core/safety/</div>
+                        <div class="lines">+9,195</div>
+                        <div class="files">28 files</div>
                     </div>
-                    <div class="system-row">
-                        <span class="system-name">kairos/core/active_inference/</span>
-                        <span class="system-stat positive">+4,452 lines · 5 files</span>
-                    </div>
-                    <div class="system-row" style="border-top: 1px solid var(--faint); margin-top: 1rem; padding-top: 1rem;">
-                        <span class="system-name"><strong>Total new code</strong></span>
-                        <span class="system-stat positive"><strong>+71,953 lines</strong></span>
+                    <div class="system-card" style="--card-color: var(--beacon);">
+                        <div class="name">kairos/core/active_inference/</div>
+                        <div class="lines">+4,452</div>
+                        <div class="files">5 files</div>
                     </div>
                 </div>
                 
@@ -389,21 +671,25 @@
         
         <!-- WHAT WAS CLEANED -->
         <section id="cleaned">
-            <div class="section-inner">
+            <div class="section-inner fade-up">
                 <div class="kanji">CLEANED</div>
                 <h2>What Was Removed</h2>
                 <p class="lead">
                     Tests: −55,629 net lines. More deleted than added. That's the point.
                 </p>
                 
-                <div class="new-systems">
-                    <div class="system-row">
-                        <span class="system-name">tests/</span>
-                        <span class="system-stat negative">+39,692 / −95,321 = −55,629 net</span>
+                <div class="bar-chart">
+                    <div class="bar-row">
+                        <span class="bar-label">tests/</span>
+                        <div class="bar-track">
+                            <div class="bar-fill added" style="width: 29%;"></div>
+                            <div class="bar-fill removed" style="width: 71%;"></div>
+                        </div>
+                        <span class="bar-value">−55,629 net</span>
                     </div>
                 </div>
                 
-                <div class="deleted-list">
+                <div class="deleted-grid" id="deleted-grid">
                     <span class="deleted-item">competition/</span>
                     <span class="deleted-item">curiosity_engine.py</span>
                     <span class="deleted-item">strange_loop_observer.py</span>
@@ -416,7 +702,7 @@
                 <div class="card">
                     <h3>The Rule</h3>
                     <p style="margin-bottom:0;">
-                        Every module that survived answered: "Does this implement a mathematical principle?" 
+                        Every module that survived answered: <em>"Does this implement a mathematical principle?"</em> 
                         Convenience got deleted.
                     </p>
                 </div>
@@ -424,33 +710,33 @@
         </section>
         
         <!-- TIMELINE -->
-        <section id="timeline">
-            <div class="section-inner">
+        <section id="arc">
+            <div class="section-inner fade-up">
                 <div class="kanji">ARC</div>
                 <h2>How It Happened</h2>
                 
-                <div class="timeline" id="timeline-container">
-                    <div class="timeline-entry">
+                <div class="timeline" id="timeline">
+                    <div class="timeline-item">
                         <div class="timeline-date">NOV 22–23</div>
                         <div class="timeline-title">Cleanup</div>
                         <div class="timeline-desc">25 commits. Broken imports fixed. CI stabilized.</div>
                     </div>
-                    <div class="timeline-entry">
+                    <div class="timeline-item">
                         <div class="timeline-date">NOV 24–25</div>
                         <div class="timeline-title">Foundation</div>
                         <div class="timeline-desc">E8 crystal integration. Unified receipts.</div>
                     </div>
-                    <div class="timeline-entry">
+                    <div class="timeline-item">
                         <div class="timeline-date">NOV 27–29</div>
                         <div class="timeline-title">Core Systems</div>
                         <div class="timeline-desc">World model built. Active inference engine. Superorganism.</div>
                     </div>
-                    <div class="timeline-entry">
+                    <div class="timeline-item">
                         <div class="timeline-date">NOV 30</div>
                         <div class="timeline-title">Hardening</div>
                         <div class="timeline-desc">E₈ codebook. G₂ equivariance. Non-equivariant paths deleted.</div>
                     </div>
-                    <div class="timeline-entry">
+                    <div class="timeline-item">
                         <div class="timeline-date">DEC 1–3</div>
                         <div class="timeline-title">Architecture</div>
                         <div class="timeline-desc">Markov blanket enforced. CatastropheKAN. Safety CBF.</div>
@@ -461,7 +747,7 @@
         
         <!-- SUMMARY -->
         <section id="summary">
-            <div class="section-inner">
+            <div class="section-inner fade-up">
                 <div class="kanji">鏡</div>
                 <h2>The Result</h2>
                 <p class="lead">
@@ -469,10 +755,24 @@
                     56K lines of cruft removed. Same file count, different architecture.
                 </p>
                 
+                <div class="summary-row">
+                    <div class="summary-item">
+                        <div class="value">+72K</div>
+                        <div class="label">lines built</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="value">−56K</div>
+                        <div class="label">lines cleaned</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="value">473K</div>
+                        <div class="label">lines touched</div>
+                    </div>
+                </div>
+                
                 <div class="card">
                     <p><strong>Built:</strong> World model, active inference, API, safety — 72K lines from scratch</p>
                     <p><strong>Cleaned:</strong> Tests consolidated — 56K lines removed</p>
-                    <p><strong>Touched:</strong> 473K lines total churn</p>
                     <p style="margin-bottom:0;"><strong>Result:</strong> 283,228 Python SLOC in 2,128 files</p>
                 </div>
                 
@@ -489,83 +789,193 @@
     (function() {
         'use strict';
         
-        const sections = ['intro', 'built', 'cleaned', 'timeline', 'summary'];
+        var sections = ['intro', 'built', 'cleaned', 'arc', 'summary'];
         
-        // Build navigation dots
-        const nav = document.getElementById('nav');
-        if (nav) {
-            sections.forEach(function(id) {
-                const dot = document.createElement('div');
-                dot.className = 'nav-dot';
-                dot.setAttribute('data-section', id);
-                dot.addEventListener('click', function() {
-                    const target = document.getElementById(id);
-                    if (target) target.scrollIntoView({ behavior: 'smooth' });
-                });
-                nav.appendChild(dot);
-            });
-        }
+        // PARTICLE SYSTEM
+        var canvas = document.getElementById('canvas');
+        var ctx = canvas.getContext('2d');
+        var particles = [];
+        var mouse = { x: 0, y: 0 };
+        var W, H;
         
-        // Make section visible
-        function showSection(sectionId) {
-            const section = document.getElementById(sectionId);
-            if (!section) return;
-            
-            const inner = section.querySelector('.section-inner');
-            if (inner) inner.classList.add('visible');
-            
-            // Update nav dots
-            document.querySelectorAll('.nav-dot').forEach(function(d) {
-                d.classList.toggle('active', d.getAttribute('data-section') === sectionId);
-            });
-            
-            // Timeline animation
-            if (sectionId === 'timeline') {
-                const entries = document.querySelectorAll('.timeline-entry');
-                entries.forEach(function(entry, i) {
-                    setTimeout(function() {
-                        entry.classList.add('visible');
-                    }, 100 + i * 100);
+        function resize() {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+            particles = [];
+            var count = Math.min(60, Math.floor((W * H) / 25000));
+            for (var i = 0; i < count; i++) {
+                particles.push({
+                    x: Math.random() * W,
+                    y: Math.random() * H,
+                    vx: (Math.random() - 0.5) * 0.3,
+                    vy: (Math.random() - 0.5) * 0.3,
+                    r: Math.random() * 1.5 + 0.5,
+                    alpha: Math.random() * 0.4 + 0.1
                 });
             }
         }
         
-        // Intersection Observer for scroll-triggered animations
-        if ('IntersectionObserver' in window) {
-            const observer = new IntersectionObserver(function(entries) {
-                entries.forEach(function(e) {
-                    if (e.isIntersecting) {
-                        showSection(e.target.id);
-                    }
-                });
-            }, { threshold: 0.15, rootMargin: '0px 0px -10% 0px' });
+        function animateParticles() {
+            ctx.fillStyle = 'rgba(8, 8, 10, 0.12)';
+            ctx.fillRect(0, 0, W, H);
             
-            sections.forEach(function(id) {
-                const el = document.getElementById(id);
-                if (el) observer.observe(el);
-            });
-        } else {
-            // Fallback: show all sections
-            sections.forEach(showSection);
+            for (var i = 0; i < particles.length; i++) {
+                var p = particles[i];
+                
+                // Mouse attraction
+                var dx = mouse.x - p.x;
+                var dy = mouse.y - p.y;
+                var d = Math.sqrt(dx * dx + dy * dy);
+                if (d < 150 && d > 0) {
+                    p.vx += dx * 0.0002;
+                    p.vy += dy * 0.0002;
+                }
+                
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= 0.99;
+                p.vy *= 0.99;
+                
+                if (p.x < 0) p.x = W;
+                if (p.x > W) p.x = 0;
+                if (p.y < 0) p.y = H;
+                if (p.y > H) p.y = 0;
+                
+                // Draw with glow
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r * 2, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(56, 189, 248, ' + (p.alpha * 0.3) + ')';
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(232, 232, 240, ' + p.alpha + ')';
+                ctx.fill();
+            }
+            
+            // Connect nearby particles
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.06)';
+            ctx.lineWidth = 0.5;
+            for (var i = 0; i < particles.length; i++) {
+                for (var j = i + 1; j < particles.length; j++) {
+                    var dx = particles[i].x - particles[j].x;
+                    var dy = particles[i].y - particles[j].y;
+                    if (Math.abs(dx) < 100 && Math.abs(dy) < 100) {
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+            
+            requestAnimationFrame(animateParticles);
         }
         
-        // Show first section immediately on load
-        document.addEventListener('DOMContentLoaded', function() {
-            showSection('intro');
+        window.addEventListener('resize', resize);
+        document.addEventListener('mousemove', function(e) {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
         });
         
-        // Also trigger on window load as backup
-        window.addEventListener('load', function() {
-            showSection('intro');
+        resize();
+        animateParticles();
+        
+        // COUNTER ANIMATION
+        function animateCounter(el) {
+            var target = parseInt(el.getAttribute('data-count'));
+            var prefix = el.getAttribute('data-prefix') || '';
+            var duration = 1500;
+            var start = performance.now();
+            
+            function update(now) {
+                var elapsed = now - start;
+                var progress = Math.min(elapsed / duration, 1);
+                var eased = 1 - Math.pow(1 - progress, 3);
+                var current = Math.floor(target * eased);
+                el.textContent = prefix + current.toLocaleString();
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                } else {
+                    el.textContent = prefix + target.toLocaleString();
+                }
+            }
+            
+            requestAnimationFrame(update);
+        }
+        
+        // NAVIGATION
+        var nav = document.getElementById('nav');
+        sections.forEach(function(id) {
+            var dot = document.createElement('div');
+            dot.className = 'nav-dot';
+            dot.setAttribute('data-section', id);
+            dot.addEventListener('click', function() {
+                var target = document.getElementById(id);
+                if (target) target.scrollIntoView({ behavior: 'smooth' });
+            });
+            nav.appendChild(dot);
         });
+        
+        // SCROLL ANIMATIONS
+        function showSection(section) {
+            var fadeUp = section.querySelector('.fade-up');
+            if (fadeUp) fadeUp.classList.add('visible');
+            
+            // Update nav
+            document.querySelectorAll('.nav-dot').forEach(function(d) {
+                d.classList.toggle('active', d.getAttribute('data-section') === section.id);
+            });
+            
+            // Counter animation
+            if (section.id === 'intro') {
+                section.querySelectorAll('[data-count]').forEach(animateCounter);
+            }
+            
+            // Deleted items stagger
+            if (section.id === 'cleaned') {
+                section.querySelectorAll('.deleted-item').forEach(function(item, i) {
+                    setTimeout(function() { item.classList.add('visible'); }, i * 80);
+                });
+            }
+            
+            // Timeline
+            if (section.id === 'arc') {
+                var timeline = document.getElementById('timeline');
+                if (timeline) timeline.classList.add('visible');
+                section.querySelectorAll('.timeline-item').forEach(function(item, i) {
+                    setTimeout(function() { item.classList.add('visible'); }, 200 + i * 150);
+                });
+            }
+        }
+        
+        // Intersection Observer
+        var observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(e) {
+                if (e.isIntersecting) {
+                    showSection(e.target);
+                }
+            });
+        }, { threshold: 0.2, rootMargin: '0px 0px -5% 0px' });
+        
+        sections.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) observer.observe(el);
+        });
+        
+        // Show intro immediately
+        setTimeout(function() {
+            var intro = document.getElementById('intro');
+            if (intro) showSection(intro);
+        }, 100);
         
         // Progress bar
         function updateProgress() {
-            const scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
-            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-            const progress = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
-            const progressBar = document.getElementById('progress');
-            if (progressBar) progressBar.style.width = progress + '%';
+            var scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+            var docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            var progress = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+            var bar = document.getElementById('progress');
+            if (bar) bar.style.width = progress + '%';
         }
         
         window.addEventListener('scroll', updateProgress, { passive: true });
