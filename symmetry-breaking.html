@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symmetry Breaking — What We Forget on the Way Down</title>
+    <meta name="description" content="A deep dive into the exceptional Lie algebra hierarchy: what each transformation removes, and what that means physically and metaphorically">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --void: #0A0A0C;
+            --light: #FAFAF8;
+            --gold: #D4AF37;
+            --dim: rgba(250, 250, 248, 0.6);
+            --accent-e8: #FFD700;
+            --accent-e7: #87CEEB;
+            --accent-e6: #DDA0DD;
+            --accent-f4: #98FB98;
+            --accent-g2: #FFA07A;
+            --accent-s7: #F0E68C;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        
+        body {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            background: var(--void);
+            color: var(--light);
+            line-height: 1.9;
+            cursor: none;
+            overflow-x: hidden;
+        }
+        
+        /* Cursor */
+        .cursor {
+            width: 24px; height: 24px;
+            border: 1px solid var(--gold);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10000;
+            mix-blend-mode: difference;
+            transition: transform 0.15s ease;
+        }
+        .cursor-dot {
+            width: 4px; height: 4px;
+            background: var(--gold);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10001;
+        }
+        
+        /* Film grain */
+        .grain {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.02;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+        
+        /* Progress */
+        .progress-bar {
+            position: fixed;
+            top: 0; left: 0;
+            width: 0%; height: 2px;
+            background: var(--gold);
+            z-index: 1000;
+        }
+        
+        /* Sections */
+        section {
+            min-height: 100vh;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        .section-canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+        }
+        
+        .section-content {
+            position: relative;
+            z-index: 1;
+            max-width: 720px;
+            padding: 5rem 2rem;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 1s ease, transform 1s ease;
+        }
+        
+        .section-content.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        /* Typography */
+        h1 {
+            font-size: clamp(2.5rem, 7vw, 4rem);
+            font-weight: 300;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.5rem;
+        }
+        
+        h2 {
+            font-size: clamp(1.6rem, 4vw, 2.2rem);
+            font-weight: 400;
+            margin-bottom: 1.5rem;
+            color: var(--light);
+        }
+        
+        h3 {
+            font-size: 1.3rem;
+            font-weight: 500;
+            margin: 2rem 0 1rem;
+            color: var(--gold);
+        }
+        
+        .kanji {
+            font-size: clamp(4rem, 10vw, 7rem);
+            font-weight: 300;
+            color: var(--gold);
+            opacity: 0.7;
+            text-shadow: 0 0 60px rgba(212, 175, 55, 0.25);
+            animation: breathe 5s ease-in-out infinite;
+        }
+        
+        @keyframes breathe {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 0.8; }
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            font-style: italic;
+            color: rgba(250, 250, 248, 0.4);
+            margin-bottom: 2rem;
+        }
+        
+        p {
+            font-size: 1.2rem;
+            margin-bottom: 1.5rem;
+            color: var(--dim);
+        }
+        
+        p.lead {
+            font-size: 1.35rem;
+            color: var(--light);
+            line-height: 1.7;
+        }
+        
+        p.emphasis {
+            color: var(--light);
+            font-size: 1.25rem;
+        }
+        
+        .whisper {
+            font-size: 1rem;
+            font-style: italic;
+            color: rgba(250, 250, 248, 0.35);
+            text-align: center;
+            margin-top: 2rem;
+        }
+        
+        .gold { color: var(--gold); }
+        .centered { text-align: center; }
+        
+        /* Math */
+        .equation {
+            font-family: 'Space Mono', monospace;
+            font-size: 1rem;
+            text-align: center;
+            padding: 1.5rem 1rem;
+            color: var(--gold);
+            letter-spacing: 0.03em;
+            background: rgba(212, 175, 55, 0.05);
+            border-left: 2px solid rgba(212, 175, 55, 0.3);
+            margin: 1.5rem 0;
+            overflow-x: auto;
+            line-height: 2;
+        }
+        
+        .equation-inline {
+            font-family: 'Space Mono', monospace;
+            color: var(--gold);
+            font-size: 0.95em;
+        }
+        
+        /* Insight boxes */
+        .insight {
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.08) 0%, rgba(212, 175, 55, 0.02) 100%);
+            border-left: 2px solid rgba(212, 175, 55, 0.4);
+            padding: 1.5rem 2rem;
+            margin: 2rem 0;
+            border-radius: 0 6px 6px 0;
+        }
+        
+        .insight p { margin-bottom: 0; font-size: 1.1rem; }
+        
+        .physics-note {
+            background: linear-gradient(135deg, rgba(78, 205, 196, 0.1) 0%, rgba(78, 205, 196, 0.02) 100%);
+            border-left: 2px solid rgba(78, 205, 196, 0.5);
+            padding: 1.5rem 2rem;
+            margin: 2rem 0;
+            border-radius: 0 6px 6px 0;
+        }
+        
+        .physics-note h4 {
+            color: #4ECDC4;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.75rem;
+        }
+        
+        .physics-note p { margin-bottom: 0; font-size: 1.1rem; }
+        
+        .metaphor-box {
+            background: linear-gradient(135deg, rgba(221, 160, 221, 0.1) 0%, rgba(221, 160, 221, 0.02) 100%);
+            border-left: 2px solid rgba(221, 160, 221, 0.5);
+            padding: 1.5rem 2rem;
+            margin: 2rem 0;
+            border-radius: 0 6px 6px 0;
+        }
+        
+        .metaphor-box h4 {
+            color: #DDA0DD;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.75rem;
+        }
+        
+        .metaphor-box p { margin-bottom: 0; font-size: 1.1rem; }
+        
+        /* Lost/kept boxes */
+        .lost-box {
+            background: rgba(255, 100, 100, 0.05);
+            border: 1px solid rgba(255, 100, 100, 0.2);
+            padding: 1.25rem 1.5rem;
+            margin: 1rem 0;
+            border-radius: 6px;
+        }
+        
+        .lost-box h4 {
+            color: #FF6B6B;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.5rem;
+        }
+        
+        .kept-box {
+            background: rgba(100, 255, 150, 0.05);
+            border: 1px solid rgba(100, 255, 150, 0.2);
+            padding: 1.25rem 1.5rem;
+            margin: 1rem 0;
+            border-radius: 6px;
+        }
+        
+        .kept-box h4 {
+            color: #64FF96;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.5rem;
+        }
+        
+        /* Scroll indicator */
+        .scroll-indicator {
+            position: absolute;
+            bottom: 3rem;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0.3;
+            animation: bob 2.5s ease-in-out infinite;
+        }
+        
+        @keyframes bob {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(12px); }
+        }
+        
+        .scroll-indicator span {
+            display: block;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.2em;
+            margin-bottom: 0.5rem;
+        }
+        
+        .scroll-indicator .arrow {
+            width: 14px; height: 14px;
+            margin: 0 auto;
+            border-right: 1px solid var(--light);
+            border-bottom: 1px solid var(--light);
+            transform: rotate(45deg);
+        }
+        
+        /* Navigation */
+        .nav-dots {
+            position: fixed;
+            right: 2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+        
+        .nav-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.15);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-dot:hover { background: rgba(255, 255, 255, 0.4); }
+        .nav-dot.active { background: var(--gold); }
+        
+        /* Code blocks */
+        code {
+            font-family: 'Space Mono', monospace;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        
+        /* Coefficient display */
+        .coefficient {
+            display: inline-block;
+            background: rgba(212, 175, 55, 0.15);
+            color: var(--gold);
+            padding: 0.15rem 0.5rem;
+            border-radius: 3px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.95em;
+            margin: 0 0.1rem;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-dots { right: 1rem; }
+            .section-content { padding: 4rem 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="cursor"></div>
+    <div class="cursor-dot"></div>
+    <div class="grain"></div>
+    <div class="progress-bar"></div>
+    
+    <nav class="nav-dots">
+        <div class="nav-dot active" data-section="hero"></div>
+        <div class="nav-dot" data-section="frame"></div>
+        <div class="nav-dot" data-section="branching"></div>
+        <div class="nav-dot" data-section="e8-e7"></div>
+        <div class="nav-dot" data-section="e7-e6"></div>
+        <div class="nav-dot" data-section="e6-f4"></div>
+        <div class="nav-dot" data-section="f4-g2"></div>
+        <div class="nav-dot" data-section="g2-s7"></div>
+        <div class="nav-dot" data-section="lattice"></div>
+        <div class="nav-dot" data-section="meaning"></div>
+        <div class="nav-dot" data-section="end"></div>
+    </nav>
+
+    <!-- ==================== HERO ==================== -->
+    <section id="hero">
+        <canvas class="section-canvas" id="canvas-hero"></canvas>
+        <div class="section-content centered">
+            <div class="kanji">対称性の破れ</div>
+            <h1>Symmetry Breaking</h1>
+            <p class="subtitle">What we choose to forget on the way down</p>
+            <p style="margin-top: 2rem; max-width: 540px; margin-left: auto; margin-right: auto;">
+                Every projection in the exceptional hierarchy isn't just "reducing dimensions."
+                It's <em>deciding what doesn't matter</em> for the purpose at hand.
+                This is what the transformations actually do, and what each one costs us.
+            </p>
+        </div>
+        <div class="scroll-indicator">
+            <span>SCROLL</span>
+            <div class="arrow"></div>
+        </div>
+    </section>
+
+    <!-- ==================== THE FRAME ==================== -->
+    <section id="frame">
+        <canvas class="section-canvas" id="canvas-frame"></canvas>
+        <div class="section-content">
+            <h2>The Setup</h2>
+            
+            <p class="lead">
+                Imagine you're trying to describe a complicated object — say, a person — 
+                to someone who's never seen them.
+            </p>
+            
+            <p>
+                You could describe every molecule. Every hair. Every freckle.
+                That's the <span class="gold">full description</span>: maximally detailed, maximally complex.
+            </p>
+            
+            <p>
+                Or you could say: "tall, dark hair, friendly smile."
+                That's a <span class="gold">compressed description</span>: you've kept what matters,
+                discarded what doesn't.
+            </p>
+            
+            <p>
+                But here's the question: <em>what makes something "matter"?</em>
+            </p>
+            
+            <div class="insight">
+                <p>
+                    The exceptional Lie algebras give us a <strong>mathematically optimal</strong> 
+                    answer. Each one describes a different "level of detail" — and the projections 
+                    between them are the unique structure-preserving ways to reduce that detail.
+                </p>
+            </div>
+            
+            <p>
+                The hierarchy E₈ → E₇ → E₆ → F₄ → G₂ → S⁷ isn't arbitrary.
+                These are the <em>only</em> exceptional structures. The dimensions are forced.
+                And the transformations between them have specific mathematical meanings.
+            </p>
+            
+            <p class="whisper">
+                Let's see what each one actually does.
+            </p>
+        </div>
+    </section>
+
+    <!-- ==================== BRANCHING RULES ==================== -->
+    <section id="branching">
+        <canvas class="section-canvas" id="canvas-branching"></canvas>
+        <div class="section-content">
+            <h2>Branching Rules: The Grammar of Forgetting</h2>
+            
+            <p class="lead">
+                When a large symmetry "breaks" into a smaller one, the pieces don't vanish.
+                They <em>reorganize</em>.
+            </p>
+            
+            <p>
+                A <strong>branching rule</strong> tells you exactly how. It says: 
+                "When you restrict from the big algebra to the small one, 
+                the representation decomposes like this."
+            </p>
+            
+            <div class="physics-note">
+                <h4>Physical Analogy</h4>
+                <p>
+                    You've seen this in quantum mechanics. A spin-2 particle (5 states) 
+                    becomes m = -2, -1, 0, +1, +2 when you choose a quantization axis.
+                    The rotational symmetry "breaks" to just rotations around that axis.
+                    The 5 states split into pieces labeled by the remaining quantum number.
+                </p>
+            </div>
+            
+            <p>
+                The numbers in a branching rule tell you:
+            </p>
+            
+            <ul style="margin: 1rem 0 1rem 1.5rem; color: var(--dim);">
+                <li><strong>What gets kept:</strong> The subalgebra's adjoint representation</li>
+                <li><strong>What gets mixed:</strong> Representations that transform under the "extra" symmetry</li>
+                <li><strong>What's orthogonal:</strong> Directions that the smaller algebra can't see at all</li>
+            </ul>
+            
+            <p>
+                The coefficients — things like <span class="coefficient">1/√2</span> — 
+                tell you <em>how</em> the pieces combine. When you see 1/√2, 
+                it means "equal superposition of two things."
+            </p>
+        </div>
+    </section>
+
+    <!-- ==================== E8 → E7 ==================== -->
+    <section id="e8-e7">
+        <canvas class="section-canvas" id="canvas-e8-e7"></canvas>
+        <div class="section-content">
+            <h2>E₈ → E₇: Choosing an Axis</h2>
+            
+            <div class="equation">
+                E₈ → E₇ × SU(2)<br>
+                248 = (133, 1) ⊕ (56, 2) ⊕ (1, 3)
+            </div>
+            
+            <p class="lead">
+                The first step breaks 248 dimensions into three pieces.
+            </p>
+            
+            <h3>The Transformation</h3>
+            
+            <p>
+                We choose a specific E₈ root — call it α = (1, -1, 0, 0, 0, 0, 0, 0) — 
+                and declare it "special." The E₇ subalgebra is exactly those E₈ generators 
+                that commute with α.
+            </p>
+            
+            <p>
+                Mathematically: we select the 126 E₈ roots that are <em>orthogonal</em> to α.
+                These, plus 7 of the 8 Cartan generators, give us E₇'s 133 dimensions.
+            </p>
+            
+            <div class="lost-box">
+                <h4>What's Lost</h4>
+                <p>
+                    The SU(2) symmetry that rotates between α and its orthogonal complement.
+                    This is the "(1, 3)" — one dimension that becomes an SU(2) triplet.
+                    We've chosen a "direction" in the 8D Cartan, and can no longer rotate freely.
+                </p>
+            </div>
+            
+            <div class="kept-box">
+                <h4>What's Kept</h4>
+                <p>
+                    The E₇ adjoint (133, 1) — all the structure that doesn't "care" about α.
+                    Plus the 56-dimensional fundamental rep of E₇, appearing as a doublet under the remaining SU(2).
+                </p>
+            </div>
+            
+            <div class="metaphor-box">
+                <h4>Metaphor</h4>
+                <p>
+                    Like choosing which way is "up" on Earth. Once you pick it, 
+                    you can still do anything that doesn't depend on that choice 
+                    (walking north vs south), but you've broken the full rotational freedom.
+                </p>
+            </div>
+            
+            <p class="whisper">
+                133 + 112 + 3 = 248. Everything is accounted for — just reorganized.
+            </p>
+        </div>
+    </section>
+
+    <!-- ==================== E7 → E6 ==================== -->
+    <section id="e7-e6">
+        <canvas class="section-canvas" id="canvas-e7-e6"></canvas>
+        <div class="section-content">
+            <h2>E₇ → E₆: Forgetting a Charge</h2>
+            
+            <div class="equation">
+                E₇ → E₆ × U(1)<br>
+                133 = 78₀ ⊕ 27₊₂ ⊕ 27̄₋₂ ⊕ 1₀
+            </div>
+            
+            <p class="lead">
+                Now we drop from 133 to 78 dimensions by ignoring a "charge."
+            </p>
+            
+            <h3>The Transformation</h3>
+            
+            <p>
+                E₆ sits inside E₇ as the subalgebra that's neutral under a U(1) subgroup.
+                We pick a direction β in E₇'s Cartan and keep only roots with 
+                <span class="equation-inline">⟨root, β⟩ = 0</span>.
+            </p>
+            
+            <p>
+                The subscripts (0, +2, -2) are U(1) charges. The 78₀ has charge zero — 
+                it's the E₆ adjoint. The 27₊₂ and 27̄₋₂ have nonzero charges — they transform.
+            </p>
+            
+            <div class="lost-box">
+                <h4>What's Lost</h4>
+                <p>
+                    The ability to distinguish "charge +2" from "charge -2" states.
+                    The U(1) is like an overall phase — we're declaring that physics 
+                    shouldn't depend on it.
+                </p>
+            </div>
+            
+            <div class="kept-box">
+                <h4>What's Kept</h4>
+                <p>
+                    The E₆ adjoint (78 dimensions) — all transformations that are "charge-neutral."
+                    Plus we can still see the 27-dimensional fundamental rep, just not its charge.
+                </p>
+            </div>
+            
+            <div class="physics-note">
+                <h4>Physical Analogy</h4>
+                <p>
+                    In QED, you can work with "charge-neutral" combinations only: 
+                    electron-positron pairs, photons. The U(1) phase becomes unphysical.
+                    This projection does the same thing: forget the phase, keep the structure.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== E6 → F4 ==================== -->
+    <section id="e6-f4">
+        <canvas class="section-canvas" id="canvas-e6-f4"></canvas>
+        <div class="section-content">
+            <h2>E₆ → F₄: Folding the Diagram</h2>
+            
+            <div class="equation">
+                E₆ → F₄<br>
+                78 = 52 ⊕ 26
+            </div>
+            
+            <p class="lead">
+                This is the most beautiful transformation: we fold E₆'s Dynkin diagram onto itself.
+            </p>
+            
+            <h3>The Transformation</h3>
+            
+            <p>
+                E₆ has an outer automorphism σ — a symmetry of its structure that swaps 
+                nodes 1 ↔ 5 and 2 ↔ 4 in the Dynkin diagram. F₄ is the subalgebra 
+                that's <em>fixed</em> by this symmetry.
+            </p>
+            
+            <p>
+                For each pair of roots (α, σα), we form the symmetric combination:
+            </p>
+            
+            <div class="equation">
+                (α + σα) / √2  →  F₄ root<br>
+                (α - σα) / √2  →  26 complement
+            </div>
+            
+            <p>
+                The coefficient <span class="coefficient">1/√2</span> appears because we're 
+                normalizing the sum of two unit vectors. It's the signature of an equal superposition.
+            </p>
+            
+            <div class="lost-box">
+                <h4>What's Lost</h4>
+                <p>
+                    The distinction between 27 and 27̄ — the "complex conjugate" representations.
+                    In E₆, these are different. In F₄, they're identified.
+                    We've declared that matter and antimatter "look the same" at this level.
+                </p>
+            </div>
+            
+            <div class="kept-box">
+                <h4>What's Kept</h4>
+                <p>
+                    The 52-dimensional F₄ adjoint — everything that's symmetric under the flip.
+                    F₄ is the automorphism group of the Albert algebra (3×3 Hermitian octonion matrices).
+                </p>
+            </div>
+            
+            <div class="metaphor-box">
+                <h4>Metaphor</h4>
+                <p>
+                    Like folding a piece of paper in half: points on the left get glued to 
+                    points on the right. You lose the ability to distinguish them, but gain 
+                    the simplicity of the folded shape.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== F4 → G2 ==================== -->
+    <section id="f4-g2">
+        <canvas class="section-canvas" id="canvas-f4-g2"></canvas>
+        <div class="section-content">
+            <h2>F₄ → G₂: From Matrices to Numbers</h2>
+            
+            <div class="equation">
+                F₄ → G₂ × SU(2)<br>
+                52 = (14, 1) ⊕ (7, 2) ⊕ (7, 2) ⊕ (1, 3) ⊕ (7, 1)
+            </div>
+            
+            <p class="lead">
+                Now we extract the octonion structure from the Albert algebra.
+            </p>
+            
+            <h3>The Transformation</h3>
+            
+            <p>
+                F₄ acts on 3×3 Hermitian octonion matrices. G₂ is the automorphism group 
+                of the octonions themselves. This projection forgets the "3×3 matrix structure" 
+                and keeps only the octonion multiplication rules.
+            </p>
+            
+            <p>
+                The G₂ roots are found by projecting F₄ roots onto a 2D subspace (the G₂ Cartan):
+            </p>
+            
+            <div class="equation">
+                (x₁, x₂, x₃, x₄) → (x₁ + x₂, x₃ + x₄)
+            </div>
+            
+            <p>
+                Of the 48 F₄ roots, exactly 12 project to distinct nonzero positions. 
+                These become the 12 G₂ roots.
+            </p>
+            
+            <div class="lost-box">
+                <h4>What's Lost</h4>
+                <p>
+                    The full Albert algebra structure — how octonions combine into 3×3 matrices.
+                    The 7-dimensional representations that appear as doublets and singlets 
+                    are "orthogonal" to G₂ — they transform under the auxiliary SU(2) we're ignoring.
+                </p>
+            </div>
+            
+            <div class="kept-box">
+                <h4>What's Kept</h4>
+                <p>
+                    The G₂ adjoint (14 dimensions) — the pure octonion automorphisms.
+                    This is the structure that preserves the multiplication table 
+                    e₁ × e₂ = e₃, etc.
+                </p>
+            </div>
+            
+            <div class="physics-note">
+                <h4>Physical Analogy</h4>
+                <p>
+                    Like going from matrix mechanics to wave mechanics: you lose the explicit 
+                    matrix representation but keep the underlying algebraic structure. 
+                    The physics is the same, the formalism is simpler.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== G2 → S7 ==================== -->
+    <section id="g2-s7">
+        <canvas class="section-canvas" id="canvas-g2-s7"></canvas>
+        <div class="section-content">
+            <h2>G₂ → S⁷: From Algebra to Geometry</h2>
+            
+            <div class="equation">
+                G₂ (14D Lie algebra) → Im(𝕆) (7D vector space)
+            </div>
+            
+            <p class="lead">
+                The final step is different: we leave Lie algebras entirely and enter geometry.
+            </p>
+            
+            <h3>The Transformation</h3>
+            
+            <p>
+                G₂ is the group of transformations that preserve octonion multiplication.
+                It acts on the 7-dimensional space of imaginary octonions (Im(𝕆) = span{e₁, ..., e₇}).
+            </p>
+            
+            <p>
+                The projection uses G₂'s 14D Lie algebra basis — specifically, how each 
+                basis element acts on a reference vector in Im(𝕆). We're asking: 
+                "What does this symmetry <em>do</em> to a point?"
+            </p>
+            
+            <div class="equation">
+                P_{k,α} = (B_α · v)_k<br>
+                where v = (1,1,1,1,1,1,1)/√7
+            </div>
+            
+            <div class="lost-box">
+                <h4>What's Lost</h4>
+                <p>
+                    The Lie algebra structure itself. S⁷ is a manifold, not an algebra.
+                    There's no "bracket" on S⁷. We've gone from transformations to the space 
+                    being transformed.
+                </p>
+            </div>
+            
+            <div class="kept-box">
+                <h4>What's Kept</h4>
+                <p>
+                    The 7 imaginary directions — the space that G₂ acts on.
+                    This is the "stage" rather than the "actors." 
+                    Unit vectors in this space form S⁷, the 7-sphere.
+                </p>
+            </div>
+            
+            <div class="metaphor-box">
+                <h4>Metaphor</h4>
+                <p>
+                    Like going from "all possible rotations of a ball" to "the surface of the ball."
+                    The rotations tell you what you <em>can do</em>. 
+                    The surface tells you <em>where you are</em>.
+                </p>
+            </div>
+            
+            <p class="whisper">
+                7 dimensions. One for each imaginary octonion. One for each colony.
+            </p>
+        </div>
+    </section>
+
+    <!-- ==================== THE LATTICE ==================== -->
+    <section id="lattice">
+        <canvas class="section-canvas" id="canvas-lattice"></canvas>
+        <div class="section-content">
+            <h2>The E₈ Lattice: Where Continuous Becomes Discrete</h2>
+            
+            <p class="lead">
+                E₈ appears <em>twice</em> in this architecture: once at the top (as a 248D Lie algebra),
+                and once at the bottom (as an infinite 8D lattice for quantization).
+            </p>
+            
+            <h3>Why a Lattice?</h3>
+            
+            <p>
+                After compressing through the hierarchy, we need to <em>discretize</em>.
+                Neural networks ultimately output real numbers, but for storage, communication, 
+                and stability, we want discrete codes.
+            </p>
+            
+            <p>
+                The E₈ lattice is the optimal way to do this in 8 dimensions (proven by Viazovska, 
+                Fields Medal 2022). Every 8D vector maps to its nearest lattice point.
+            </p>
+            
+            <div class="equation">
+                E₈ = D₈ ∪ (D₈ + ½)<br>
+                D₈ = { z ∈ ℤ⁸ : Σzᵢ is even }
+            </div>
+            
+            <h3>Not Just 240 Points</h3>
+            
+            <p>
+                The lattice is <strong>infinite</strong>. The "240 roots" are just the closest 
+                points to the origin (the kissing number). But quantization uses the whole lattice.
+            </p>
+            
+            <div class="insight">
+                <p>
+                    <strong>The encoding:</strong> Each lattice point is stored as 8 half-step integers,
+                    varint-encoded. Small coordinates = fewer bytes. This is entropy-efficient, 
+                    not a fixed 240-way lookup.
+                </p>
+            </div>
+            
+            <div class="physics-note">
+                <h4>Physical Analogy</h4>
+                <p>
+                    Like measuring position in a crystal. The atoms form an infinite lattice.
+                    Any electron gets "snapped" to the nearest lattice site 
+                    (in the tight-binding approximation). The continuous becomes discrete.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== THE MEANING ==================== -->
+    <section id="meaning">
+        <canvas class="section-canvas" id="canvas-meaning"></canvas>
+        <div class="section-content">
+            <h2>What It All Means</h2>
+            
+            <p class="lead">
+                Each step down the hierarchy is a decision about <em>what matters</em>.
+            </p>
+            
+            <h3>E₈ → E₇: Choose a direction</h3>
+            <p>
+                Break rotational symmetry. Declare one axis special.
+                <em>Physical: Pick a quantization axis.</em>
+            </p>
+            
+            <h3>E₇ → E₆: Forget a phase</h3>
+            <p>
+                Ignore an overall U(1) charge.
+                <em>Physical: Work in gauge-invariant quantities.</em>
+            </p>
+            
+            <h3>E₆ → F₄: Identify conjugates</h3>
+            <p>
+                Declare that 27 and 27̄ are the same.
+                <em>Physical: Matter and antimatter are equivalent labels.</em>
+            </p>
+            
+            <h3>F₄ → G₂: Forget the matrix structure</h3>
+            <p>
+                Keep only the underlying number system.
+                <em>Physical: Abstract away the representation.</em>
+            </p>
+            
+            <h3>G₂ → S⁷: From algebra to geometry</h3>
+            <p>
+                Stop caring about transformations; care about position.
+                <em>Physical: From symmetry group to state space.</em>
+            </p>
+            
+            <div class="metaphor-box">
+                <h4>The Big Picture</h4>
+                <p>
+                    The hierarchy is a funnel of increasing <strong>commitment</strong>.
+                    At E₈, all possibilities are open. At S⁷, you're at a specific point.
+                    Each step closes some doors and opens others.
+                    <br><br>
+                    Compression isn't loss — it's <strong>choice</strong>.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== END ==================== -->
+    <section id="end">
+        <canvas class="section-canvas" id="canvas-end"></canvas>
+        <div class="section-content centered">
+            
+            <p class="lead" style="margin-bottom: 2rem;">
+                The exceptional hierarchy exists because mathematics allows exactly five structures
+                outside the infinite classical families.
+            </p>
+            
+            <p>
+                Their dimensions (248, 133, 78, 52, 14) aren't arbitrary — they're forced by 
+                root systems and Killing-Cartan classification.
+            </p>
+            
+            <p>
+                The branching rules (how they nest) aren't arbitrary — they're forced by 
+                representation theory and subalgebra embeddings.
+            </p>
+            
+            <p>
+                The coefficients (the √2s and 1s) aren't arbitrary — they're forced by 
+                orthonormality and the geometry of the root systems.
+            </p>
+            
+            <div class="equation" style="margin: 2.5rem 0; line-height: 2.5;">
+                E₈(248) →<sup>choose axis</sup> E₇(133) →<sup>forget phase</sup> E₆(78)<br>
+                →<sup>fold conjugates</sup> F₄(52) →<sup>to octonions</sup> G₂(14) →<sup>to geometry</sup> S⁷(7)<br>
+                ↓<br>
+                E₈ lattice (∞ points, optimal quantization)
+            </div>
+            
+            <p>
+                This is what it means to compress while preserving structure.
+                Each level keeps what's essential and discards what's not — 
+                for that level's purpose.
+            </p>
+            
+            <p style="margin-top: 2rem;">
+                Understanding is compression.
+                Compression is choice.
+                The mathematics just tells us which choices are <em>coherent</em>.
+            </p>
+            
+            <div style="margin: 4rem 0;">
+                <span class="kanji" style="font-size: 4rem;">鏡</span>
+            </div>
+            
+            <p class="whisper">
+                The mirror that chooses what to reflect.
+            </p>
+        </div>
+    </section>
+
+    <script>
+        // ==================== CURSOR ====================
+        const cursor = document.querySelector('.cursor');
+        const cursorDot = document.querySelector('.cursor-dot');
+        let mouseX = 0, mouseY = 0, cursorX = 0, cursorY = 0;
+        
+        document.addEventListener('mousemove', e => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+        
+        function animateCursor() {
+            cursorX += (mouseX - cursorX) * 0.12;
+            cursorY += (mouseY - cursorY) * 0.12;
+            cursor.style.left = cursorX - 12 + 'px';
+            cursor.style.top = cursorY - 12 + 'px';
+            cursorDot.style.left = mouseX - 2 + 'px';
+            cursorDot.style.top = mouseY - 2 + 'px';
+            requestAnimationFrame(animateCursor);
+        }
+        animateCursor();
+        
+        // ==================== PROGRESS ====================
+        const progressBar = document.querySelector('.progress-bar');
+        window.addEventListener('scroll', () => {
+            const progress = (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100;
+            progressBar.style.width = progress + '%';
+        });
+        
+        // ==================== NAVIGATION ====================
+        const sections = document.querySelectorAll('section');
+        const navDots = document.querySelectorAll('.nav-dot');
+        
+        const observer = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.querySelector('.section-content')?.classList.add('visible');
+                    navDots.forEach(dot => {
+                        dot.classList.toggle('active', dot.dataset.section === entry.target.id);
+                    });
+                }
+            });
+        }, { threshold: 0.35 });
+        
+        sections.forEach(s => observer.observe(s));
+        navDots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                document.getElementById(dot.dataset.section)?.scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+        
+        // ==================== CANVAS SETUP ====================
+        function setupCanvas(id) {
+            const canvas = document.getElementById(id);
+            if (!canvas) return null;
+            const ctx = canvas.getContext('2d');
+            const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+            resize();
+            window.addEventListener('resize', resize);
+            return { canvas, ctx };
+        }
+        
+        // ==================== HERO: Cascading dimensions ====================
+        const hero = setupCanvas('canvas-hero');
+        if (hero) {
+            const { canvas, ctx } = hero;
+            const levels = [248, 133, 78, 52, 14, 7];
+            const particles = [];
+            
+            for (let i = 0; i < 150; i++) {
+                particles.push({
+                    x: Math.random(),
+                    y: Math.random(),
+                    speed: 0.0003 + Math.random() * 0.0004,
+                    level: Math.floor(Math.random() * levels.length)
+                });
+            }
+            
+            function draw(t) {
+                ctx.fillStyle = 'rgba(10, 10, 12, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const cx = canvas.width / 2;
+                
+                // Draw level bands
+                levels.forEach((dim, i) => {
+                    const y = (i / (levels.length - 1)) * canvas.height * 0.8 + canvas.height * 0.1;
+                    const width = Math.sqrt(dim) * 5;
+                    
+                    ctx.strokeStyle = `rgba(212, 175, 55, ${0.1 + i * 0.02})`;
+                    ctx.beginPath();
+                    ctx.moveTo(cx - width * 2, y);
+                    ctx.lineTo(cx + width * 2, y);
+                    ctx.stroke();
+                });
+                
+                // Animate particles falling through levels
+                particles.forEach(p => {
+                    p.y += p.speed;
+                    if (p.y > 1) {
+                        p.y = 0;
+                        p.x = 0.3 + Math.random() * 0.4;
+                        p.level = 0;
+                    }
+                    
+                    const levelIdx = Math.min(Math.floor(p.y * levels.length), levels.length - 1);
+                    const dim = levels[levelIdx];
+                    const maxSpread = Math.sqrt(dim) / Math.sqrt(248);
+                    
+                    // Compress toward center as we go down
+                    const targetX = 0.5 + (p.x - 0.5) * maxSpread;
+                    p.x += (targetX - p.x) * 0.02;
+                    
+                    const px = cx + (p.x - 0.5) * canvas.width * 0.4;
+                    const py = p.y * canvas.height * 0.8 + canvas.height * 0.1;
+                    
+                    const alpha = 0.3 + (1 - p.y) * 0.4;
+                    ctx.fillStyle = `rgba(212, 175, 55, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                
+                requestAnimationFrame(draw);
+            }
+            draw(0);
+        }
+        
+        // ==================== FRAME: Complexity levels ====================
+        const frameCanvas = setupCanvas('canvas-frame');
+        if (frameCanvas) {
+            const { canvas, ctx } = frameCanvas;
+            
+            function draw(t) {
+                ctx.fillStyle = 'rgba(10, 10, 12, 0.04)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const cx = canvas.width * 0.7;
+                const cy = canvas.height / 2;
+                
+                // Detailed representation (many points)
+                const detailCount = 100;
+                for (let i = 0; i < detailCount; i++) {
+                    const angle = (i / detailCount) * Math.PI * 2 + t * 0.0002;
+                    const r = 120 + Math.sin(angle * 7 + t * 0.001) * 20;
+                    const x = cx + Math.cos(angle) * r;
+                    const y = cy + Math.sin(angle) * r;
+                    
+                    ctx.fillStyle = 'rgba(212, 175, 55, 0.15)';
+                    ctx.beginPath();
+                    ctx.arc(x, y, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Compressed representation (few points)
+                for (let i = 0; i < 7; i++) {
+                    const angle = (i / 7) * Math.PI * 2 + t * 0.0003;
+                    const x = cx + Math.cos(angle) * 50;
+                    const y = cy + Math.sin(angle) * 50;
+                    
+                    ctx.fillStyle = 'rgba(212, 175, 55, 0.6)';
+                    ctx.beginPath();
+                    ctx.arc(x, y, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Center point
+                ctx.fillStyle = 'rgba(212, 175, 55, 0.8)';
+                ctx.beginPath();
+                ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+                ctx.fill();
+                
+                requestAnimationFrame(draw);
+            }
+            draw(0);
+        }
+        
+        // ==================== BRANCHING: Split visualization ====================
+        const branchCanvas = setupCanvas('canvas-branching');
+        if (branchCanvas) {
+            const { canvas, ctx } = branchCanvas;
+            
+            function draw(t) {
+                ctx.fillStyle = 'rgba(10, 10, 12, 0.04)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const cx = canvas.width * 0.65;
+                const cy = canvas.height / 2;
+                
+                // Parent node
+                ctx.fillStyle = 'rgba(212, 175, 55, 0.4)';
+                ctx.beginPath();
+                ctx.arc(cx, cy - 120, 30, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Three child branches
+                const children = [
+                    { x: cx - 80, y: cy + 60, size: 25, label: '133' },
+                    { x: cx + 40, y: cy + 80, size: 18, label: '56×2' },
+                    { x: cx + 100, y: cy + 40, size: 10, label: '3' }
+                ];
+                
+                children.forEach((c, i) => {
+                    // Connection line
+                    ctx.strokeStyle = 'rgba(212, 175, 55, 0.2)';
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy - 90);
+                    ctx.quadraticCurveTo(cx, cy - 20, c.x, c.y - c.size);
+                    ctx.stroke();
+                    
+                    // Child node
+                    const pulse = 1 + Math.sin(t * 0.003 + i) * 0.1;
+                    ctx.fillStyle = 'rgba(212, 175, 55, 0.4)';
+                    ctx.beginPath();
+                    ctx.arc(c.x, c.y, c.size * pulse, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                
+                requestAnimationFrame(draw);
+            }
+            draw(0);
+        }
+        
+        // ==================== E8-E7: Axis selection ====================
+        const e8e7Canvas = setupCanvas('canvas-e8-e7');
+        if (e8e7Canvas) {
+            const { canvas, ctx } = e8e7Canvas;
+            
+            // 240 E8 roots projected
+            const roots = [];
+            for (let i = 0; i < 240; i++) {
+                const phi = Math.acos(1 - 2 * (i + 0.5) / 240);
+                const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+                // Compute if "orthogonal" to chosen axis (simplified)
+                const isE7 = Math.abs(Math.cos(phi)) < 0.7; // ~126 roots
+                roots.push({ theta, phi, isE7 });
+            }
+            
+            function draw(t) {
+                ctx.fillStyle = 'rgba(10, 10, 12, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const cx = canvas.width * 0.65;
+                const cy = canvas.height / 2;
+                const radius = Math.min(canvas.width, canvas.height) * 0.22;
+                
+                // The chosen axis
+                ctx.strokeStyle = 'rgba(255, 100, 100, 0.4)';
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(cx, cy - radius * 1.3);
+                ctx.lineTo(cx, cy + radius * 1.3);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // E8 roots
+                roots.forEach((r, i) => {
+                    const rotY = t * 0.0001;
+                    const x = Math.sin(r.phi) * Math.cos(r.theta + rotY);
+                    const y = Math.sin(r.phi) * Math.sin(r.theta + rotY);
+                    const z = Math.cos(r.phi);
+                    
+                    const scale = 1 / (1.5 - z * 0.3);
+                    const px = cx + x * radius * scale;
+                    const py = cy + y * radius * scale;
+                    
+                    // E7 roots (orthogonal to axis) in gold, others dimmer
+                    const alpha = r.isE7 ? 0.5 : 0.15;
+                    const color = r.isE7 ? '212, 175, 55' : '150, 150, 150';
+                    ctx.fillStyle = `rgba(${color}, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 2 * scale, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                
+                requestAnimationFrame(draw);
+            }
+            draw(0);
+        }
+        
+        // ==================== E7-E6: Phase circle ====================
+        const e7e6Canvas = setupCanvas('canvas-e7-e6');
+        if (e7e6Canvas) {
+            const { canvas, ctx } = e7e6Canvas;
+            
+            function draw(t) {
+                ctx.fillStyle = 'rgba(10, 10, 12, 0.04)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const cx = canvas.width * 0.65;
+                const cy = canvas.height / 2;
+                const r = 100;
+                
+                // U(1) circle
+                ctx.strokeStyle = 'rgba(212, 175, 55, 0.2)';
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // Points at different phases
+                for (let i = 0; i < 12; i++) {
+                    const angle = (i / 12) * Math.PI * 2;
+                    const x = cx + Math.cos(angle) * r;
+                    const y = cy + Math.sin(angle) * r;
+                    
+                    // Charge: cos(angle) > 0 = positive, < 0 = negative
+                    const charge = Math.cos(angle);
+                    const color = charge > 0.3 ? '100, 200, 255' : charge < -0.3 ? '255, 150, 100' : '212, 175, 55';
+                    
+                    ctx.fillStyle = `rgba(${color}, 0.5)`;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // The "forgotten" phase angle rotating
+                const phaseAngle = t * 0.001;
+                const px = cx + Math.cos(phaseAngle) * r;
+                const py = cy + Math.sin(phaseAngle) * r;
+                
+                ctx.strokeStyle = 'rgba(255, 100, 100, 0.3)';
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(px, py);
+                ctx.stroke();
+                
+                // Center: charge-neutral
+                ctx.fillStyle = 'rgba(212, 175, 55, 0.8)';
+                ctx.beginPath();
+                ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                requestAnimationFrame(draw);
+            }
+            draw(0);
+        }
+        
+        // ==================== E6-F4: Diagram folding ====================
+        const e6f4Canvas = setupCanvas('canvas-e6-f4');
+        if (e6f4Canvas) {
+            const { canvas, ctx } = e6f4Canvas;
+            
+            function draw(t) {
+                ctx.fillStyle = 'rgba(10, 10, 12, 0.04)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const cx = canvas.width * 0.65;
+                const cy = canvas.height / 2;
+                
+                // E6 Dynkin diagram (before folding)
+                // 1 - 2 - 3 - 4 - 5
+                //         |
+                //         6
+                
+                const nodeSpacing = 50;
+                const foldProgress = (Math.sin(t * 0.001) + 1) / 2; // 0 to 1
+                
+                const nodes = [
+                    { id: 1, x: cx - nodeSpacing * 2, y: cy - 30 },
+                    { id: 2, x: cx - nodeSpacing, y: cy - 30 },
+                    { id: 3, x: cx, y: cy - 30 },
+                    { id: 4, x: cx + nodeSpacing, y: cy - 30 },
+                    { id: 5, x: cx + nodeSpacing * 2, y: cy - 30 },
+                    { id: 6, x: cx, y: cy + 30 }
+                ];
+                
+                // Animate folding: 1↔5, 2↔4
+                const fold1_5 = {
+                    x: cx + nodeSpacing * 2 * (0.5 - foldProgress),
+                    y: cy - 30
+                };
+                const fold2_4 = {
+                    x: cx + nodeSpacing * (0.5 - foldProgress),
+                    y: cy - 30
+                };
+                
+                // Draw edges
+                ctx.strokeStyle = 'rgba(212, 175, 55, 0.3)';
+                ctx.lineWidth = 1;
+                
+                // Horizontal edges
+                ctx.beginPath();
+                ctx.moveTo(nodes[0].x + (fold1_5.x - nodes[0].x) * foldProgress, nodes[0].y);
+                ctx.lineTo(nodes[1].x + (fold2_4.x - nodes[1].x) * foldProgress, nodes[1].y);
+                ctx.lineTo(nodes[2].x, nodes[2].y);
+                ctx.lineTo(nodes[3].x + (fold2_4.x - nodes[3].x) * foldProgress, nodes[3].y);
+                ctx.lineTo(nodes[4].x + (fold1_5.x - nodes[4].x) * foldProgress, nodes[4].y);
+                ctx.stroke();
+                
+                // Vertical edge to node 6
+                ctx.beginPath();
+                ctx.moveTo(nodes[2].x, nodes[2].y);
+                ctx.lineTo(nodes[5].x, nodes[5].y);
+                ctx.stroke();
+                
+                // Draw nodes
+                nodes.forEach((n, i) => {
+                    let nx = n.x;
+                    let ny = n.y;
+                    
+                    // Fold nodes 1↔5, 2↔4
+                    if (n.id === 1 || n.id === 5) {
+                        nx = n.x + (fold1_5.x - n.x) * foldProgress;
+                    } else if (n.id === 2 || n.id === 4) {
+                        nx = n.x + (fold2_4.x - n.x) * foldProgress;
+                    }
+                    
+                    ctx.fillStyle = 'rgba(212, 175, 55, 0.6)';
+                    ctx.beginPath();
+                    ctx.arc(nx, ny, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                
+                requestAnimationFrame(draw);
+            }
+            draw(0);
+        }
+        
+        // ==================== F4-G2: Matrix to number ====================
+        const f4g2Canvas = setupCanvas('canvas-f4-g2');
+        if (f4g2Canvas) {
+            const { canvas, ctx } = f4g2Canvas;
+            
+            function draw(t) {
+                ctx.fillStyle = 'rgba(10, 10, 12, 0.04)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const cx = canvas.width * 0.6;
+                const cy = canvas.height / 2;
+                
+                // 3x3 matrix grid (Albert algebra)
+                const gridSize = 60;
+                for (let i = 0; i < 3; i++) {
+                    for (let j = 0; j < 3; j++) {
+                        const x = cx - gridSize + i * gridSize;
+                        const y = cy - gridSize + j * gridSize;
+                        
+                        const isCorner = (i === 0 || i === 2) && (j === 0 || j === 2);
+                        const isDiag = i === j;
+                        
+                        ctx.strokeStyle = `rgba(212, 175, 55, ${isDiag ? 0.4 : 0.2})`;
+                        ctx.strokeRect(x - 20, y - 20, 40, 40);
+                        
+                        // Only diagonal elements survive (simplified)
+                        if (isDiag) {
+                            ctx.fillStyle = 'rgba(212, 175, 55, 0.4)';
+                            ctx.beginPath();
+                            ctx.arc(x, y, 10 + Math.sin(t * 0.003 + i) * 3, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+                }
+                
+                // Arrow to G2 hexagon
+                ctx.strokeStyle = 'rgba(212, 175, 55, 0.2)';
+                ctx.beginPath();
+                ctx.moveTo(cx + gridSize * 1.5, cy);
+                ctx.lineTo(cx + gridSize * 2.5, cy);
+                ctx.stroke();
+                
+                // G2 hexagon
+                const hx = cx + gridSize * 3.5;
+                const r1 = 30, r2 = 50;
+                
+                ctx.strokeStyle = 'rgba(212, 175, 55, 0.3)';
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2 + t * 0.0003;
+                    const x = hx + Math.cos(angle) * r1;
+                    const y = cy + Math.sin(angle) * r1;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.stroke();
+                
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2 + Math.PI/6 + t * 0.0003;
+                    const x = hx + Math.cos(angle) * r2;
+                    const y = cy + Math.sin(angle) * r2;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.stroke();
+                
+                requestAnimationFrame(draw);
+            }
+            draw(0);
+        }
+        
+        // ==================== G2-S7: Algebra to geometry ====================
+        const g2s7Canvas = setupCanvas('canvas-g2-s7');
+        if (g2s7Canvas) {
+            const { canvas, ctx } = g2s7Canvas;
+            
+            function draw(t) {
+                ctx.fillStyle = 'rgba(10, 10, 12, 0.04)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const cx = canvas.width * 0.65;
+                const cy = canvas.height / 2;
+                const r = 100;
+                
+                // S7 as a circle (projection)
+                ctx.strokeStyle = 'rgba(212, 175, 55, 0.3)';
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // 7 points on the sphere
+                for (let i = 0; i < 7; i++) {
+                    const angle = (i / 7) * Math.PI * 2 + t * 0.0003;
+                    const x = cx + Math.cos(angle) * r;
+                    const y = cy + Math.sin(angle) * r;
+                    
+                    ctx.fillStyle = 'rgba(212, 175, 55, 0.6)';
+                    ctx.beginPath();
+                    ctx.arc(x, y, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Trail
+                    for (let j = 1; j < 10; j++) {
+                        const ta = angle - j * 0.03;
+                        const tx = cx + Math.cos(ta) * r;
+                        const ty = cy + Math.sin(ta) * r;
+                        ctx.fillStyle = `rgba(212, 175, 55, ${0.3 * (1 - j/10)})`;
+                        ctx.beginPath();
+                        ctx.arc(tx, ty, 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                
+                // The transformation acting (fading G2 hexagon at center)
+                const hexAlpha = 0.15 + Math.sin(t * 0.002) * 0.1;
+                ctx.strokeStyle = `rgba(150, 150, 150, ${hexAlpha})`;
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2;
+                    const hx = cx + Math.cos(angle) * 30;
+                    const hy = cy + Math.sin(angle) * 30;
+                    if (i === 0) ctx.moveTo(hx, hy);
+                    else ctx.lineTo(hx, hy);
+                }
+                ctx.closePath();
+                ctx.stroke();
+                
+                requestAnimationFrame(draw);
+            }
+            draw(0);
+        }
+        
+        // ==================== LATTICE: Sphere packing ====================
+        const latticeCanvas = setupCanvas('canvas-lattice');
+        if (latticeCanvas) {
+            const { canvas, ctx } = latticeCanvas;
+            
+            const spheres = [];
+            for (let i = -3; i <= 3; i++) {
+                for (let j = -3; j <= 3; j++) {
+                    const even = (i + j) % 2 === 0;
+                    if (even) { // D8 lattice condition (simplified)
+                        spheres.push({
+                            x: i * 40,
+                            y: j * 40,
+                            z: ((i + j + 6) % 3) * 20
+                        });
+                    }
+                }
+            }
+            
+            function draw(t) {
+                ctx.fillStyle = 'rgba(10, 10, 12, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const cx = canvas.width * 0.65;
+                const cy = canvas.height / 2;
+                
+                spheres.forEach(s => {
+                    const rotY = t * 0.0002;
+                    const x = s.x * Math.cos(rotY) - s.z * Math.sin(rotY);
+                    const z = s.x * Math.sin(rotY) + s.z * Math.cos(rotY);
+                    
+                    const scale = 1 / (1.5 - z / 150);
+                    const px = cx + x * scale;
+                    const py = cy + s.y * scale;
+                    const r = 15 * scale;
+                    
+                    const grad = ctx.createRadialGradient(px - r/3, py - r/3, 0, px, py, r);
+                    grad.addColorStop(0, 'rgba(212, 175, 55, 0.5)');
+                    grad.addColorStop(1, 'rgba(212, 175, 55, 0.15)');
+                    
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(px, py, r, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                
+                requestAnimationFrame(draw);
+            }
+            draw(0);
+        }
+        
+        // ==================== MEANING: Summary flow ====================
+        const meaningCanvas = setupCanvas('canvas-meaning');
+        if (meaningCanvas) {
+            const { canvas, ctx } = meaningCanvas;
+            
+            const steps = ['E₈', 'E₇', 'E₆', 'F₄', 'G₂', 'S⁷'];
+            const losses = ['axis', 'phase', 'conjugate', 'matrix', 'algebra'];
+            
+            function draw(t) {
+                ctx.fillStyle = 'rgba(10, 10, 12, 0.03)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const startX = canvas.width * 0.15;
+                const endX = canvas.width * 0.15;
+                const stepHeight = canvas.height * 0.12;
+                const startY = canvas.height * 0.15;
+                
+                steps.forEach((step, i) => {
+                    const y = startY + i * stepHeight;
+                    const pulse = 1 + Math.sin(t * 0.003 + i * 0.5) * 0.1;
+                    
+                    // Node
+                    ctx.fillStyle = 'rgba(212, 175, 55, 0.5)';
+                    ctx.beginPath();
+                    ctx.arc(startX, y, 8 * pulse, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Arrow to next (if not last)
+                    if (i < steps.length - 1) {
+                        ctx.strokeStyle = 'rgba(212, 175, 55, 0.2)';
+                        ctx.beginPath();
+                        ctx.moveTo(startX, y + 12);
+                        ctx.lineTo(startX, y + stepHeight - 12);
+                        ctx.stroke();
+                        
+                        // Lost item floating away
+                        const lostX = startX + 30 + Math.sin(t * 0.002 + i) * 10;
+                        const lostY = y + stepHeight / 2;
+                        ctx.fillStyle = 'rgba(255, 100, 100, 0.2)';
+                        ctx.beginPath();
+                        ctx.arc(lostX, lostY, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                });
+                
+                requestAnimationFrame(draw);
+            }
+            draw(0);
+        }
+        
+        // ==================== END: Complete picture ====================
+        const endCanvas = setupCanvas('canvas-end');
+        if (endCanvas) {
+            const { canvas, ctx } = endCanvas;
+            
+            const levels = [248, 133, 78, 52, 14, 7];
+            
+            function draw(t) {
+                ctx.fillStyle = 'rgba(10, 10, 12, 0.03)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const cx = canvas.width / 2;
+                
+                levels.forEach((dim, i) => {
+                    const y = (i / (levels.length - 1)) * canvas.height * 0.6 + canvas.height * 0.2;
+                    const width = Math.sqrt(dim) * 4;
+                    const pulse = 1 + Math.sin(t * 0.002 + i * 0.5) * 0.1;
+                    
+                    ctx.strokeStyle = `rgba(212, 175, 55, ${0.15 + i * 0.03})`;
+                    ctx.beginPath();
+                    ctx.arc(cx, y, width * pulse, 0, Math.PI * 2);
+                    ctx.stroke();
+                    
+                    // Connection
+                    if (i < levels.length - 1) {
+                        const nextY = ((i + 1) / (levels.length - 1)) * canvas.height * 0.6 + canvas.height * 0.2;
+                        ctx.strokeStyle = 'rgba(212, 175, 55, 0.1)';
+                        ctx.beginPath();
+                        ctx.moveTo(cx, y + width * pulse);
+                        ctx.lineTo(cx, nextY - Math.sqrt(levels[i + 1]) * 4 * pulse);
+                        ctx.stroke();
+                    }
+                });
+                
+                // E8 lattice at bottom
+                const latticeY = canvas.height * 0.9;
+                ctx.fillStyle = 'rgba(212, 175, 55, 0.3)';
+                for (let i = 0; i < 20; i++) {
+                    const x = cx + (i - 10) * 15;
+                    ctx.beginPath();
+                    ctx.arc(x, latticeY, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                requestAnimationFrame(draw);
+            }
+            draw(0);
+        }
+    </script>
+</body>
+</html>
