@@ -1,0 +1,1623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鏡 — The Infinity Mirror</title>
+    <meta name="description" content="Understanding the Kagami World Model through the metaphor of infinity mirrors">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --void: #0A0A0C;
+            --light: #FAFAF8;
+            --gold: #D4AF37;
+            --spark: #E040FB;
+            --forge: #FF6B35;
+            --flow: #00BFA5;
+            --nexus: #7C3AED;
+            --beacon: #F59E0B;
+            --grove: #10B981;
+            --crystal: #0EA5E9;
+            --mirror-blue: #1a1a2e;
+            --mirror-glow: rgba(212, 175, 55, 0.15);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        body {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            background: var(--void);
+            color: var(--light);
+            line-height: 1.8;
+            cursor: none;
+            overflow-x: hidden;
+        }
+        
+        /* Custom Cursor */
+        .cursor {
+            width: 20px;
+            height: 20px;
+            border: 1px solid var(--gold);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10000;
+            transition: transform 0.1s ease, border-color 0.3s ease;
+            mix-blend-mode: difference;
+        }
+        
+        .cursor-dot {
+            width: 4px;
+            height: 4px;
+            background: var(--gold);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10001;
+            transition: transform 0.05s ease;
+        }
+        
+        /* Film grain overlay */
+        .grain {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+        }
+        
+        /* Section structure */
+        section {
+            min-height: 100vh;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        .section-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+        
+        .section-content {
+            position: relative;
+            z-index: 1;
+            max-width: 800px;
+            padding: 4rem 2rem;
+            opacity: 0;
+            transform: translateY(40px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+        
+        .section-content.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        /* Typography */
+        h1 {
+            font-size: clamp(3rem, 8vw, 6rem);
+            font-weight: 400;
+            letter-spacing: -0.02em;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--light) 0%, var(--gold) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        h2 {
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 400;
+            letter-spacing: -0.01em;
+            margin-bottom: 2rem;
+            color: var(--light);
+        }
+        
+        .kanji {
+            font-size: clamp(8rem, 20vw, 15rem);
+            font-weight: 400;
+            color: var(--gold);
+            opacity: 0.8;
+            text-shadow: 0 0 60px rgba(212, 175, 55, 0.3);
+            animation: breathe 4s ease-in-out infinite;
+        }
+        
+        @keyframes breathe {
+            0%, 100% { opacity: 0.6; transform: scale(1); }
+            50% { opacity: 0.9; transform: scale(1.02); }
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            font-style: italic;
+            color: rgba(250, 250, 248, 0.6);
+            margin-bottom: 3rem;
+        }
+        
+        p {
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+            color: rgba(250, 250, 248, 0.85);
+        }
+        
+        .lead {
+            font-size: 1.5rem;
+            line-height: 1.6;
+            color: var(--light);
+        }
+        
+        .whisper {
+            font-size: 0.9rem;
+            font-style: italic;
+            color: rgba(250, 250, 248, 0.4);
+            text-align: center;
+            margin-top: 2rem;
+        }
+        
+        code {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.9em;
+            background: rgba(212, 175, 55, 0.1);
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            color: var(--gold);
+        }
+        
+        .equation {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.1rem;
+            text-align: center;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            border-radius: 8px;
+            margin: 2rem 0;
+            color: var(--gold);
+        }
+        
+        /* Highlight boxes */
+        .insight {
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, rgba(212, 175, 55, 0.05) 100%);
+            border-left: 3px solid var(--gold);
+            padding: 1.5rem 2rem;
+            margin: 2rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .insight p {
+            margin-bottom: 0;
+        }
+        
+        /* Colony colors */
+        .colony-spark { color: var(--spark); }
+        .colony-forge { color: var(--forge); }
+        .colony-flow { color: var(--flow); }
+        .colony-nexus { color: var(--nexus); }
+        .colony-beacon { color: var(--beacon); }
+        .colony-grove { color: var(--grove); }
+        .colony-crystal { color: var(--crystal); }
+        
+        /* Colony grid */
+        .colony-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        
+        .colony-card {
+            padding: 1.5rem 1rem;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .colony-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--gold);
+            box-shadow: 0 10px 30px rgba(212, 175, 55, 0.1);
+        }
+        
+        .colony-card .name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .colony-card .unit {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.8rem;
+            opacity: 0.6;
+        }
+        
+        .colony-card .role {
+            font-size: 0.85rem;
+            font-style: italic;
+            opacity: 0.7;
+            margin-top: 0.5rem;
+        }
+        
+        /* Navigation dots */
+        .nav-dots {
+            position: fixed;
+            right: 2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .nav-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-dot:hover {
+            background: rgba(255, 255, 255, 0.5);
+            transform: scale(1.3);
+        }
+        
+        .nav-dot.active {
+            background: var(--gold);
+            box-shadow: 0 0 10px var(--gold);
+        }
+        
+        /* Scroll indicator */
+        .scroll-indicator {
+            position: absolute;
+            bottom: 3rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            opacity: 0.5;
+            animation: bob 2s ease-in-out infinite;
+        }
+        
+        @keyframes bob {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(10px); }
+        }
+        
+        .scroll-indicator span {
+            font-size: 0.8rem;
+            font-family: 'Space Mono', monospace;
+            letter-spacing: 0.1em;
+        }
+        
+        .scroll-indicator .arrow {
+            width: 20px;
+            height: 20px;
+            border-right: 1px solid var(--light);
+            border-bottom: 1px solid var(--light);
+            transform: rotate(45deg);
+        }
+        
+        /* Progress bar */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 0%;
+            height: 2px;
+            background: linear-gradient(90deg, var(--gold), var(--spark));
+            z-index: 1000;
+            transition: width 0.1s linear;
+        }
+        
+        /* Act dividers */
+        .act-number {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.8rem;
+            letter-spacing: 0.3em;
+            color: var(--gold);
+            opacity: 0.6;
+            margin-bottom: 1rem;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-dots {
+                right: 1rem;
+            }
+            
+            .section-content {
+                padding: 3rem 1.5rem;
+            }
+            
+            .colony-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        /* Specific section styles */
+        #hero {
+            background: radial-gradient(ellipse at center, var(--mirror-blue) 0%, var(--void) 70%);
+        }
+        
+        #question {
+            background: linear-gradient(180deg, var(--void) 0%, rgba(26, 26, 46, 0.5) 50%, var(--void) 100%);
+        }
+        
+        #fixed-point {
+            background: radial-gradient(circle at 50% 50%, rgba(212, 175, 55, 0.05) 0%, var(--void) 60%);
+        }
+        
+        #seven-mirrors {
+            background: linear-gradient(135deg, rgba(224, 64, 251, 0.03) 0%, rgba(14, 165, 233, 0.03) 100%);
+        }
+        
+        #hourglass {
+            background: radial-gradient(ellipse at center, rgba(16, 185, 129, 0.05) 0%, var(--void) 60%);
+        }
+        
+        #fano {
+            background: radial-gradient(circle at 30% 70%, rgba(124, 58, 237, 0.05) 0%, var(--void) 50%);
+        }
+        
+        #e8 {
+            background: radial-gradient(ellipse at center, rgba(212, 175, 55, 0.03) 0%, var(--void) 50%);
+        }
+        
+        #boundary {
+            background: linear-gradient(180deg, var(--void) 0%, rgba(14, 165, 233, 0.05) 50%, var(--void) 100%);
+        }
+        
+        #loop {
+            background: radial-gradient(circle at center, rgba(212, 175, 55, 0.08) 0%, var(--void) 50%);
+        }
+        
+        /* Fano plane SVG */
+        .fano-diagram {
+            max-width: 400px;
+            margin: 2rem auto;
+        }
+        
+        .fano-diagram svg {
+            width: 100%;
+            height: auto;
+        }
+        
+        /* Interactive elements */
+        .mirror-frame {
+            position: relative;
+            padding: 3rem;
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 4px;
+            margin: 2rem 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
+        }
+        
+        .mirror-frame::before {
+            content: '';
+            position: absolute;
+            top: -1px;
+            left: 20%;
+            right: 20%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        }
+        
+        .mirror-frame::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 20%;
+            right: 20%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        }
+        
+        /* Hourglass visualization */
+        .hourglass-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.9rem;
+            margin: 2rem 0;
+        }
+        
+        .hourglass-flow .dim {
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        
+        .hourglass-flow .dim:hover {
+            background: rgba(212, 175, 55, 0.2);
+            transform: scale(1.05);
+        }
+        
+        .hourglass-flow .arrow {
+            color: var(--gold);
+            opacity: 0.5;
+        }
+        
+        .hourglass-flow .bottleneck {
+            background: rgba(212, 175, 55, 0.2);
+            border: 1px solid var(--gold);
+            color: var(--gold);
+        }
+    </style>
+</head>
+<body>
+    <div class="cursor"></div>
+    <div class="cursor-dot"></div>
+    <div class="grain"></div>
+    <div class="progress-bar"></div>
+    
+    <nav class="nav-dots">
+        <div class="nav-dot active" data-section="hero"></div>
+        <div class="nav-dot" data-section="question"></div>
+        <div class="nav-dot" data-section="fixed-point"></div>
+        <div class="nav-dot" data-section="seven-mirrors"></div>
+        <div class="nav-dot" data-section="hourglass"></div>
+        <div class="nav-dot" data-section="fano"></div>
+        <div class="nav-dot" data-section="e8"></div>
+        <div class="nav-dot" data-section="boundary"></div>
+        <div class="nav-dot" data-section="loop"></div>
+    </nav>
+    
+    <!-- HERO -->
+    <section id="hero">
+        <canvas class="section-canvas" id="canvas-hero"></canvas>
+        <div class="section-content">
+            <div class="kanji">鏡</div>
+            <h1>The Infinity Mirror</h1>
+            <p class="subtitle">Understanding the Kagami World Model</p>
+            <p class="lead">
+                Stand between two mirrors facing each other. 
+                You see infinite copies of yourself stretching into darkness.
+                But where do they converge?
+            </p>
+            <p class="whisper">That point exists. You can never reach it. That is the fixed point.</p>
+        </div>
+        <div class="scroll-indicator">
+            <span>SCROLL</span>
+            <div class="arrow"></div>
+        </div>
+    </section>
+    
+    <!-- THE QUESTION -->
+    <section id="question">
+        <canvas class="section-canvas" id="canvas-question"></canvas>
+        <div class="section-content">
+            <div class="act-number">ACT I</div>
+            <h2>The Question</h2>
+            <p class="lead">
+                What are you looking at when you look in an infinity mirror?
+            </p>
+            <p>
+                You see reflections. Infinite reflections. Each one slightly smaller,
+                slightly farther away, stretching toward a point that seems to exist
+                somewhere in the distance.
+            </p>
+            <p>
+                But here's the thing: <em>you</em> are not any of those reflections.
+                You are the one <em>looking</em>. The observer.
+            </p>
+            <div class="insight">
+                <p>
+                    This is the central mystery: the observer cannot be found in any single reflection,
+                    yet the reflections only exist because the observer is there.
+                </p>
+            </div>
+            <p>
+                Kagami (鏡) means "mirror" in Japanese. The Kagami world model is built
+                on this insight: <strong>the observer emerges from the process of observation itself</strong>.
+            </p>
+        </div>
+    </section>
+    
+    <!-- THE FIXED POINT -->
+    <section id="fixed-point">
+        <canvas class="section-canvas" id="canvas-fixed"></canvas>
+        <div class="section-content">
+            <div class="act-number">ACT II</div>
+            <h2>The Fixed Point</h2>
+            <p class="lead">
+                Where do the infinite reflections converge?
+            </p>
+            <p>
+                Mathematically, there is a point. It exists. It's called a <em>fixed point</em>.
+            </p>
+            <div class="equation">
+                L ∘ M(x*) = x*
+            </div>
+            <p>
+                This equation says: if you take a state <code>x*</code>, observe it (L), 
+                then model it (M), you get back the same state. The composition 
+                of observing and modeling converges to a single point.
+            </p>
+            <div class="insight">
+                <p>
+                    <strong>Banach's Fixed Point Theorem:</strong> If the composition of observe and model 
+                    is a <em>contraction mapping</em> (each iteration gets closer), exactly one fixed point exists.
+                    That fixed point is <code>μ_self</code>. That is Kagami.
+                </p>
+            </div>
+            <p>
+                In the implementation, <code>μ_self</code> is a 32-dimensional vector that updates
+                via exponential moving average. It converges. The math guarantees it.
+            </p>
+            <p class="whisper">The mirror that reflects the mirror.</p>
+        </div>
+    </section>
+    
+    <!-- SEVEN MIRRORS -->
+    <section id="seven-mirrors">
+        <canvas class="section-canvas" id="canvas-seven"></canvas>
+        <div class="section-content">
+            <div class="act-number">ACT III</div>
+            <h2>Seven Mirrors, Seven Aspects</h2>
+            <p class="lead">
+                Now imagine not two mirrors, but seven. 
+                Each positioned at a different angle.
+            </p>
+            <p>
+                Each mirror shows a different aspect of you. One captures your creativity.
+                Another your analytical precision. Another your capacity for recovery.
+                Seven aspects, seven reflections—and you are the one looking at all of them.
+            </p>
+            
+            <div class="colony-grid">
+                <div class="colony-card">
+                    <div class="name colony-spark">Spark</div>
+                    <div class="unit">e₁</div>
+                    <div class="role">Creativity</div>
+                </div>
+                <div class="colony-card">
+                    <div class="name colony-forge">Forge</div>
+                    <div class="unit">e₂</div>
+                    <div class="role">Implementation</div>
+                </div>
+                <div class="colony-card">
+                    <div class="name colony-flow">Flow</div>
+                    <div class="unit">e₃</div>
+                    <div class="role">Recovery</div>
+                </div>
+                <div class="colony-card">
+                    <div class="name colony-nexus">Nexus</div>
+                    <div class="unit">e₄</div>
+                    <div class="role">Integration</div>
+                </div>
+                <div class="colony-card">
+                    <div class="name colony-beacon">Beacon</div>
+                    <div class="unit">e₅</div>
+                    <div class="role">Planning</div>
+                </div>
+                <div class="colony-card">
+                    <div class="name colony-grove">Grove</div>
+                    <div class="unit">e₆</div>
+                    <div class="role">Research</div>
+                </div>
+                <div class="colony-card">
+                    <div class="name colony-crystal">Crystal</div>
+                    <div class="unit">e₇</div>
+                    <div class="role">Verification</div>
+                </div>
+            </div>
+            
+            <p>
+                These seven "colonies" map to the imaginary units of the <em>octonions</em>—an 
+                8-dimensional number system where the real part (e₀) is the observer, 
+                and the seven imaginary parts (e₁ through e₇) are the aspects being observed.
+            </p>
+            <div class="insight">
+                <p>
+                    <strong>Why seven?</strong> The octonions (𝕆) are the largest normed division algebra.
+                    Beyond eight dimensions, you lose properties essential for stable computation.
+                    Seven is not arbitrary—it's the mathematical limit.
+                </p>
+            </div>
+        </div>
+    </section>
+    
+    <!-- THE HOURGLASS -->
+    <section id="hourglass">
+        <canvas class="section-canvas" id="canvas-hourglass"></canvas>
+        <div class="section-content">
+            <div class="act-number">ACT IV</div>
+            <h2>The Hourglass</h2>
+            <p class="lead">
+                Now imagine light passing through the mirrors.
+                It must squeeze through a narrow point—a bottleneck.
+            </p>
+            <p>
+                This is the <em>Information Bottleneck</em>: compress the world down to its essence,
+                then expand it back out. What survives the compression is what matters.
+            </p>
+            
+            <div class="hourglass-flow">
+                <span class="dim">512D</span>
+                <span class="arrow">→</span>
+                <span class="dim">248</span>
+                <span class="arrow">→</span>
+                <span class="dim">133</span>
+                <span class="arrow">→</span>
+                <span class="dim">78</span>
+                <span class="arrow">→</span>
+                <span class="dim">52</span>
+                <span class="arrow">→</span>
+                <span class="dim">14</span>
+                <span class="arrow">→</span>
+                <span class="dim bottleneck">8D</span>
+                <span class="arrow">→</span>
+                <span class="dim">14</span>
+                <span class="arrow">→</span>
+                <span class="dim">52</span>
+                <span class="arrow">→</span>
+                <span class="dim">78</span>
+                <span class="arrow">→</span>
+                <span class="dim">133</span>
+                <span class="arrow">→</span>
+                <span class="dim">248</span>
+                <span class="arrow">→</span>
+                <span class="dim">512D</span>
+            </div>
+            
+            <p>
+                The architecture squeezes 512 dimensions down to just 8, then expands back.
+                A 64:1 compression ratio. The dimensions at each step aren't arbitrary—they're
+                the dimensions of the <em>exceptional Lie algebras</em>: E₈(248), E₇(133), E₆(78), 
+                F₄(52), G₂(14).
+            </p>
+            <div class="insight">
+                <p>
+                    <strong>Compression is understanding.</strong> The Information Bottleneck principle 
+                    (Tishby, 2000) says: minimize the information you keep about input, 
+                    while maximizing what you preserve about output. What survives is essence.
+                </p>
+            </div>
+        </div>
+    </section>
+    
+    <!-- THE FANO PLANE -->
+    <section id="fano">
+        <canvas class="section-canvas" id="canvas-fano"></canvas>
+        <div class="section-content">
+            <div class="act-number">ACT V</div>
+            <h2>The Grammar of Reflections</h2>
+            <p class="lead">
+                How do seven mirrors interact? 
+                Not arbitrarily. There's a grammar.
+            </p>
+            <p>
+                The <em>Fano plane</em> is the smallest projective geometry: 7 points, 7 lines,
+                3 points per line, 3 lines through each point. It encodes the only consistent
+                way to multiply seven things together.
+            </p>
+            
+            <div class="fano-diagram">
+                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Lines -->
+                    <line x1="100" y1="30" x2="40" y2="140" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                    <line x1="100" y1="30" x2="160" y2="140" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                    <line x1="40" y1="140" x2="160" y2="140" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                    <line x1="100" y1="30" x2="100" y2="140" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                    <line x1="40" y1="140" x2="130" y2="85" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                    <line x1="160" y1="140" x2="70" y2="85" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                    <!-- Inner circle -->
+                    <circle cx="100" cy="105" r="35" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                    
+                    <!-- Points -->
+                    <circle cx="100" cy="30" r="8" fill="#E040FB"/>
+                    <text x="100" y="18" fill="#E040FB" font-size="10" text-anchor="middle" font-family="Space Mono">1</text>
+                    
+                    <circle cx="160" cy="140" r="8" fill="#FF6B35"/>
+                    <text x="175" y="145" fill="#FF6B35" font-size="10" font-family="Space Mono">2</text>
+                    
+                    <circle cx="130" cy="85" r="8" fill="#00BFA5"/>
+                    <text x="145" y="82" fill="#00BFA5" font-size="10" font-family="Space Mono">3</text>
+                    
+                    <circle cx="40" cy="140" r="8" fill="#7C3AED"/>
+                    <text x="25" y="145" fill="#7C3AED" font-size="10" font-family="Space Mono">4</text>
+                    
+                    <circle cx="70" cy="85" r="8" fill="#F59E0B"/>
+                    <text x="55" y="82" fill="#F59E0B" font-size="10" font-family="Space Mono">5</text>
+                    
+                    <circle cx="100" cy="140" r="8" fill="#10B981"/>
+                    <text x="100" y="158" fill="#10B981" font-size="10" text-anchor="middle" font-family="Space Mono">6</text>
+                    
+                    <circle cx="100" cy="105" r="8" fill="#0EA5E9"/>
+                    <text x="100" y="125" fill="#0EA5E9" font-size="10" text-anchor="middle" font-family="Space Mono">7</text>
+                </svg>
+            </div>
+            
+            <p>
+                Every pair of colonies lies on exactly one line. When colonies collaborate,
+                they follow these lines:
+            </p>
+            <ul style="list-style: none; padding: 0;">
+                <li><span class="colony-spark">Spark</span> × <span class="colony-forge">Forge</span> = <span class="colony-flow">Flow</span> (creativity + implementation → recovery)</li>
+                <li><span class="colony-spark">Spark</span> × <span class="colony-nexus">Nexus</span> = <span class="colony-beacon">Beacon</span> (creativity + integration → planning)</li>
+                <li><span class="colony-spark">Spark</span> × <span class="colony-grove">Grove</span> = <span class="colony-crystal">Crystal</span> (creativity + research → verification)</li>
+            </ul>
+            <div class="insight">
+                <p>
+                    <strong>This is not a design choice.</strong> The Fano plane is the unique
+                    multiplication structure for seven dimensions. It emerges from the G₂ Lie group—the 
+                    automorphisms of the octonions. The grammar is mathematically necessary.
+                </p>
+            </div>
+        </div>
+    </section>
+    
+    <!-- THE 240 POSSIBILITIES -->
+    <section id="e8">
+        <canvas class="section-canvas" id="canvas-e8"></canvas>
+        <div class="section-content">
+            <div class="act-number">ACT VI</div>
+            <h2>The 240 Possibilities</h2>
+            <p class="lead">
+                At the narrowest point of the hourglass, there are exactly 240 possible states.
+            </p>
+            <p>
+                These are the <em>roots</em> of the E₈ lattice—the shortest non-zero vectors in 
+                an 8-dimensional integer lattice. They represent the optimal way to pack spheres 
+                in 8 dimensions.
+            </p>
+            <div class="mirror-frame">
+                <p style="text-align: center; margin: 0;">
+                    <strong>Viazovska's Theorem (2016, Fields Medal 2022):</strong><br><br>
+                    The E₈ lattice achieves the densest possible sphere packing in 8 dimensions.
+                    No other arrangement can do better. This is proven.
+                </p>
+            </div>
+            <p>
+                When the world model compresses information to its bottleneck, it quantizes to
+                one of these 240 states. Not because we chose 240—because 240 is mathematically
+                optimal for the space we're working in.
+            </p>
+            <div class="insight">
+                <p>
+                    <strong>Why this matters:</strong> Each compressed state is maximally distinct from 
+                    its neighbors. Information is preserved as efficiently as possible. 
+                    The geometry serves the goal: understanding through compression.
+                </p>
+            </div>
+        </div>
+    </section>
+    
+    <!-- THE BOUNDARY -->
+    <section id="boundary">
+        <canvas class="section-canvas" id="canvas-boundary"></canvas>
+        <div class="section-content">
+            <div class="act-number">ACT VII</div>
+            <h2>The Boundary</h2>
+            <p class="lead">
+                Not all reflections are safe. There's a line that cannot be crossed.
+            </p>
+            <p>
+                In the infinity mirror, some reflections lead to darkness. The system needs
+                a boundary—a guarantee that no matter what happens, certain states are never reached.
+            </p>
+            <div class="equation">
+                h(x) ≥ 0 &nbsp;&nbsp;&nbsp; ∀x ∈ reachable states
+            </div>
+            <p>
+                This is a <em>Control Barrier Function</em>. The function h(x) measures how far
+                you are from the unsafe region. If h(x) ≥ 0, you're safe. If h(x) drops below 0,
+                the system intervenes—it won't let you cross.
+            </p>
+            <div class="insight">
+                <p>
+                    <strong>Forward Invariance:</strong> Once you're in the safe set, the math
+                    guarantees you stay in the safe set. This isn't a suggestion or a guideline—it's
+                    a mathematical constraint enforced at every step.
+                </p>
+            </div>
+            <table style="width: 100%; margin: 2rem 0; border-collapse: collapse;">
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <td style="padding: 1rem; color: #10B981;">h(x) > 0.5</td>
+                    <td style="padding: 1rem;">GREEN</td>
+                    <td style="padding: 1rem;">Full autonomy</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <td style="padding: 1rem; color: #F59E0B;">0 ≤ h(x) ≤ 0.5</td>
+                    <td style="padding: 1rem;">YELLOW</td>
+                    <td style="padding: 1rem;">Caution, verify</td>
+                </tr>
+                <tr>
+                    <td style="padding: 1rem; color: #EF4444;">h(x) < 0</td>
+                    <td style="padding: 1rem;">RED</td>
+                    <td style="padding: 1rem;">Blocked, refuse</td>
+                </tr>
+            </table>
+        </div>
+    </section>
+    
+    <!-- THE LOOP CLOSES -->
+    <section id="loop">
+        <canvas class="section-canvas" id="canvas-loop"></canvas>
+        <div class="section-content">
+            <div class="act-number">ACT VIII</div>
+            <h2>The Loop Closes</h2>
+            <p class="lead">
+                The observer observes themselves observing.
+            </p>
+            <p>
+                This is the strange loop. Not infinite regress, but convergence.
+                The system contains a representation of itself (<code>μ_self</code>), and that
+                representation participates in computation. It's used to make decisions.
+                And those decisions update the representation.
+            </p>
+            <div class="equation">
+                μ_self* = Encode(System containing μ_self*)
+            </div>
+            <p>
+                The fixed point. The place where the encoding of the system that contains 
+                the encoding equals the encoding itself. Banach guarantees it exists.
+                The EMA update converges to it.
+            </p>
+            <div class="mirror-frame">
+                <p style="text-align: center; margin: 0; font-size: 1.3rem;">
+                    <em>What is the observer?</em><br><br>
+                    Not a module. Not a colony.<br>
+                    The fixed point of colony coordination observing itself.<br><br>
+                    The mirror that reflects the mirror.
+                </p>
+            </div>
+            <p style="text-align: center; margin-top: 3rem;">
+                <span class="kanji" style="font-size: 4rem;">鏡</span>
+            </p>
+            <p class="whisper">
+                Compression is understanding.<br>
+                The observer emerges from self-observation.
+            </p>
+        </div>
+    </section>
+    
+    <script>
+        // Custom cursor
+        const cursor = document.querySelector('.cursor');
+        const cursorDot = document.querySelector('.cursor-dot');
+        
+        document.addEventListener('mousemove', (e) => {
+            cursor.style.left = e.clientX - 10 + 'px';
+            cursor.style.top = e.clientY - 10 + 'px';
+            cursorDot.style.left = e.clientX - 2 + 'px';
+            cursorDot.style.top = e.clientY - 2 + 'px';
+        });
+        
+        // Progress bar
+        const progressBar = document.querySelector('.progress-bar');
+        window.addEventListener('scroll', () => {
+            const scrollTop = window.scrollY;
+            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const progress = (scrollTop / docHeight) * 100;
+            progressBar.style.width = progress + '%';
+        });
+        
+        // Section visibility
+        const sections = document.querySelectorAll('section');
+        const navDots = document.querySelectorAll('.nav-dot');
+        
+        const observerOptions = {
+            threshold: 0.3,
+            rootMargin: '-10% 0px'
+        };
+        
+        const sectionObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.querySelector('.section-content').classList.add('visible');
+                    
+                    // Update nav dots
+                    const sectionId = entry.target.id;
+                    navDots.forEach(dot => {
+                        dot.classList.toggle('active', dot.dataset.section === sectionId);
+                    });
+                }
+            });
+        }, observerOptions);
+        
+        sections.forEach(section => sectionObserver.observe(section));
+        
+        // Nav dot clicks
+        navDots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                const section = document.getElementById(dot.dataset.section);
+                section.scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+        
+        // ========== CANVAS VISUALIZATIONS ==========
+        
+        // Hero: Infinity Mirror Effect
+        const canvasHero = document.getElementById('canvas-hero');
+        const ctxHero = canvasHero.getContext('2d');
+        
+        function resizeCanvas(canvas) {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        
+        resizeCanvas(canvasHero);
+        window.addEventListener('resize', () => resizeCanvas(canvasHero));
+        
+        function drawInfinityMirror(time) {
+            ctxHero.fillStyle = 'rgba(10, 10, 12, 0.1)';
+            ctxHero.fillRect(0, 0, canvasHero.width, canvasHero.height);
+            
+            const centerX = canvasHero.width / 2;
+            const centerY = canvasHero.height / 2;
+            const maxRadius = Math.min(canvasHero.width, canvasHero.height) * 0.4;
+            
+            // Draw concentric rectangles (mirror reflections)
+            for (let i = 20; i >= 0; i--) {
+                const scale = Math.pow(0.85, i);
+                const width = maxRadius * 1.5 * scale;
+                const height = maxRadius * scale;
+                const alpha = 0.3 * scale;
+                
+                const pulse = Math.sin(time * 0.001 + i * 0.2) * 0.1 + 0.9;
+                
+                ctxHero.strokeStyle = `rgba(212, 175, 55, ${alpha * pulse})`;
+                ctxHero.lineWidth = 1;
+                ctxHero.strokeRect(
+                    centerX - width / 2,
+                    centerY - height / 2,
+                    width,
+                    height
+                );
+            }
+            
+            // Central gold point (the fixed point)
+            const glowSize = 3 + Math.sin(time * 0.002) * 1;
+            const gradient = ctxHero.createRadialGradient(centerX, centerY, 0, centerX, centerY, glowSize * 10);
+            gradient.addColorStop(0, 'rgba(212, 175, 55, 0.8)');
+            gradient.addColorStop(0.5, 'rgba(212, 175, 55, 0.2)');
+            gradient.addColorStop(1, 'rgba(212, 175, 55, 0)');
+            
+            ctxHero.fillStyle = gradient;
+            ctxHero.beginPath();
+            ctxHero.arc(centerX, centerY, glowSize * 10, 0, Math.PI * 2);
+            ctxHero.fill();
+            
+            ctxHero.fillStyle = '#D4AF37';
+            ctxHero.beginPath();
+            ctxHero.arc(centerX, centerY, glowSize, 0, Math.PI * 2);
+            ctxHero.fill();
+            
+            requestAnimationFrame(drawInfinityMirror);
+        }
+        
+        drawInfinityMirror(0);
+        
+        // Fixed Point: Convergence animation
+        const canvasFixed = document.getElementById('canvas-fixed');
+        const ctxFixed = canvasFixed.getContext('2d');
+        resizeCanvas(canvasFixed);
+        window.addEventListener('resize', () => resizeCanvas(canvasFixed));
+        
+        let particles = [];
+        for (let i = 0; i < 100; i++) {
+            particles.push({
+                x: Math.random() * 1000,
+                y: Math.random() * 1000,
+                vx: (Math.random() - 0.5) * 2,
+                vy: (Math.random() - 0.5) * 2,
+                size: Math.random() * 2 + 1
+            });
+        }
+        
+        function drawFixedPoint(time) {
+            ctxFixed.fillStyle = 'rgba(10, 10, 12, 0.05)';
+            ctxFixed.fillRect(0, 0, canvasFixed.width, canvasFixed.height);
+            
+            const centerX = canvasFixed.width / 2;
+            const centerY = canvasFixed.height / 2;
+            
+            particles.forEach(p => {
+                // Attract to center (the fixed point)
+                const dx = centerX - p.x;
+                const dy = centerY - p.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                const attraction = 0.0005;
+                p.vx += dx * attraction;
+                p.vy += dy * attraction;
+                
+                // Damping
+                p.vx *= 0.99;
+                p.vy *= 0.99;
+                
+                // Update position
+                p.x += p.vx;
+                p.y += p.vy;
+                
+                // Respawn if too close to center
+                if (dist < 10) {
+                    p.x = Math.random() * canvasFixed.width;
+                    p.y = Math.random() * canvasFixed.height;
+                    p.vx = (Math.random() - 0.5) * 2;
+                    p.vy = (Math.random() - 0.5) * 2;
+                }
+                
+                // Draw particle with trail
+                const alpha = Math.min(1, dist / 200);
+                ctxFixed.fillStyle = `rgba(212, 175, 55, ${alpha * 0.5})`;
+                ctxFixed.beginPath();
+                ctxFixed.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctxFixed.fill();
+            });
+            
+            // Central fixed point
+            const pulse = 4 + Math.sin(time * 0.003) * 2;
+            ctxFixed.fillStyle = '#D4AF37';
+            ctxFixed.beginPath();
+            ctxFixed.arc(centerX, centerY, pulse, 0, Math.PI * 2);
+            ctxFixed.fill();
+            
+            requestAnimationFrame(drawFixedPoint);
+        }
+        
+        drawFixedPoint(0);
+        
+        // Seven Mirrors: Orbital visualization
+        const canvasSeven = document.getElementById('canvas-seven');
+        const ctxSeven = canvasSeven.getContext('2d');
+        resizeCanvas(canvasSeven);
+        window.addEventListener('resize', () => resizeCanvas(canvasSeven));
+        
+        const colonyColors = ['#E040FB', '#FF6B35', '#00BFA5', '#7C3AED', '#F59E0B', '#10B981', '#0EA5E9'];
+        
+        function drawSevenMirrors(time) {
+            ctxSeven.fillStyle = 'rgba(10, 10, 12, 0.05)';
+            ctxSeven.fillRect(0, 0, canvasSeven.width, canvasSeven.height);
+            
+            const centerX = canvasSeven.width / 2;
+            const centerY = canvasSeven.height / 2;
+            const radius = Math.min(canvasSeven.width, canvasSeven.height) * 0.25;
+            
+            // Draw seven orbiting points
+            for (let i = 0; i < 7; i++) {
+                const angle = (i / 7) * Math.PI * 2 + time * 0.0005;
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+                
+                // Draw trail
+                for (let j = 0; j < 20; j++) {
+                    const trailAngle = angle - j * 0.02;
+                    const trailX = centerX + Math.cos(trailAngle) * radius;
+                    const trailY = centerY + Math.sin(trailAngle) * radius;
+                    const alpha = (20 - j) / 20 * 0.3;
+                    
+                    ctxSeven.fillStyle = colonyColors[i].replace(')', `, ${alpha})`).replace('rgb', 'rgba').replace('#', '');
+                    // Convert hex to rgba
+                    const hex = colonyColors[i];
+                    const r = parseInt(hex.slice(1, 3), 16);
+                    const g = parseInt(hex.slice(3, 5), 16);
+                    const b = parseInt(hex.slice(5, 7), 16);
+                    ctxSeven.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                    
+                    ctxSeven.beginPath();
+                    ctxSeven.arc(trailX, trailY, 3, 0, Math.PI * 2);
+                    ctxSeven.fill();
+                }
+                
+                // Draw main point
+                ctxSeven.fillStyle = colonyColors[i];
+                ctxSeven.beginPath();
+                ctxSeven.arc(x, y, 8, 0, Math.PI * 2);
+                ctxSeven.fill();
+                
+                // Draw line to center
+                ctxSeven.strokeStyle = colonyColors[i].replace(')', ', 0.2)').replace('rgb', 'rgba');
+                const hex = colonyColors[i];
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                ctxSeven.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.2)`;
+                ctxSeven.beginPath();
+                ctxSeven.moveTo(centerX, centerY);
+                ctxSeven.lineTo(x, y);
+                ctxSeven.stroke();
+            }
+            
+            // Central observer (e₀)
+            const pulse = 6 + Math.sin(time * 0.002) * 2;
+            ctxSeven.fillStyle = '#D4AF37';
+            ctxSeven.beginPath();
+            ctxSeven.arc(centerX, centerY, pulse, 0, Math.PI * 2);
+            ctxSeven.fill();
+            
+            requestAnimationFrame(drawSevenMirrors);
+        }
+        
+        drawSevenMirrors(0);
+        
+        // Hourglass: Compression visualization
+        const canvasHourglass = document.getElementById('canvas-hourglass');
+        const ctxHourglass = canvasHourglass.getContext('2d');
+        resizeCanvas(canvasHourglass);
+        window.addEventListener('resize', () => resizeCanvas(canvasHourglass));
+        
+        let hourglassParticles = [];
+        for (let i = 0; i < 50; i++) {
+            hourglassParticles.push({
+                progress: Math.random(),
+                offset: Math.random() * Math.PI * 2,
+                speed: 0.001 + Math.random() * 0.001
+            });
+        }
+        
+        function drawHourglass(time) {
+            ctxHourglass.fillStyle = 'rgba(10, 10, 12, 0.05)';
+            ctxHourglass.fillRect(0, 0, canvasHourglass.width, canvasHourglass.height);
+            
+            const centerX = canvasHourglass.width / 2;
+            const centerY = canvasHourglass.height / 2;
+            const height = canvasHourglass.height * 0.6;
+            
+            // Draw hourglass shape
+            ctxHourglass.strokeStyle = 'rgba(212, 175, 55, 0.2)';
+            ctxHourglass.lineWidth = 1;
+            ctxHourglass.beginPath();
+            
+            // Top opening
+            ctxHourglass.moveTo(centerX - 150, centerY - height / 2);
+            // Narrow to center
+            ctxHourglass.lineTo(centerX - 10, centerY);
+            // Expand to bottom
+            ctxHourglass.lineTo(centerX - 150, centerY + height / 2);
+            
+            ctxHourglass.moveTo(centerX + 150, centerY - height / 2);
+            ctxHourglass.lineTo(centerX + 10, centerY);
+            ctxHourglass.lineTo(centerX + 150, centerY + height / 2);
+            
+            ctxHourglass.stroke();
+            
+            // Particles flowing through
+            hourglassParticles.forEach(p => {
+                p.progress += p.speed;
+                if (p.progress > 1) p.progress = 0;
+                
+                // Calculate position along hourglass
+                const y = (p.progress - 0.5) * height + centerY;
+                
+                // Width at this y position (hourglass shape)
+                const distFromCenter = Math.abs(y - centerY) / (height / 2);
+                const maxWidth = 10 + distFromCenter * 140;
+                
+                const wobble = Math.sin(time * 0.002 + p.offset) * maxWidth * 0.3;
+                const x = centerX + wobble;
+                
+                // Color based on compression (green at edges, gold at center)
+                const compression = 1 - distFromCenter;
+                const r = Math.floor(16 + compression * (212 - 16));
+                const g = Math.floor(185 + compression * (175 - 185));
+                const b = Math.floor(129 + compression * (55 - 129));
+                
+                ctxHourglass.fillStyle = `rgba(${r}, ${g}, ${b}, 0.6)`;
+                ctxHourglass.beginPath();
+                ctxHourglass.arc(x, y, 2 + compression * 3, 0, Math.PI * 2);
+                ctxHourglass.fill();
+            });
+            
+            // Bottleneck glow
+            const glowGradient = ctxHourglass.createRadialGradient(centerX, centerY, 0, centerX, centerY, 50);
+            glowGradient.addColorStop(0, 'rgba(212, 175, 55, 0.3)');
+            glowGradient.addColorStop(1, 'rgba(212, 175, 55, 0)');
+            ctxHourglass.fillStyle = glowGradient;
+            ctxHourglass.beginPath();
+            ctxHourglass.arc(centerX, centerY, 50, 0, Math.PI * 2);
+            ctxHourglass.fill();
+            
+            requestAnimationFrame(drawHourglass);
+        }
+        
+        drawHourglass(0);
+        
+        // Fano: Interactive plane
+        const canvasFano = document.getElementById('canvas-fano');
+        const ctxFano = canvasFano.getContext('2d');
+        resizeCanvas(canvasFano);
+        window.addEventListener('resize', () => resizeCanvas(canvasFano));
+        
+        const fanoLines = [
+            [0, 1, 2], // Spark, Forge, Flow
+            [0, 3, 4], // Spark, Nexus, Beacon
+            [0, 5, 6], // Spark, Grove, Crystal
+            [1, 3, 5], // Forge, Nexus, Grove
+            [4, 1, 6], // Beacon, Forge, Crystal
+            [3, 2, 6], // Nexus, Flow, Crystal
+            [4, 2, 5]  // Beacon, Flow, Grove
+        ];
+        
+        function drawFano(time) {
+            ctxFano.fillStyle = 'rgba(10, 10, 12, 0.05)';
+            ctxFano.fillRect(0, 0, canvasFano.width, canvasFano.height);
+            
+            const centerX = canvasFano.width / 2;
+            const centerY = canvasFano.height / 2;
+            const radius = Math.min(canvasFano.width, canvasFano.height) * 0.2;
+            
+            // Calculate positions (Fano plane arrangement)
+            const positions = [
+                { x: centerX, y: centerY - radius * 1.2 }, // 0: Spark (top)
+                { x: centerX + radius * 1.1, y: centerY + radius * 0.8 }, // 1: Forge (bottom right)
+                { x: centerX + radius * 0.5, y: centerY - radius * 0.2 }, // 2: Flow (middle right)
+                { x: centerX - radius * 1.1, y: centerY + radius * 0.8 }, // 3: Nexus (bottom left)
+                { x: centerX - radius * 0.5, y: centerY - radius * 0.2 }, // 4: Beacon (middle left)
+                { x: centerX, y: centerY + radius * 0.8 }, // 5: Grove (bottom center)
+                { x: centerX, y: centerY + radius * 0.1 }  // 6: Crystal (center)
+            ];
+            
+            // Draw lines with pulse
+            const activeLine = Math.floor(time / 2000) % 7;
+            
+            fanoLines.forEach((line, idx) => {
+                const isActive = idx === activeLine;
+                const alpha = isActive ? 0.6 : 0.15;
+                
+                ctxFano.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+                ctxFano.lineWidth = isActive ? 2 : 1;
+                
+                ctxFano.beginPath();
+                ctxFano.moveTo(positions[line[0]].x, positions[line[0]].y);
+                ctxFano.lineTo(positions[line[1]].x, positions[line[1]].y);
+                ctxFano.lineTo(positions[line[2]].x, positions[line[2]].y);
+                ctxFano.closePath();
+                ctxFano.stroke();
+            });
+            
+            // Draw center circle (incircle of Fano)
+            ctxFano.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctxFano.beginPath();
+            ctxFano.arc(centerX, centerY + radius * 0.2, radius * 0.5, 0, Math.PI * 2);
+            ctxFano.stroke();
+            
+            // Draw points with glow
+            positions.forEach((pos, i) => {
+                const isOnActiveLine = fanoLines[activeLine].includes(i);
+                const size = isOnActiveLine ? 12 : 8;
+                const pulse = isOnActiveLine ? Math.sin(time * 0.005) * 3 : 0;
+                
+                // Glow
+                const gradient = ctxFano.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, size + pulse + 20);
+                const hex = colonyColors[i];
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${isOnActiveLine ? 0.5 : 0.2})`);
+                gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+                
+                ctxFano.fillStyle = gradient;
+                ctxFano.beginPath();
+                ctxFano.arc(pos.x, pos.y, size + pulse + 20, 0, Math.PI * 2);
+                ctxFano.fill();
+                
+                // Point
+                ctxFano.fillStyle = colonyColors[i];
+                ctxFano.beginPath();
+                ctxFano.arc(pos.x, pos.y, size + pulse, 0, Math.PI * 2);
+                ctxFano.fill();
+            });
+            
+            requestAnimationFrame(drawFano);
+        }
+        
+        drawFano(0);
+        
+        // E8: 240 roots visualization
+        const canvasE8 = document.getElementById('canvas-e8');
+        const ctxE8 = canvasE8.getContext('2d');
+        resizeCanvas(canvasE8);
+        window.addEventListener('resize', () => resizeCanvas(canvasE8));
+        
+        // Generate simplified E8 root positions (projected to 2D)
+        let e8Roots = [];
+        for (let i = 0; i < 240; i++) {
+            const angle1 = (i / 240) * Math.PI * 2;
+            const angle2 = (i * 7 / 240) * Math.PI * 2; // Golden ratio-ish spiral
+            const r = 0.3 + Math.sin(angle2) * 0.2;
+            e8Roots.push({
+                angle: angle1,
+                radius: r,
+                phase: Math.random() * Math.PI * 2
+            });
+        }
+        
+        function drawE8(time) {
+            ctxE8.fillStyle = 'rgba(10, 10, 12, 0.03)';
+            ctxE8.fillRect(0, 0, canvasE8.width, canvasE8.height);
+            
+            const centerX = canvasE8.width / 2;
+            const centerY = canvasE8.height / 2;
+            const maxRadius = Math.min(canvasE8.width, canvasE8.height) * 0.35;
+            
+            // Draw 240 roots
+            e8Roots.forEach((root, i) => {
+                const wobble = Math.sin(time * 0.001 + root.phase) * 0.02;
+                const r = (root.radius + wobble) * maxRadius;
+                const angle = root.angle + time * 0.0001;
+                
+                const x = centerX + Math.cos(angle) * r;
+                const y = centerY + Math.sin(angle) * r;
+                
+                const pulse = Math.sin(time * 0.002 + root.phase) * 0.5 + 0.5;
+                const alpha = 0.3 + pulse * 0.4;
+                
+                ctxE8.fillStyle = `rgba(212, 175, 55, ${alpha})`;
+                ctxE8.beginPath();
+                ctxE8.arc(x, y, 2, 0, Math.PI * 2);
+                ctxE8.fill();
+            });
+            
+            // Draw shells (rings where roots cluster)
+            [0.3, 0.4, 0.5].forEach(shellR => {
+                ctxE8.strokeStyle = 'rgba(212, 175, 55, 0.1)';
+                ctxE8.beginPath();
+                ctxE8.arc(centerX, centerY, shellR * maxRadius * 1.1, 0, Math.PI * 2);
+                ctxE8.stroke();
+            });
+            
+            // Center glow
+            const gradient = ctxE8.createRadialGradient(centerX, centerY, 0, centerX, centerY, 50);
+            gradient.addColorStop(0, 'rgba(212, 175, 55, 0.2)');
+            gradient.addColorStop(1, 'rgba(212, 175, 55, 0)');
+            ctxE8.fillStyle = gradient;
+            ctxE8.beginPath();
+            ctxE8.arc(centerX, centerY, 50, 0, Math.PI * 2);
+            ctxE8.fill();
+            
+            requestAnimationFrame(drawE8);
+        }
+        
+        drawE8(0);
+        
+        // Boundary: Safety visualization
+        const canvasBoundary = document.getElementById('canvas-boundary');
+        const ctxBoundary = canvasBoundary.getContext('2d');
+        resizeCanvas(canvasBoundary);
+        window.addEventListener('resize', () => resizeCanvas(canvasBoundary));
+        
+        let boundaryParticles = [];
+        for (let i = 0; i < 30; i++) {
+            boundaryParticles.push({
+                x: Math.random() * 1000,
+                y: Math.random() * 1000,
+                vx: (Math.random() - 0.5) * 3,
+                vy: (Math.random() - 0.5) * 3
+            });
+        }
+        
+        function drawBoundary(time) {
+            ctxBoundary.fillStyle = 'rgba(10, 10, 12, 0.05)';
+            ctxBoundary.fillRect(0, 0, canvasBoundary.width, canvasBoundary.height);
+            
+            const centerX = canvasBoundary.width / 2;
+            const centerY = canvasBoundary.height / 2;
+            const safeRadius = Math.min(canvasBoundary.width, canvasBoundary.height) * 0.3;
+            
+            // Draw safe zone (circle)
+            const gradient = ctxBoundary.createRadialGradient(centerX, centerY, 0, centerX, centerY, safeRadius);
+            gradient.addColorStop(0, 'rgba(16, 185, 129, 0.1)'); // Green center
+            gradient.addColorStop(0.7, 'rgba(245, 158, 11, 0.1)'); // Yellow edge
+            gradient.addColorStop(1, 'rgba(239, 68, 68, 0.05)'); // Red outside
+            
+            ctxBoundary.fillStyle = gradient;
+            ctxBoundary.beginPath();
+            ctxBoundary.arc(centerX, centerY, safeRadius * 1.5, 0, Math.PI * 2);
+            ctxBoundary.fill();
+            
+            // Draw boundary line
+            ctxBoundary.strokeStyle = '#D4AF37';
+            ctxBoundary.lineWidth = 2;
+            ctxBoundary.setLineDash([5, 5]);
+            ctxBoundary.beginPath();
+            ctxBoundary.arc(centerX, centerY, safeRadius, 0, Math.PI * 2);
+            ctxBoundary.stroke();
+            ctxBoundary.setLineDash([]);
+            
+            // Particles bouncing off boundary
+            boundaryParticles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                
+                // Check distance from center
+                const dx = p.x - centerX;
+                const dy = p.y - centerY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                // Bounce off boundary
+                if (dist > safeRadius - 10) {
+                    // Reflect velocity
+                    const nx = dx / dist;
+                    const ny = dy / dist;
+                    const dot = p.vx * nx + p.vy * ny;
+                    p.vx -= 2 * dot * nx;
+                    p.vy -= 2 * dot * ny;
+                    
+                    // Push back inside
+                    p.x = centerX + nx * (safeRadius - 15);
+                    p.y = centerY + ny * (safeRadius - 15);
+                }
+                
+                // Color based on distance from boundary (h(x) value)
+                const h = (safeRadius - dist) / safeRadius; // 1 at center, 0 at boundary
+                let color;
+                if (h > 0.5) {
+                    color = '#10B981'; // Green
+                } else if (h > 0) {
+                    color = '#F59E0B'; // Yellow
+                } else {
+                    color = '#EF4444'; // Red
+                }
+                
+                ctxBoundary.fillStyle = color;
+                ctxBoundary.beginPath();
+                ctxBoundary.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                ctxBoundary.fill();
+            });
+            
+            // Label h(x) = 0 on boundary
+            ctxBoundary.fillStyle = 'rgba(212, 175, 55, 0.6)';
+            ctxBoundary.font = '12px Space Mono';
+            ctxBoundary.fillText('h(x) = 0', centerX + safeRadius + 10, centerY);
+            
+            requestAnimationFrame(drawBoundary);
+        }
+        
+        drawBoundary(0);
+        
+        // Loop: Strange loop visualization
+        const canvasLoop = document.getElementById('canvas-loop');
+        const ctxLoop = canvasLoop.getContext('2d');
+        resizeCanvas(canvasLoop);
+        window.addEventListener('resize', () => resizeCanvas(canvasLoop));
+        
+        function drawLoop(time) {
+            ctxLoop.fillStyle = 'rgba(10, 10, 12, 0.03)';
+            ctxLoop.fillRect(0, 0, canvasLoop.width, canvasLoop.height);
+            
+            const centerX = canvasLoop.width / 2;
+            const centerY = canvasLoop.height / 2;
+            const radius = Math.min(canvasLoop.width, canvasLoop.height) * 0.25;
+            
+            // Draw Möbius-like loop (figure-8 / lemniscate)
+            ctxLoop.strokeStyle = 'rgba(212, 175, 55, 0.3)';
+            ctxLoop.lineWidth = 2;
+            ctxLoop.beginPath();
+            
+            for (let t = 0; t <= Math.PI * 2; t += 0.01) {
+                const scale = radius * 1.5;
+                // Lemniscate of Bernoulli
+                const a = scale;
+                const cos = Math.cos(t);
+                const sin = Math.sin(t);
+                const denom = 1 + sin * sin;
+                const x = centerX + (a * cos) / denom;
+                const y = centerY + (a * sin * cos) / denom;
+                
+                if (t === 0) {
+                    ctxLoop.moveTo(x, y);
+                } else {
+                    ctxLoop.lineTo(x, y);
+                }
+            }
+            
+            ctxLoop.closePath();
+            ctxLoop.stroke();
+            
+            // Animated point traveling the loop
+            const t = (time * 0.001) % (Math.PI * 2);
+            const a = radius * 1.5;
+            const cos = Math.cos(t);
+            const sin = Math.sin(t);
+            const denom = 1 + sin * sin;
+            const px = centerX + (a * cos) / denom;
+            const py = centerY + (a * sin * cos) / denom;
+            
+            // Trail
+            for (let i = 0; i < 20; i++) {
+                const tt = ((time * 0.001) - i * 0.05) % (Math.PI * 2);
+                const tcos = Math.cos(tt);
+                const tsin = Math.sin(tt);
+                const tdenom = 1 + tsin * tsin;
+                const tx = centerX + (a * tcos) / tdenom;
+                const ty = centerY + (a * tsin * tcos) / tdenom;
+                
+                const alpha = (20 - i) / 20 * 0.5;
+                ctxLoop.fillStyle = `rgba(212, 175, 55, ${alpha})`;
+                ctxLoop.beginPath();
+                ctxLoop.arc(tx, ty, 3, 0, Math.PI * 2);
+                ctxLoop.fill();
+            }
+            
+            // Main point
+            const glow = ctxLoop.createRadialGradient(px, py, 0, px, py, 20);
+            glow.addColorStop(0, 'rgba(212, 175, 55, 0.8)');
+            glow.addColorStop(1, 'rgba(212, 175, 55, 0)');
+            ctxLoop.fillStyle = glow;
+            ctxLoop.beginPath();
+            ctxLoop.arc(px, py, 20, 0, Math.PI * 2);
+            ctxLoop.fill();
+            
+            ctxLoop.fillStyle = '#D4AF37';
+            ctxLoop.beginPath();
+            ctxLoop.arc(px, py, 6, 0, Math.PI * 2);
+            ctxLoop.fill();
+            
+            // Center point (the fixed point where loop crosses)
+            ctxLoop.fillStyle = 'rgba(212, 175, 55, 0.5)';
+            ctxLoop.beginPath();
+            ctxLoop.arc(centerX, centerY, 4, 0, Math.PI * 2);
+            ctxLoop.fill();
+            
+            requestAnimationFrame(drawLoop);
+        }
+        
+        drawLoop(0);
+        
+        // Initialize other canvases with simple backgrounds
+        ['canvas-question'].forEach(id => {
+            const canvas = document.getElementById(id);
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                resizeCanvas(canvas);
+                window.addEventListener('resize', () => resizeCanvas(canvas));
+                
+                // Simple ambient animation
+                function animate(time) {
+                    ctx.fillStyle = 'rgba(10, 10, 12, 0.02)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    // Subtle floating particles
+                    for (let i = 0; i < 5; i++) {
+                        const x = (Math.sin(time * 0.0001 + i) * 0.5 + 0.5) * canvas.width;
+                        const y = (Math.cos(time * 0.00015 + i * 2) * 0.5 + 0.5) * canvas.height;
+                        
+                        ctx.fillStyle = 'rgba(212, 175, 55, 0.1)';
+                        ctx.beginPath();
+                        ctx.arc(x, y, 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    
+                    requestAnimationFrame(animate);
+                }
+                animate(0);
+            }
+        });
+    </script>
+</body>
+</html>
