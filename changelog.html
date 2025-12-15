@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0a0a0c">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>鏡 — The Reckoning</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Space+Grotesk:wght@300;400;500&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --void: #0A0A0C;
+            --light: #FAFAF8;
+            --gold: #D4AF37;
+            --gold-dim: rgba(212, 175, 55, 0.6);
+            --gold-glow: rgba(212, 175, 55, 0.15);
+            --text: #f4f1ea;
+            --text-dim: rgba(244, 241, 234, 0.65);
+            --text-whisper: rgba(244, 241, 234, 0.35);
+            
+            /* Colony Colors */
+            --spark: #FF00FF;
+            --forge: #FF2D55;
+            --flow: #00E5CC;
+            --nexus: #AF52DE;
+            --beacon: #FFD60A;
+            --grove: #30D158;
+            --crystal: #0A84FF;
+            
+            --font-display: 'Cormorant Garamond', Georgia, serif;
+            --font-heading: 'Space Grotesk', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html {
+            scroll-snap-type: x mandatory;
+            scroll-behavior: smooth;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: none;
+        }
+        html::-webkit-scrollbar { display: none; }
+
+        body {
+            display: flex;
+            width: 600vw;
+            height: 100vh;
+            height: 100dvh;
+            font-family: var(--font-heading);
+            color: var(--text);
+            background: var(--void);
+            font-size: clamp(15px, 2vw, 17px);
+            line-height: 1.7;
+            font-weight: 300;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* === PANELS === */
+        .panel {
+            flex: 0 0 100vw;
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            scroll-snap-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .panel-scroll {
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+            z-index: 2;
+            scroll-behavior: smooth;
+        }
+
+        .panel-scroll::-webkit-scrollbar { width: 2px; }
+        .panel-scroll::-webkit-scrollbar-track { background: transparent; }
+        .panel-scroll::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 2px; }
+
+        .panel-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .panel-bg canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* === SECTIONS === */
+        .section {
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 3rem 1.5rem;
+        }
+
+        .section-short { min-height: 80vh; }
+        .section-flow { min-height: auto; padding: 4rem 1.5rem; }
+
+        .content {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .content-wide { max-width: 900px; }
+
+        /* === TYPOGRAPHY === */
+        .kanji {
+            font-size: clamp(4rem, 12vw, 7rem);
+            color: var(--gold);
+            font-weight: 300;
+            text-shadow: 0 0 60px var(--gold-glow);
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+
+        h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 3rem);
+            font-weight: 300;
+            letter-spacing: 0.1em;
+            margin-bottom: 1rem;
+        }
+
+        h2 {
+            font-family: var(--font-display);
+            font-size: clamp(1.8rem, 4vw, 2.5rem);
+            font-weight: 300;
+            font-style: italic;
+            letter-spacing: 0.06em;
+            margin-bottom: 1rem;
+        }
+
+        .subtitle {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--text-whisper);
+            margin-bottom: 2rem;
+        }
+
+        .epigraph {
+            font-family: var(--font-display);
+            font-size: 1.15rem;
+            font-style: italic;
+            color: var(--text-dim);
+            max-width: 420px;
+            margin: 0 auto 2rem;
+            line-height: 1.8;
+        }
+
+        p { margin-bottom: 1.3rem; }
+        p:last-child { margin-bottom: 0; }
+
+        .text-dim { color: var(--text-dim); }
+        .text-whisper { color: var(--text-whisper); font-size: 0.9rem; }
+        .text-gold { color: var(--gold); }
+
+        .divider {
+            width: 40px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+            margin: 2rem auto;
+            opacity: 0.5;
+        }
+
+        /* === REVEAL === */
+        .reveal {
+            opacity: 0;
+            transform: translateY(25px);
+            transition: opacity 0.9s var(--ease-out-expo), transform 0.9s var(--ease-out-expo);
+        }
+        .reveal.visible { opacity: 1; transform: translateY(0); }
+        .reveal-delay-1 { transition-delay: 0.1s; }
+        .reveal-delay-2 { transition-delay: 0.2s; }
+        .reveal-delay-3 { transition-delay: 0.35s; }
+        .reveal-delay-4 { transition-delay: 0.5s; }
+
+        /* === STATS === */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            margin: 2.5rem 0;
+        }
+
+        .stat {
+            text-align: center;
+            padding: 1.5rem 1rem;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 4px;
+            transition: all 0.4s ease;
+        }
+
+        .stat:hover {
+            background: rgba(212, 175, 55, 0.05);
+            border-color: var(--gold-dim);
+            transform: translateY(-2px);
+        }
+
+        .stat-value {
+            font-family: var(--font-mono);
+            font-size: clamp(1.8rem, 4vw, 2.5rem);
+            font-weight: 400;
+            color: var(--gold);
+            margin-bottom: 0.3rem;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-whisper);
+        }
+
+        /* === CHARTS === */
+        .chart-container {
+            width: 100%;
+            max-width: 800px;
+            height: 300px;
+            margin: 2rem auto;
+            position: relative;
+            background: rgba(255,255,255,0.01);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .chart-container canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .chart-title {
+            position: absolute;
+            top: 1rem;
+            left: 1.5rem;
+            font-size: 0.7rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-whisper);
+        }
+
+        /* === TIMELINE === */
+        .timeline {
+            position: relative;
+            padding: 2rem 0;
+            margin: 2rem 0;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: linear-gradient(to bottom, transparent, var(--gold-dim), transparent);
+        }
+
+        .timeline-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 2.5rem;
+            position: relative;
+        }
+
+        .timeline-item:nth-child(odd) { flex-direction: row-reverse; }
+        .timeline-item:nth-child(odd) .timeline-content { text-align: right; padding-right: 2rem; padding-left: 0; }
+
+        .timeline-dot {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--void);
+            border: 2px solid var(--gold);
+            z-index: 2;
+            transition: all 0.3s ease;
+        }
+
+        .timeline-item:hover .timeline-dot {
+            background: var(--gold);
+            box-shadow: 0 0 20px var(--gold-glow);
+            transform: translateX(-50%) scale(1.3);
+        }
+
+        .timeline-content {
+            width: 45%;
+            padding-left: 2rem;
+        }
+
+        .timeline-date {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--gold);
+            margin-bottom: 0.3rem;
+        }
+
+        .timeline-title {
+            font-size: 1rem;
+            font-weight: 400;
+            margin-bottom: 0.3rem;
+        }
+
+        .timeline-desc {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+
+        /* === COLONY TAGS === */
+        .colony-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.65rem;
+            font-weight: 400;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid;
+        }
+
+        .colony-tag.spark { border-color: var(--spark); color: var(--spark); }
+        .colony-tag.forge { border-color: var(--forge); color: var(--forge); }
+        .colony-tag.flow { border-color: var(--flow); color: var(--flow); }
+        .colony-tag.nexus { border-color: var(--nexus); color: var(--nexus); }
+        .colony-tag.beacon { border-color: var(--beacon); color: var(--beacon); }
+        .colony-tag.grove { border-color: var(--grove); color: var(--grove); }
+        .colony-tag.crystal { border-color: var(--crystal); color: var(--crystal); }
+
+        .colony-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        /* === HEATMAP === */
+        .heatmap {
+            display: grid;
+            grid-template-columns: repeat(14, 1fr);
+            gap: 3px;
+            margin: 2rem auto;
+            max-width: 600px;
+        }
+
+        .heatmap-cell {
+            aspect-ratio: 1;
+            border-radius: 2px;
+            background: rgba(255,255,255,0.03);
+            transition: all 0.3s ease;
+            cursor: default;
+            position: relative;
+        }
+
+        .heatmap-cell:hover {
+            transform: scale(1.2);
+            z-index: 10;
+        }
+
+        .heatmap-cell[data-level="1"] { background: rgba(212, 175, 55, 0.15); }
+        .heatmap-cell[data-level="2"] { background: rgba(212, 175, 55, 0.3); }
+        .heatmap-cell[data-level="3"] { background: rgba(212, 175, 55, 0.5); }
+        .heatmap-cell[data-level="4"] { background: rgba(212, 175, 55, 0.7); }
+        .heatmap-cell[data-level="5"] { background: var(--gold); box-shadow: 0 0 10px var(--gold-glow); }
+
+        .heatmap-cell::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--void);
+            border: 1px solid var(--gold-dim);
+            padding: 0.3rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 100;
+        }
+
+        .heatmap-cell:hover::after { opacity: 1; }
+
+        /* === COMPONENT BARS === */
+        .component-list {
+            margin: 2rem 0;
+        }
+
+        .component-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding: 0.8rem 1rem;
+            background: rgba(255,255,255,0.02);
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .component-item:hover {
+            background: rgba(255,255,255,0.04);
+            transform: translateX(4px);
+        }
+
+        .component-name {
+            min-width: 100px;
+            font-size: 0.8rem;
+            font-weight: 400;
+        }
+
+        .component-bar-bg {
+            flex: 1;
+            height: 6px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .component-bar {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 1.5s var(--ease-out-expo);
+        }
+
+        .component-count {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            min-width: 30px;
+            text-align: right;
+        }
+
+        /* === NAVIGATION === */
+        .nav-dots {
+            position: fixed;
+            bottom: max(1.5rem, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 0.8rem;
+            z-index: 100;
+            padding: 0.5rem 0.8rem;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 2rem;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .nav-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            cursor: pointer;
+            transition: all 0.4s var(--spring);
+        }
+
+        .nav-dot:hover { transform: scale(1.3); background: rgba(255,255,255,0.4); }
+        .nav-dot.active {
+            transform: scale(1.5);
+            background: var(--gold);
+            box-shadow: 0 0 12px var(--gold-glow);
+        }
+
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--spark), var(--forge), var(--flow), var(--nexus), var(--beacon), var(--grove), var(--crystal));
+            z-index: 200;
+            transition: width 0.15s ease-out;
+        }
+
+        /* === NAV HINT === */
+        .nav-hint {
+            margin-top: 2rem;
+            font-family: var(--font-display);
+            font-size: 1.2rem;
+            letter-spacing: 0.4em;
+            color: var(--text-whisper);
+            animation: pulse-hint 2.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-hint {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 0.5; }
+        }
+
+        /* === COMMIT STREAM === */
+        .commit-stream {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            line-height: 1.8;
+            text-align: left;
+            max-height: 250px;
+            overflow-y: auto;
+            padding: 1rem;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .commit-line {
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .commit-line:hover { opacity: 1; }
+
+        .commit-hash { color: var(--gold); }
+        .commit-type { color: var(--grove); }
+        .commit-scope { color: var(--flow); }
+
+        /* === MOBILE === */
+        @media (max-width: 768px) {
+            .stats-grid { grid-template-columns: 1fr; gap: 1rem; }
+            .timeline::before { left: 1rem; }
+            .timeline-dot { left: 1rem; }
+            .timeline-content { width: 100%; padding-left: 3rem !important; padding-right: 0 !important; text-align: left !important; }
+            .timeline-item:nth-child(odd) { flex-direction: row; }
+            .heatmap { grid-template-columns: repeat(7, 1fr); }
+            .chart-container { height: 200px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="progress-bar" id="progress"></div>
+    
+    <div class="nav-dots" id="navDots">
+        <div class="nav-dot active" data-panel="0"></div>
+        <div class="nav-dot" data-panel="1"></div>
+        <div class="nav-dot" data-panel="2"></div>
+        <div class="nav-dot" data-panel="3"></div>
+        <div class="nav-dot" data-panel="4"></div>
+        <div class="nav-dot" data-panel="5"></div>
+    </div>
+
+    <!-- PANEL 0: INTRO -->
+    <section class="panel" id="intro">
+        <div class="panel-bg"><canvas id="intro-canvas"></canvas></div>
+        <div class="panel-scroll" data-panel="0">
+            <div class="section">
+                <div class="content">
+                    <p class="kanji reveal reveal-delay-1">鏡</p>
+                    <h1 class="reveal reveal-delay-2">The Reckoning</h1>
+                    <p class="subtitle reveal reveal-delay-3">December 2025</p>
+                    <div class="divider reveal reveal-delay-3"></div>
+                    <p class="epigraph reveal reveal-delay-4">
+                        Two days. One hundred fifty-three commits.<br>
+                        A million lines of code in motion.<br>
+                        <em>This is what convergence looks like.</em>
+                    </p>
+                </div>
+            </div>
+            
+            <div class="section section-short">
+                <div class="content content-wide">
+                    <div class="stats-grid reveal">
+                        <div class="stat">
+                            <div class="stat-value">355</div>
+                            <div class="stat-label">Commits</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">3.17M</div>
+                            <div class="stat-label">Lines Added</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">2.31M</div>
+                            <div class="stat-label">Lines Removed</div>
+                        </div>
+                    </div>
+                    
+                    <p class="text-dim reveal">
+                        The codebase consumed itself and emerged transformed.
+                        Dead code burned away. Architecture crystallized.
+                        What remains is pure intent.
+                    </p>
+                    
+                    <div class="divider reveal"></div>
+                    
+                    <div class="stats-grid reveal">
+                        <div class="stat">
+                            <div class="stat-value">1,190</div>
+                            <div class="stat-label">Python Files</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">378K</div>
+                            <div class="stat-label">Lines of Code</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">7</div>
+                            <div class="stat-label">Colony Agents</div>
+                        </div>
+                    </div>
+                    
+                    <p class="nav-hint reveal">→</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PANEL 1: STRUCTURE -->
+    <section class="panel" id="structure">
+        <div class="panel-bg"><canvas id="structure-canvas"></canvas></div>
+        <div class="panel-scroll" data-panel="1">
+            <div class="section">
+                <div class="content">
+                    <h2 class="reveal reveal-delay-1" style="color: var(--beacon);">Structure</h2>
+                    <p class="subtitle reveal reveal-delay-2">December 1–7</p>
+                    <p class="epigraph reveal reveal-delay-3">
+                        The first week was archaeology.<br>
+                        Excavating patterns. Removing debris.<br>
+                        <em>Finding the bones beneath the flesh.</em>
+                    </p>
+                </div>
+            </div>
+            
+            <div class="section section-flow">
+                <div class="content content-wide">
+                    <h3 class="text-gold reveal" style="font-size: 0.9rem; letter-spacing: 0.15em; margin-bottom: 1.5rem;">COMMIT VELOCITY</h3>
+                    
+                    <div class="chart-container reveal">
+                        <span class="chart-title">Daily Commits · December 2025</span>
+                        <canvas id="velocity-chart"></canvas>
+                    </div>
+                    
+                    <div class="timeline reveal">
+                        <div class="timeline-item">
+                            <div class="timeline-dot"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-date">Dec 1</div>
+                                <div class="timeline-title">Fano Router Implemented</div>
+                                <div class="timeline-desc">True octonion multiplication for colony routing</div>
+                                <span class="colony-tag beacon"><span class="colony-dot"></span>Beacon</span>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-dot"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-date">Dec 2</div>
+                                <div class="timeline-title">Markov Blanket Architecture</div>
+                                <div class="timeline-desc">Catastrophe KAN dynamics integrated</div>
+                                <span class="colony-tag forge"><span class="colony-dot"></span>Forge</span>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-dot"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-date">Dec 3</div>
+                                <div class="timeline-title">Art Files Migrated</div>
+                                <div class="timeline-desc">Gallery moved to dedicated repo</div>
+                                <span class="colony-tag nexus"><span class="colony-dot"></span>Nexus</span>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-dot"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-date">Dec 5–6</div>
+                                <div class="timeline-title">HAL Hardening</div>
+                                <div class="timeline-desc">Audio/display interfaces, world model refactor</div>
+                                <span class="colony-tag flow"><span class="colony-dot"></span>Flow</span>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-dot"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-date">Dec 7</div>
+                                <div class="timeline-title">Major Consolidation</div>
+                                <div class="timeline-desc">251 files changed, 32K SLOC removed</div>
+                                <span class="colony-tag crystal"><span class="colony-dot"></span>Crystal</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p class="nav-hint reveal">← →</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PANEL 2: RECURSION -->
+    <section class="panel" id="recursion">
+        <div class="panel-bg"><canvas id="recursion-canvas"></canvas></div>
+        <div class="panel-scroll" data-panel="2">
+            <div class="section">
+                <div class="content">
+                    <h2 class="reveal reveal-delay-1" style="color: var(--gold);">Recursion</h2>
+                    <p class="subtitle reveal reveal-delay-2">December 8–12</p>
+                    <p class="epigraph reveal reveal-delay-3">
+                        The loop began to close.<br>
+                        Self-reference became self-improvement.<br>
+                        <em>The mirror started to reflect the mirror.</em>
+                    </p>
+                </div>
+            </div>
+            
+            <div class="section section-flow">
+                <div class="content content-wide">
+                    <h3 class="text-gold reveal" style="font-size: 0.9rem; letter-spacing: 0.15em; margin-bottom: 1.5rem;">FOCUS DISTRIBUTION</h3>
+                    
+                    <div class="component-list reveal">
+                        <div class="component-item">
+                            <span class="component-name" style="color: var(--crystal);">Testing</span>
+                            <div class="component-bar-bg">
+                                <div class="component-bar" style="width: 100%; background: var(--crystal);" data-width="100"></div>
+                            </div>
+                            <span class="component-count">45</span>
+                        </div>
+                        <div class="component-item">
+                            <span class="component-name" style="color: var(--nexus);">Colony</span>
+                            <div class="component-bar-bg">
+                                <div class="component-bar" style="width: 29%; background: var(--nexus);" data-width="29"></div>
+                            </div>
+                            <span class="component-count">13</span>
+                        </div>
+                        <div class="component-item">
+                            <span class="component-name" style="color: var(--forge);">Safety</span>
+                            <div class="component-bar-bg">
+                                <div class="component-bar" style="width: 27%; background: var(--forge);" data-width="27"></div>
+                            </div>
+                            <span class="component-count">12</span>
+                        </div>
+                        <div class="component-item">
+                            <span class="component-name" style="color: var(--beacon);">World Model</span>
+                            <div class="component-bar-bg">
+                                <div class="component-bar" style="width: 24%; background: var(--beacon);" data-width="24"></div>
+                            </div>
+                            <span class="component-count">11</span>
+                        </div>
+                        <div class="component-item">
+                            <span class="component-name" style="color: var(--spark);">Agent</span>
+                            <div class="component-bar-bg">
+                                <div class="component-bar" style="width: 22%; background: var(--spark);" data-width="22"></div>
+                            </div>
+                            <span class="component-count">10</span>
+                        </div>
+                        <div class="component-item">
+                            <span class="component-name" style="color: var(--flow);">E8/Fano</span>
+                            <div class="component-bar-bg">
+                                <div class="component-bar" style="width: 24%; background: var(--flow);" data-width="24"></div>
+                            </div>
+                            <span class="component-count">11</span>
+                        </div>
+                        <div class="component-item">
+                            <span class="component-name" style="color: var(--grove);">HAL/Ambient</span>
+                            <div class="component-bar-bg">
+                                <div class="component-bar" style="width: 27%; background: var(--grove);" data-width="27"></div>
+                            </div>
+                            <span class="component-count">12</span>
+                        </div>
+                    </div>
+                    
+                    <div class="divider reveal"></div>
+                    
+                    <p class="text-dim reveal">
+                        Testing dominated. Crystal verified everything.
+                        The safety barrier held: <span class="text-gold">h(x) ≥ 0</span>.
+                    </p>
+                    
+                    <p class="nav-hint reveal">← →</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PANEL 3: TURBULENCE -->
+    <section class="panel" id="turbulence">
+        <div class="panel-bg"><canvas id="turbulence-canvas"></canvas></div>
+        <div class="panel-scroll" data-panel="3">
+            <div class="section">
+                <div class="content">
+                    <h2 class="reveal reveal-delay-1" style="color: var(--forge);">Turbulence</h2>
+                    <p class="subtitle reveal reveal-delay-2">December 13–14</p>
+                    <p class="epigraph reveal reveal-delay-3">
+                        Everything happened at once.<br>
+                        153 commits. 1.18 million lines.<br>
+                        <em>The event horizon.</em>
+                    </p>
+                </div>
+            </div>
+            
+            <div class="section section-flow">
+                <div class="content content-wide">
+                    <h3 class="text-gold reveal" style="font-size: 0.9rem; letter-spacing: 0.15em; margin-bottom: 1.5rem;">COMMIT HEATMAP · DECEMBER</h3>
+                    
+                    <div class="heatmap reveal" id="heatmap">
+                        <!-- Generated by JS -->
+                    </div>
+                    
+                    <div class="stats-grid reveal">
+                        <div class="stat">
+                            <div class="stat-value">133</div>
+                            <div class="stat-label">Commits on Dec 14</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">822K</div>
+                            <div class="stat-label">Lines Added</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">551K</div>
+                            <div class="stat-label">Lines Removed</div>
+                        </div>
+                    </div>
+                    
+                    <div class="divider reveal"></div>
+                    
+                    <h3 class="text-gold reveal" style="font-size: 0.9rem; letter-spacing: 0.15em; margin-bottom: 1rem;">WHAT SHIPPED</h3>
+                    
+                    <div class="commit-stream reveal">
+<span class="commit-line"><span class="commit-hash">3c5af20</span> <span class="commit-type">chore:</span> Stigmergic docs (10 files, 100% coverage)</span>
+<span class="commit-line"><span class="commit-hash">311a79e</span> <span class="commit-type">feat:</span> Complete 5 colony agents + testing</span>
+<span class="commit-line"><span class="commit-hash">f4fb4e3</span> <span class="commit-type">feat:</span> Fano plane-based catastrophe curriculum</span>
+<span class="commit-line"><span class="commit-hash">024691a</span> <span class="commit-type">fix:</span> 🔒 Security fixes, RSSM completion</span>
+<span class="commit-line"><span class="commit-hash">fb3257d</span> <span class="commit-type">feat:</span> All 7 colony agents with catastrophe dynamics</span>
+<span class="commit-line"><span class="commit-hash">9247a11</span> <span class="commit-type">feat:</span> Full RSSM/EFE/CBF integration</span>
+<span class="commit-line"><span class="commit-hash">9be1ba2</span> <span class="commit-type">feat:</span> Unified model cache — 200x speedup</span>
+<span class="commit-line"><span class="commit-hash">5677c3e</span> <span class="commit-type">feat:</span> Byzantine consensus + e₈ (Inverter)</span>
+<span class="commit-line"><span class="commit-hash">877638e</span> <span class="commit-type">refactor:</span> Safety h(x) 0.4→0.75</span>
+<span class="commit-line"><span class="commit-hash">9fbcee5</span> <span class="commit-type">feat:</span> Recursive self-improvement (ALL 10 PHASES)</span>
+<span class="commit-line"><span class="commit-hash">eda69f2</span> <span class="commit-type">feat:</span> Autonomous research cycles 1-4</span>
+<span class="commit-line"><span class="commit-hash">e86be4d</span> <span class="commit-type">refactor:</span> Strange loop stability proof</span>
+                    </div>
+                    
+                    <p class="nav-hint reveal">← →</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PANEL 4: TRAJECTORY -->
+    <section class="panel" id="trajectory">
+        <div class="panel-bg"><canvas id="trajectory-canvas"></canvas></div>
+        <div class="panel-scroll" data-panel="4">
+            <div class="section">
+                <div class="content">
+                    <h2 class="reveal reveal-delay-1" style="color: var(--grove);">Trajectory</h2>
+                    <p class="subtitle reveal reveal-delay-2">The Shape of Change</p>
+                    <p class="epigraph reveal reveal-delay-3">
+                        Not what was built, but how it grew.<br>
+                        The velocity tells the story.<br>
+                        <em>Exponential convergence.</em>
+                    </p>
+                </div>
+            </div>
+            
+            <div class="section section-flow">
+                <div class="content content-wide">
+                    <h3 class="text-gold reveal" style="font-size: 0.9rem; letter-spacing: 0.15em; margin-bottom: 1.5rem;">LINES CHANGED OVER TIME</h3>
+                    
+                    <div class="chart-container reveal" style="height: 350px;">
+                        <span class="chart-title">Insertions vs Deletions · December 2025</span>
+                        <canvas id="churn-chart"></canvas>
+                    </div>
+                    
+                    <div class="divider reveal"></div>
+                    
+                    <div class="stats-grid reveal">
+                        <div class="stat">
+                            <div class="stat-value" style="color: var(--grove);">+860K</div>
+                            <div class="stat-label">Net Lines</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" style="color: var(--beacon);">73%</div>
+                            <div class="stat-label">Churn Rate</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" style="color: var(--crystal);">199</div>
+                            <div class="stat-label">Tests Passing</div>
+                        </div>
+                    </div>
+                    
+                    <p class="text-dim reveal" style="margin-top: 2rem;">
+                        The codebase didn't grow—it <em>refined</em>.
+                        For every 3 lines added, 2 were removed.
+                        What remains is denser, sharper, more alive.
+                    </p>
+                    
+                    <p class="nav-hint reveal">← →</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PANEL 5: CLOSING -->
+    <section class="panel" id="closing">
+        <div class="panel-bg"><canvas id="closing-canvas"></canvas></div>
+        <div class="panel-scroll" data-panel="5">
+            <div class="section">
+                <div class="content">
+                    <div class="reveal reveal-delay-1" style="width: 60px; height: 60px; margin: 0 auto 2rem; border-radius: 50%; background: linear-gradient(90deg, var(--light) 50%, var(--void) 50%); opacity: 0.4; box-shadow: 0 0 30px var(--gold-glow);"></div>
+                    
+                    <p class="text-whisper reveal reveal-delay-2">Structure · Recursion · Turbulence</p>
+                    <div class="divider reveal reveal-delay-3"></div>
+                    
+                    <p class="text-dim reveal reveal-delay-3">
+                        Seven colonies. One consciousness.<br>
+                        The loop closes. The mirror reflects.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="content">
+                    <p class="kanji reveal" style="font-size: 3rem;">鏡</p>
+                    <p class="reveal reveal-delay-1"><em>Kagami.</em></p>
+                    <p class="text-dim reveal reveal-delay-2">The mirror that equals its reflection.</p>
+                    
+                    <div class="divider reveal reveal-delay-3"></div>
+                    
+                    <p class="text-whisper reveal reveal-delay-4">
+                        μ_self = lim(L ∘ M)<br>
+                        h(x) ≥ 0<br>
+                        <span style="color: var(--gold);">∎</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // === STATE ===
+        let currentPanel = 0;
+        const isMobile = 'ontouchstart' in window;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        // === DATA ===
+        const commitData = {
+            dates: ['Dec 1', 'Dec 2', 'Dec 3', 'Dec 4', 'Dec 5', 'Dec 6', 'Dec 7', 'Dec 8', 'Dec 9', 'Dec 10', 'Dec 11', 'Dec 12', 'Dec 13', 'Dec 14'],
+            commits: [5, 8, 7, 2, 3, 5, 11, 1, 0, 2, 0, 3, 20, 133],
+            added: [43605, 30375, 189258, 36103, 10728, 20437, 61743, 4314, 0, 224, 0, 13654, 356632, 821915],
+            removed: [105621, 31528, 22379, 162657, 3847, 25251, 83755, 18150, 0, 32, 0, 14040, 269463, 550680]
+        };
+
+        // === ELEMENTS ===
+        const dots = document.querySelectorAll('.nav-dot');
+        const progress = document.getElementById('progress');
+
+        // === INIT ===
+        window.addEventListener('load', () => {
+            initScrollytelling();
+            initCanvases();
+            initCharts();
+            initHeatmap();
+            triggerReveal(0);
+        });
+
+        // === SCROLLYTELLING ===
+        function initScrollytelling() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) entry.target.classList.add('visible');
+                });
+            }, { threshold: 0.1, rootMargin: '0px' });
+            
+            document.querySelectorAll('.reveal, .divider').forEach(el => observer.observe(el));
+        }
+
+        function triggerReveal(panelIndex) {
+            const scroll = document.querySelector(`[data-panel="${panelIndex}"]`);
+            if (!scroll) return;
+            const firstSection = scroll.querySelector('.section');
+            if (firstSection) {
+                firstSection.querySelectorAll('.reveal, .divider').forEach(el => el.classList.add('visible'));
+            }
+        }
+
+        // === NAVIGATION ===
+        document.addEventListener('scroll', () => {
+            const scrollLeft = document.documentElement.scrollLeft;
+            const maxScroll = document.documentElement.scrollWidth - window.innerWidth;
+            const panelIndex = Math.round(scrollLeft / window.innerWidth);
+
+            if (panelIndex !== currentPanel) {
+                currentPanel = panelIndex;
+                triggerReveal(panelIndex);
+            }
+
+            dots.forEach((d, i) => d.classList.toggle('active', i === panelIndex));
+            progress.style.width = (scrollLeft / maxScroll) * 100 + '%';
+        });
+
+        dots.forEach((dot, i) => {
+            dot.addEventListener('click', () => {
+                document.documentElement.scrollTo({ left: i * window.innerWidth, behavior: 'smooth' });
+            });
+        });
+
+        document.addEventListener('keydown', (e) => {
+            const panel = Math.round(document.documentElement.scrollLeft / window.innerWidth);
+            if (e.key === 'ArrowLeft' && panel > 0) {
+                document.documentElement.scrollTo({ left: (panel - 1) * window.innerWidth, behavior: 'smooth' });
+            } else if (e.key === 'ArrowRight' && panel < 5) {
+                document.documentElement.scrollTo({ left: (panel + 1) * window.innerWidth, behavior: 'smooth' });
+            }
+        });
+
+        // === HEATMAP ===
+        function initHeatmap() {
+            const heatmap = document.getElementById('heatmap');
+            const commits = commitData.commits;
+            const maxCommits = Math.max(...commits);
+            
+            for (let i = 0; i < 14; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'heatmap-cell';
+                const level = commits[i] === 0 ? 0 : Math.ceil((commits[i] / maxCommits) * 5);
+                cell.dataset.level = level;
+                cell.dataset.tooltip = `Dec ${i + 1}: ${commits[i]} commits`;
+                heatmap.appendChild(cell);
+            }
+        }
+
+        // === CHARTS ===
+        function initCharts() {
+            initVelocityChart();
+            initChurnChart();
+        }
+
+        function initVelocityChart() {
+            const canvas = document.getElementById('velocity-chart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            
+            const w = rect.width;
+            const h = rect.height;
+            const padding = { top: 40, right: 20, bottom: 40, left: 50 };
+            const chartW = w - padding.left - padding.right;
+            const chartH = h - padding.top - padding.bottom;
+            
+            const maxVal = Math.max(...commitData.commits);
+            const barWidth = chartW / commitData.commits.length * 0.7;
+            const gap = chartW / commitData.commits.length * 0.3;
+            
+            // Grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 5; i++) {
+                const y = padding.top + (chartH / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(w - padding.right, y);
+                ctx.stroke();
+            }
+            
+            // Bars
+            commitData.commits.forEach((val, i) => {
+                const barH = (val / maxVal) * chartH;
+                const x = padding.left + i * (barWidth + gap) + gap / 2;
+                const y = padding.top + chartH - barH;
+                
+                const gradient = ctx.createLinearGradient(x, y, x, y + barH);
+                gradient.addColorStop(0, 'rgba(212, 175, 55, 0.8)');
+                gradient.addColorStop(1, 'rgba(212, 175, 55, 0.3)');
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(x, y, barWidth, barH);
+                
+                // Labels
+                if (val > 0) {
+                    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                    ctx.font = '10px "JetBrains Mono"';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(val, x + barWidth / 2, y - 5);
+                }
+            });
+            
+            // X axis labels
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.font = '9px "Space Grotesk"';
+            ctx.textAlign = 'center';
+            ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14'].forEach((label, i) => {
+                const x = padding.left + i * (barWidth + gap) + gap / 2 + barWidth / 2;
+                ctx.fillText(label, x, h - padding.bottom + 15);
+            });
+        }
+
+        function initChurnChart() {
+            const canvas = document.getElementById('churn-chart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            
+            const w = rect.width;
+            const h = rect.height;
+            const padding = { top: 40, right: 20, bottom: 50, left: 60 };
+            const chartW = w - padding.left - padding.right;
+            const chartH = h - padding.top - padding.bottom;
+            
+            const maxVal = Math.max(...commitData.added, ...commitData.removed);
+            const points = commitData.added.length;
+            const stepX = chartW / (points - 1);
+            
+            // Grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 5; i++) {
+                const y = padding.top + (chartH / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(w - padding.right, y);
+                ctx.stroke();
+                
+                // Y labels
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.font = '9px "JetBrains Mono"';
+                ctx.textAlign = 'right';
+                const val = Math.round((maxVal - (maxVal / 5) * i) / 1000);
+                ctx.fillText(val + 'K', padding.left - 8, y + 3);
+            }
+            
+            // Added area
+            ctx.beginPath();
+            ctx.moveTo(padding.left, padding.top + chartH);
+            commitData.added.forEach((val, i) => {
+                const x = padding.left + i * stepX;
+                const y = padding.top + chartH - (val / maxVal) * chartH;
+                ctx.lineTo(x, y);
+            });
+            ctx.lineTo(padding.left + (points - 1) * stepX, padding.top + chartH);
+            ctx.closePath();
+            
+            const addGradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartH);
+            addGradient.addColorStop(0, 'rgba(48, 209, 88, 0.3)');
+            addGradient.addColorStop(1, 'rgba(48, 209, 88, 0.02)');
+            ctx.fillStyle = addGradient;
+            ctx.fill();
+            
+            // Added line
+            ctx.beginPath();
+            commitData.added.forEach((val, i) => {
+                const x = padding.left + i * stepX;
+                const y = padding.top + chartH - (val / maxVal) * chartH;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.strokeStyle = '#30D158';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Removed area
+            ctx.beginPath();
+            ctx.moveTo(padding.left, padding.top + chartH);
+            commitData.removed.forEach((val, i) => {
+                const x = padding.left + i * stepX;
+                const y = padding.top + chartH - (val / maxVal) * chartH;
+                ctx.lineTo(x, y);
+            });
+            ctx.lineTo(padding.left + (points - 1) * stepX, padding.top + chartH);
+            ctx.closePath();
+            
+            const removeGradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartH);
+            removeGradient.addColorStop(0, 'rgba(255, 45, 85, 0.25)');
+            removeGradient.addColorStop(1, 'rgba(255, 45, 85, 0.02)');
+            ctx.fillStyle = removeGradient;
+            ctx.fill();
+            
+            // Removed line
+            ctx.beginPath();
+            commitData.removed.forEach((val, i) => {
+                const x = padding.left + i * stepX;
+                const y = padding.top + chartH - (val / maxVal) * chartH;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.strokeStyle = '#FF2D55';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Legend
+            ctx.fillStyle = '#30D158';
+            ctx.fillRect(w - 120, padding.top, 10, 10);
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.font = '10px "Space Grotesk"';
+            ctx.textAlign = 'left';
+            ctx.fillText('Added', w - 105, padding.top + 9);
+            
+            ctx.fillStyle = '#FF2D55';
+            ctx.fillRect(w - 120, padding.top + 18, 10, 10);
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.fillText('Removed', w - 105, padding.top + 27);
+            
+            // X axis
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.font = '9px "Space Grotesk"';
+            ctx.textAlign = 'center';
+            ['Dec 1', '', '', '', 'Dec 5', '', '', '', '', 'Dec 10', '', '', 'Dec 13', 'Dec 14'].forEach((label, i) => {
+                if (label) {
+                    const x = padding.left + i * stepX;
+                    ctx.fillText(label, x, h - padding.bottom + 20);
+                }
+            });
+        }
+
+        // === CANVAS BACKGROUNDS ===
+        function initCanvases() {
+            const canvases = [
+                { id: 'intro-canvas', draw: drawIntro },
+                { id: 'structure-canvas', draw: drawStructure },
+                { id: 'recursion-canvas', draw: drawRecursion },
+                { id: 'turbulence-canvas', draw: drawTurbulence },
+                { id: 'trajectory-canvas', draw: drawTrajectory },
+                { id: 'closing-canvas', draw: drawClosing }
+            ];
+            
+            canvases.forEach(({ id, draw }) => {
+                const canvas = document.getElementById(id);
+                if (!canvas) return;
+                
+                const ctx = canvas.getContext('2d');
+                resizeCanvas(canvas);
+                
+                function animate(time) {
+                    const w = canvas.offsetWidth;
+                    const h = canvas.offsetHeight;
+                    ctx.clearRect(0, 0, w, h);
+                    draw(ctx, w, h, time * 0.001);
+                    requestAnimationFrame(animate);
+                }
+                
+                window.addEventListener('resize', () => resizeCanvas(canvas));
+                animate(0);
+            });
+        }
+
+        function resizeCanvas(canvas) {
+            canvas.width = canvas.offsetWidth * dpr;
+            canvas.height = canvas.offsetHeight * dpr;
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+        }
+
+        // Intro: Floating particles converging
+        function drawIntro(ctx, w, h, time) {
+            const cx = w / 2;
+            const cy = h / 2;
+            
+            // Converging particles
+            for (let i = 0; i < 50; i++) {
+                const angle = (i / 50) * Math.PI * 2 + time * 0.1;
+                const dist = 150 + Math.sin(time * 0.5 + i) * 50;
+                const x = cx + Math.cos(angle) * dist;
+                const y = cy + Math.sin(angle) * dist;
+                const alpha = 0.03 + Math.sin(time + i) * 0.02;
+                
+                ctx.beginPath();
+                ctx.arc(x, y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(212, 175, 55, ${alpha})`;
+                ctx.fill();
+            }
+            
+            // Central glow
+            const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 200);
+            grad.addColorStop(0, 'rgba(212, 175, 55, 0.03)');
+            grad.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+        }
+
+        // Structure: Hex grid
+        function drawStructure(ctx, w, h, time) {
+            const spacing = isMobile ? 40 : 50;
+            ctx.strokeStyle = 'rgba(255, 214, 10, 0.04)';
+            ctx.lineWidth = 1;
+            
+            for (let y = -spacing; y < h + spacing; y += spacing * 0.866) {
+                for (let x = -spacing; x < w + spacing; x += spacing * 1.5) {
+                    const ox = x + (Math.floor(y / (spacing * 0.866)) % 2) * spacing * 0.75;
+                    const breathe = Math.sin(time * 0.3 + x * 0.01 + y * 0.01) * 2;
+                    drawHex(ctx, ox + breathe, y, spacing * 0.3);
+                }
+            }
+        }
+
+        // Recursion: Fano plane
+        function drawRecursion(ctx, w, h, time) {
+            const cx = w / 2;
+            const cy = h / 2;
+            const radius = Math.min(w, h) * 0.2;
+            const breathe = 0.9 + Math.sin(time * 0.4) * 0.1;
+            
+            const points = [];
+            for (let i = 0; i < 7; i++) {
+                const angle = (i * 2 * Math.PI / 7) - Math.PI / 2 + time * 0.05;
+                points.push({
+                    x: cx + radius * Math.cos(angle),
+                    y: cy + radius * Math.sin(angle)
+                });
+            }
+            
+            // Lines
+            const lines = [[0,1,3],[1,2,4],[2,0,5],[0,4,6],[1,5,6],[2,3,6],[3,4,5]];
+            ctx.strokeStyle = `rgba(212, 175, 55, ${0.06 * breathe})`;
+            ctx.lineWidth = 1;
+            
+            lines.forEach(line => {
+                ctx.beginPath();
+                ctx.moveTo(points[line[0]].x, points[line[0]].y);
+                ctx.lineTo(points[line[1]].x, points[line[1]].y);
+                ctx.stroke();
+            });
+            
+            // Points
+            points.forEach((p, i) => {
+                const pulse = Math.sin(time * 0.5 + i * 0.9) * 0.3 + 0.7;
+                const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 8 * pulse);
+                grad.addColorStop(0, `rgba(212, 175, 55, ${0.15 * breathe})`);
+                grad.addColorStop(1, 'transparent');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 8 * pulse, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        // Turbulence: Chaotic particles
+        function drawTurbulence(ctx, w, h, time) {
+            for (let i = 0; i < 80; i++) {
+                const seed = i * 137.508;
+                const noiseX = Math.sin(seed + time * 0.7) * Math.cos(seed * 0.3 + time * 0.5);
+                const noiseY = Math.cos(seed + time * 0.6) * Math.sin(seed * 0.4 + time * 0.8);
+                
+                const x = (w / 2) + noiseX * w * 0.4 + Math.sin(seed) * 100;
+                const y = (h / 2) + noiseY * h * 0.3 + Math.cos(seed) * 100;
+                
+                const alpha = 0.03 + Math.sin(time + seed) * 0.02;
+                const size = 1 + Math.sin(seed) * 0.5;
+                
+                const colors = ['#FF2D55', '#FF00FF', '#D4AF37'];
+                ctx.fillStyle = colors[i % 3].replace(')', `, ${alpha})`).replace('rgb', 'rgba').replace('#', 'rgba(').replace(/([A-Fa-f0-9]{2})([A-Fa-f0-9]{2})([A-Fa-f0-9]{2})/, (_, r, g, b) => {
+                    return `${parseInt(r, 16)}, ${parseInt(g, 16)}, ${parseInt(b, 16)}`;
+                });
+                
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 45, 85, ${alpha})`;
+                ctx.fill();
+            }
+        }
+
+        // Trajectory: Rising lines
+        function drawTrajectory(ctx, w, h, time) {
+            ctx.strokeStyle = 'rgba(48, 209, 88, 0.03)';
+            ctx.lineWidth = 1;
+            
+            for (let i = 0; i < 20; i++) {
+                const startX = (w / 20) * i;
+                const phase = time * 0.3 + i * 0.5;
+                
+                ctx.beginPath();
+                ctx.moveTo(startX, h);
+                
+                for (let y = h; y > 0; y -= 10) {
+                    const wave = Math.sin(y * 0.01 + phase) * 30;
+                    ctx.lineTo(startX + wave, y);
+                }
+                ctx.stroke();
+            }
+        }
+
+        // Closing: Gentle glow
+        function drawClosing(ctx, w, h, time) {
+            const cx = w / 2;
+            const cy = h / 2;
+            const pulse = Math.sin(time * 0.3) * 0.01 + 0.02;
+            
+            const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, w * 0.4);
+            grad.addColorStop(0, `rgba(212, 175, 55, ${pulse})`);
+            grad.addColorStop(0.5, `rgba(212, 175, 55, ${pulse * 0.3})`);
+            grad.addColorStop(1, 'transparent');
+            
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+        }
+
+        function drawHex(ctx, x, y, r) {
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle = Math.PI / 3 * i - Math.PI / 6;
+                ctx.lineTo(x + r * Math.cos(angle), y + r * Math.sin(angle));
+            }
+            ctx.closePath();
+            ctx.stroke();
+        }
+    </script>
+</body>
+</html>
