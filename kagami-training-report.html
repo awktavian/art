@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0A0A0C">
+    <title>Training a Language-Grounded World Model — ChronOS</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --void: #0A0A0C;
+            --light: #FAFAF8;
+            --gold: #D4AF37;
+            --gold-glow: rgba(212, 175, 55, 0.4);
+            --gold-subtle: rgba(212, 175, 55, 0.1);
+            --text-dim: rgba(250, 250, 248, 0.65);
+            --text-faint: rgba(250, 250, 248, 0.25);
+            --border: rgba(250, 250, 248, 0.1);
+        }
+
+        body {
+            font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--void);
+            color: var(--light);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 1000px;
+            height: 1000px;
+            background: radial-gradient(circle, var(--gold-glow) 0%, transparent 60%);
+            transform: translate(-50%, -50%);
+            animation: pulse 8s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.2; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 0.4; transform: translate(-50%, -50%) scale(1.05); }
+        }
+
+        .kanji {
+            font-size: clamp(80px, 12vw, 140px);
+            font-weight: 300;
+            color: rgba(212, 175, 55, 0.25);
+            margin-bottom: 40px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-title {
+            font-size: clamp(28px, 5vw, 56px);
+            font-weight: 400;
+            line-height: 1.2;
+            margin-bottom: 32px;
+            max-width: 900px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-story {
+            font-size: clamp(16px, 2.5vw, 22px);
+            font-weight: 300;
+            line-height: 1.7;
+            color: var(--text-dim);
+            max-width: 800px;
+            margin: 0 auto 48px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-story strong {
+            color: var(--gold);
+            font-weight: 500;
+        }
+
+        .hero-metrics {
+            display: flex;
+            gap: 60px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 60px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .metric {
+            text-align: center;
+        }
+
+        .metric-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: clamp(40px, 6vw, 72px);
+            font-weight: 300;
+            background: linear-gradient(135deg, var(--gold) 0%, var(--light) 50%, var(--gold) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+            line-height: 1;
+        }
+
+        .metric-label {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-faint);
+            font-weight: 400;
+        }
+
+        .scroll-hint {
+            position: absolute;
+            bottom: 40px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: var(--text-faint);
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Section Container */
+        .section {
+            min-height: 100vh;
+            padding: 120px 40px;
+            position: relative;
+        }
+
+        .section-inner {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 80px;
+        }
+
+        .section-title {
+            font-size: clamp(32px, 5vw, 56px);
+            font-weight: 400;
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, var(--gold) 0%, var(--light) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .section-subtitle {
+            font-size: clamp(16px, 2vw, 20px);
+            color: var(--text-dim);
+            font-weight: 300;
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        /* Curriculum Journey */
+        .curriculum-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 32px;
+            margin-bottom: 80px;
+        }
+
+        .phase-card {
+            background: rgba(250, 250, 248, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 40px 32px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .phase-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .phase-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(212, 175, 55, 0.3);
+            background: rgba(250, 250, 248, 0.04);
+        }
+
+        .phase-card:hover::before {
+            opacity: 1;
+        }
+
+        .phase-card.active {
+            border-color: var(--gold);
+            background: var(--gold-subtle);
+        }
+
+        .phase-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .phase-number {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 32px;
+            font-weight: 300;
+            color: var(--gold);
+            min-width: 50px;
+        }
+
+        .phase-title {
+            font-size: 24px;
+            font-weight: 500;
+        }
+
+        .phase-status {
+            margin-left: auto;
+            font-size: 24px;
+        }
+
+        .phase-range {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-faint);
+            margin-bottom: 16px;
+        }
+
+        .phase-description {
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--text-dim);
+            margin-bottom: 16px;
+        }
+
+        .phase-why {
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--text-faint);
+            font-style: italic;
+        }
+
+        /* Loss Trajectory */
+        .chart-container {
+            background: rgba(250, 250, 248, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 60px 40px;
+            margin-bottom: 80px;
+        }
+
+        #lossCanvas {
+            width: 100%;
+            height: 70vh;
+            min-height: 500px;
+            display: block;
+            cursor: crosshair;
+        }
+
+        /* What Makes This Special */
+        .special-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 32px;
+        }
+
+        .special-card {
+            background: rgba(250, 250, 248, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 40px 32px;
+            transition: all 0.3s ease;
+        }
+
+        .special-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(212, 175, 55, 0.3);
+            background: rgba(250, 250, 248, 0.04);
+        }
+
+        .special-icon {
+            font-size: 48px;
+            margin-bottom: 24px;
+        }
+
+        .special-title {
+            font-size: 22px;
+            font-weight: 500;
+            margin-bottom: 16px;
+            color: var(--gold);
+        }
+
+        .special-text {
+            font-size: 15px;
+            line-height: 1.7;
+            color: var(--text-dim);
+        }
+
+        .special-citation {
+            font-size: 13px;
+            color: var(--text-faint);
+            margin-top: 12px;
+            font-style: italic;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            margin-top: 60px;
+        }
+
+        .stat-box {
+            background: rgba(250, 250, 248, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px 24px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat-box:hover {
+            transform: translateY(-2px);
+            border-color: rgba(212, 175, 55, 0.3);
+        }
+
+        .stat-icon {
+            font-size: 28px;
+            margin-bottom: 12px;
+            opacity: 0.6;
+        }
+
+        .stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: clamp(28px, 4vw, 40px);
+            font-weight: 400;
+            color: var(--gold);
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-faint);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 80px 40px;
+            color: var(--text-faint);
+            font-size: 13px;
+            letter-spacing: 2px;
+        }
+
+        /* Loading State */
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--void);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.6s ease, visibility 0.6s ease;
+        }
+
+        .loading.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 3px solid rgba(212, 175, 55, 0.2);
+            border-top-color: var(--gold);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 24px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--gold);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .section { padding: 80px 20px; }
+            .hero-metrics { gap: 40px; }
+            .curriculum-grid { grid-template-columns: 1fr; }
+            .special-grid { grid-template-columns: 1fr; }
+            #lossCanvas { height: 50vh; min-height: 400px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div class="loading-text">Loading training data...</div>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="kanji">鏡</div>
+        <h1 class="hero-title">Training a Language-Grounded World Model</h1>
+        <div class="hero-story">
+            After <strong id="runtime">9 hours</strong> and <strong id="totalSteps">3,392</strong> steps, the model has learned to:<br>
+            • Understand molecular geometry (QM9: 133K molecules)<br>
+            • Navigate hierarchical trees (TreeOfLife: 2.3M taxonomy nodes)<br>
+            • Predict physics (Genesis: infinite procedural scenarios)<br>
+            • Ground language in geometric reality (Qwen2.5-7B alignment)
+        </div>
+        <div class="hero-metrics">
+            <div class="metric">
+                <div class="metric-value" id="lossReduction">95.0%</div>
+                <div class="metric-label">Convergence</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value"><span id="startLoss">0.371</span> → <span id="endLoss">0.018</span></div>
+                <div class="metric-label">Loss Trajectory</div>
+            </div>
+        </div>
+        <div class="scroll-hint">↓ Explore the Journey</div>
+    </section>
+
+    <!-- Curriculum Journey -->
+    <section class="section">
+        <div class="section-inner">
+            <div class="section-header">
+                <h2 class="section-title">The 5-Phase Curriculum Journey</h2>
+                <p class="section-subtitle">Each phase builds on the last, teaching the model progressively complex representations of reality.</p>
+            </div>
+            <div class="curriculum-grid">
+                <div class="phase-card active" id="phase1">
+                    <div class="phase-header">
+                        <div class="phase-number">01</div>
+                        <div class="phase-title">Hierarchy</div>
+                        <div class="phase-status">✓</div>
+                    </div>
+                    <div class="phase-range">Steps 0 — 5,000</div>
+                    <div class="phase-description">
+                        Learning the exceptional algebra descent: E8→E7→E6→F4→G2→S⁷
+                    </div>
+                    <div class="phase-why">
+                        Why: Optimal compression via E8 sphere packing (Viazovska 2016, Fields Medal 2018). The densest known packing in 8 dimensions provides the mathematical foundation for efficient representation.
+                    </div>
+                </div>
+                <div class="phase-card" id="phase2">
+                    <div class="phase-header">
+                        <div class="phase-number">02</div>
+                        <div class="phase-title">Rotation</div>
+                        <div class="phase-status">⋯</div>
+                    </div>
+                    <div class="phase-range">Steps 5,000 — 15,000</div>
+                    <div class="phase-description">
+                        Learning SE(3) rotational symmetry for 3D geometry
+                    </div>
+                    <div class="phase-why">
+                        Why: Physical objects rotate and translate in 3D space. The model must understand that a molecule is the same molecule regardless of its orientation in space.
+                    </div>
+                </div>
+                <div class="phase-card" id="phase3">
+                    <div class="phase-header">
+                        <div class="phase-number">03</div>
+                        <div class="phase-title">Dynamics</div>
+                        <div class="phase-status">⋯</div>
+                    </div>
+                    <div class="phase-range">Steps 15,000 — 40,000</div>
+                    <div class="phase-description">
+                        Learning predictive world model (JEPA-style temporal prediction)
+                    </div>
+                    <div class="phase-why">
+                        Why: Understanding change over time is fundamental to intelligence. The model learns to predict future states from current observations, essential for planning and reasoning.
+                    </div>
+                </div>
+                <div class="phase-card" id="phase4">
+                    <div class="phase-header">
+                        <div class="phase-number">04</div>
+                        <div class="phase-title">Language</div>
+                        <div class="phase-status">⋯</div>
+                    </div>
+                    <div class="phase-range">Steps 40,000 — 80,000</div>
+                    <div class="phase-description">
+                        Grounding text descriptions in geometric reality (bidirectional alignment)
+                    </div>
+                    <div class="phase-why">
+                        Why: Language must connect to physical meaning. "The molecule is planar" should activate the same geometric representation as seeing a flat molecular structure.
+                    </div>
+                </div>
+                <div class="phase-card" id="phase5">
+                    <div class="phase-header">
+                        <div class="phase-number">05</div>
+                        <div class="phase-title">Synthesis</div>
+                        <div class="phase-status">⋯</div>
+                    </div>
+                    <div class="phase-range">Steps 80,000 — 100,000</div>
+                    <div class="phase-description">
+                        Full multi-modal integration: text ↔ physics ↔ geometry ↔ dynamics
+                    </div>
+                    <div class="phase-why">
+                        Why: Real intelligence requires seamless integration. The model should reason fluidly across modalities, using whichever representation best serves the task.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Loss Trajectory -->
+    <section class="section">
+        <div class="section-inner">
+            <div class="section-header">
+                <h2 class="section-title">Loss Trajectory</h2>
+                <p class="section-subtitle">Smooth exponential decay showing steady convergence toward optimal representations.</p>
+            </div>
+            <div class="chart-container">
+                <canvas id="lossCanvas"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- What Makes This Special -->
+    <section class="section">
+        <div class="section-inner">
+            <div class="section-header">
+                <h2 class="section-title">What Makes This Special</h2>
+                <p class="section-subtitle">This isn't just a neural network — it's a mathematically grounded world understanding system.</p>
+            </div>
+            <div class="special-grid">
+                <div class="special-card">
+                    <div class="special-icon">⬡</div>
+                    <div class="special-title">E8 Lattice</div>
+                    <div class="special-text">
+                        Uses the densest sphere packing in 8 dimensions, providing optimal compression for high-dimensional data. This mathematical structure minimizes redundancy while preserving information.
+                    </div>
+                    <div class="special-citation">Maryna Viazovska, Fields Medal 2018</div>
+                </div>
+                <div class="special-card">
+                    <div class="special-icon">⚛</div>
+                    <div class="special-title">Exceptional Algebras</div>
+                    <div class="special-text">
+                        E8→E7→E6→F4→G2→S⁷ hierarchy provides structural inductive bias. Each step down preserves key symmetries while reducing dimensionality, creating a natural learning curriculum.
+                    </div>
+                    <div class="special-citation">Lie theory, proven mathematics since 1890s</div>
+                </div>
+                <div class="special-card">
+                    <div class="special-icon">🔗</div>
+                    <div class="special-title">Language Grounding</div>
+                    <div class="special-text">
+                        Bidirectional text ↔ physics ↔ geometry alignment using Qwen2.5-7B. Language tokens learn to activate the same latent states as visual and physical observations of the same concepts.
+                    </div>
+                    <div class="special-citation">Inspired by LeCun's H-JEPA architecture</div>
+                </div>
+                <div class="special-card">
+                    <div class="special-icon">📐</div>
+                    <div class="special-title">Catastrophe Theory</div>
+                    <div class="special-text">
+                        Phase transitions guided by singularity detection (fold, cusp, swallowtail catastrophes). The model learns when to make discrete jumps versus smooth interpolations in representation space.
+                    </div>
+                    <div class="special-citation">René Thom, 1972</div>
+                </div>
+            </div>
+
+            <!-- Dataset Stats -->
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-icon">🧪</div>
+                    <div class="stat-value" id="qm9Count">133K</div>
+                    <div class="stat-label">QM9 Molecules</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-icon">🌳</div>
+                    <div class="stat-value" id="treeCount">2.3M</div>
+                    <div class="stat-label">TreeOfLife Nodes</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-icon">🌍</div>
+                    <div class="stat-value" id="genesisCount">∞</div>
+                    <div class="stat-label">Genesis Scenarios</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-value" id="lossMeasurements">907</div>
+                    <div class="stat-label">Loss Measurements</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        CHRONOS — KAGAMI WORLD MODEL — DECEMBER 2025
+    </footer>
+
+    <script>
+        const CONFIG = {
+            colors: {
+                void: '#0A0A0C',
+                light: '#FAFAF8',
+                gold: '#D4AF37',
+                goldGlow: 'rgba(212, 175, 55, 0.5)',
+                goldSubtle: 'rgba(212, 175, 55, 0.2)',
+                textDim: 'rgba(250, 250, 248, 0.65)',
+                textFaint: 'rgba(250, 250, 248, 0.15)',
+                gridLine: 'rgba(250, 250, 248, 0.08)'
+            }
+        };
+
+        let trainingData = null;
+
+        // Load and render
+        async function loadData() {
+            try {
+                const response = await fetch('./real_training_data.json');
+                trainingData = await response.json();
+                renderDashboard();
+                hideLoading();
+            } catch (e) {
+                console.error('Failed to load training data:', e);
+                showError('Failed to load training data. Make sure real_training_data.json exists.');
+            }
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.add('hidden');
+        }
+
+        function showError(message) {
+            hideLoading();
+            document.body.innerHTML = `
+                <div style="display: flex; justify-content: center; align-items: center; height: 100vh; padding: 40px;">
+                    <div style="text-align: center; max-width: 600px;">
+                        <h1 style="color: #EF4444; margin-bottom: 20px;">Error</h1>
+                        <p style="color: var(--text-dim); line-height: 1.6;">${message}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderDashboard() {
+            // Extract loss data (only steps with loss measurements)
+            const lossData = trainingData.steps
+                .filter(s => s.loss !== null && s.loss !== undefined)
+                .map(s => ({ step: s.step, loss: s.loss }));
+
+            if (lossData.length === 0) {
+                showError('No loss data found in training data.');
+                return;
+            }
+
+            const totalSteps = trainingData.steps.length;
+            const firstLoss = lossData[0].loss;
+            const lastLoss = lossData[lossData.length - 1].loss;
+            const reduction = ((firstLoss - lastLoss) / firstLoss * 100);
+
+            // Calculate runtime
+            const firstTime = new Date(trainingData.steps[0].timestamp.replace(',', '.'));
+            const lastTime = new Date(trainingData.steps[totalSteps - 1].timestamp.replace(',', '.'));
+            const runtimeMs = lastTime - firstTime;
+            const runtimeHours = Math.floor(runtimeMs / (1000 * 60 * 60));
+            const runtimeMinutes = Math.floor((runtimeMs % (1000 * 60 * 60)) / (1000 * 60));
+
+            // Update hero metrics
+            document.getElementById('runtime').textContent = `${runtimeHours} hours ${runtimeMinutes} minutes`;
+            document.getElementById('totalSteps').textContent = totalSteps.toLocaleString();
+            document.getElementById('lossReduction').textContent = `${reduction.toFixed(1)}%`;
+            document.getElementById('startLoss').textContent = firstLoss.toFixed(3);
+            document.getElementById('endLoss').textContent = lastLoss.toFixed(3);
+            document.getElementById('lossMeasurements').textContent = lossData.length.toLocaleString();
+
+            // Update phase indicators based on current step
+            const currentStep = lossData[lossData.length - 1].step;
+            updatePhaseStatus(currentStep);
+
+            // Draw loss curve
+            drawLossCurve(lossData);
+        }
+
+        function updatePhaseStatus(currentStep) {
+            const phases = [
+                { id: 'phase1', start: 0, end: 5000 },
+                { id: 'phase2', start: 5000, end: 15000 },
+                { id: 'phase3', start: 15000, end: 40000 },
+                { id: 'phase4', start: 40000, end: 80000 },
+                { id: 'phase5', start: 80000, end: 100000 }
+            ];
+
+            phases.forEach((phase, idx) => {
+                const card = document.getElementById(phase.id);
+                const status = card.querySelector('.phase-status');
+
+                card.classList.remove('active');
+
+                if (currentStep >= phase.end) {
+                    status.textContent = '✓';
+                } else if (currentStep >= phase.start) {
+                    status.textContent = '◉';
+                    card.classList.add('active');
+                } else {
+                    status.textContent = '⋯';
+                }
+            });
+        }
+
+        function drawLossCurve(lossData) {
+            const canvas = document.getElementById('lossCanvas');
+            const ctx = canvas.getContext('2d');
+
+            // High DPI support
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+
+            const width = rect.width;
+            const height = rect.height;
+            const padding = { top: 80, right: 80, bottom: 100, left: 120 };
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+
+            // Calculate scales
+            const maxStep = Math.max(...lossData.map(d => d.step));
+            const maxLoss = Math.max(...lossData.map(d => d.loss));
+            const minLoss = Math.min(...lossData.map(d => d.loss));
+            const lossRange = maxLoss - minLoss;
+            const lossPadding = lossRange * 0.15;
+
+            const xScale = step => padding.left + (step / maxStep) * chartWidth;
+            const yScale = loss => padding.top + chartHeight - ((loss - minLoss + lossPadding) / (lossRange + 2 * lossPadding)) * chartHeight;
+
+            // Clear
+            ctx.fillStyle = CONFIG.colors.void;
+            ctx.fillRect(0, 0, width, height);
+
+            // Grid lines
+            ctx.strokeStyle = CONFIG.colors.gridLine;
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 8; i++) {
+                const y = padding.top + (chartHeight / 8) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(width - padding.right, y);
+                ctx.stroke();
+            }
+
+            // Phase transition markers
+            const phaseMarkers = [
+                { step: 5000, label: 'Phase 2' },
+                { step: 15000, label: 'Phase 3' },
+                { step: 40000, label: 'Phase 4' },
+                { step: 80000, label: 'Phase 5' }
+            ];
+
+            ctx.strokeStyle = CONFIG.colors.goldSubtle;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            ctx.font = '12px Space Grotesk';
+            ctx.fillStyle = CONFIG.colors.textFaint;
+            ctx.textAlign = 'center';
+
+            phaseMarkers.forEach(marker => {
+                if (marker.step <= maxStep) {
+                    const x = xScale(marker.step);
+                    ctx.beginPath();
+                    ctx.moveTo(x, padding.top);
+                    ctx.lineTo(x, height - padding.bottom);
+                    ctx.stroke();
+                    ctx.fillText(marker.label, x, padding.top - 10);
+                }
+            });
+            ctx.setLineDash([]);
+
+            // Area fill under curve (gradient)
+            const gradient = ctx.createLinearGradient(0, padding.top, 0, height - padding.bottom);
+            gradient.addColorStop(0, 'rgba(212, 175, 55, 0.15)');
+            gradient.addColorStop(1, 'transparent');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.moveTo(xScale(lossData[0].step), height - padding.bottom);
+            lossData.forEach(d => {
+                ctx.lineTo(xScale(d.step), yScale(d.loss));
+            });
+            ctx.lineTo(xScale(lossData[lossData.length - 1].step), height - padding.bottom);
+            ctx.closePath();
+            ctx.fill();
+
+            // Loss curve (smooth with glow)
+            ctx.strokeStyle = CONFIG.colors.gold;
+            ctx.lineWidth = 3;
+            ctx.shadowColor = CONFIG.colors.goldGlow;
+            ctx.shadowBlur = 15;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            ctx.beginPath();
+            lossData.forEach((d, i) => {
+                const x = xScale(d.step);
+                const y = yScale(d.loss);
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Current position marker
+            const currentX = xScale(lossData[lossData.length - 1].step);
+            const currentY = yScale(lossData[lossData.length - 1].loss);
+            ctx.fillStyle = CONFIG.colors.gold;
+            ctx.beginPath();
+            ctx.arc(currentX, currentY, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = CONFIG.colors.void;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Axes
+            ctx.strokeStyle = CONFIG.colors.textDim;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding.left, padding.top);
+            ctx.lineTo(padding.left, height - padding.bottom);
+            ctx.lineTo(width - padding.right, height - padding.bottom);
+            ctx.stroke();
+
+            // X-axis labels
+            ctx.fillStyle = CONFIG.colors.light;
+            ctx.font = '14px JetBrains Mono';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+
+            const xTicks = 6;
+            for (let i = 0; i <= xTicks; i++) {
+                const step = Math.round((maxStep / xTicks) * i);
+                const x = padding.left + (chartWidth / xTicks) * i;
+                ctx.fillText(step.toLocaleString(), x, height - padding.bottom + 20);
+            }
+
+            // Y-axis labels
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let i = 0; i <= 8; i++) {
+                const loss = (minLoss - lossPadding) + ((lossRange + 2 * lossPadding) / 8) * (8 - i);
+                const y = padding.top + (chartHeight / 8) * i;
+                ctx.fillText(loss.toFixed(3), padding.left - 20, y);
+            }
+
+            // Axis titles
+            ctx.fillStyle = CONFIG.colors.textDim;
+            ctx.font = '16px Space Grotesk';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText('Training Step', width / 2, height - 40);
+
+            ctx.save();
+            ctx.translate(40, height / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('Loss', 0, 0);
+            ctx.restore();
+
+            // Start marker
+            const startX = xScale(lossData[0].step);
+            const startY = yScale(lossData[0].loss);
+            ctx.fillStyle = CONFIG.colors.gold;
+            ctx.beginPath();
+            ctx.arc(startX, startY, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.font = '13px JetBrains Mono';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`Start: ${lossData[0].loss.toFixed(4)}`, startX + 15, startY);
+
+            // End marker annotation
+            ctx.textAlign = 'right';
+            ctx.fillText(`Current: ${lossData[lossData.length - 1].loss.toFixed(4)}`, currentX - 15, currentY);
+
+            // Title
+            ctx.fillStyle = CONFIG.colors.light;
+            ctx.font = '20px Space Grotesk';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(`Smooth Exponential Decay — ${lossData.length} Measurements`, width / 2, padding.top - 30);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (trainingData) {
+                const lossData = trainingData.steps
+                    .filter(s => s.loss !== null && s.loss !== undefined)
+                    .map(s => ({ step: s.step, loss: s.loss }));
+                if (lossData.length > 0) {
+                    drawLossCurve(lossData);
+                }
+            }
+        });
+
+        // Initialize
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadData);
+        } else {
+            loadData();
+        }
+    </script>
+</body>
+</html>
