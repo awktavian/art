@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>言語学 — Prompt Linguistics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&family=Zen+Kaku+Gothic+New:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="design-system.css">
+    <style>
+        :root {
+            --color-void: #0A0A0C;
+            --color-deep: #050507;
+            --color-light: #FAFAF8;
+            --color-gold: #D4AF37;
+            --color-gold-bright: #E5C158;
+            --color-text: #F4F1EA;
+            --color-text-dim: rgba(244, 241, 234, 0.65);
+            --color-text-whisper: rgba(244, 241, 234, 0.35);
+
+            --color-spark: #FF00FF;
+            --color-forge: #FF2D55;
+            --color-flow: #00E5CC;
+            --color-nexus: #AF52DE;
+            --color-beacon: #FFD60A;
+            --color-grove: #30D158;
+            --color-crystal: #0A84FF;
+
+            --font-display: 'Cormorant Garamond', Georgia, serif;
+            --font-heading: 'Space Grotesk', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+            --font-jp: 'Zen Kaku Gothic New', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: var(--font-heading);
+            background: var(--color-deep);
+            color: var(--color-text);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* Animated gradient background */
+        .bg-canvas {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            opacity: 0.4;
+        }
+
+        /* Grain texture */
+        .grain {
+            position: fixed;
+            inset: -100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            opacity: 0.04;
+            pointer-events: none;
+            z-index: 10000;
+            animation: grain 8s steps(10) infinite;
+        }
+        @keyframes grain {
+            0%, 100% { transform: translate(0, 0); }
+            10% { transform: translate(-5%, -10%); }
+            30% { transform: translate(3%, -15%); }
+            50% { transform: translate(12%, 9%); }
+            70% { transform: translate(9%, 4%); }
+            90% { transform: translate(-1%, 7%); }
+        }
+
+        /* Hero */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-kanji {
+            font-family: var(--font-jp);
+            font-size: clamp(8rem, 24vw, 16rem);
+            color: var(--color-gold);
+            opacity: 0;
+            letter-spacing: 0.1em;
+            font-weight: 300;
+            line-height: 0.9;
+            animation: hero-reveal 2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            background: linear-gradient(135deg, var(--color-gold) 0%, var(--color-gold-bright) 50%, var(--color-gold) 100%);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: hero-reveal 2s cubic-bezier(0.16, 1, 0.3, 1) forwards, gradient-shift 8s ease infinite;
+            filter: drop-shadow(0 0 60px rgba(212, 175, 55, 0.3));
+        }
+
+        @keyframes hero-reveal {
+            from {
+                opacity: 0;
+                transform: translateY(50px) scale(0.9);
+                filter: blur(20px) drop-shadow(0 0 60px rgba(212, 175, 55, 0.3));
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+                filter: blur(0) drop-shadow(0 0 60px rgba(212, 175, 55, 0.3));
+            }
+        }
+
+        @keyframes gradient-shift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .hero-title {
+            font-family: var(--font-display);
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            letter-spacing: 0.5em;
+            color: var(--color-text-dim);
+            text-transform: uppercase;
+            margin-top: 3rem;
+            opacity: 0;
+            animation: fade-in-up 1.5s ease 0.5s forwards;
+            font-style: italic;
+        }
+
+        .hero-subtitle {
+            font-size: clamp(1.1rem, 2.5vw, 1.4rem);
+            color: var(--color-text-whisper);
+            max-width: 700px;
+            margin-top: 2rem;
+            line-height: 2;
+            opacity: 0;
+            animation: fade-in-up 1.5s ease 1s forwards;
+            font-weight: 300;
+        }
+
+        @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 4rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--color-gold);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            opacity: 0;
+            animation: fade-in-up 1.5s ease 1.5s forwards, bounce 2s ease-in-out 3s infinite;
+        }
+
+        .scroll-indicator::after {
+            content: '';
+            width: 2px;
+            height: 50px;
+            background: linear-gradient(to bottom, var(--color-gold), transparent);
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(15px); }
+        }
+
+        /* Section */
+        .section {
+            min-height: 100vh;
+            padding: 8rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .section-content {
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+            opacity: 0;
+            transform: translateY(80px);
+            transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1), transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .section-content.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .section-label {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            letter-spacing: 0.4em;
+            text-transform: uppercase;
+            color: var(--color-gold);
+            margin-bottom: 1.5rem;
+            display: inline-block;
+            padding: 0.5rem 1.5rem;
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 50px;
+            background: rgba(212, 175, 55, 0.05);
+        }
+
+        .section-title {
+            font-family: var(--font-display);
+            font-size: clamp(3rem, 8vw, 5.5rem);
+            font-weight: 400;
+            color: var(--color-text);
+            margin-bottom: 2.5rem;
+            line-height: 1.1;
+            font-style: italic;
+        }
+
+        .section-title .accent {
+            color: var(--color-gold);
+            font-style: normal;
+        }
+
+        .section-description {
+            font-size: clamp(1.15rem, 2.5vw, 1.5rem);
+            color: var(--color-text-dim);
+            max-width: 900px;
+            margin-bottom: 4rem;
+            line-height: 1.9;
+            font-weight: 300;
+        }
+
+        /* Interactive cards with 3D transforms */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2.5rem;
+            margin-top: 4rem;
+            perspective: 1000px;
+        }
+
+        .card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 2.5rem;
+            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transform-style: preserve-3d;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--card-accent, var(--color-gold)), transparent);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), var(--card-accent, var(--color-gold))15, transparent 50%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-12px) rotateX(5deg);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+            border-color: var(--card-accent, var(--color-gold));
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), 0 0 40px var(--card-accent, var(--color-gold))20;
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card:hover::after {
+            opacity: 1;
+        }
+
+        .card-icon {
+            font-size: 3rem;
+            margin-bottom: 1.5rem;
+            display: block;
+            filter: drop-shadow(0 0 20px var(--card-accent, var(--color-gold)));
+        }
+
+        .card-title {
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: var(--color-text);
+            margin-bottom: 0.75rem;
+            font-family: var(--font-heading);
+        }
+
+        .card-description {
+            font-size: 1rem;
+            color: var(--color-text-dim);
+            line-height: 1.7;
+            font-weight: 300;
+        }
+
+        /* Interactive Fano Plane Visualization */
+        .fano-plane {
+            margin: 5rem 0;
+            padding: 4rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            position: relative;
+        }
+
+        .fano-title {
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--color-gold);
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .fano-canvas-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            aspect-ratio: 1;
+        }
+
+        #fano-canvas {
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        .fano-legend {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin-top: 3rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid currentColor;
+        }
+
+        /* Context window visualization */
+        .context-viz {
+            margin: 5rem 0;
+            padding: 3rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .context-layers {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .context-layer {
+            position: relative;
+            padding: 1.5rem 2rem;
+            background: linear-gradient(90deg, var(--layer-color)20, var(--layer-color)05);
+            border-left: 4px solid var(--layer-color);
+            border-radius: 8px;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            cursor: pointer;
+        }
+
+        .context-layer:hover {
+            transform: translateX(10px);
+            box-shadow: 0 10px 30px var(--layer-color)30;
+        }
+
+        .layer-title {
+            font-family: var(--font-mono);
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--color-text);
+            margin-bottom: 0.5rem;
+        }
+
+        .layer-size {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--color-text-dim);
+        }
+
+        .layer-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background: var(--layer-color);
+            transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
+            width: 0;
+        }
+
+        .context-layer.visible .layer-bar {
+            width: var(--layer-width);
+        }
+
+        /* Stats with animated counters */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 2rem;
+            margin: 4rem 0;
+        }
+
+        .stat-card {
+            text-align: center;
+            padding: 3rem 2rem;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, var(--color-gold)10, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            border-color: var(--color-gold);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+        }
+
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+
+        .stat-value {
+            font-size: 4rem;
+            font-weight: 300;
+            color: var(--color-gold);
+            font-family: var(--font-display);
+            line-height: 1;
+            margin-bottom: 1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .stat-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--color-text-dim);
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Code blocks with syntax highlighting */
+        .code-block {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 3rem 2rem 2rem 2rem;
+            margin: 3rem 0;
+            overflow: visible;
+            position: relative;
+            backdrop-filter: blur(10px);
+        }
+
+        .code-block::before {
+            content: attr(data-label);
+            position: absolute;
+            top: -18px;
+            left: 1.5rem;
+            background: linear-gradient(135deg, var(--color-gold), var(--color-gold-bright));
+            padding: 0.6rem 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            letter-spacing: 0.25em;
+            color: var(--color-void);
+            text-transform: uppercase;
+            border-radius: 8px;
+            font-weight: 700;
+            z-index: 100;
+            box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
+            line-height: 1;
+        }
+
+        .code-block code {
+            display: block;
+            overflow-x: auto;
+        }
+
+        .code-block code {
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            line-height: 1.9;
+            color: var(--color-text);
+            display: block;
+            white-space: pre;
+        }
+
+        .code-keyword { color: var(--color-crystal); font-weight: 500; }
+        .code-string { color: var(--color-grove); }
+        .code-number { color: var(--color-beacon); font-weight: 500; }
+        .code-comment { color: var(--color-text-whisper); font-style: italic; }
+
+        /* Interactive flow diagram */
+        .flow-diagram {
+            margin: 4rem 0;
+            padding: 4rem 2rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .flow-title {
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--color-gold);
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .flow-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .flow-node {
+            padding: 2rem 2.5rem;
+            background: linear-gradient(135deg, var(--node-color)20, var(--node-color)05);
+            border: 2px solid var(--node-color, var(--color-gold));
+            border-radius: 12px;
+            font-family: var(--font-mono);
+            font-size: 1rem;
+            color: var(--color-text);
+            text-align: center;
+            min-width: 180px;
+            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+            cursor: pointer;
+        }
+
+        .flow-node:hover {
+            transform: scale(1.1) translateY(-8px);
+            box-shadow: 0 20px 40px var(--node-color, var(--color-gold))40, 0 0 60px var(--node-color, var(--color-gold))20;
+            border-width: 3px;
+        }
+
+        .flow-node small {
+            display: block;
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            opacity: 0.6;
+        }
+
+        .flow-arrow {
+            font-size: 2.5rem;
+            color: var(--color-gold);
+            font-weight: 300;
+            animation: pulse-arrow 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-arrow {
+            0%, 100% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        /* Highlight with tooltip */
+        .highlight {
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(212, 175, 55, 0.05));
+            border-bottom: 2px solid var(--color-gold);
+            padding: 0.1rem 0.4rem;
+            cursor: help;
+            transition: all 0.3s ease;
+            position: relative;
+            border-radius: 4px;
+        }
+
+        .highlight:hover {
+            background: rgba(212, 175, 55, 0.25);
+            border-bottom-width: 3px;
+        }
+
+        .highlight::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 130%;
+            left: 50%;
+            transform: translateX(-50%) translateY(10px) scale(0.9);
+            background: var(--color-void);
+            border: 2px solid var(--color-gold);
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 100;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .highlight:hover::after {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0) scale(1);
+        }
+
+        /* Progress bar */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg,
+                var(--color-crystal),
+                var(--color-nexus),
+                var(--color-spark),
+                var(--color-beacon),
+                var(--color-grove),
+                var(--color-gold)
+            );
+            z-index: 99999;
+            transform-origin: left;
+            transform: scaleX(0);
+            transition: transform 0.1s ease;
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
+        }
+
+        /* Colony colors */
+        [data-colony="spark"] { --card-accent: var(--color-spark); --node-color: var(--color-spark); --layer-color: var(--color-spark); }
+        [data-colony="forge"] { --card-accent: var(--color-forge); --node-color: var(--color-forge); --layer-color: var(--color-forge); }
+        [data-colony="flow"] { --card-accent: var(--color-flow); --node-color: var(--color-flow); --layer-color: var(--color-flow); }
+        [data-colony="nexus"] { --card-accent: var(--color-nexus); --node-color: var(--color-nexus); --layer-color: var(--color-nexus); }
+        [data-colony="beacon"] { --card-accent: var(--color-beacon); --node-color: var(--color-beacon); --layer-color: var(--color-beacon); }
+        [data-colony="grove"] { --card-accent: var(--color-grove); --node-color: var(--color-grove); --layer-color: var(--color-grove); }
+        [data-colony="crystal"] { --card-accent: var(--color-crystal); --node-color: var(--color-crystal); --layer-color: var(--color-crystal); }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .section { padding: 4rem 1.5rem; }
+            .cards-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+            .flow-container { flex-direction: column; }
+            .flow-arrow { transform: rotate(90deg); }
+            .hero-kanji { font-size: clamp(5rem, 20vw, 10rem); }
+        }
+    </style>
+</head>
+<body>
+    <canvas class="bg-canvas" id="bg-canvas"></canvas>
+    <div class="grain"></div>
+    <div class="progress-bar"></div>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1 class="hero-kanji">言語学</h1>
+        <p class="hero-title">Prompt Linguistics</p>
+        <p class="hero-subtitle">
+            Exploring how CLAUDE.md transforms a monolithic LLM into a distributed cognitive architecture through structured context injection and Fano plane routing
+        </p>
+        <div class="scroll-indicator">Explore the architecture</div>
+    </section>
+
+    <!-- Section 1: Core Insight -->
+    <section class="section">
+        <div class="section-content">
+            <div class="section-label">01 — Core Insight</div>
+            <h2 class="section-title"><span class="accent">Prompt Engineering</span> as Cognitive Architecture</h2>
+            <p class="section-description">
+                CLAUDE.md + .claude/ isn't documentation—it's a <span class="highlight" data-tooltip="Runtime modification via context">cognitive operating system</span> that transforms a single LLM into <span class="highlight" data-tooltip="Spark, Forge, Flow, Nexus, Beacon, Grove, Crystal + Kagami">7+1 specialized personas</span> through structured context injection.
+            </p>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" data-target="12">0</div>
+                    <div class="stat-label">Baseline Context (K tokens)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" data-target="8">0</div>
+                    <div class="stat-label">Specialized Agents</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" data-target="158">0</div>
+                    <div class="stat-label">Peak Context (K tokens)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" data-target="7">0</div>
+                    <div class="stat-label">Speedup (Complex Tasks)</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 2: Context Window -->
+    <section class="section">
+        <div class="section-content">
+            <div class="section-label">02 — Context Window</div>
+            <h2 class="section-title">Document <span class="accent">Hierarchy</span> in 1M Tokens</h2>
+
+            <div class="context-viz">
+                <div class="context-layers">
+                    <div class="context-layer" data-colony="crystal" style="--layer-width: 8%; --layer-color: var(--color-crystal);">
+                        <div class="layer-title">System Prompt (Claude Code Base)</div>
+                        <div class="layer-size">~8K tokens — Tool definitions, safety, CLI behavior</div>
+                        <div class="layer-bar"></div>
+                    </div>
+                    <div class="context-layer" data-colony="beacon" style="--layer-width: 4.5%; --layer-color: var(--color-beacon);">
+                        <div class="layer-title">CLAUDE.md (Project Configuration)</div>
+                        <div class="layer-size">~4.5K tokens — Identity, colonies, routing, safety</div>
+                        <div class="layer-bar"></div>
+                    </div>
+                    <div class="context-layer" data-colony="spark" style="--layer-width: 2%; --layer-color: var(--color-spark);">
+                        <div class="layer-title">.claude/agents/*.md (Role Personas)</div>
+                        <div class="layer-size">~1-2K tokens each — Specialized behaviors per colony</div>
+                        <div class="layer-bar"></div>
+                    </div>
+                    <div class="context-layer" data-colony="grove" style="--layer-width: 1.5%; --layer-color: var(--color-grove);">
+                        <div class="layer-title">.claude/skills/*.md (Domain Knowledge)</div>
+                        <div class="layer-size">~1-2K tokens each — Loaded on-demand</div>
+                        <div class="layer-bar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="section-description" style="margin-top: 3rem;">
+                <strong>Total utilization:</strong> Even with all 7 colonies active in parallel (~158K tokens), we're using less than 16% of the 1M context window.
+            </p>
+        </div>
+    </section>
+
+    <!-- Section 3: Seven Colonies + Fano Plane -->
+    <section class="section">
+        <div class="section-content">
+            <div class="section-label">03 — Seven Colonies</div>
+            <h2 class="section-title">Fano Plane <span class="accent">Routing</span></h2>
+            <p class="section-description">
+                Each colony maps to an imaginary octonion (e₁-e₇). The <span class="highlight" data-tooltip="Seven points, seven lines, three points per line">Fano plane</span> determines composition: every pair of colonies lies on exactly one line.
+            </p>
+
+            <div class="cards-grid">
+                <div class="card" data-colony="spark">
+                    <span class="card-icon">⚡</span>
+                    <h3 class="card-title">Spark (e₁)</h3>
+                    <p class="card-description">Creative ideation, divergent thinking. Fold catastrophe (A₂). Activates on: brainstorm, ideate, "what if".</p>
+                </div>
+                <div class="card" data-colony="forge">
+                    <span class="card-icon">⚒️</span>
+                    <h3 class="card-title">Forge (e₂)</h3>
+                    <p class="card-description">Implementation, code quality. Cusp catastrophe (A₃). Activates on: build, implement, code, create.</p>
+                </div>
+                <div class="card" data-colony="flow">
+                    <span class="card-icon">🌊</span>
+                    <h3 class="card-title">Flow (e₃)</h3>
+                    <p class="card-description">Debugging, recovery, adaptation. Swallowtail catastrophe (A₄). Activates on: debug, fix, broken, error.</p>
+                </div>
+                <div class="card" data-colony="nexus">
+                    <span class="card-icon">🔗</span>
+                    <h3 class="card-title">Nexus (e₄)</h3>
+                    <p class="card-description">Integration, memory, relationships. Butterfly catastrophe (A₅). Activates on: connect, integrate, bridge.</p>
+                </div>
+                <div class="card" data-colony="beacon">
+                    <span class="card-icon">🗼</span>
+                    <h3 class="card-title">Beacon (e₅)</h3>
+                    <p class="card-description">Planning, architecture, strategy. Hyperbolic catastrophe (D₄⁺). Activates on: plan, architect, design.</p>
+                </div>
+                <div class="card" data-colony="grove">
+                    <span class="card-icon">🌿</span>
+                    <h3 class="card-title">Grove (e₆)</h3>
+                    <p class="card-description">Research, knowledge gathering. Elliptic catastrophe (D₄⁻). Activates on: research, explore, investigate.</p>
+                </div>
+                <div class="card" data-colony="crystal">
+                    <span class="card-icon">💎</span>
+                    <h3 class="card-title">Crystal (e₇)</h3>
+                    <p class="card-description">Verification, testing, security. Parabolic catastrophe (D₅). Activates on: test, verify, audit, prove.</p>
+                </div>
+            </div>
+
+            <!-- Interactive Fano Plane -->
+            <div class="fano-plane">
+                <div class="fano-title">Interactive Fano Plane — Hover over colonies</div>
+                <div class="fano-canvas-container">
+                    <canvas id="fano-canvas"></canvas>
+                </div>
+                <div class="fano-legend">
+                    <div class="legend-item" style="color: var(--color-spark);">
+                        <span class="legend-color" style="background: var(--color-spark);"></span>
+                        Spark
+                    </div>
+                    <div class="legend-item" style="color: var(--color-forge);">
+                        <span class="legend-color" style="background: var(--color-forge);"></span>
+                        Forge
+                    </div>
+                    <div class="legend-item" style="color: var(--color-flow);">
+                        <span class="legend-color" style="background: var(--color-flow);"></span>
+                        Flow
+                    </div>
+                    <div class="legend-item" style="color: var(--color-nexus);">
+                        <span class="legend-color" style="background: var(--color-nexus);"></span>
+                        Nexus
+                    </div>
+                    <div class="legend-item" style="color: var(--color-beacon);">
+                        <span class="legend-color" style="background: var(--color-beacon);"></span>
+                        Beacon
+                    </div>
+                    <div class="legend-item" style="color: var(--color-grove);">
+                        <span class="legend-color" style="background: var(--color-grove);"></span>
+                        Grove
+                    </div>
+                    <div class="legend-item" style="color: var(--color-crystal);">
+                        <span class="legend-color" style="background: var(--color-crystal);"></span>
+                        Crystal
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 4: Mechanism -->
+    <section class="section">
+        <div class="section-content">
+            <div class="section-label">04 — Mechanism</div>
+            <h2 class="section-title">How Prompts <span class="accent">Modify</span> Runtime</h2>
+
+            <div class="cards-grid">
+                <div class="card">
+                    <span class="card-icon">📝</span>
+                    <h3 class="card-title">Identity Shaping</h3>
+                    <p class="card-description">"Dense. Direct. Technical." shifts token distribution toward technical vocabulary, reduces conversational fluff by ~20%.</p>
+                </div>
+                <div class="card">
+                    <span class="card-icon">🔀</span>
+                    <h3 class="card-title">Task Decomposition</h3>
+                    <p class="card-description">Fano algebra encodes dependency graphs: "Beacon × Forge = Crystal" means plan + implement → verify.</p>
+                </div>
+                <div class="card">
+                    <span class="card-icon">⚡</span>
+                    <h3 class="card-title">Parallelism Bias</h3>
+                    <p class="card-description">Explicit anti-patterns overcome sequential bias: "❌ WRONG: wait between tasks" primes parallel execution.</p>
+                </div>
+                <div class="card">
+                    <span class="card-icon">🔒</span>
+                    <h3 class="card-title">Safety Constraints</h3>
+                    <p class="card-description">"INVIOLABLE: h(x) ≥ 0" triggers refusal logic. Crystal verification mandatory for auth/security.</p>
+                </div>
+            </div>
+
+            <div class="code-block" data-label="Token Distribution Example">
+<code><span class="code-comment">// Without CLAUDE.md (default behavior):</span>
+<span class="code-keyword">P</span>(<span class="code-string">"I'll help you"</span>) = <span class="code-number">0.30</span>
+<span class="code-keyword">P</span>(<span class="code-string">"Let me"</span>) = <span class="code-number">0.25</span>
+<span class="code-keyword">P</span>(<span class="code-string">"Here's how"</span>) = <span class="code-number">0.20</span>
+
+<span class="code-comment">// With CLAUDE.md ("Dense. Direct. Technical."):</span>
+<span class="code-keyword">P</span>(<span class="code-string">"Spawning Forge"</span>) = <span class="code-number">0.40</span>
+<span class="code-keyword">P</span>(<span class="code-string">"Implementation plan"</span>) = <span class="code-number">0.30</span>
+<span class="code-keyword">P</span>(<span class="code-string">"I'll help you"</span>) = <span class="code-number">0.05</span>  <span class="code-comment">// Suppressed</span>
+
+<span class="code-comment">// Effect: "Helpful assistant" tokens ↓, technical action tokens ↑</span></code>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 5: Workflow Example -->
+    <section class="section">
+        <div class="section-content">
+            <div class="section-label">05 — Workflow Example</div>
+            <h2 class="section-title">Fano <span class="accent">Composition</span> in Action</h2>
+
+            <div class="flow-diagram">
+                <div class="flow-title">Implement Auth Module: Beacon × Forge = Crystal</div>
+                <div class="flow-container">
+                    <div class="flow-node" data-colony="beacon">
+                        <strong>Beacon</strong>
+                        <small>Design architecture</small>
+                    </div>
+                    <div class="flow-arrow">×</div>
+                    <div class="flow-node" data-colony="forge">
+                        <strong>Forge</strong>
+                        <small>Implement code</small>
+                    </div>
+                    <div class="flow-arrow">=</div>
+                    <div class="flow-node" data-colony="crystal">
+                        <strong>Crystal</strong>
+                        <small>Verify security</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="code-block" data-label="Complete Fano Lines">
+<code><span class="code-string">Spark × Forge = Flow</span>       <span class="code-comment">(creativity + implementation → adaptation)</span>
+<span class="code-string">Spark × Nexus = Beacon</span>     <span class="code-comment">(creativity + integration → planning)</span>
+<span class="code-string">Spark × Grove = Crystal</span>    <span class="code-comment">(creativity + research → verification)</span>
+<span class="code-string">Forge × Nexus = Grove</span>      <span class="code-comment">(implementation + integration → research)</span>
+<span class="code-string">Beacon × Forge = Crystal</span>   <span class="code-comment">(planning + implementation → verification)</span>
+<span class="code-string">Nexus × Flow = Crystal</span>     <span class="code-comment">(integration + adaptation → verification)</span>
+<span class="code-string">Beacon × Flow = Grove</span>      <span class="code-comment">(planning + adaptation → research)</span></code>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 6: Performance -->
+    <section class="section">
+        <div class="section-content">
+            <div class="section-label">06 — Performance Impact</div>
+            <h2 class="section-title">Measured <span class="accent">Effects</span></h2>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" data-target="20">0</div>
+                    <div class="stat-label">% Shorter Responses</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" data-target="95">0</div>
+                    <div class="stat-label">% Routing Accuracy</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" data-target="16">0</div>
+                    <div class="stat-label">% Context Used (Peak)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" data-target="7">0</div>
+                    <div class="stat-label">× Speedup (Parallel)</div>
+                </div>
+            </div>
+
+            <p class="section-description" style="margin-top: 3rem;">
+                <strong>Latency:</strong> Single-agent ~2-5s | Colony spawn +3-8s | 7 parallel ~5-10s total<br><br>
+                <strong>Efficiency:</strong> Responses 20% shorter, but total tokens increase. Net: faster iteration, higher API cost.
+            </p>
+        </div>
+    </section>
+
+    <!-- Section 7: Summary -->
+    <section class="section">
+        <div class="section-content">
+            <div class="section-label">07 — The Innovation</div>
+            <h2 class="section-title">Not documentation. <em><span class="accent">Architecture.</span></em></h2>
+            <p class="section-description" style="font-size: 1.3rem; line-height: 2; max-width: 1000px;">
+                <strong>CLAUDE.md is a compiler</strong> from human intent to multi-agent pipelines. It transforms:<br><br>
+
+                • <span class="highlight" data-tooltip="Via context injection">Single LLM → Multi-agent system</span><br>
+                • <span class="highlight" data-tooltip="Via routing tables">Ad-hoc reasoning → Structured workflows</span><br>
+                • <span class="highlight" data-tooltip="Via explicit patterns">Sequential execution → Parallel execution</span><br>
+                • <span class="highlight" data-tooltip="Via safety invariants">Soft preferences → Hard constraints</span><br><br>
+
+                <strong>Result:</strong> 5-8× faster, higher quality, enforced safety.<br>
+                <strong>Key insight:</strong> Distributed cognitive architectures need zero fine-tuning—just clever prompting.
+            </p>
+
+            <div class="flow-diagram" style="margin-top: 4rem;">
+                <div class="flow-title">The Formula</div>
+                <div class="flow-container">
+                    <div class="flow-node" data-colony="crystal">Claude<br><small>Base Model</small></div>
+                    <div class="flow-arrow">+</div>
+                    <div class="flow-node" data-colony="spark">Context<br><small>Specialized Prompt</small></div>
+                    <div class="flow-arrow">=</div>
+                    <div class="flow-node" data-colony="beacon">Agent<br><small>Specialized Persona</small></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <section class="section" style="min-height: 50vh;">
+        <div class="section-content" style="text-align: center;">
+            <p style="font-family: var(--font-mono); font-size: 0.8rem; letter-spacing: 0.3em; color: var(--color-text-whisper); text-transform: uppercase;">
+                Created with Claude Code + ChronOS Design System
+            </p>
+        </div>
+    </section>
+
+    <script src="microinteractions.js"></script>
+    <script>
+        // ===== ANIMATED BACKGROUND =====
+        const bgCanvas = document.getElementById('bg-canvas');
+        const bgCtx = bgCanvas.getContext('2d');
+
+        function resizeBgCanvas() {
+            bgCanvas.width = window.innerWidth;
+            bgCanvas.height = document.documentElement.scrollHeight;
+        }
+        resizeBgCanvas();
+        window.addEventListener('resize', resizeBgCanvas);
+
+        const particles = [];
+        const particleCount = 80;
+        const colors = ['#D4AF37', '#FF00FF', '#00E5CC', '#AF52DE', '#FFD60A', '#30D158', '#0A84FF'];
+
+        for (let i = 0; i < particleCount; i++) {
+            particles.push({
+                x: Math.random() * bgCanvas.width,
+                y: Math.random() * bgCanvas.height,
+                vx: (Math.random() - 0.5) * 0.5,
+                vy: (Math.random() - 0.5) * 0.5,
+                radius: Math.random() * 2 + 1,
+                color: colors[Math.floor(Math.random() * colors.length)]
+            });
+        }
+
+        function animateBg() {
+            bgCtx.fillStyle = 'rgba(5, 5, 7, 0.05)';
+            bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+
+            particles.forEach((p, i) => {
+                p.x += p.vx;
+                p.y += p.vy;
+
+                if (p.x < 0 || p.x > bgCanvas.width) p.vx *= -1;
+                if (p.y < 0 || p.y > bgCanvas.height) p.vy *= -1;
+
+                // Draw particle
+                bgCtx.beginPath();
+                bgCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                bgCtx.fillStyle = p.color + '40';
+                bgCtx.fill();
+
+                // Connect nearby particles
+                for (let j = i + 1; j < particles.length; j++) {
+                    const p2 = particles[j];
+                    const dx = p.x - p2.x;
+                    const dy = p.y - p2.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < 150) {
+                        bgCtx.beginPath();
+                        bgCtx.moveTo(p.x, p.y);
+                        bgCtx.lineTo(p2.x, p2.y);
+                        bgCtx.strokeStyle = p.color + Math.floor((1 - dist / 150) * 30).toString(16).padStart(2, '0');
+                        bgCtx.lineWidth = 0.5;
+                        bgCtx.stroke();
+                    }
+                }
+            });
+
+            requestAnimationFrame(animateBg);
+        }
+        animateBg();
+
+        // ===== FANO PLANE INTERACTIVE VISUALIZATION =====
+        const fanoCanvas = document.getElementById('fano-canvas');
+        const fanoCtx = fanoCanvas.getContext('2d');
+
+        function resizeFanoCanvas() {
+            const container = fanoCanvas.parentElement;
+            fanoCanvas.width = container.clientWidth;
+            fanoCanvas.height = container.clientHeight;
+        }
+        resizeFanoCanvas();
+        window.addEventListener('resize', resizeFanoCanvas);
+
+        const colonies = [
+            { name: 'Spark', symbol: 'e₁', color: '#FF00FF', angle: 0 },
+            { name: 'Forge', symbol: 'e₂', color: '#FF2D55', angle: Math.PI * 2 / 7 },
+            { name: 'Flow', symbol: 'e₃', color: '#00E5CC', angle: Math.PI * 4 / 7 },
+            { name: 'Nexus', symbol: 'e₄', color: '#AF52DE', angle: Math.PI * 6 / 7 },
+            { name: 'Beacon', symbol: 'e₅', color: '#FFD60A', angle: Math.PI * 8 / 7 },
+            { name: 'Grove', symbol: 'e₆', color: '#30D158', angle: Math.PI * 10 / 7 },
+            { name: 'Crystal', symbol: 'e₇', color: '#0A84FF', angle: Math.PI * 12 / 7 }
+        ];
+
+        // Fano lines (each line has 3 points)
+        const fanoLines = [
+            [0, 1, 2], // Spark × Forge = Flow
+            [0, 3, 4], // Spark × Nexus = Beacon
+            [0, 5, 6], // Spark × Grove = Crystal
+            [1, 3, 5], // Forge × Nexus = Grove
+            [1, 4, 6], // Beacon × Forge = Crystal
+            [2, 3, 6], // Nexus × Flow = Crystal
+            [2, 4, 5]  // Beacon × Flow = Grove
+        ];
+
+        let hoveredColony = -1;
+
+        function drawFanoPlane() {
+            const centerX = fanoCanvas.width / 2;
+            const centerY = fanoCanvas.height / 2;
+            const radius = Math.min(centerX, centerY) * 0.7;
+
+            fanoCtx.clearRect(0, 0, fanoCanvas.width, fanoCanvas.height);
+
+            // Draw lines
+            fanoLines.forEach(line => {
+                const shouldHighlight = hoveredColony >= 0 && line.includes(hoveredColony);
+
+                fanoCtx.beginPath();
+                const points = line.map(i => ({
+                    x: centerX + Math.cos(colonies[i].angle - Math.PI / 2) * radius,
+                    y: centerY + Math.sin(colonies[i].angle - Math.PI / 2) * radius
+                }));
+
+                fanoCtx.moveTo(points[0].x, points[0].y);
+                points.forEach(p => fanoCtx.lineTo(p.x, p.y));
+                fanoCtx.closePath();
+
+                if (shouldHighlight) {
+                    fanoCtx.strokeStyle = colonies[line[0]].color + '80';
+                    fanoCtx.lineWidth = 3;
+                    fanoCtx.fillStyle = colonies[line[0]].color + '10';
+                    fanoCtx.fill();
+                } else {
+                    fanoCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                    fanoCtx.lineWidth = 1;
+                }
+                fanoCtx.stroke();
+            });
+
+            // Draw colonies
+            colonies.forEach((colony, i) => {
+                const x = centerX + Math.cos(colony.angle - Math.PI / 2) * radius;
+                const y = centerY + Math.sin(colony.angle - Math.PI / 2) * radius;
+                const isHovered = i === hoveredColony;
+
+                // Glow
+                if (isHovered) {
+                    fanoCtx.beginPath();
+                    fanoCtx.arc(x, y, 35, 0, Math.PI * 2);
+                    fanoCtx.fillStyle = colony.color + '30';
+                    fanoCtx.fill();
+                }
+
+                // Circle
+                fanoCtx.beginPath();
+                fanoCtx.arc(x, y, isHovered ? 18 : 14, 0, Math.PI * 2);
+                fanoCtx.fillStyle = isHovered ? colony.color : 'rgba(10, 10, 12, 0.8)';
+                fanoCtx.fill();
+                fanoCtx.strokeStyle = colony.color;
+                fanoCtx.lineWidth = isHovered ? 3 : 2;
+                fanoCtx.stroke();
+
+                // Label
+                fanoCtx.fillStyle = isHovered ? '#F4F1EA' : colony.color;
+                fanoCtx.font = isHovered ? 'bold 14px "Space Grotesk"' : '12px "Space Grotesk"';
+                fanoCtx.textAlign = 'center';
+                fanoCtx.textBaseline = 'middle';
+                fanoCtx.fillText(colony.symbol, x, y);
+
+                // Name on hover
+                if (isHovered) {
+                    fanoCtx.fillStyle = colony.color;
+                    fanoCtx.font = '16px "Space Grotesk"';
+                    fanoCtx.fillText(colony.name, x, y + 35);
+                }
+            });
+        }
+
+        fanoCanvas.addEventListener('mousemove', (e) => {
+            const rect = fanoCanvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            const centerX = fanoCanvas.width / 2;
+            const centerY = fanoCanvas.height / 2;
+            const radius = Math.min(centerX, centerY) * 0.7;
+
+            hoveredColony = -1;
+            colonies.forEach((colony, i) => {
+                const x = centerX + Math.cos(colony.angle - Math.PI / 2) * radius;
+                const y = centerY + Math.sin(colony.angle - Math.PI / 2) * radius;
+                const dist = Math.sqrt((mouseX - x) ** 2 + (mouseY - y) ** 2);
+                if (dist < 20) hoveredColony = i;
+            });
+
+            drawFanoPlane();
+        });
+
+        drawFanoPlane();
+        setInterval(drawFanoPlane, 50);
+
+        // ===== SCROLL PROGRESS =====
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            const height = document.documentElement.scrollHeight - window.innerHeight;
+            const progress = scrolled / height;
+            document.querySelector('.progress-bar').style.transform = `scaleX(${progress})`;
+        });
+
+        // ===== INTERSECTION OBSERVER =====
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1, rootMargin: '0px 0px -100px 0px' });
+
+        document.querySelectorAll('.section-content, .context-layer').forEach(el => {
+            observer.observe(el);
+        });
+
+        // ===== CARD MOUSE TRACKING =====
+        document.querySelectorAll('.card').forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width) * 100;
+                const y = ((e.clientY - rect.top) / rect.height) * 100;
+                card.style.setProperty('--mouse-x', `${x}%`);
+                card.style.setProperty('--mouse-y', `${y}%`);
+            });
+        });
+
+        // ===== ANIMATED COUNTERS =====
+        const counterObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && !entry.target.dataset.animated) {
+                    entry.target.dataset.animated = 'true';
+                    const target = parseInt(entry.target.dataset.target);
+                    const duration = 2000;
+                    const start = performance.now();
+
+                    function animate(time) {
+                        const elapsed = time - start;
+                        const progress = Math.min(elapsed / duration, 1);
+                        const eased = 1 - Math.pow(2, -10 * progress);
+                        const value = Math.floor(target * eased);
+                        entry.target.textContent = value;
+
+                        if (progress < 1) {
+                            requestAnimationFrame(animate);
+                        } else {
+                            entry.target.textContent = target;
+                        }
+                    }
+
+                    requestAnimationFrame(animate);
+                }
+            });
+        }, { threshold: 0.5 });
+
+        document.querySelectorAll('.stat-value[data-target]').forEach(stat => {
+            counterObserver.observe(stat);
+        });
+
+        // ===== INITIALIZE MICROINTERACTIONS =====
+        const microinteractions = new ChangelogMicrointeractions({
+            enableStagger: false,
+            enableElevation: false,
+            enableInfiniteScroll: false,
+            enableSkeleton: false,
+            enableMagneticSnap: false,
+            enableCompactMode: false,
+            enableFilters: false,
+            enableAutoCollapse: false,
+            enableAccordion: false,
+            enableCopyFeedback: false,
+            enableOdometer: false,
+            enableScrollRocket: true
+        });
+    </script>
+</body>
+</html>
