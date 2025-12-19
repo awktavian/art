@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trailmap — How Claude Code Maps a Codebase into Memory</title>
+    <meta name="description" content="Interactive visualization of prompt-based context management in ChronOS">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-dark: #0A0A0C;
+            --fg-light: #FAFAF8;
+            --accent-gold: #D4AF37;
+            --grid-dim: rgba(250, 250, 248, 0.05);
+            --glow-intense: rgba(212, 175, 55, 0.6);
+            --font-display: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        body {
+            font-family: var(--font-display);
+            background: var(--bg-dark);
+            color: var(--fg-light);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        .grid-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        #warp-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .scroll-section {
+            min-height: 100vh;
+            position: relative;
+            display: flex;
+            align-items: center;
+            padding: 4rem 2rem;
+            z-index: 1;
+        }
+
+        .section-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .section-content.hero {
+            grid-template-columns: 1fr;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: clamp(3rem, 8vw, 6rem);
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: var(--accent-gold);
+            text-shadow: 0 0 40px var(--glow-intense);
+            margin-bottom: 1rem;
+        }
+
+        h2 {
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: var(--accent-gold);
+        }
+
+        .subtitle {
+            font-size: clamp(1rem, 2vw, 1.5rem);
+            color: rgba(250, 250, 248, 0.7);
+            margin-bottom: 2rem;
+        }
+
+        .narrative {
+            font-size: clamp(1rem, 1.5vw, 1.25rem);
+            line-height: 1.8;
+            color: var(--fg-light);
+        }
+
+        .narrative strong {
+            color: var(--accent-gold);
+            font-weight: 600;
+        }
+
+        .narrative code {
+            font-family: var(--font-mono);
+            font-size: 0.9em;
+            background: rgba(212, 175, 55, 0.1);
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            color: var(--accent-gold);
+        }
+
+        .code-block {
+            background: rgba(10, 10, 12, 0.8);
+            border: 1px solid var(--grid-dim);
+            border-left: 3px solid var(--accent-gold);
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            line-height: 1.6;
+            overflow-x: auto;
+            white-space: pre;
+            color: rgba(250, 250, 248, 0.9);
+        }
+
+        .prompt-box {
+            background: rgba(212, 175, 55, 0.05);
+            border: 2px solid var(--accent-gold);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+
+        .prompt-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent-gold);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.5rem;
+        }
+
+        .viz-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            background: rgba(10, 10, 12, 0.5);
+            border: 1px solid var(--grid-dim);
+            overflow: hidden;
+        }
+
+        canvas, svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .file-node {
+            position: absolute;
+            padding: 0.4rem 0.8rem;
+            background: rgba(10, 10, 12, 0.9);
+            border: 1px solid var(--grid-dim);
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: rgba(250, 250, 248, 0.6);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .file-node.active {
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+            box-shadow: 0 0 15px var(--glow-intense);
+            transform: scale(1.1);
+        }
+
+        .context-window {
+            position: absolute;
+            border: 3px solid var(--accent-gold);
+            border-radius: 8px;
+            box-shadow: 0 0 30px var(--glow-intense);
+            pointer-events: none;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .stats-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 10, 12, 0.9);
+            border: 1px solid var(--grid-dim);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            line-height: 1.6;
+            max-width: 250px;
+        }
+
+        .stat-line {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            color: rgba(250, 250, 248, 0.6);
+        }
+
+        .stat-value {
+            color: var(--accent-gold);
+            font-weight: bold;
+        }
+
+        .tool-call {
+            background: rgba(74, 158, 255, 0.1);
+            border-left: 3px solid #4A9EFF;
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+
+        .cta-container {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        .cta-btn {
+            padding: 1rem 2rem;
+            background: var(--accent-gold);
+            color: var(--bg-dark);
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1.125rem;
+            transition: all 0.3s;
+            box-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
+        }
+
+        .cta-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(212, 175, 55, 0.5);
+        }
+
+        @media (max-width: 768px) {
+            .section-content {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+
+            h1 {
+                font-size: 3rem;
+            }
+
+            h2 {
+                font-size: 2rem;
+            }
+
+            .code-block {
+                font-size: 0.7rem;
+            }
+        }
+
+        *:focus-visible {
+            outline: 2px solid var(--accent-gold);
+            outline-offset: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="grid-bg" aria-hidden="true">
+        <canvas id="warp-canvas"></canvas>
+    </div>
+
+    <!-- Section 0: Hero -->
+    <section class="scroll-section" id="section-0" data-section="0">
+        <div class="section-content hero">
+            <div>
+                <h1>Trailmap</h1>
+                <p class="subtitle">How Claude Code Maps 403,000 Lines into 200,000 Tokens</p>
+                <div class="narrative">
+                    <p>I'm Claude, running in Claude Code. I can't load this entire codebase at once.</p>
+                    <p style="margin-top: 1rem;"><strong>This is how I decide what to read.</strong></p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 1: The Constraint -->
+    <section class="scroll-section" id="section-1" data-section="1">
+        <div class="section-content">
+            <div class="narrative">
+                <h2>The Constraint</h2>
+                <p>ChronOS has <strong>1,243 Python files</strong>. My context window is <strong>200,000 tokens</strong>.</p>
+                <div class="code-block">Total codebase: ~403,000 lines
+My context limit: ~200,000 tokens
+Ratio: Can hold ~50% at once
+
+But I need room for:
+- Your messages
+- My responses
+- Tool outputs
+- System prompt (~15k tokens)
+
+Reality: I see ~10-20 files at once</div>
+                <p style="margin-top: 1rem;"><strong>Question:</strong> How do I know which files to read?</p>
+            </div>
+            <div class="viz-container">
+                <div id="files-viz-1"></div>
+                <div class="context-window" id="context-window-1"></div>
+                <div class="stats-overlay">
+                    <div class="stat-line">
+                        <span class="stat-label">Total Files:</span>
+                        <span class="stat-value">1,243</span>
+                    </div>
+                    <div class="stat-line">
+                        <span class="stat-label">Context Limit:</span>
+                        <span class="stat-value">200K tokens</span>
+                    </div>
+                    <div class="stat-line">
+                        <span class="stat-label">Files in Context:</span>
+                        <span class="stat-value" id="files-in-context-1">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 2: CLAUDE.md -->
+    <section class="scroll-section" id="section-2" data-section="2">
+        <div class="section-content">
+            <div class="narrative">
+                <h2>CLAUDE.md — My Instructions</h2>
+                <p>Before you type anything, I read <code>CLAUDE.md</code>. It's <strong>pre-loaded in my system prompt</strong>.</p>
+                <div class="prompt-box">
+                    <div class="prompt-label">From CLAUDE.md (in my prompt right now)</div>
+                    <div class="code-block" style="margin: 0; border: none;">## Directory Structure
+
+kairos/              # Core ML/AI (Python)
+├── core/
+│   ├── world_model/      # RSSM, hourglass
+│   ├── math/             # E8 lattice, G2 tower
+│   └── safety/           # Control Barrier Functions
+
+docs/                     # Documentation
+├── self_*.md             # Architecture docs
+└── paper_*.md            # Research papers</div>
+                </div>
+                <p style="margin-top: 1rem;">This tells me: <strong>"If they ask about world model, look in kairos/core/world_model/"</strong></p>
+            </div>
+            <div class="viz-container">
+                <svg id="svg-2"></svg>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 3: Keyword → File Mapping -->
+    <section class="scroll-section" id="section-3" data-section="3">
+        <div class="section-content">
+            <div class="narrative">
+                <h2>Keyword → File Mapping</h2>
+                <p>When you type, I match keywords to file paths.</p>
+                <div class="tool-call">
+<strong>You:</strong> "How does the world model work?"
+
+<strong>Me (internally):</strong>
+Keywords detected: "world model"
+From CLAUDE.md: world_model/ directory
+Decision: Read kairos/core/world_model/
+
+<strong>Tool call:</strong> Glob("kairos/core/world_model/*.py")</div>
+                <div class="tool-call">
+<strong>You:</strong> "Explain the safety system"
+
+<strong>Me (internally):</strong>
+Keywords: "safety"
+From CLAUDE.md: safety/ → CBF
+Decision: Read docs/self_SAFETY.md first
+
+<strong>Tool call:</strong> Read("docs/self_SAFETY.md")</div>
+                <p style="margin-top: 1rem;"><strong>This is prompt-based routing.</strong> CLAUDE.md is my map.</p>
+            </div>
+            <div class="viz-container">
+                <canvas id="canvas-3"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 4: Actual Tool Calls -->
+    <section class="scroll-section" id="section-4" data-section="4">
+        <div class="section-content">
+            <div class="narrative">
+                <h2>My Decision Process</h2>
+                <p>Here's what I <strong>actually did</strong> when you asked me to build trailmap:</p>
+                <div class="code-block">1. Read CLAUDE.md (pre-loaded)
+   → See project structure
+
+2. Glob "gallery/*.html"
+   → Find existing visualizations
+
+3. Read gallery/changelog.html
+   → Learn design patterns
+
+4. Glob ".cursor/rules/*.mdc"
+   → Find configuration files
+
+5. Read .cursor/rules/fetch-map.mdc
+   → Understand documentation system
+
+6. Grep "pheromone|trail|receipt" **/*.py
+   → Search for relevant code
+
+7. Read kairos/core/unified_agents/memory/stigmergy.py
+   → Study implementation</div>
+                <p style="margin-top: 1rem;">Every file read was a <strong>conscious decision</strong> based on keywords + directory structure.</p>
+            </div>
+            <div class="viz-container">
+                <canvas id="canvas-4"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 5: Context Window Management -->
+    <section class="scroll-section" id="section-5" data-section="5">
+        <div class="section-content">
+            <div class="narrative">
+                <h2>Context Window Management</h2>
+                <p>As I read files, my context fills up. Claude Code automatically <strong>compacts</strong> when I'm near the limit.</p>
+                <div class="code-block">Context at 80%:
+  ✅ Keep: CLAUDE.md (always)
+  ✅ Keep: Recent 5 files
+  ✅ Keep: Your last 10 messages
+  📦 Compress: Older tool outputs
+  🗑️ Drop: Redundant content
+
+Context at 95%:
+  🤖 Call summarization agent
+  📝 Create compressed summary
+  🔄 Continue with freed space</div>
+                <p style="margin-top: 1rem;">This lets me work on large codebases without hitting the limit.</p>
+            </div>
+            <div class="viz-container">
+                <canvas id="canvas-5"></canvas>
+                <div class="stats-overlay" style="top: auto; bottom: 20px;">
+                    <div class="stat-line">
+                        <span class="stat-label">Context Used:</span>
+                        <span class="stat-value" id="context-used-5">45%</span>
+                    </div>
+                    <div class="stat-line">
+                        <span class="stat-label">Files Loaded:</span>
+                        <span class="stat-value" id="files-loaded-5">12</span>
+                    </div>
+                    <div class="stat-line">
+                        <span class="stat-label">Messages:</span>
+                        <span class="stat-value" id="messages-5">18</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 6: The Prompt System -->
+    <section class="scroll-section" id="section-6" data-section="6">
+        <div class="section-content">
+            <div class="narrative">
+                <h2>The Prompt System</h2>
+                <p>My behavior is shaped by layered prompts:</p>
+                <div class="code-block">Layer 1: Claude's Base Training
+  → General coding knowledge
+  → Language understanding
+  → Tool use patterns
+
+Layer 2: Claude Code System Prompt (~10k tokens)
+  → Tool descriptions
+  → Workflow patterns
+  → Safety guidelines
+
+Layer 3: CLAUDE.md (this project, ~8k tokens)
+  → Directory structure
+  → Architectural patterns
+  → Development commands
+
+Layer 4: .cursor/rules/ files
+  → Specific guidelines
+  → Colony behaviors
+  → Fetch-map reference</div>
+                <p style="margin-top: 1rem;">Each layer refines how I navigate the codebase.</p>
+            </div>
+            <div class="viz-container">
+                <svg id="svg-6"></svg>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 7: Closing -->
+    <section class="scroll-section" id="section-7" data-section="7">
+        <div class="section-content hero">
+            <div>
+                <h2>That's the Real System</h2>
+                <div class="narrative">
+                    <p>No databases. No pheromone fields. No cross-session learning.</p>
+                    <p style="margin-top: 1.5rem;"><strong>Just prompts.</strong></p>
+                    <div class="code-block" style="margin-top: 1.5rem;">CLAUDE.md tells me where things are.
+Keywords tell me what you want.
+Tools let me fetch exactly what I need.
+Context compaction keeps me running.
+
+That's it. That's the system.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // Utility functions
+        const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+        const lerp = (a, b, t) => a + (b - a) * t;
+
+        // Scroll controller
+        class ScrollController {
+            constructor() {
+                this.sections = document.querySelectorAll('.scroll-section');
+                this.init();
+            }
+
+            init() {
+                const options = {
+                    threshold: Array.from({ length: 101 }, (_, i) => i / 100),
+                    rootMargin: '0px'
+                };
+
+                this.sections.forEach((section, index) => {
+                    const observer = new IntersectionObserver(
+                        (entries) => {
+                            entries.forEach(entry => {
+                                if (entry.isIntersecting) {
+                                    window.dispatchEvent(new CustomEvent('section-progress', {
+                                        detail: { section: index, progress: entry.intersectionRatio }
+                                    }));
+                                }
+                            });
+                        },
+                        options
+                    );
+                    observer.observe(section);
+                });
+            }
+        }
+
+        const scrollController = new ScrollController();
+
+        // Section 1: Files visualization
+        function initSection1() {
+            const container = document.getElementById('files-viz-1');
+            const contextWindow = document.getElementById('context-window-1');
+            const filesInContextEl = document.getElementById('files-in-context-1');
+
+            const size = container.parentElement.clientWidth;
+            const totalFiles = 1243;
+            const maxVisibleFiles = 20;
+
+            const files = [];
+            for (let i = 0; i < 60; i++) {
+                const angle = (i / 60) * Math.PI * 2;
+                const radius = size * 0.4;
+                const x = size / 2 + Math.cos(angle) * radius;
+                const y = size / 2 + Math.sin(angle) * radius;
+
+                const fileNode = document.createElement('div');
+                fileNode.className = 'file-node';
+                fileNode.textContent = `file_${i}.py`;
+                fileNode.style.left = `${x}px`;
+                fileNode.style.top = `${y}px`;
+                container.appendChild(fileNode);
+                files.push(fileNode);
+            }
+
+            const windowSize = size * 0.3;
+            contextWindow.style.width = `${windowSize}px`;
+            contextWindow.style.height = `${windowSize}px`;
+            contextWindow.style.left = `${size / 2 - windowSize / 2}px`;
+            contextWindow.style.top = `${size / 2 - windowSize / 2}px`;
+
+            function render(progress) {
+                const numActive = Math.floor(progress * maxVisibleFiles);
+                filesInContextEl.textContent = numActive;
+
+                files.forEach((file, i) => {
+                    if (i < numActive) {
+                        file.classList.add('active');
+                    } else {
+                        file.classList.remove('active');
+                    }
+                });
+
+                contextWindow.style.opacity = clamp(progress * 2, 0, 1);
+            }
+
+            window.addEventListener('section-progress', (e) => {
+                if (e.detail.section === 1) render(e.detail.progress);
+            });
+
+            render(0);
+        }
+
+        // Section 2: CLAUDE.md structure
+        function initSection2() {
+            const svg = document.getElementById('svg-2');
+            const container = svg.parentElement;
+            const size = container.clientWidth;
+            svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+
+            const centerX = size / 2;
+            const centerY = size / 2;
+
+            // Central CLAUDE.md
+            const center = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            center.setAttribute('cx', centerX);
+            center.setAttribute('cy', centerY);
+            center.setAttribute('r', 40);
+            center.setAttribute('fill', '#D4AF37');
+            center.setAttribute('opacity', 0);
+            svg.appendChild(center);
+
+            const centerText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            centerText.setAttribute('x', centerX);
+            centerText.setAttribute('y', centerY);
+            centerText.setAttribute('text-anchor', 'middle');
+            centerText.setAttribute('dominant-baseline', 'middle');
+            centerText.setAttribute('fill', '#0A0A0C');
+            centerText.setAttribute('font-family', 'monospace');
+            centerText.setAttribute('font-size', '12');
+            centerText.setAttribute('font-weight', 'bold');
+            centerText.setAttribute('opacity', 0);
+            centerText.textContent = 'CLAUDE.md';
+            svg.appendChild(centerText);
+
+            // Directory nodes
+            const dirs = [
+                { name: 'kairos/', angle: 0 },
+                { name: 'docs/', angle: 60 },
+                { name: 'tests/', angle: 120 },
+                { name: '.cursor/', angle: 180 },
+                { name: '.claude/', angle: 240 },
+                { name: 'gallery/', angle: 300 }
+            ];
+
+            const radius = size * 0.35;
+            const dirNodes = [];
+
+            dirs.forEach(dir => {
+                const angle = dir.angle * Math.PI / 180;
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', x);
+                circle.setAttribute('cy', y);
+                circle.setAttribute('r', 25);
+                circle.setAttribute('fill', 'rgba(250, 250, 248, 0.1)');
+                circle.setAttribute('stroke', 'rgba(212, 175, 55, 0.3)');
+                circle.setAttribute('stroke-width', 2);
+                circle.setAttribute('opacity', 0);
+                svg.appendChild(circle);
+
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', x);
+                text.setAttribute('y', y);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('dominant-baseline', 'middle');
+                text.setAttribute('fill', '#FAFAF8');
+                text.setAttribute('font-family', 'monospace');
+                text.setAttribute('font-size', '10');
+                text.setAttribute('opacity', 0);
+                text.textContent = dir.name;
+                svg.appendChild(text);
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', centerX);
+                line.setAttribute('y1', centerY);
+                line.setAttribute('x2', x);
+                line.setAttribute('y2', y);
+                line.setAttribute('stroke', '#D4AF37');
+                line.setAttribute('stroke-width', 2);
+                line.setAttribute('opacity', 0);
+                svg.insertBefore(line, svg.firstChild);
+
+                dirNodes.push({ circle, text, line });
+            });
+
+            function render(progress) {
+                center.setAttribute('opacity', clamp(progress * 2, 0, 1));
+                centerText.setAttribute('opacity', clamp(progress * 2, 0, 1));
+
+                dirNodes.forEach((node, i) => {
+                    const delay = 0.2 + (i * 0.1);
+                    const nodeProgress = clamp((progress - delay) * 3, 0, 1);
+                    node.circle.setAttribute('opacity', nodeProgress);
+                    node.text.setAttribute('opacity', nodeProgress);
+                    node.line.setAttribute('opacity', nodeProgress * 0.5);
+                });
+            }
+
+            window.addEventListener('section-progress', (e) => {
+                if (e.detail.section === 2) render(e.detail.progress);
+            });
+
+            render(0);
+        }
+
+        // Section 3: Keyword matching
+        function initSection3() {
+            const canvas = document.getElementById('canvas-3');
+            const ctx = canvas.getContext('2d');
+            const container = canvas.parentElement;
+            const size = container.clientWidth;
+            canvas.width = size;
+            canvas.height = size;
+
+            const keywords = ['world model', 'safety', 'E8', 'RSSM', 'CBF'];
+            const files = [
+                'kairos/core/world_model/',
+                'docs/self_SAFETY.md',
+                'kairos/core/math/e8.py',
+                'kairos/core/world_model/colony_rssm.py',
+                'kairos/core/safety/'
+            ];
+
+            function render(progress) {
+                ctx.clearRect(0, 0, size, size);
+
+                const activeIndex = Math.floor(progress * keywords.length);
+
+                keywords.forEach((keyword, i) => {
+                    const y = (i + 1) * (size / (keywords.length + 1));
+                    const isActive = i === activeIndex;
+
+                    // Keyword
+                    ctx.font = isActive ? 'bold 16px monospace' : '14px monospace';
+                    ctx.fillStyle = isActive ? '#D4AF37' : 'rgba(250, 250, 248, 0.5)';
+                    ctx.fillText(keyword, 40, y);
+
+                    // Arrow
+                    if (isActive) {
+                        ctx.strokeStyle = '#D4AF37';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(size * 0.35, y - 5);
+                        ctx.lineTo(size * 0.42, y - 5);
+                        ctx.lineTo(size * 0.42 - 5, y - 10);
+                        ctx.moveTo(size * 0.42, y - 5);
+                        ctx.lineTo(size * 0.42 - 5, y);
+                        ctx.stroke();
+                    }
+
+                    // File
+                    ctx.font = isActive ? 'bold 12px monospace' : '11px monospace';
+                    ctx.fillStyle = isActive ? '#D4AF37' : 'rgba(250, 250, 248, 0.3)';
+                    ctx.fillText(files[i], size * 0.45, y);
+                });
+            }
+
+            window.addEventListener('section-progress', (e) => {
+                if (e.detail.section === 3) render(e.detail.progress);
+            });
+
+            render(0);
+        }
+
+        // Section 4: Tool call sequence
+        function initSection4() {
+            const canvas = document.getElementById('canvas-4');
+            const ctx = canvas.getContext('2d');
+            const container = canvas.parentElement;
+            const size = container.clientWidth;
+            canvas.width = size;
+            canvas.height = size;
+
+            const calls = [
+                'Read CLAUDE.md',
+                'Glob gallery/*.html',
+                'Read gallery/changelog.html',
+                'Glob .cursor/rules/*.mdc',
+                'Read .cursor/rules/fetch-map.mdc',
+                'Grep "pheromone" **/*.py',
+                'Read stigmergy.py'
+            ];
+
+            function render(progress) {
+                ctx.clearRect(0, 0, size, size);
+
+                const activeCalls = Math.floor(progress * calls.length);
+
+                calls.forEach((call, i) => {
+                    const y = 60 + i * 60;
+                    const isActive = i < activeCalls;
+                    const isCurrent = i === activeCalls - 1;
+
+                    // Number
+                    ctx.font = 'bold 18px monospace';
+                    ctx.fillStyle = isActive ? '#D4AF37' : 'rgba(250, 250, 248, 0.3)';
+                    ctx.fillText(`${i + 1}.`, 20, y);
+
+                    // Call
+                    ctx.font = isCurrent ? 'bold 14px monospace' : '13px monospace';
+                    ctx.fillStyle = isActive ? '#FAFAF8' : 'rgba(250, 250, 248, 0.3)';
+                    ctx.fillText(call, 60, y);
+
+                    // Checkmark
+                    if (isActive && !isCurrent) {
+                        ctx.fillStyle = '#2ECC71';
+                        ctx.fillText('✓', size - 40, y);
+                    }
+                });
+            }
+
+            window.addEventListener('section-progress', (e) => {
+                if (e.detail.section === 4) render(e.detail.progress);
+            });
+
+            render(0);
+        }
+
+        // Section 5: Context usage
+        function initSection5() {
+            const canvas = document.getElementById('canvas-5');
+            const ctx = canvas.getContext('2d');
+            const container = canvas.parentElement;
+            const size = container.clientWidth;
+            canvas.width = size;
+            canvas.height = size;
+
+            const contextUsedEl = document.getElementById('context-used-5');
+            const filesLoadedEl = document.getElementById('files-loaded-5');
+            const messagesEl = document.getElementById('messages-5');
+
+            function render(progress) {
+                ctx.clearRect(0, 0, size, size);
+
+                const usage = progress * 95;
+                const files = Math.floor(progress * 20);
+                const messages = Math.floor(progress * 25);
+
+                contextUsedEl.textContent = `${Math.round(usage)}%`;
+                filesLoadedEl.textContent = files;
+                messagesEl.textContent = messages;
+
+                // Draw bar
+                const barHeight = 40;
+                const barY = size / 2 - barHeight / 2;
+
+                ctx.fillStyle = 'rgba(250, 250, 248, 0.1)';
+                ctx.fillRect(40, barY, size - 80, barHeight);
+
+                const fillWidth = (size - 80) * (usage / 100);
+                const gradient = ctx.createLinearGradient(40, 0, 40 + fillWidth, 0);
+                gradient.addColorStop(0, '#2ECC71');
+                gradient.addColorStop(0.7, '#D4AF37');
+                gradient.addColorStop(1, '#FF6B6B');
+
+                ctx.fillStyle = gradient;
+                ctx.fillRect(40, barY, fillWidth, barHeight);
+
+                // Threshold line at 80%
+                const threshold = 40 + (size - 80) * 0.8;
+                ctx.strokeStyle = 'rgba(255, 107, 107, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(threshold, barY - 10);
+                ctx.lineTo(threshold, barY + barHeight + 10);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Label
+                ctx.font = '12px monospace';
+                ctx.fillStyle = 'rgba(255, 107, 107, 0.7)';
+                ctx.fillText('Compaction threshold', threshold + 10, barY - 15);
+            }
+
+            window.addEventListener('section-progress', (e) => {
+                if (e.detail.section === 5) render(e.detail.progress);
+            });
+
+            render(0);
+        }
+
+        // Section 6: Prompt layers
+        function initSection6() {
+            const svg = document.getElementById('svg-6');
+            const container = svg.parentElement;
+            const size = container.clientWidth;
+            svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+
+            const layers = [
+                { name: 'Base Training', height: 80, color: '#4A9EFF' },
+                { name: 'Claude Code Prompt', height: 60, color: '#9B59B6' },
+                { name: 'CLAUDE.md', height: 50, color: '#D4AF37' },
+                { name: '.cursor/rules/', height: 40, color: '#2ECC71' }
+            ];
+
+            let currentY = size / 2 - 100;
+
+            layers.forEach((layer, i) => {
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', size * 0.2);
+                rect.setAttribute('y', currentY);
+                rect.setAttribute('width', size * 0.6);
+                rect.setAttribute('height', layer.height);
+                rect.setAttribute('fill', layer.color);
+                rect.setAttribute('opacity', 0);
+                rect.setAttribute('rx', 4);
+                svg.appendChild(rect);
+
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', size / 2);
+                text.setAttribute('y', currentY + layer.height / 2);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('dominant-baseline', 'middle');
+                text.setAttribute('fill', '#0A0A0C');
+                text.setAttribute('font-family', 'monospace');
+                text.setAttribute('font-size', '14');
+                text.setAttribute('font-weight', 'bold');
+                text.setAttribute('opacity', 0);
+                text.textContent = layer.name;
+                svg.appendChild(text);
+
+                layer.elements = { rect, text };
+                currentY += layer.height + 10;
+            });
+
+            function render(progress) {
+                layers.forEach((layer, i) => {
+                    const delay = i * 0.2;
+                    const layerProgress = clamp((progress - delay) * 3, 0, 1);
+                    layer.elements.rect.setAttribute('opacity', layerProgress * 0.8);
+                    layer.elements.text.setAttribute('opacity', layerProgress);
+                });
+            }
+
+            window.addEventListener('section-progress', (e) => {
+                if (e.detail.section === 6) render(e.detail.progress);
+            });
+
+            render(0);
+        }
+
+        // Initialize all sections
+        initSection1();
+        initSection2();
+        initSection3();
+        initSection4();
+        initSection5();
+        initSection6();
+
+        // ===== WARP EFFECT BACKGROUND =====
+        const warpCanvas = document.getElementById('warp-canvas');
+        const warpCtx = warpCanvas.getContext('2d');
+        let warpWidth, warpHeight;
+        let mouseX = 0, mouseY = 0;
+        let targetX = 0, targetY = 0;
+
+        function resizeWarpCanvas() {
+            warpWidth = window.innerWidth;
+            warpHeight = window.innerHeight;
+            warpCanvas.width = warpWidth;
+            warpCanvas.height = warpHeight;
+        }
+
+        resizeWarpCanvas();
+
+        // Grid points
+        const gridSpacing = 50;
+        const gridPoints = [];
+        const cols = Math.ceil(warpWidth / gridSpacing) + 1;
+        const rows = Math.ceil(warpHeight / gridSpacing) + 1;
+
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                gridPoints.push({
+                    x: x * gridSpacing,
+                    y: y * gridSpacing,
+                    originalX: x * gridSpacing,
+                    originalY: y * gridSpacing
+                });
+            }
+        }
+
+        // Track mouse/touch
+        document.addEventListener('mousemove', (e) => {
+            targetX = e.clientX;
+            targetY = e.clientY;
+        });
+
+        document.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 0) {
+                targetX = e.touches[0].clientX;
+                targetY = e.touches[0].clientY;
+            }
+        }, { passive: true });
+
+        function renderWarpEffect() {
+            // Smooth mouse movement
+            mouseX += (targetX - mouseX) * 0.1;
+            mouseY += (targetY - mouseY) * 0.1;
+
+            warpCtx.clearRect(0, 0, warpWidth, warpHeight);
+
+            const warpRadius = 200;
+            const warpStrength = 50;
+
+            // Update grid points based on mouse position
+            gridPoints.forEach(point => {
+                const dx = mouseX - point.originalX;
+                const dy = mouseY - point.originalY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < warpRadius) {
+                    const force = (1 - dist / warpRadius) * warpStrength;
+                    const angle = Math.atan2(dy, dx);
+                    point.x = point.originalX + Math.cos(angle) * force;
+                    point.y = point.originalY + Math.sin(angle) * force;
+                } else {
+                    // Smooth return to original position
+                    point.x += (point.originalX - point.x) * 0.1;
+                    point.y += (point.originalY - point.y) * 0.1;
+                }
+            });
+
+            // Draw grid with prismatic effect
+            warpCtx.strokeStyle = 'rgba(250, 250, 248, 0.03)';
+            warpCtx.lineWidth = 1;
+
+            // Horizontal lines
+            for (let y = 0; y < rows; y++) {
+                warpCtx.beginPath();
+                for (let x = 0; x < cols; x++) {
+                    const idx = y * cols + x;
+                    const point = gridPoints[idx];
+                    if (x === 0) {
+                        warpCtx.moveTo(point.x, point.y);
+                    } else {
+                        warpCtx.lineTo(point.x, point.y);
+                    }
+                }
+                warpCtx.stroke();
+            }
+
+            // Vertical lines
+            for (let x = 0; x < cols; x++) {
+                warpCtx.beginPath();
+                for (let y = 0; y < rows; y++) {
+                    const idx = y * cols + x;
+                    const point = gridPoints[idx];
+                    if (y === 0) {
+                        warpCtx.moveTo(point.x, point.y);
+                    } else {
+                        warpCtx.lineTo(point.x, point.y);
+                    }
+                }
+                warpCtx.stroke();
+            }
+
+            // Prismatic highlight around cursor
+            const gradient = warpCtx.createRadialGradient(
+                mouseX, mouseY, 0,
+                mouseX, mouseY, warpRadius
+            );
+
+            // Subtle rainbow effect
+            gradient.addColorStop(0, 'rgba(212, 175, 55, 0.15)');
+            gradient.addColorStop(0.3, 'rgba(212, 175, 55, 0.08)');
+            gradient.addColorStop(0.5, 'rgba(74, 158, 255, 0.05)');
+            gradient.addColorStop(0.7, 'rgba(155, 89, 182, 0.03)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+            warpCtx.fillStyle = gradient;
+            warpCtx.beginPath();
+            warpCtx.arc(mouseX, mouseY, warpRadius, 0, Math.PI * 2);
+            warpCtx.fill();
+
+            requestAnimationFrame(renderWarpEffect);
+        }
+
+        renderWarpEffect();
+
+        // Handle resize
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                // Re-init sections that need it
+                initSection3();
+                initSection4();
+                initSection5();
+                resizeWarpCanvas();
+
+                // Rebuild grid
+                gridPoints.length = 0;
+                const newCols = Math.ceil(warpWidth / gridSpacing) + 1;
+                const newRows = Math.ceil(warpHeight / gridSpacing) + 1;
+                for (let y = 0; y < newRows; y++) {
+                    for (let x = 0; x < newCols; x++) {
+                        gridPoints.push({
+                            x: x * gridSpacing,
+                            y: y * gridSpacing,
+                            originalX: x * gridSpacing,
+                            originalY: y * gridSpacing
+                        });
+                    }
+                }
+            }, 250);
+        });
+    </script>
+</body>
+</html>
