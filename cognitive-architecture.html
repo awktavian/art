@@ -1,0 +1,1406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>認知 — Cognitive Architecture</title>
+    <meta name="description" content="How an AI thinks: memory, tools, and the boundary between self and world">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Noto+Sans+JP:wght@100;300;400;500;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Core palette - warm gold meets deep void */
+            --gold: #D4A853;
+            --gold-bright: #F5C542;
+            --gold-dim: #9A7B3A;
+            --void: #0A0A0F;
+            --void-light: #12121A;
+            --void-lighter: #1A1A25;
+            
+            /* Accent spectrum */
+            --cyan: #4ECDC4;
+            --violet: #9B7EDE;
+            --coral: #FF6B6B;
+            --mint: #7EDE9B;
+            
+            /* Memory hierarchy colors */
+            --registers: #FF6B6B;
+            --l0-cache: #F5C542;
+            --l1-cache: #4ECDC4;
+            --l2-cache: #7EDE9B;
+            
+            /* Blanket colors */
+            --sensory: #4ECDC4;
+            --internal: #9B7EDE;
+            --active: #FF8A80;
+            
+            /* Text */
+            --text-primary: #FFFFFF;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-tertiary: rgba(255, 255, 255, 0.4);
+            
+            /* Typography */
+            --font-display: 'Space Grotesk', sans-serif;
+            --font-serif: 'Crimson Pro', Georgia, serif;
+            --font-jp: 'Noto Sans JP', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            
+            /* Spacing */
+            --space-xs: 0.25rem;
+            --space-sm: 0.5rem;
+            --space-md: 1rem;
+            --space-lg: 2rem;
+            --space-xl: 4rem;
+            --space-2xl: 8rem;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html { 
+            scroll-behavior: smooth;
+            scrollbar-width: thin;
+            scrollbar-color: var(--gold-dim) var(--void);
+        }
+
+        body {
+            font-family: var(--font-display);
+            background: var(--void);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* ============================================
+           ANIMATED BACKGROUND - DEEP SPACE
+           ============================================ */
+        
+        .bg-canvas {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        /* Gradient orbs */
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.4;
+            animation: orb-drift 40s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 60vw;
+            height: 60vw;
+            background: radial-gradient(circle, var(--gold) 0%, transparent 70%);
+            top: -20%;
+            right: -20%;
+            animation-delay: 0s;
+        }
+
+        .orb-2 {
+            width: 50vw;
+            height: 50vw;
+            background: radial-gradient(circle, var(--violet) 0%, transparent 70%);
+            bottom: -15%;
+            left: -15%;
+            animation-delay: -15s;
+        }
+
+        .orb-3 {
+            width: 40vw;
+            height: 40vw;
+            background: radial-gradient(circle, var(--cyan) 0%, transparent 70%);
+            top: 40%;
+            left: 30%;
+            opacity: 0.2;
+            animation-delay: -25s;
+        }
+
+        @keyframes orb-drift {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(30px, -40px) scale(1.05); }
+            50% { transform: translate(-20px, 20px) scale(0.95); }
+            75% { transform: translate(40px, 30px) scale(1.02); }
+        }
+
+        /* Floating particles */
+        .particle {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: var(--gold);
+            border-radius: 50%;
+            opacity: 0;
+            animation: particle-float 20s linear infinite;
+        }
+
+        @keyframes particle-float {
+            0% { 
+                opacity: 0;
+                transform: translateY(100vh) scale(0);
+            }
+            10% { opacity: 0.8; }
+            90% { opacity: 0.8; }
+            100% { 
+                opacity: 0;
+                transform: translateY(-100vh) scale(1);
+            }
+        }
+
+        /* Grid overlay - subtle */
+        .grid-overlay {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(212, 168, 83, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(212, 168, 83, 0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            mask-image: radial-gradient(ellipse at center, black 0%, transparent 70%);
+        }
+
+        /* ============================================
+           LAYOUT
+           ============================================ */
+        
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 var(--space-lg);
+        }
+
+        section {
+            padding: var(--space-2xl) 0;
+            opacity: 0;
+            transform: translateY(40px);
+            transition: all 1s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        section.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ============================================
+           HERO
+           ============================================ */
+        
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero-kanji {
+            font-family: var(--font-jp);
+            font-size: clamp(10rem, 30vw, 20rem);
+            font-weight: 100;
+            line-height: 0.85;
+            background: linear-gradient(
+                135deg, 
+                var(--gold-bright) 0%, 
+                var(--gold) 40%, 
+                var(--gold-dim) 100%
+            );
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 80px rgba(212, 168, 83, 0.5));
+            animation: kanji-breathe 8s ease-in-out infinite;
+            user-select: none;
+        }
+
+        @keyframes kanji-breathe {
+            0%, 100% { 
+                filter: drop-shadow(0 0 80px rgba(212, 168, 83, 0.5));
+                transform: scale(1);
+            }
+            50% { 
+                filter: drop-shadow(0 0 120px rgba(245, 197, 66, 0.7));
+                transform: scale(1.02);
+            }
+        }
+
+        .hero-title {
+            font-family: var(--font-display);
+            font-size: clamp(1.2rem, 3vw, 1.8rem);
+            font-weight: 300;
+            letter-spacing: 0.5em;
+            color: var(--text-secondary);
+            margin-top: var(--space-lg);
+            text-transform: uppercase;
+        }
+
+        .hero-subtitle {
+            font-family: var(--font-serif);
+            font-size: clamp(1rem, 2vw, 1.25rem);
+            font-weight: 300;
+            font-style: italic;
+            color: var(--text-tertiary);
+            margin-top: var(--space-md);
+            max-width: 600px;
+            line-height: 1.8;
+        }
+
+        .scroll-hint {
+            position: absolute;
+            bottom: var(--space-xl);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--space-sm);
+            color: var(--gold);
+            font-size: 0.8rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            animation: hint-pulse 3s ease-in-out infinite;
+        }
+
+        .scroll-hint::after {
+            content: '';
+            width: 1px;
+            height: 40px;
+            background: linear-gradient(to bottom, var(--gold), transparent);
+            animation: scroll-line 2s ease-in-out infinite;
+        }
+
+        @keyframes hint-pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes scroll-line {
+            0%, 100% { transform: scaleY(1); opacity: 0.5; }
+            50% { transform: scaleY(1.3); opacity: 1; }
+        }
+
+        /* ============================================
+           SECTION HEADERS
+           ============================================ */
+        
+        .section-label {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-sm);
+            padding: var(--space-xs) var(--space-md);
+            background: rgba(212, 168, 83, 0.1);
+            border: 1px solid var(--gold-dim);
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--gold);
+            margin-bottom: var(--space-md);
+        }
+
+        .section-title {
+            font-family: var(--font-serif);
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 300;
+            font-style: italic;
+            line-height: 1.2;
+            margin-bottom: var(--space-md);
+        }
+
+        .section-title .accent {
+            color: var(--gold);
+            font-style: normal;
+            font-weight: 500;
+        }
+
+        .section-intro {
+            font-size: 1.15rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            line-height: 1.9;
+            margin-bottom: var(--space-xl);
+        }
+
+        /* ============================================
+           THREE PILLARS CARDS
+           ============================================ */
+        
+        .pillars-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: var(--space-lg);
+        }
+
+        .pillar-card {
+            background: linear-gradient(135deg, var(--void-light) 0%, var(--void) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-left: 4px solid var(--card-accent, var(--gold));
+            border-radius: 0 16px 16px 0;
+            padding: var(--space-lg);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            cursor: default;
+        }
+
+        .pillar-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--card-accent, var(--gold))08, transparent);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .pillar-card:hover {
+            transform: translateX(8px) translateY(-4px);
+            border-left-width: 6px;
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.3),
+                0 0 40px var(--card-accent, var(--gold))15;
+        }
+
+        .pillar-card:hover::before {
+            opacity: 1;
+        }
+
+        .pillar-icon {
+            font-size: 2.5rem;
+            margin-bottom: var(--space-md);
+            display: block;
+            filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+        }
+
+        .pillar-title {
+            font-family: var(--font-display);
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: var(--card-accent, var(--gold));
+            margin-bottom: var(--space-xs);
+        }
+
+        .pillar-tagline {
+            font-size: 0.9rem;
+            color: var(--text-tertiary);
+            margin-bottom: var(--space-md);
+            font-weight: 500;
+        }
+
+        .pillar-description {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+        }
+
+        /* ============================================
+           MEMORY HIERARCHY
+           ============================================ */
+        
+        .analogy-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-lg);
+            flex-wrap: wrap;
+            margin-bottom: var(--space-xl);
+            padding: var(--space-lg);
+        }
+
+        .analogy-item {
+            text-align: center;
+        }
+
+        .analogy-icon {
+            font-size: 3rem;
+            margin-bottom: var(--space-sm);
+        }
+
+        .analogy-label {
+            font-size: 0.7rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+        }
+
+        .analogy-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--cyan);
+        }
+
+        .analogy-equals {
+            font-size: 2rem;
+            color: var(--gold);
+            font-weight: 300;
+        }
+
+        .memory-stack {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-sm);
+        }
+
+        .memory-row {
+            display: grid;
+            grid-template-columns: 150px 1fr 100px;
+            align-items: center;
+            gap: var(--space-lg);
+            padding: var(--space-md) var(--space-lg);
+            background: var(--void-light);
+            border-left: 5px solid var(--row-color);
+            border-radius: 0 12px 12px 0;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            cursor: default;
+        }
+
+        .memory-row:hover {
+            transform: translateX(10px);
+            background: var(--void-lighter);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .row-label {
+            font-family: var(--font-display);
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--row-color);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .row-type {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            margin-top: 2px;
+        }
+
+        .row-content strong {
+            color: var(--text-primary);
+        }
+
+        .row-content {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .row-speed {
+            text-align: right;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--row-color);
+        }
+
+        .row-speed-label {
+            font-size: 0.65rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        /* ============================================
+           CALLOUT BOX
+           ============================================ */
+        
+        .callout {
+            position: relative;
+            margin: var(--space-xl) 0;
+            padding: var(--space-lg);
+            padding-left: calc(var(--space-lg) + 20px);
+            background: rgba(212, 168, 83, 0.03);
+            border: 1px solid var(--gold-dim);
+            border-left: none;
+            border-radius: 0 20px 20px 0;
+        }
+
+        .callout::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(to bottom, var(--gold-bright), var(--gold-dim));
+            border-radius: 4px;
+        }
+
+        .callout-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--gold);
+            margin-bottom: var(--space-md);
+        }
+
+        .callout-text {
+            font-family: var(--font-serif);
+            font-size: 1.2rem;
+            font-style: italic;
+            line-height: 2;
+            color: var(--text-primary);
+        }
+
+        .callout-text strong {
+            color: var(--gold);
+            font-style: normal;
+            font-weight: 500;
+        }
+
+        /* ============================================
+           MARKOV BLANKET FLOW
+           ============================================ */
+        
+        .blanket-panel {
+            background: var(--void-light);
+            border: 1px solid rgba(155, 126, 222, 0.2);
+            border-radius: 20px;
+            padding: var(--space-xl);
+            margin: var(--space-xl) 0;
+        }
+
+        .blanket-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-lg);
+            padding-bottom: var(--space-md);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .blanket-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--violet);
+        }
+
+        .blanket-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .blanket-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-md);
+            flex-wrap: wrap;
+            padding: var(--space-lg) 0;
+        }
+
+        .blanket-node {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: var(--space-md) var(--space-lg);
+            background: var(--void);
+            border: 2px solid var(--node-color, rgba(255, 255, 255, 0.1));
+            border-radius: 16px;
+            min-width: 120px;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            cursor: default;
+        }
+
+        .blanket-node:hover {
+            transform: translateY(-8px) scale(1.05);
+            box-shadow: 
+                0 20px 50px rgba(0, 0, 0, 0.3),
+                0 0 30px var(--node-color, var(--gold))30;
+        }
+
+        .node-icon {
+            font-size: 1.8rem;
+            margin-bottom: var(--space-sm);
+        }
+
+        .node-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--node-color, var(--text-primary));
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .node-sublabel {
+            font-size: 0.7rem;
+            color: var(--text-tertiary);
+            margin-top: 4px;
+        }
+
+        .flow-arrow {
+            font-size: 1.5rem;
+            color: var(--gold);
+            opacity: 0.6;
+            animation: arrow-pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes arrow-pulse {
+            0%, 100% { opacity: 0.4; transform: translateX(0); }
+            50% { opacity: 1; transform: translateX(4px); }
+        }
+
+        /* ============================================
+           TOOL COMPARISON
+           ============================================ */
+        
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--space-lg);
+        }
+
+        .tool-panel {
+            background: var(--void-light);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .tool-header {
+            background: var(--panel-color, var(--cyan));
+            color: var(--void);
+            padding: var(--space-md) var(--space-lg);
+            font-weight: 600;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .tool-body {
+            padding: var(--space-lg);
+        }
+
+        .tool-list {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            line-height: 2;
+            margin-bottom: var(--space-md);
+        }
+
+        .tool-discipline {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            padding-top: var(--space-md);
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            line-height: 1.7;
+        }
+
+        .tool-discipline strong {
+            color: var(--panel-color, var(--cyan));
+        }
+
+        /* ============================================
+           GOLDEN RULE
+           ============================================ */
+        
+        .golden-rule {
+            text-align: center;
+            padding: var(--space-xl);
+            background: linear-gradient(135deg, rgba(212, 168, 83, 0.05) 0%, rgba(212, 168, 83, 0.02) 100%);
+            border: 1px solid var(--gold-dim);
+            border-radius: 24px;
+            margin: var(--space-xl) 0;
+        }
+
+        .golden-rule-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--gold);
+            margin-bottom: var(--space-md);
+        }
+
+        .golden-rule-text {
+            font-family: var(--font-serif);
+            font-size: clamp(1.5rem, 4vw, 2rem);
+            font-weight: 300;
+            font-style: italic;
+            color: var(--gold-bright);
+            line-height: 1.6;
+        }
+
+        .golden-rule-explanation {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-top: var(--space-lg);
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.9;
+        }
+
+        /* ============================================
+           UPDATES SECTION
+           ============================================ */
+        
+        .updates-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: var(--space-md);
+        }
+
+        .update-item {
+            background: var(--void-light);
+            border-left: 3px solid var(--item-color, var(--gold));
+            border-radius: 0 12px 12px 0;
+            padding: var(--space-md);
+            transition: all 0.3s ease;
+        }
+
+        .update-item:hover {
+            transform: translateX(6px);
+            background: var(--void-lighter);
+        }
+
+        .update-file {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--item-color, var(--gold));
+            margin-bottom: var(--space-sm);
+        }
+
+        .update-description {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* ============================================
+           SCROLL ROCKET
+           ============================================ */
+        
+        .scroll-rocket {
+            position: fixed;
+            bottom: var(--space-lg);
+            right: var(--space-lg);
+            width: 56px;
+            height: 56px;
+            background: var(--gold);
+            border: none;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            pointer-events: none;
+            z-index: 1000;
+            box-shadow: 0 8px 30px rgba(212, 168, 83, 0.4);
+        }
+
+        .scroll-rocket.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .scroll-rocket:hover {
+            transform: translateY(-4px) scale(1.1);
+            box-shadow: 0 12px 40px rgba(212, 168, 83, 0.6);
+        }
+
+        /* ============================================
+           PROGRESS BAR
+           ============================================ */
+        
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--gold-dim), var(--gold-bright), var(--gold));
+            z-index: 10000;
+            transform-origin: left;
+            transform: scaleX(0);
+        }
+
+        /* ============================================
+           FOOTER
+           ============================================ */
+        
+        footer {
+            padding: var(--space-xl) 0;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            margin-top: var(--space-2xl);
+        }
+
+        .footer-text {
+            font-size: 0.85rem;
+            color: var(--text-tertiary);
+            letter-spacing: 0.1em;
+        }
+
+        .footer-text span {
+            color: var(--gold-dim);
+        }
+
+        /* ============================================
+           RESPONSIVE
+           ============================================ */
+        
+        /* ============================================
+           CURSOR INFLUENCE (Subtle World Effect)
+           ============================================ */
+        
+        .cursor-influence {
+            position: fixed;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: radial-gradient(
+                circle,
+                rgba(212, 168, 83, 0.08) 0%,
+                transparent 60%
+            );
+            pointer-events: none;
+            z-index: 1;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.5s ease;
+            mix-blend-mode: screen;
+        }
+
+        /* Hide on touch devices */
+        @media (hover: none) {
+            .cursor-influence {
+                display: none;
+            }
+        }
+
+        /* ============================================
+           RESPONSIVE
+           ============================================ */
+        
+        @media (max-width: 768px) {
+            .memory-row {
+                grid-template-columns: 1fr;
+                text-align: center;
+                gap: var(--space-sm);
+            }
+
+            .row-speed {
+                text-align: center;
+            }
+
+            .blanket-flow {
+                flex-direction: column;
+            }
+
+            .flow-arrow {
+                transform: rotate(90deg);
+            }
+
+            .analogy-row {
+                flex-direction: column;
+            }
+
+            .analogy-equals {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="bg-canvas">
+        <div class="grid-overlay"></div>
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+        <!-- Particles generated by JS -->
+    </div>
+
+    <div class="progress-bar" id="progress-bar"></div>
+
+    <!-- Hero -->
+    <section class="hero visible">
+        <div class="hero-kanji">認知</div>
+        <h1 class="hero-title">How an AI Thinks</h1>
+        <p class="hero-subtitle">
+            A simple, human explanation of how LLMs manage memory, 
+            use tools, and understand themselves
+        </p>
+        <div class="scroll-hint">Scroll to explore</div>
+    </section>
+
+    <!-- Section 1: Three Components -->
+    <section id="components">
+        <div class="container">
+            <span class="section-label">01 — Foundation</span>
+            <h2 class="section-title">It all reduces to <span class="accent">three things</span></h2>
+            <p class="section-intro">
+                Every AI system—no matter how complex—is built from just three capabilities. 
+                Everything else is implementation detail.
+            </p>
+
+            <div class="pillars-grid">
+                <div class="pillar-card" style="--card-accent: var(--sensory);">
+                    <span class="pillar-icon">👁️</span>
+                    <h3 class="pillar-title">Tools</h3>
+                    <p class="pillar-tagline">What it can sense and do</p>
+                    <p class="pillar-description">
+                        Can it read files? Search the web? Run code? 
+                        These are its eyes and hands in the world—the interface 
+                        between internal thought and external reality.
+                    </p>
+                </div>
+                <div class="pillar-card" style="--card-accent: var(--internal);">
+                    <span class="pillar-icon">🪞</span>
+                    <h3 class="pillar-title">Self-Model</h3>
+                    <p class="pillar-tagline">What it knows about itself</p>
+                    <p class="pillar-description">
+                        Its rules, constraints, identity, and accumulated knowledge. 
+                        How it recognizes patterns, remembers context, and predicts 
+                        outcomes based on what it's learned.
+                    </p>
+                </div>
+                <div class="pillar-card" style="--card-accent: var(--gold);">
+                    <span class="pillar-icon">⚡</span>
+                    <h3 class="pillar-title">Inference</h3>
+                    <p class="pillar-tagline">The actual thinking</p>
+                    <p class="pillar-description">
+                        The LLM's processing capacity. Fixed per turn. 
+                        Like a CPU that processes everything currently loaded 
+                        in the context window—transform input to output.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 2: Memory Hierarchy -->
+    <section id="memory">
+        <div class="container">
+            <span class="section-label">02 — Memory</span>
+            <h2 class="section-title">It thinks like a <span class="accent">CPU</span></h2>
+            <p class="section-intro">
+                An LLM's memory isn't one thing—it's a hierarchy. 
+                Just like a computer has registers, caches, and hard drives, 
+                an AI has layers of memory with different speeds and costs.
+            </p>
+
+            <div class="analogy-row">
+                <div class="analogy-item">
+                    <div class="analogy-icon">🖥️</div>
+                    <div class="analogy-label">Computer</div>
+                    <div class="analogy-title">CPU + RAM + Disk</div>
+                </div>
+                <div class="analogy-equals">=</div>
+                <div class="analogy-item">
+                    <div class="analogy-icon">🤖</div>
+                    <div class="analogy-label">LLM</div>
+                    <div class="analogy-title">Context + Vector + Files</div>
+                </div>
+            </div>
+
+            <div class="memory-stack">
+                <div class="memory-row" style="--row-color: var(--registers);">
+                    <div>
+                        <div class="row-label">Registers</div>
+                        <div class="row-type">Context Window</div>
+                    </div>
+                    <div class="row-content">
+                        <strong>What's "in mind" right now.</strong> 
+                        Your message, instructions, recent tool outputs. Precious and expensive.
+                    </div>
+                    <div class="row-speed">
+                        ~200K tokens
+                        <div class="row-speed-label">Instant</div>
+                    </div>
+                </div>
+                <div class="memory-row" style="--row-color: var(--l0-cache);">
+                    <div>
+                        <div class="row-label">L0 Cache</div>
+                        <div class="row-type">Vector Memory</div>
+                    </div>
+                    <div class="row-content">
+                        <strong>Semantic recall by meaning.</strong> 
+                        "Remember when we talked about X?" Found by similarity, not exact match.
+                    </div>
+                    <div class="row-speed">
+                        ~1-10ms
+                        <div class="row-speed-label">One tool call</div>
+                    </div>
+                </div>
+                <div class="memory-row" style="--row-color: var(--l1-cache);">
+                    <div>
+                        <div class="row-label">L1 Cache</div>
+                        <div class="row-type">Filesystem</div>
+                    </div>
+                    <div class="row-content">
+                        <strong>What's written down.</strong> 
+                        Documentation, rules, pheromone trails. Persistent but requires explicit reading.
+                    </div>
+                    <div class="row-speed">
+                        ~10-50ms
+                        <div class="row-speed-label">File read</div>
+                    </div>
+                </div>
+                <div class="memory-row" style="--row-color: var(--l2-cache);">
+                    <div>
+                        <div class="row-label">L2 Cache</div>
+                        <div class="row-type">Tools</div>
+                    </div>
+                    <div class="row-content">
+                        <strong>The outside world.</strong> 
+                        Running code, searching the web, calling APIs. Slowest but most powerful.
+                    </div>
+                    <div class="row-speed">
+                        ~100-1000ms
+                        <div class="row-speed-label">Execution</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="callout">
+                <div class="callout-label">In Human Terms</div>
+                <p class="callout-text">
+                    The <strong>context window</strong> is like your working memory—what you're actively thinking about. 
+                    <strong>Vector memory</strong> is like long-term memory—you recall it by association. 
+                    <strong>Files</strong> are like your notes—you have to look them up. 
+                    <strong>Tools</strong> are like calling a friend—takes time but they know things you don't.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 3: Markov Blanket -->
+    <section id="boundary">
+        <div class="container">
+            <span class="section-label">03 — Boundary</span>
+            <h2 class="section-title">Self and <span class="accent">World</span></h2>
+            <p class="section-intro">
+                There's an invisible boundary around the AI. Some tools read from the world (sensory), 
+                some tools write to the world (active). The thinking happens inside, private.
+            </p>
+
+            <div class="blanket-panel">
+                <div class="blanket-header">
+                    <span class="blanket-title">The Markov Blanket</span>
+                    <span class="blanket-subtitle">Information Flow</span>
+                </div>
+                <div class="blanket-flow">
+                    <div class="blanket-node" style="--node-color: var(--text-tertiary);">
+                        <span class="node-icon">🌍</span>
+                        <span class="node-label">World (η)</span>
+                        <span class="node-sublabel">External reality</span>
+                    </div>
+                    <span class="flow-arrow">→</span>
+                    <div class="blanket-node" style="--node-color: var(--sensory);">
+                        <span class="node-icon">👁️</span>
+                        <span class="node-label">Sensory (s)</span>
+                        <span class="node-sublabel">Read, Search, Observe</span>
+                    </div>
+                    <span class="flow-arrow">→</span>
+                    <div class="blanket-node" style="--node-color: var(--internal);">
+                        <span class="node-icon">🧠</span>
+                        <span class="node-label">Internal (μ)</span>
+                        <span class="node-sublabel">Thinking, Reasoning</span>
+                    </div>
+                    <span class="flow-arrow">→</span>
+                    <div class="blanket-node" style="--node-color: var(--active);">
+                        <span class="node-icon">✍️</span>
+                        <span class="node-label">Active (a)</span>
+                        <span class="node-sublabel">Write, Execute, Change</span>
+                    </div>
+                    <span class="flow-arrow">→</span>
+                    <div class="blanket-node" style="--node-color: var(--text-tertiary);">
+                        <span class="node-icon">🌍</span>
+                        <span class="node-label">World (η)</span>
+                        <span class="node-sublabel">Changed reality</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tools-grid">
+                <div class="tool-panel" style="--panel-color: var(--sensory);">
+                    <div class="tool-header">
+                        <span>👁️</span>
+                        <span>Sensory Tools</span>
+                    </div>
+                    <div class="tool-body">
+                        <p class="tool-list">
+                            read_file · grep · glob · codebase_search<br>
+                            web_search · context7 · mcp_memory (search)
+                        </p>
+                        <p class="tool-discipline">
+                            <strong>Discipline:</strong> Use these first. 
+                            Understand before acting. Read before write.
+                        </p>
+                    </div>
+                </div>
+                <div class="tool-panel" style="--panel-color: var(--active);">
+                    <div class="tool-header">
+                        <span>✍️</span>
+                        <span>Active Tools</span>
+                    </div>
+                    <div class="tool-body">
+                        <p class="tool-list">
+                            write · search_replace · delete_file<br>
+                            run_terminal_cmd · todo_write · mcp_memory (create)
+                        </p>
+                        <p class="tool-discipline">
+                            <strong>Discipline:</strong> Use after sensing. 
+                            Verify before mutating. Plan → Execute → Verify.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="golden-rule">
+                <div class="golden-rule-label">The Golden Rule</div>
+                <p class="golden-rule-text">
+                    Read before write. Sense before act. Verify before mutate.
+                </p>
+                <p class="golden-rule-explanation">
+                    The best AI behavior follows this flow: observe the world, 
+                    think about it internally, then carefully change the world. Never skip steps.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 4: What Changed -->
+    <section id="updates">
+        <div class="container">
+            <span class="section-label">04 — Updates</span>
+            <h2 class="section-title">What <span class="accent">Changed</span></h2>
+            <p class="section-intro">
+                Today we formalized this framework across all configuration files. 
+                Here's the architectural update.
+            </p>
+
+            <div class="updates-grid">
+                <div class="update-item" style="--item-color: var(--gold);">
+                    <div class="update-file">CLAUDE.md</div>
+                    <p class="update-description">
+                        Added "Cognitive Architecture" section. Documents the three components, 
+                        memory hierarchy, and tool classification by blanket position.
+                    </p>
+                </div>
+                <div class="update-item" style="--item-color: var(--violet);">
+                    <div class="update-file">kagami.mdc</div>
+                    <p class="update-description">
+                        Added memory hierarchy table. Tools now categorized as Sensory vs Active. 
+                        MCP servers tagged by cache layer (L0, L2).
+                    </p>
+                </div>
+                <div class="update-item" style="--item-color: var(--cyan);">
+                    <div class="update-file">subagents.mdc</div>
+                    <p class="update-description">
+                        Tool preferences now "blanket-aware." Each colony has explicit sensory vs 
+                        active tool lists. Added blanket discipline section.
+                    </p>
+                </div>
+                <div class="update-item" style="--item-color: var(--mint);">
+                    <div class="update-file">fetch-map.mdc</div>
+                    <p class="update-description">
+                        Added pheromone trail to COGNITIVE_ARCHITECTURE.md. Signal "memory hierarchy" 
+                        or "cognitive architecture" now routes directly.
+                    </p>
+                </div>
+            </div>
+
+            <div class="callout">
+                <div class="callout-label">Why This Matters</div>
+                <p class="callout-text">
+                    <strong>Better tool discipline</strong> — Colonies know which tools are for sensing vs acting.<br><br>
+                    <strong>Explicit memory model</strong> — No vague "memory"—specific layers with specific costs.<br><br>
+                    <strong>Unified framework</strong> — Same model across all configuration files.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p class="footer-text">
+                ChronOS · Kagami <span>·</span> December 2025 <span>·</span> 認知
+            </p>
+        </div>
+    </footer>
+
+    <button class="scroll-rocket" id="scroll-rocket" aria-label="Scroll to top">🚀</button>
+
+    <script>
+        // ===== PARTICLE GENERATOR =====
+        const bgCanvas = document.querySelector('.bg-canvas');
+        for (let i = 0; i < 30; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.animationDelay = -Math.random() * 20 + 's';
+            particle.style.animationDuration = 15 + Math.random() * 15 + 's';
+            particle.style.opacity = 0.3 + Math.random() * 0.5;
+            bgCanvas.appendChild(particle);
+        }
+
+        // ===== INTERSECTION OBSERVER =====
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.15, rootMargin: '0px 0px -80px 0px' });
+
+        document.querySelectorAll('section:not(.hero)').forEach(el => observer.observe(el));
+
+        // ===== SCROLL PROGRESS =====
+        const progressBar = document.getElementById('progress-bar');
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            const total = document.documentElement.scrollHeight - window.innerHeight;
+            progressBar.style.transform = `scaleX(${scrolled / total})`;
+        });
+
+        // ===== SCROLL ROCKET =====
+        const rocket = document.getElementById('scroll-rocket');
+
+        window.addEventListener('scroll', () => {
+            if (window.pageYOffset > 500) {
+                rocket.classList.add('visible');
+            } else {
+                rocket.classList.remove('visible');
+            }
+        });
+
+        rocket.addEventListener('click', () => {
+            rocket.style.transform = 'translateY(-1000px) rotate(-30deg)';
+            rocket.style.transition = 'transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)';
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            setTimeout(() => {
+                rocket.style.transition = 'none';
+                rocket.style.transform = 'translateY(20px)';
+                rocket.classList.remove('visible');
+                setTimeout(() => {
+                    rocket.style.transition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                }, 50);
+            }, 800);
+        });
+
+        // ===== CARD TILT EFFECT =====
+        document.querySelectorAll('.pillar-card, .blanket-node').forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                const rotateX = (y - centerY) / 20;
+                const rotateY = (centerX - x) / 20;
+                
+                card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-4px)`;
+            });
+
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = '';
+            });
+        });
+
+        // ===== CURSOR WORLD INFLUENCE =====
+        // Subtle effect: cursor influences background particles and orbs
+        
+        const cursorInfluence = document.createElement('div');
+        cursorInfluence.className = 'cursor-influence';
+        document.body.appendChild(cursorInfluence);
+
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+        let influenceX = mouseX;
+        let influenceY = mouseY;
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        // Get background orbs for influence
+        const orbs = document.querySelectorAll('.orb');
+        const particles = document.querySelectorAll('.particle');
+        
+        // Store original positions
+        const orbData = Array.from(orbs).map(orb => ({
+            el: orb,
+            baseX: 0,
+            baseY: 0
+        }));
+
+        function animateWorld() {
+            // Smooth cursor follow
+            influenceX += (mouseX - influenceX) * 0.08;
+            influenceY += (mouseY - influenceY) * 0.08;
+            
+            cursorInfluence.style.left = influenceX + 'px';
+            cursorInfluence.style.top = influenceY + 'px';
+
+            // Calculate normalized cursor position (0-1)
+            const normX = influenceX / window.innerWidth;
+            const normY = influenceY / window.innerHeight;
+
+            // Influence orbs - subtle gravitational pull toward cursor
+            orbData.forEach((orb, i) => {
+                const pullStrength = 30; // pixels of max displacement
+                const offsetX = (normX - 0.5) * pullStrength * (i % 2 === 0 ? 1 : -1);
+                const offsetY = (normY - 0.5) * pullStrength * (i % 2 === 0 ? -1 : 1);
+                orb.el.style.marginLeft = offsetX + 'px';
+                orb.el.style.marginTop = offsetY + 'px';
+            });
+
+            // Influence grid overlay - subtle warp via CSS variable
+            const gridOverlay = document.querySelector('.grid-overlay');
+            if (gridOverlay) {
+                const warpX = (normX - 0.5) * 20;
+                const warpY = (normY - 0.5) * 20;
+                gridOverlay.style.transform = `translate(${warpX}px, ${warpY}px)`;
+            }
+
+            // Particles respond to cursor proximity
+            particles.forEach(particle => {
+                const rect = particle.getBoundingClientRect();
+                const px = rect.left + rect.width / 2;
+                const py = rect.top + rect.height / 2;
+                const dist = Math.hypot(influenceX - px, influenceY - py);
+                
+                if (dist < 150) {
+                    // Push particles away from cursor
+                    const angle = Math.atan2(py - influenceY, px - influenceX);
+                    const push = (150 - dist) / 150 * 20;
+                    particle.style.transform = `translate(${Math.cos(angle) * push}px, ${Math.sin(angle) * push}px)`;
+                    particle.style.opacity = Math.min(1, 0.3 + (150 - dist) / 150 * 0.7);
+                } else {
+                    particle.style.transform = '';
+                }
+            });
+
+            requestAnimationFrame(animateWorld);
+        }
+        animateWorld();
+
+        // Fade influence when mouse leaves
+        document.addEventListener('mouseleave', () => {
+            cursorInfluence.style.opacity = '0';
+        });
+
+        document.addEventListener('mouseenter', () => {
+            cursorInfluence.style.opacity = '1';
+        });
+    </script>
+</body>
+</html>
