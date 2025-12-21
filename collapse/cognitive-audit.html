@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         :root {
             /* The void */
@@ -281,6 +282,30 @@
         .reveal.visible {
             opacity: 1;
             transform: translateY(0);
+        }
+
+        /* Chart containers */
+        .chart-container {
+            background: var(--void-up);
+            border: 1px solid rgba(212,168,83,0.1);
+            border-radius: 16px;
+            padding: 32px;
+            margin: 32px 0;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s var(--ease-out);
+        }
+        .chart-container:hover {
+            border-color: rgba(212,168,83,0.3);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3), 0 0 30px var(--gold-glow);
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+            margin-top: 24px;
+        }
+        .chart-wrapper canvas {
+            cursor: crosshair;
         }
 
         /* Loss curve visualization */
@@ -746,11 +771,106 @@
             color: var(--text-muted);
         }
 
+        /* Sparklines */
+        .sparkline {
+            display: inline-block;
+            width: 60px;
+            height: 20px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+        .sparkline path {
+            fill: none;
+            stroke: var(--gold);
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* Metric cards with sparklines */
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 32px 0;
+        }
+        .metric-card {
+            background: var(--void-up);
+            border: 1px solid rgba(212,168,83,0.08);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s var(--ease-spring);
+            position: relative;
+            overflow: hidden;
+        }
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, transparent, var(--gold-glow));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .metric-card:hover {
+            transform: translateY(-4px) scale(1.02);
+            border-color: var(--gold-dim);
+        }
+        .metric-card:hover::before {
+            opacity: 1;
+        }
+        .metric-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-family: var(--mono);
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--gold);
+            display: flex;
+            align-items: center;
+        }
+        .metric-change {
+            font-size: 12px;
+            margin-left: 8px;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .metric-change.up {
+            background: var(--success-glow);
+            color: var(--success);
+        }
+        .metric-change.down {
+            background: var(--danger-glow);
+            color: var(--danger);
+        }
+
+        /* Count-up animation */
+        @keyframes count-up {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animated-number {
+            animation: count-up 0.6s var(--ease-out) forwards;
+        }
+
+        /* Pulse for live indicator */
+        @keyframes live-pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--danger); }
+            50% { opacity: 0.8; box-shadow: 0 0 0 10px transparent; }
+        }
+        .hero-badge {
+            animation: live-pulse 2s ease-in-out infinite;
+        }
+
         /* Responsive */
         @media (max-width: 640px) {
             .hero-stats { flex-direction: column; gap: 24px; }
             .container { padding: 0 20px; }
             section { padding: 60px 0; }
+            .chart-wrapper { height: 250px; }
         }
     </style>
 </head>
@@ -831,7 +951,7 @@
                             <path class="loss-path" d="M0,100 L40,105 L80,98 L120,110 L160,102 L200,108 L240,95 L280,112 L320,103 L360,108 L400,99 L440,106 L480,102 L520,110 L560,101 L600,108 L640,103 L680,111 L720,104 L760,109 L800,105"/>
                         </svg>
                         <span class="loss-axis-label loss-axis-y">Loss</span>
-                        <span class="loss-axis-label loss-axis-x">Step 300</span>
+                        <span class="loss-axis-label loss-axis-x">Step 350</span>
                     </div>
                 </div>
 
@@ -840,7 +960,7 @@
                         <div class="phase-num">PHASE 0 · CURRENT</div>
                         <div class="phase-name">H¹⁴ Hierarchy (Fold A₂)</div>
                         <div class="phase-loss ok">11.11</div>
-                        <div class="phase-steps">Step 300 / 5000 (warmup)</div>
+                        <div class="phase-steps">Step 350 / 5000 (warmup)</div>
                     </div>
                     <div class="phase-card">
                         <div class="phase-num">PHASE 1</div>
@@ -1062,7 +1182,7 @@ Step    210: loss=<span class="info">11.11</span>   <span class="dim">← Curren
                     <a href="collapse/index.html">The Symmetry of Collapse</a>
                     <a href="trailmap.html">Trailmap</a>
                 </nav>
-                <p class="footer-text">chronOS / Kagami · Updated December 20, 2025 23:40:14 · Training Step 300 · Demos not memos.</p>
+                <p class="footer-text">chronOS / Kagami · Updated December 20, 2025 23:45:15 · Training Step 350 · Demos not memos.</p>
             </div>
         </footer>
     </div>
