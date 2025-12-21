@@ -923,35 +923,44 @@
                 <h2 class="section-title">Early training phase: <span>Loss oscillating</span></h2>
                 <p class="section-lead">Training started at loss 10.86, currently at 11.11 after 210 steps. Loss is oscillating between 10.86-12.20 as the model explores the loss landscape during warmup (learning rate ramping 0.00002 → 0.00052).</p>
 
-                <div class="loss-curve-container">
+                <div class="chart-container reveal">
                     <div class="loss-curve-header">
                         <span class="loss-curve-title">LOSS TRAJECTORY · RUNS/KAGAMI</span>
                         <div class="loss-curve-legend">
                             <div class="legend-item"><div class="legend-dot loss"></div>Training Loss</div>
-                            <div class="legend-item"><div class="legend-dot phase"></div>Phase Transition</div>
                         </div>
                     </div>
-                    <div class="loss-curve">
-                        <svg class="loss-curve-svg" viewBox="0 0 800 200" preserveAspectRatio="none">
-                            <defs>
-                                <linearGradient id="loss-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                                    <stop offset="0%" stop-color="#ff4757" stop-opacity="0.4"/>
-                                    <stop offset="100%" stop-color="#ff4757" stop-opacity="0"/>
-                                </linearGradient>
-                            </defs>
-                            <!-- Phase transition lines -->
-                            <line class="phase-line" x1="178" y1="0" x2="178" y2="200"/>
-                            <text class="phase-label" x="178" y="15" text-anchor="middle">P1</text>
-                            <line class="phase-line" x1="356" y1="0" x2="356" y2="200"/>
-                            <text class="phase-label" x="356" y="15" text-anchor="middle">P2</text>
-                            <line class="phase-line" x1="712" y1="0" x2="712" y2="200"/>
-                            <text class="phase-label" x="712" y="15" text-anchor="middle">P3</text>
-                            <!-- Loss curve (early training oscillation, normalized to 10.86-12.20 range) -->
-                            <path class="loss-area" d="M0,100 L40,105 L80,98 L120,110 L160,102 L200,108 L240,95 L280,112 L320,103 L360,108 L400,99 L440,106 L480,102 L520,110 L560,101 L600,108 L640,103 L680,111 L720,104 L760,109 L800,105 L800,200 L0,200 Z"/>
-                            <path class="loss-path" d="M0,100 L40,105 L80,98 L120,110 L160,102 L200,108 L240,95 L280,112 L320,103 L360,108 L400,99 L440,106 L480,102 L520,110 L560,101 L600,108 L640,103 L680,111 L720,104 L760,109 L800,105"/>
-                        </svg>
-                        <span class="loss-axis-label loss-axis-y">Loss</span>
-                        <span class="loss-axis-label loss-axis-x">Step 350</span>
+                    <div class="chart-wrapper">
+                        <canvas id="lossChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="metric-grid reveal">
+                    <div class="metric-card">
+                        <div class="metric-label">CURRENT LOSS</div>
+                        <div class="metric-value">
+                            <span class="animated-number" data-target="11.11">11.11</span>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">LEARNING RATE</div>
+                        <div class="metric-value">
+                            <span class="animated-number" data-target="0.00052">0.00052</span>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">THROUGHPUT</div>
+                        <div class="metric-value">
+                            <span class="animated-number" data-target="401">401</span>
+                            <span class="metric-change up">+33%</span>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">STEP TIME</div>
+                        <div class="metric-value">
+                            <span class="animated-number" data-target="5.11">5.11</span>s
+                            <span class="metric-change up">-25%</span>
+                        </div>
                     </div>
                 </div>
 
@@ -1048,6 +1057,24 @@ Step    210: loss=<span class="info">11.11</span>   <span class="dim">← Curren
                 <div class="throughput-bar">
                     <div class="throughput-fill" style="width: 80%;">401 samples/sec</div>
                     <span class="throughput-label">Target: 500</span>
+                </div>
+
+                <div class="chart-container reveal">
+                    <div class="loss-curve-header">
+                        <span class="loss-curve-title">THROUGHPUT OPTIMIZATION</span>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="throughputChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-container reveal">
+                    <div class="loss-curve-header">
+                        <span class="loss-curve-title">MEMORY PRESSURE (STEP TIME PROXY)</span>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="memoryChart"></canvas>
+                    </div>
                 </div>
 
                 <div class="code-block">
@@ -1245,27 +1272,254 @@ Step    210: loss=<span class="info">11.11</span>   <span class="dim">← Curren
             throughputObserver.observe(throughputFill.parentElement);
         }
 
-        // Loss curve animation
-        const lossPath = document.querySelector('.loss-path');
-        const lossArea = document.querySelector('.loss-area');
-        if (lossPath) {
-            const length = lossPath.getTotalLength();
-            lossPath.style.strokeDasharray = length;
-            lossPath.style.strokeDashoffset = length;
-            lossArea.style.opacity = '0';
+        // Real training data from TensorBoard
+        const trainingData = {
+            steps: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210],
+            loss: [11.584089279174805, 10.898714065551758, 10.863332748413086, 10.860494613647461, 11.207508087158203, 11.900808334350586, 11.83535099029541, 11.542173385620117, 11.249327659606934, 11.040092468261719, 11.483482360839844, 12.17408561706543, 12.19565200805664, 11.995092391967773, 11.409642219543457, 11.187341690063477, 11.171669960021973, 11.27291202545166, 11.409192085266113, 11.463643074035645, 11.106230735778809],
+            lr: [0.00002, 0.00005, 0.00007, 0.0001, 0.00012, 0.00015, 0.00017, 0.0002, 0.00022, 0.00025, 0.00027, 0.0003, 0.00032, 0.00035, 0.00037, 0.0004, 0.00042, 0.00045, 0.00047, 0.0005, 0.00052],
+            throughput: [301.34320068359375, 343.7966003417969, 361.6537170410156, 370.8589172363281, 376.58428955078125, 380.76666259765625, 382.7396545410156, 385.02313232421875, 387.07708740234375, 389.0296325683594, 402.7853088378906, 403.6486511230469, 404.45684814453125, 404.8850402832031, 405.80413818359375, 406.3599548339844, 407.9184265136719, 408.2912902832031, 404.40142822265625, 401.91741943359375, 400.6566467285156],
+            stepTime: [6.796237468719482, 5.957010746002197, 5.662875652313232, 5.522315979003906, 5.438357830047607, 5.378622055053711, 5.350895881652832, 5.3191609382629395, 5.290935516357422, 5.26438045501709, 5.084594249725342, 5.073719501495361, 5.0635809898376465, 5.058226108551025, 5.046769618988037, 5.039866924285889, 5.02061128616333, 5.016026496887207, 5.064274787902832, 5.095574378967285, 5.111608982086182]
+        };
 
-            const curveObserver = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        lossPath.style.transition = 'stroke-dashoffset 2s ease-out';
-                        lossPath.style.strokeDashoffset = '0';
-                        lossArea.style.transition = 'opacity 1s ease-out 1s';
-                        lossArea.style.opacity = '0.3';
+        // Chart.js default configuration
+        Chart.defaults.font.family = "'JetBrains Mono', monospace";
+        Chart.defaults.color = 'rgba(240, 237, 230, 0.65)';
+
+        // Common chart options
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(10, 10, 15, 0.95)',
+                    titleColor: '#d4a853',
+                    bodyColor: '#f0ede6',
+                    borderColor: '#d4a853',
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: false,
+                    titleFont: { family: "'JetBrains Mono', monospace", size: 11 },
+                    bodyFont: { family: "'JetBrains Mono', monospace", size: 13 }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(212, 168, 83, 0.08)' },
+                    ticks: { color: '#f0ede6', font: { size: 10 } }
+                },
+                y: {
+                    grid: { color: 'rgba(212, 168, 83, 0.08)' },
+                    ticks: { color: '#f0ede6', font: { size: 10 } }
+                }
+            }
+        };
+
+        // Loss Chart
+        const lossCtx = document.getElementById('lossChart');
+        if (lossCtx) {
+            new Chart(lossCtx, {
+                type: 'line',
+                data: {
+                    labels: trainingData.steps,
+                    datasets: [{
+                        label: 'Training Loss',
+                        data: trainingData.loss,
+                        borderColor: '#ff4757',
+                        backgroundColor: 'rgba(255, 71, 87, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: '#ff4757',
+                        pointBorderColor: '#0a0a0f',
+                        pointBorderWidth: 2,
+                        pointHoverBorderWidth: 3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    ...commonOptions,
+                    plugins: {
+                        ...commonOptions.plugins,
+                        tooltip: {
+                            ...commonOptions.plugins.tooltip,
+                            callbacks: {
+                                title: (context) => `Step ${context[0].label}`,
+                                label: (context) => `Loss: ${context.parsed.y.toFixed(4)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        ...commonOptions.scales,
+                        y: {
+                            ...commonOptions.scales.y,
+                            title: {
+                                display: true,
+                                text: 'Loss',
+                                color: '#d4a853'
+                            }
+                        }
                     }
-                });
-            }, { threshold: 0.3 });
-            curveObserver.observe(lossPath.closest('.loss-curve-container'));
+                }
+            });
         }
+
+        // Throughput Chart
+        const throughputCtx = document.getElementById('throughputChart');
+        if (throughputCtx) {
+            new Chart(throughputCtx, {
+                type: 'line',
+                data: {
+                    labels: trainingData.steps,
+                    datasets: [{
+                        label: 'Throughput',
+                        data: trainingData.throughput,
+                        borderColor: '#2ed573',
+                        backgroundColor: 'rgba(46, 213, 115, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: '#2ed573',
+                        pointBorderColor: '#0a0a0f',
+                        pointBorderWidth: 2,
+                        pointHoverBorderWidth: 3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    ...commonOptions,
+                    plugins: {
+                        ...commonOptions.plugins,
+                        tooltip: {
+                            ...commonOptions.plugins.tooltip,
+                            callbacks: {
+                                title: (context) => `Step ${context[0].label}`,
+                                label: (context) => `${context.parsed.y.toFixed(1)} samples/sec`
+                            }
+                        }
+                    },
+                    scales: {
+                        ...commonOptions.scales,
+                        y: {
+                            ...commonOptions.scales.y,
+                            title: {
+                                display: true,
+                                text: 'Samples/sec',
+                                color: '#2ed573'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Memory Chart (using step time as proxy)
+        const memoryCtx = document.getElementById('memoryChart');
+        if (memoryCtx) {
+            new Chart(memoryCtx, {
+                type: 'line',
+                data: {
+                    labels: trainingData.steps,
+                    datasets: [{
+                        label: 'Memory Pressure',
+                        data: trainingData.stepTime,
+                        borderColor: '#70a1ff',
+                        backgroundColor: 'rgba(112, 161, 255, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: '#70a1ff',
+                        pointBorderColor: '#0a0a0f',
+                        pointBorderWidth: 2,
+                        pointHoverBorderWidth: 3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    ...commonOptions,
+                    plugins: {
+                        ...commonOptions.plugins,
+                        tooltip: {
+                            ...commonOptions.plugins.tooltip,
+                            callbacks: {
+                                title: (context) => `Step ${context[0].label}`,
+                                label: (context) => `${context.parsed.y.toFixed(2)}s per step`
+                            }
+                        }
+                    },
+                    scales: {
+                        ...commonOptions.scales,
+                        y: {
+                            ...commonOptions.scales.y,
+                            title: {
+                                display: true,
+                                text: 'Step Time (seconds)',
+                                color: '#70a1ff'
+                            },
+                            reverse: true  // Lower is better
+                        }
+                    }
+                }
+            });
+        }
+
+        // Number count-up animation
+        function animateNumber(element) {
+            const target = parseFloat(element.dataset.target);
+            const duration = 1000;
+            const steps = 60;
+            const increment = target / steps;
+            let current = 0;
+            let step = 0;
+
+            const timer = setInterval(() => {
+                step++;
+                current += increment;
+                if (step >= steps) {
+                    current = target;
+                    clearInterval(timer);
+                }
+
+                if (target < 1) {
+                    element.textContent = current.toFixed(5);
+                } else if (target < 10) {
+                    element.textContent = current.toFixed(2);
+                } else {
+                    element.textContent = Math.round(current);
+                }
+            }, duration / steps);
+        }
+
+        // Trigger number animations on scroll
+        const numberObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && !entry.target.dataset.animated) {
+                    entry.target.dataset.animated = 'true';
+                    animateNumber(entry.target);
+                }
+            });
+        }, { threshold: 0.5 });
+
+        document.querySelectorAll('.animated-number').forEach(el => numberObserver.observe(el));
+
+        // Add chart cursor effects
+        document.querySelectorAll('.chart-container').forEach(container => {
+            container.addEventListener('mouseenter', () => {
+                cursor.style.transform = 'scale(1.5)';
+                cursor.style.borderColor = '#d4a853';
+            });
+            container.addEventListener('mouseleave', () => {
+                cursor.style.transform = 'scale(1)';
+                cursor.style.borderColor = '#d4a853';
+            });
+        });
     </script>
 </body>
 </html>
