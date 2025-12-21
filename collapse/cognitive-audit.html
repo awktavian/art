@@ -1,86 +1,1073 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>認知 · Training Audit</title>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
-    background: #050508;
-    color: #f0ede6;
-    padding: 60px 40px;
-    line-height: 1.7;
-}
-.container { max-width: 800px; margin: 0 auto; }
-h1 {
-    font-size: 48px;
-    font-weight: 300;
-    margin-bottom: 16px;
-    background: linear-gradient(135deg, #d4a853, #efc86e);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-.subtitle {
-    font-size: 14px;
-    color: #999;
-    margin-bottom: 48px;
-}
-.card {
-    background: rgba(22,22,32,0.6);
-    border: 1px solid rgba(212,168,83,0.2);
-    border-radius: 16px;
-    padding: 32px;
-    margin-bottom: 24px;
-    backdrop-filter: blur(20px);
-}
-.metric { margin: 16px 0; display: flex; justify-content: space-between; }
-.label { color: #999; }
-.value { color: #d4a853; font-weight: 600; }
-.success { color: #2ed573; }
-.warning { color: #ff4757; }
-a { color: #d4a853; text-decoration: none; transition: color 0.2s; }
-a:hover { color: #efc86e; }
-.footer { margin-top: 64px; padding-top: 32px; border-top: 1px solid rgba(212,168,83,0.1); text-align: center; font-size: 12px; color: #666; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>認知 — Cognitive Training Audit</title>
+    <meta name="description" content="A visual journey through world model training at step 999.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Noto+Sans+JP:wght@100;300;500&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --void: #030306;
+            --void-light: #080810;
+            --obsidian: #0c0c14;
+            --glass: rgba(255, 255, 255, 0.02);
+            --glass-border: rgba(255, 255, 255, 0.05);
+
+            --text: #f0ece4;
+            --text-dim: rgba(240, 236, 228, 0.6);
+            --text-whisper: rgba(240, 236, 228, 0.25);
+            --text-ghost: rgba(240, 236, 228, 0.08);
+
+            /* Training colors */
+            --training-violet: #9B5DE5;
+            --world-model: #00BBF9;
+            --e8-gold: #FFBE0B;
+            --g2-green: #00F5A0;
+            --s7-cyan: #00F5D4;
+            --loss-red: #FF6B6B;
+            --convergence-green: #51CF66;
+
+            --font-display: 'Space Grotesk', sans-serif;
+            --font-serif: 'Crimson Pro', Georgia, serif;
+            --font-jp: 'Noto Sans JP', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        ::selection {
+            background: var(--training-violet);
+            color: var(--void);
+        }
+
+        html {
+            scroll-behavior: smooth;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(155, 93, 229, 0.3) transparent;
+        }
+
+        body {
+            font-family: var(--font-display);
+            background: var(--void);
+            color: var(--text);
+            overflow-x: hidden;
+            cursor: none;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        /* ═══════════════════════════════════════
+           CUSTOM CURSOR
+           ═══════════════════════════════════════ */
+        .cursor {
+            position: fixed;
+            width: 28px;
+            height: 28px;
+            border: 1.5px solid var(--training-violet);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 10000;
+            transition: transform 0.2s var(--ease-out-expo),
+                        border-color 0.3s,
+                        box-shadow 0.3s;
+            box-shadow: 0 0 25px rgba(155, 93, 229, 0.4),
+                        inset 0 0 10px rgba(155, 93, 229, 0.1);
+        }
+
+        .cursor-dot {
+            position: fixed;
+            width: 5px;
+            height: 5px;
+            background: var(--training-violet);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 10001;
+            box-shadow: 0 0 10px var(--training-violet);
+        }
+
+        .cursor.hover {
+            transform: scale(2);
+            border-color: var(--e8-gold);
+            box-shadow: 0 0 40px rgba(255, 190, 11, 0.5),
+                        inset 0 0 20px rgba(255, 190, 11, 0.2);
+        }
+
+        /* ═══════════════════════════════════════
+           BACKGROUND
+           ═══════════════════════════════════════ */
+        .constellation-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            overflow: hidden;
+            background: radial-gradient(ellipse 100% 60% at 50% -10%, rgba(155, 93, 229, 0.06) 0%, transparent 50%),
+                        radial-gradient(ellipse 80% 50% at 90% 90%, rgba(0, 187, 249, 0.03) 0%, transparent 40%),
+                        radial-gradient(ellipse 60% 40% at 10% 80%, rgba(0, 245, 212, 0.03) 0%, transparent 40%),
+                        var(--void);
+        }
+
+        .constellation-canvas {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        /* ═══════════════════════════════════════
+           NAVIGATION
+           ═══════════════════════════════════════ */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 1.5rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(180deg, rgba(3, 3, 6, 0.98) 0%, rgba(3, 3, 6, 0.8) 50%, transparent 100%);
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-logo {
+            font-family: var(--font-jp);
+            font-size: 1.8rem;
+            font-weight: 300;
+            color: var(--training-violet);
+            text-shadow: 0 0 30px rgba(155, 93, 229, 0.4);
+            letter-spacing: 0.1em;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2.5rem;
+        }
+
+        .nav-links a {
+            font-size: 0.65rem;
+            font-weight: 500;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            text-decoration: none;
+            transition: all 0.3s var(--ease-out-expo);
+            position: relative;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 1px;
+            background: var(--training-violet);
+            transition: width 0.3s var(--ease-out-expo);
+        }
+
+        .nav-links a:hover { color: var(--training-violet); }
+        .nav-links a:hover::after { width: 100%; }
+
+        /* ═══════════════════════════════════════
+           HERO
+           ═══════════════════════════════════════ */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 2rem;
+            position: relative;
+        }
+
+        .hero-kanji {
+            font-family: var(--font-jp);
+            font-size: clamp(10rem, 25vw, 20rem);
+            font-weight: 100;
+            color: var(--training-violet);
+            opacity: 0.2;
+            text-shadow: 0 0 150px rgba(155, 93, 229, 0.4),
+                         0 0 80px rgba(155, 93, 229, 0.3);
+            animation: hero-pulse 5s ease-in-out infinite;
+            line-height: 0.9;
+        }
+
+        @keyframes hero-pulse {
+            0%, 100% { text-shadow: 0 0 120px rgba(155, 93, 229, 0.25), 0 0 60px rgba(155, 93, 229, 0.15); }
+            50% { text-shadow: 0 0 180px rgba(155, 93, 229, 0.4), 0 0 100px rgba(155, 93, 229, 0.25); }
+        }
+
+        .hero-title {
+            font-family: var(--font-serif);
+            font-size: clamp(1.8rem, 4vw, 3.2rem);
+            font-weight: 400;
+            font-style: italic;
+            letter-spacing: 0.05em;
+            margin-top: -1.5rem;
+            background: linear-gradient(135deg, var(--text) 0%, var(--text-dim) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-subtitle {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--text-whisper);
+            margin-top: 1.5rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 3rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--text-whisper);
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .scroll-indicator span {
+            font-size: 0.6rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(12px); }
+        }
+
+        /* ═══════════════════════════════════════
+           SECTIONS
+           ═══════════════════════════════════════ */
+        main { position: relative; z-index: 1; }
+
+        section {
+            padding: 10rem 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 5rem;
+        }
+
+        .section-number {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            font-weight: 400;
+            color: var(--training-violet);
+            letter-spacing: 0.4em;
+            margin-bottom: 1.5rem;
+            opacity: 0.8;
+        }
+
+        .section-title {
+            font-family: var(--font-serif);
+            font-size: clamp(2.2rem, 5vw, 4rem);
+            font-weight: 400;
+            font-style: italic;
+            letter-spacing: 0.02em;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--text) 0%, var(--text-dim) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .section-subtitle {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.8;
+        }
+
+        /* ═══════════════════════════════════════
+           STATS GRID
+           ═══════════════════════════════════════ */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            margin: 5rem 0;
+        }
+
+        .stat-card {
+            position: relative;
+            text-align: center;
+            padding: 3rem 2rem;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 1.5rem;
+            overflow: hidden;
+            transition: all 0.5s var(--ease-out-expo);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--stat-color, var(--training-violet)), transparent);
+            opacity: 0.5;
+        }
+
+        .stat-card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 0%, var(--stat-color, var(--training-violet)) 0%, transparent 60%);
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-8px);
+            border-color: color-mix(in srgb, var(--stat-color, var(--training-violet)) 20%, transparent);
+        }
+
+        .stat-card:hover::after { opacity: 0.08; }
+
+        .stat-value {
+            font-family: var(--font-mono);
+            font-size: 3.5rem;
+            font-weight: 300;
+            color: var(--stat-color, var(--training-violet));
+            line-height: 1;
+            text-shadow: 0 0 40px color-mix(in srgb, var(--stat-color, var(--training-violet)) 50%, transparent);
+            position: relative;
+            z-index: 1;
+        }
+
+        .stat-label {
+            font-size: 0.65rem;
+            font-weight: 500;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            margin-top: 1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ═══════════════════════════════════════
+           TRAINING JOURNEY (Timeline)
+           ═══════════════════════════════════════ */
+        .journey-section {
+            padding: 8rem 0;
+            position: relative;
+        }
+
+        .journey-timeline {
+            position: relative;
+            max-width: 900px;
+            margin: 5rem auto 0;
+        }
+
+        .timeline-track {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 2px;
+            background: linear-gradient(180deg,
+                var(--training-violet),
+                var(--world-model),
+                var(--e8-gold),
+                var(--g2-green),
+                var(--s7-cyan)
+            );
+            transform: translateX(-50%);
+            opacity: 0.2;
+        }
+
+        .journey-phase {
+            position: relative;
+            margin-bottom: 6rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .journey-phase:nth-child(odd) {
+            flex-direction: row;
+        }
+
+        .journey-phase:nth-child(even) {
+            flex-direction: row-reverse;
+        }
+
+        .phase-content {
+            flex: 1;
+            padding: 2rem;
+        }
+
+        .phase-node {
+            position: relative;
+            width: 60px;
+            height: 60px;
+            background: var(--phase-color, var(--training-violet));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 0 40px var(--phase-color, var(--training-violet)),
+                        0 0 80px color-mix(in srgb, var(--phase-color, var(--training-violet)) 50%, transparent);
+            z-index: 5;
+        }
+
+        .phase-node::before {
+            content: '';
+            position: absolute;
+            inset: -8px;
+            border: 2px solid var(--phase-color, var(--training-violet));
+            border-radius: 50%;
+            opacity: 0.3;
+        }
+
+        .phase-step {
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            letter-spacing: 0.2em;
+            color: var(--phase-color, var(--training-violet));
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .phase-title {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            font-weight: 500;
+            color: var(--text);
+            margin-bottom: 0.75rem;
+        }
+
+        .phase-desc {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            line-height: 1.7;
+        }
+
+        /* ═══════════════════════════════════════
+           ARCHITECTURE VISUALIZATION
+           ═══════════════════════════════════════ */
+        .architecture-section {
+            padding: 8rem 2rem;
+        }
+
+        .arch-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            margin: 5rem 0;
+        }
+
+        .arch-layer {
+            position: relative;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 1rem;
+            padding: 2rem;
+            overflow: hidden;
+            transition: all 0.5s var(--ease-out-expo);
+        }
+
+        .arch-layer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--layer-color, var(--training-violet));
+            opacity: 0.8;
+        }
+
+        .arch-layer::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--layer-color, var(--training-violet)) 15%, transparent), transparent 60%);
+        }
+
+        .arch-layer:hover {
+            transform: translateY(-12px);
+            border-color: color-mix(in srgb, var(--layer-color, var(--training-violet)) 30%, transparent);
+            box-shadow: 0 20px 60px -20px color-mix(in srgb, var(--layer-color, var(--training-violet)) 30%, transparent);
+        }
+
+        .layer-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            filter: drop-shadow(0 0 20px color-mix(in srgb, var(--layer-color, var(--training-violet)) 50%, transparent));
+            position: relative;
+            z-index: 1;
+        }
+
+        .layer-name {
+            font-family: var(--font-display);
+            font-size: 1.2rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .layer-dim {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            color: var(--layer-color, var(--training-violet));
+            margin-bottom: 1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .layer-desc {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            line-height: 1.6;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ═══════════════════════════════════════
+           FOOTER
+           ═══════════════════════════════════════ */
+        footer {
+            text-align: center;
+            padding: 8rem 2rem;
+            border-top: 1px solid var(--glass-border);
+            background: linear-gradient(180deg, transparent 0%, rgba(155, 93, 229, 0.02) 100%);
+        }
+
+        .footer-glyph {
+            font-family: var(--font-jp);
+            font-size: 4rem;
+            font-weight: 100;
+            color: var(--training-violet);
+            opacity: 0.25;
+            margin-bottom: 2.5rem;
+            text-shadow: 0 0 60px rgba(155, 93, 229, 0.4);
+            transition: all 0.5s;
+        }
+
+        .footer-glyph:hover {
+            opacity: 0.5;
+            text-shadow: 0 0 100px rgba(155, 93, 229, 0.6);
+        }
+
+        .footer-text {
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            letter-spacing: 0.2em;
+            color: var(--text-whisper);
+            line-height: 2;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 3rem;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .footer-links a {
+            font-size: 0.65rem;
+            font-weight: 500;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-whisper);
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .footer-links a:hover { color: var(--training-violet); }
+
+        /* ═══════════════════════════════════════
+           ANIMATIONS
+           ═══════════════════════════════════════ */
+        .reveal {
+            opacity: 0;
+            transform: translateY(50px);
+            transition: opacity 1s var(--ease-out-expo), transform 1s var(--ease-out-expo);
+        }
+
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ═══════════════════════════════════════
+           RESPONSIVE
+           ═══════════════════════════════════════ */
+        @media (max-width: 1100px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .arch-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 768px) {
+            .nav { padding: 1rem 1.5rem; }
+            .nav-links { display: none; }
+            section { padding: 6rem 1.5rem; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .arch-grid { grid-template-columns: 1fr; }
+            .journey-phase { flex-direction: column !important; }
+        }
+    </style>
 </head>
 <body>
-<div class="container">
-<h1>認知</h1>
-<div class="subtitle">Training Progress · December 21, 2025</div>
+    <!-- Custom Cursor -->
+    <div class="cursor"></div>
+    <div class="cursor-dot"></div>
 
-<div class="card">
-<h2 style="margin-bottom: 24px; font-size: 18px; color: #d4a853;">Current Status</h2>
-<div class="metric"><span class="label">Training Step</span><span class="value">483 / 1000</span></div>
-<div class="metric"><span class="label">Loss (total)</span><span class="value">0.645</span></div>
-<div class="metric"><span class="label">Loss (recon)</span><span class="value">~0.001</span></div>
-<div class="metric"><span class="label">Loss (KL)</span><span class="success">64.0 (healthy)</span></div>
-<div class="metric"><span class="label">Learning Rate</span><span class="value">0.0001</span></div>
-<div class="metric"><span class="label">Phase</span><span class="value">1 (Hierarchy)</span></div>
-</div>
+    <!-- Background -->
+    <div class="constellation-bg">
+        <canvas class="constellation-canvas" id="bgCanvas"></canvas>
+    </div>
 
-<div class="card">
-<h2 style="margin-bottom: 16px; font-size: 18px; color: #d4a853;">Key Findings</h2>
-<p style="margin-bottom: 12px;">✅ <strong>KL Divergence Restored:</strong> Was 0 (posterior collapse), now 64.0 (healthy). Model using latent variables properly.</p>
-<p style="margin-bottom: 12px;">✅ <strong>Loss Decreasing:</strong> 2.2 → 0.645 (71% reduction). Proper RSSM training curve.</p>
-<p style="margin-bottom: 12px;">✅ <strong>Validation Active:</strong> Train/val split working. Gap = 190% (expected, val uses harder puzzles).</p>
-<p>⚠️ <strong>Gradient Monitoring:</strong> Some parameters showing small gradients. Continue monitoring.</p>
-</div>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-logo">認知</div>
+        <div class="nav-links">
+            <a href="genesis-constellation.html">Genesis Constellation</a>
+            <a href="collapse/index.html">Symmetry of Collapse</a>
+            <a href="../">kagamiOS</a>
+        </div>
+    </nav>
 
-<div class="card">
-<h2 style="margin-bottom: 16px; font-size: 18px; color: #d4a853;">Architecture</h2>
-<p style="margin-bottom: 12px;"><strong>Model:</strong> KagamiWorldModel (1.61M parameters)</p>
-<p style="margin-bottom: 12px;"><strong>Structure:</strong> E8→E7→E6→F4→G2→S⁷ exceptional hierarchy</p>
-<p style="margin-bottom: 12px;"><strong>Dynamics:</strong> 7-colony OrganismRSSM with Fano coupling</p>
-<p><strong>Training:</strong> Joint RSSM+EFE with 5-phase Fano curriculum</p>
-</div>
+    <!-- Hero -->
+    <section class="hero">
+        <div class="hero-kanji" id="heroKanji">認知</div>
+        <h1 class="hero-title">Cognitive Training Audit</h1>
+        <p class="hero-subtitle">Step 999 · December 21, 2025 · 03:07 UTC</p>
+        <div class="scroll-indicator">
+            <span>Explore the journey</span>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M12 5v14M19 12l-7 7-7-7"/>
+            </svg>
+        </div>
+    </section>
 
-<div class="footer">
-<p style="margin-bottom: 12px;"><a href="../genesis-constellation.html">創世 — The Genesis Constellation</a> · <a href="index.html">The Symmetry of Collapse</a></p>
-<p>KagamiOS · Demos not memos</p>
-</div>
-</div>
+    <main>
+        <!-- Stats Overview -->
+        <section class="reveal">
+            <div class="section-header">
+                <div class="section-number">00 / OVERVIEW</div>
+                <h2 class="section-title">Training Snapshot</h2>
+                <p class="section-subtitle">
+                    Checkpoint 999 captured mid-training. The world model is learning.
+                </p>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card" style="--stat-color: var(--training-violet);">
+                    <div class="stat-value">999</div>
+                    <div class="stat-label">Training Steps</div>
+                </div>
+                <div class="stat-card" style="--stat-color: var(--e8-gold);">
+                    <div class="stat-value">240</div>
+                    <div class="stat-label">E8 Roots</div>
+                </div>
+                <div class="stat-card" style="--stat-color: var(--world-model);">
+                    <div class="stat-value">1.61M</div>
+                    <div class="stat-label">Parameters</div>
+                </div>
+                <div class="stat-card" style="--stat-color: var(--g2-green);">
+                    <div class="stat-value">14</div>
+                    <div class="stat-label">G2 Dimensions</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Training Journey -->
+        <section class="journey-section reveal">
+            <div class="section-header">
+                <div class="section-number">01 / JOURNEY</div>
+                <h2 class="section-title">The Exceptional Hierarchy</h2>
+                <p class="section-subtitle">
+                    From bulk features through E8 lattice down to S⁷ parallelizable sphere.
+                </p>
+            </div>
+
+            <div class="journey-timeline">
+                <div class="timeline-track"></div>
+
+                <!-- Phase 1: Bulk → E8 -->
+                <div class="journey-phase" style="--phase-color: var(--training-violet);">
+                    <div class="phase-content">
+                        <div class="phase-step">STEP 1</div>
+                        <h3 class="phase-title">Bulk → E8 Lattice</h3>
+                        <p class="phase-desc">
+                            Input features (bulk_dim=512) are projected into E8 lattice space (240 dimensions).
+                            The E8 lattice provides optimal sphere packing in 8D, discovered by Viazovska (2017, Fields Medal).
+                        </p>
+                    </div>
+                    <div class="phase-node">🌌</div>
+                    <div class="phase-content"></div>
+                </div>
+
+                <!-- Phase 2: E8 → E7 -->
+                <div class="journey-phase" style="--phase-color: var(--e8-gold);">
+                    <div class="phase-content"></div>
+                    <div class="phase-node">🔷</div>
+                    <div class="phase-content">
+                        <div class="phase-step">STEP 2</div>
+                        <h3 class="phase-title">E8 → E7 Projection</h3>
+                        <p class="phase-desc">
+                            E7 projection (133 dimensions) using learned orthogonal transformation.
+                            Preserves exceptional algebra structure while reducing dimensionality.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Phase 3: E7 → E6 -->
+                <div class="journey-phase" style="--phase-color: var(--world-model);">
+                    <div class="phase-content">
+                        <div class="phase-step">STEP 3</div>
+                        <h3 class="phase-title">E7 → E6 Contraction</h3>
+                        <p class="phase-desc">
+                            E6 (78 dimensions) hosts the Jordan algebra of 3×3 Hermitian octonionic matrices.
+                            Critical for preserving compositional structure.
+                        </p>
+                    </div>
+                    <div class="phase-node">💎</div>
+                    <div class="phase-content"></div>
+                </div>
+
+                <!-- Phase 4: E6 → F4 -->
+                <div class="journey-phase" style="--phase-color: var(--g2-green);">
+                    <div class="phase-content"></div>
+                    <div class="phase-node">🌿</div>
+                    <div class="phase-content">
+                        <div class="phase-step">STEP 4</div>
+                        <h3 class="phase-title">E6 → F4 Descent</h3>
+                        <p class="phase-desc">
+                            F4 (52 dimensions) is the automorphism group of the exceptional Jordan algebra.
+                            Learned projection with small perturbations from canonical embedding.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Phase 5: F4 → G2 -->
+                <div class="journey-phase" style="--phase-color: var(--s7-cyan);">
+                    <div class="phase-content">
+                        <div class="phase-step">STEP 5</div>
+                        <h3 class="phase-title">F4 → G2 Tower</h3>
+                        <p class="phase-desc">
+                            G2 (14 dimensions) is the automorphism group of the octonions.
+                            This is where non-associative algebra structure emerges.
+                        </p>
+                    </div>
+                    <div class="phase-node">⚛️</div>
+                    <div class="phase-content"></div>
+                </div>
+
+                <!-- Phase 6: G2 → S7 -->
+                <div class="journey-phase" style="--phase-color: var(--convergence-green);">
+                    <div class="phase-content"></div>
+                    <div class="phase-node">🌀</div>
+                    <div class="phase-content">
+                        <div class="phase-step">STEP 6</div>
+                        <h3 class="phase-title">G2 → S⁷ Parallelizable Sphere</h3>
+                        <p class="phase-desc">
+                            Final projection to S⁷ (7 dimensions), the only parallelizable sphere after S¹ and S³.
+                            Hosts unit octonions—optimal for compositional representations.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Phase 7: S7 → Tower -->
+                <div class="journey-phase" style="--phase-color: var(--training-violet);">
+                    <div class="phase-content">
+                        <div class="phase-step">STEP 7</div>
+                        <h3 class="phase-title">S⁷ → Tower (CatastropheKAN)</h3>
+                        <p class="phase-desc">
+                            7 catastrophe types mapped to learnable B-spline control points.
+                            Each colony (Spark, Forge, Flow, Nexus, Beacon, Grove, Crystal) has dedicated parameters.
+                            Tower output: 28 dimensions.
+                        </p>
+                    </div>
+                    <div class="phase-node">🏛️</div>
+                    <div class="phase-content"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Architecture -->
+        <section class="architecture-section reveal">
+            <div class="section-header">
+                <div class="section-number">02 / ARCHITECTURE</div>
+                <h2 class="section-title">Learned Representations</h2>
+                <p class="section-subtitle">
+                    What the checkpoint reveals about internal structure at step 999.
+                </p>
+            </div>
+
+            <div class="arch-grid">
+                <!-- μ_self (Self-location) -->
+                <div class="arch-layer" style="--layer-color: var(--training-violet);">
+                    <div class="layer-icon">📍</div>
+                    <h3 class="layer-name">μ_self</h3>
+                    <div class="layer-dim">7D · S⁷ position</div>
+                    <p class="layer-desc">
+                        Self-location in latent space: [0.08, 0.26, -0.06, -0.29, 0.04, 0.14, 0.26].
+                        Encodes "where I am" in the world model's representational space.
+                    </p>
+                </div>
+
+                <!-- E8 → E7 Projection -->
+                <div class="arch-layer" style="--layer-color: var(--e8-gold);">
+                    <div class="layer-icon">🔺</div>
+                    <h3 class="layer-name">E8 → E7</h3>
+                    <div class="layer-dim">240 → 133</div>
+                    <p class="layer-desc">
+                        Nearly canonical projection (−√2/2, √2/2 pattern).
+                        Preserves the root system structure of E8 → E7 Dynkin diagram folding.
+                    </p>
+                </div>
+
+                <!-- E7 → E6 Projection -->
+                <div class="arch-layer" style="--layer-color: var(--world-model);">
+                    <div class="layer-icon">🔻</div>
+                    <h3 class="layer-name">E7 → E6</h3>
+                    <div class="layer-dim">133 → 78</div>
+                    <p class="layer-desc">
+                        Identity-dominated transformation.
+                        Minimal learned deviation from mathematical canonical projection.
+                    </p>
+                </div>
+
+                <!-- E6 → F4 Projection -->
+                <div class="arch-layer" style="--layer-color: var(--g2-green);">
+                    <div class="layer-icon">🌱</div>
+                    <h3 class="layer-name">E6 → F4</h3>
+                    <div class="layer-dim">78 → 52</div>
+                    <p class="layer-desc">
+                        First learned perturbations appear. Small non-zero off-diagonal elements
+                        suggest data-driven adjustment to canonical structure.
+                    </p>
+                </div>
+
+                <!-- F4 → G2 Projection -->
+                <div class="arch-layer" style="--layer-color: var(--s7-cyan);">
+                    <div class="layer-icon">⚡</div>
+                    <h3 class="layer-name">F4 → G2</h3>
+                    <div class="layer-dim">52 → 14</div>
+                    <p class="layer-desc">
+                        Sparsest projection. Most entries zero (−√2/2 or ±1 where active).
+                        Reflects the constraint that G2 sits inside F4 as automorphisms of octonions.
+                    </p>
+                </div>
+
+                <!-- G2 → S7 Projection -->
+                <div class="arch-layer" style="--layer-color: var(--convergence-green);">
+                    <div class="layer-icon">🎯</div>
+                    <h3 class="layer-name">G2 → S⁷</h3>
+                    <div class="layer-dim">14 → 7</div>
+                    <p class="layer-desc">
+                        Dense learned projection with no canonical template.
+                        Values range [-0.47, +0.46], suggesting full expressivity.
+                    </p>
+                </div>
+
+                <!-- S7 → Tower (CatastropheKAN) -->
+                <div class="arch-layer" style="--layer-color: var(--training-violet);">
+                    <div class="layer-icon">🏔️</div>
+                    <h3 class="layer-name">S⁷ → Tower</h3>
+                    <div class="layer-dim">7 → 28</div>
+                    <p class="layer-desc">
+                        CatastropheKAN layer: 7 control parameters (range [-0.08, +0.09]) modulate
+                        catastrophe bifurcations. Residual gate: 0.098 (10% passthrough).
+                    </p>
+                </div>
+
+                <!-- Tower → E8 VQ -->
+                <div class="arch-layer" style="--layer-color: var(--e8-gold);">
+                    <div class="layer-icon">📊</div>
+                    <h3 class="layer-name">Tower → E8 VQ</h3>
+                    <div class="layer-dim">28 → 240</div>
+                    <p class="layer-desc">
+                        Vector quantization back to E8 lattice for discrete codebook.
+                        Enables discrete latent representations with continuous gradients.
+                    </p>
+                </div>
+
+                <!-- Bulk → E8 Initial -->
+                <div class="arch-layer" style="--layer-color: var(--world-model);">
+                    <div class="layer-icon">🌐</div>
+                    <h3 class="layer-name">Bulk → E8</h3>
+                    <div class="layer-dim">512 → 240</div>
+                    <p class="layer-desc">
+                        Entry projection: learned dense matrix (512×240).
+                        Followed by LayerNorm for stable gradients. All biases initialized to zero.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Key Insights -->
+        <section class="reveal">
+            <div class="section-header">
+                <div class="section-number">03 / INSIGHTS</div>
+                <h2 class="section-title">What We Learned</h2>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card" style="--stat-color: var(--convergence-green);">
+                    <div class="stat-value">✓</div>
+                    <div class="stat-label">Canonical Structure Preserved</div>
+                </div>
+                <div class="stat-card" style="--stat-color: var(--e8-gold);">
+                    <div class="stat-value">10%</div>
+                    <div class="stat-label">Residual Gate Open</div>
+                </div>
+                <div class="stat-card" style="--stat-color: var(--training-violet);">
+                    <div class="stat-value">7</div>
+                    <div class="stat-label">Active Catastrophes</div>
+                </div>
+                <div class="stat-card" style="--stat-color: var(--world-model);">
+                    <div class="stat-value">0</div>
+                    <div class="stat-label">Gradient Explosions</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-glyph">認知</div>
+        <p class="footer-text">
+            December 2025 · kagamiOS<br>
+            Forge Colony · Training Audit
+        </p>
+        <div class="footer-links">
+            <a href="genesis-constellation.html">Genesis Constellation</a>
+            <a href="collapse/index.html">Symmetry of Collapse</a>
+            <a href="../">Back to kagamiOS</a>
+        </div>
+    </footer>
+
+    <script>
+        // ═══════════════════════════════════════
+        // CUSTOM CURSOR
+        // ═══════════════════════════════════════
+        const cursor = document.querySelector('.cursor');
+        const cursorDot = document.querySelector('.cursor-dot');
+
+        let mouseX = 0, mouseY = 0;
+        let cursorX = 0, cursorY = 0;
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            cursorDot.style.left = mouseX - 2.5 + 'px';
+            cursorDot.style.top = mouseY - 2.5 + 'px';
+        });
+
+        function animateCursor() {
+            cursorX += (mouseX - cursorX) * 0.12;
+            cursorY += (mouseY - cursorY) * 0.12;
+            cursor.style.left = cursorX - 14 + 'px';
+            cursor.style.top = cursorY - 14 + 'px';
+            requestAnimationFrame(animateCursor);
+        }
+        animateCursor();
+
+        document.querySelectorAll('a, .stat-card, .arch-layer, .journey-phase').forEach(el => {
+            el.addEventListener('mouseenter', () => cursor.classList.add('hover'));
+            el.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+        });
+
+        // ═══════════════════════════════════════
+        // BACKGROUND STARS
+        // ═══════════════════════════════════════
+        const bgCanvas = document.getElementById('bgCanvas');
+        const bgCtx = bgCanvas.getContext('2d');
+
+        function resizeBgCanvas() {
+            bgCanvas.width = window.innerWidth;
+            bgCanvas.height = window.innerHeight;
+        }
+        resizeBgCanvas();
+        window.addEventListener('resize', resizeBgCanvas);
+
+        const stars = [];
+        for (let i = 0; i < 150; i++) {
+            stars.push({
+                x: Math.random() * window.innerWidth,
+                y: Math.random() * window.innerHeight,
+                size: Math.random() * 1.5 + 0.5,
+                opacity: Math.random() * 0.4 + 0.1,
+                speed: Math.random() * 0.015 + 0.005,
+                phase: Math.random() * Math.PI * 2
+            });
+        }
+
+        function drawBg(time) {
+            bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+            stars.forEach(star => {
+                const twinkle = Math.sin(time * star.speed + star.phase) * 0.3 + 0.7;
+                bgCtx.beginPath();
+                bgCtx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                bgCtx.fillStyle = `rgba(155, 93, 229, ${star.opacity * twinkle * 0.6})`;
+                bgCtx.fill();
+            });
+            requestAnimationFrame(drawBg);
+        }
+        drawBg(0);
+
+        // ═══════════════════════════════════════
+        // SCROLL REVEAL
+        // ═══════════════════════════════════════
+        const revealElements = document.querySelectorAll('.reveal');
+
+        function checkReveal() {
+            revealElements.forEach(el => {
+                const top = el.getBoundingClientRect().top;
+                if (top < window.innerHeight * 0.85) {
+                    el.classList.add('visible');
+                }
+            });
+        }
+
+        window.addEventListener('scroll', checkReveal);
+        checkReveal();
+
+        // ═══════════════════════════════════════
+        // HERO PARALLAX
+        // ═══════════════════════════════════════
+        const heroKanji = document.getElementById('heroKanji');
+
+        window.addEventListener('scroll', () => {
+            const scrollY = window.scrollY;
+            const opacity = Math.max(0, 0.2 - scrollY / 800);
+            const scale = Math.max(0.7, 1 - scrollY / 1500);
+            const translateY = scrollY * 0.3;
+
+            heroKanji.style.opacity = opacity;
+            heroKanji.style.transform = `scale(${scale}) translateY(${translateY}px)`;
+        });
+    </script>
 </body>
 </html>
