@@ -9,89 +9,103 @@
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
 
-        // Network energy effect - cursor as energy source
-        const energyOrigin = document.getElementById('energyOrigin');
+
+        // Quiet cursor effects - particles on gridlines, not vertices
         const gridIntersections = document.getElementById('gridIntersections');
-        let lastPulseTime = 0;
-        const GRID_SIZE = 100; // 100px grid
+        let lastParticleTime = 0;
+        const GRID_SIZE = 100;
+        const PARTICLE_THROTTLE = 80; // ms between particles
+
+        // Determine alert state from current loss
+        function updateAlertState() {
+            // This would be updated by auto-updater with real loss data
+            const currentLoss = 11.11; // Will be replaced by updater
+            const body = document.body;
+
+            if (currentLoss < 5) {
+                body.setAttribute('data-alert', 'success');
+            } else if (currentLoss < 15) {
+                body.setAttribute('data-alert', 'normal');
+            } else if (currentLoss < 30) {
+                body.setAttribute('data-alert', 'warning');
+            } else {
+                body.setAttribute('data-alert', 'critical');
+            }
+        }
+
+        updateAlertState();
+        setInterval(updateAlertState, 10000); // Update alert state every 10s
 
         document.addEventListener('mousemove', (e) => {
             const x = e.clientX;
             const y = e.clientY;
 
-            // Position energy origin
-            energyOrigin.style.left = (x - 4) + 'px';
-            energyOrigin.style.top = (y - 4) + 'px';
-
-            // Mark cursor as active
-            document.body.classList.add('cursor-active');
-
-            // Pulse grid nodes near cursor (throttled)
             const now = Date.now();
-            if (now - lastPulseTime > 150) {
-                createGridPulse(x, y);
-                lastPulseTime = now;
+            if (now - lastParticleTime < PARTICLE_THROTTLE) return;
+            lastParticleTime = now;
+
+            // Snap to nearest gridlines (not vertices)
+            const gridX = Math.round(x / GRID_SIZE) * GRID_SIZE;
+            const gridY = Math.round(y / GRID_SIZE) * GRID_SIZE;
+
+            // Decide: particle on horizontal or vertical line
+            const distToVertical = Math.abs(x - gridX);
+            const distToHorizontal = Math.abs(y - gridY);
+
+            if (distToVertical < distToHorizontal) {
+                // Closer to vertical line - place particle there
+                createLineParticle(gridX, y, 'vertical');
+                createLineGlow(gridX, y, 'vertical');
+            } else {
+                // Closer to horizontal line
+                createLineParticle(x, gridY, 'horizontal');
+                createLineGlow(x, gridY, 'horizontal');
             }
         });
 
-        // Remove active state after 300ms of no movement
-        let cursorTimeout;
-        document.addEventListener('mousemove', () => {
-            clearTimeout(cursorTimeout);
-            cursorTimeout = setTimeout(() => {
-                document.body.classList.remove('cursor-active');
-            }, 300);
-        });
+        function createLineParticle(x, y, orientation) {
+            const particle = document.createElement('div');
+            particle.className = 'grid-particle';
 
-        function createGridPulse(mx, my) {
-            // Find nearest grid intersections
-            const gridX = Math.round(mx / GRID_SIZE) * GRID_SIZE;
-            const gridY = Math.round(my / GRID_SIZE) * GRID_SIZE;
+            // Choose color based on alert state
+            const alertState = document.body.getAttribute('data-alert') || 'normal';
+            const colors = {
+                'normal': 'rgba(212,168,83,0.8)',
+                'warning': 'rgba(255,165,2,0.8)',
+                'critical': 'rgba(255,71,87,0.8)',
+                'success': 'rgba(46,213,115,0.8)'
+            };
+            const color = colors[alertState];
 
-            // Create pulse at intersection
-            const node = document.createElement('div');
-            node.className = 'grid-node';
-            node.style.left = (gridX - 3) + 'px';
-            node.style.top = (gridY - 3) + 'px';
+            particle.style.setProperty('--particle-color', color);
+            particle.style.left = (x - 1) + 'px';
+            particle.style.top = (y - 1) + 'px';
 
-            // Randomize color (cyan, magenta, or gold)
-            const colors = [
-                'rgba(0,229,204,1)',
-                'rgba(255,0,255,1)',
-                'rgba(212,168,83,1)'
-            ];
-            const color = colors[Math.floor(Math.random() * colors.length)];
-            node.style.background = color;
-            node.style.boxShadow = `0 0 12px ${color}`;
-
-            gridIntersections.appendChild(node);
-
-            // Also pulse nearby intersections (spreading energy)
-            setTimeout(() => {
-                if (Math.random() > 0.5) createNeighborPulse(gridX + GRID_SIZE, gridY, color);
-                if (Math.random() > 0.5) createNeighborPulse(gridX - GRID_SIZE, gridY, color);
-                if (Math.random() > 0.5) createNeighborPulse(gridX, gridY + GRID_SIZE, color);
-                if (Math.random() > 0.5) createNeighborPulse(gridX, gridY - GRID_SIZE, color);
-            }, 200);
-
-            // Remove after animation
-            setTimeout(() => node.remove(), 1500);
+            gridIntersections.appendChild(particle);
+            setTimeout(() => particle.remove(), 800);
         }
 
-        function createNeighborPulse(x, y, color) {
-            if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return;
+        function createLineGlow(x, y, orientation) {
+            const glow = document.createElement('div');
+            glow.className = `line-glow ${orientation}`;
 
-            const node = document.createElement('div');
-            node.className = 'grid-node';
-            node.style.left = (x - 3) + 'px';
-            node.style.top = (y - 3) + 'px';
-            node.style.background = color;
-            node.style.boxShadow = `0 0 8px ${color}`;
-            node.style.animationDelay = '0.1s';
+            const alertState = document.body.getAttribute('data-alert') || 'normal';
+            const colors = {
+                'normal': 'rgba(212,168,83,0.3)',
+                'warning': 'rgba(255,165,2,0.3)',
+                'critical': 'rgba(255,71,87,0.3)',
+                'success': 'rgba(46,213,115,0.3)'
+            };
+            const color = colors[alertState];
 
-            gridIntersections.appendChild(node);
-            setTimeout(() => node.remove(), 1600);
+            glow.style.setProperty('--glow-color', color);
+            glow.style.left = (x - 100) + 'px';
+            glow.style.top = (y - 100) + 'px';
+
+            gridIntersections.appendChild(glow);
+            setTimeout(() => glow.remove(), 1200);
         }
+
 
 
     </script>
@@ -184,9 +198,8 @@
 
         /* Training pulse grid */
 
-        /* Prismatic training grid with cursor interaction */
 
-        /* Prismatic training grid with cursor interaction */
+        /* Base grid - always visible, very quiet */
         .training-grid {
             position: absolute;
             inset: 0;
@@ -194,107 +207,153 @@
                 repeating-linear-gradient(0deg,
                     transparent 0px,
                     transparent 99px,
-                    rgba(212,168,83,0.04) 99px,
-                    rgba(212,168,83,0.04) 100px),
+                    rgba(212,168,83,0.015) 99px,
+                    rgba(212,168,83,0.015) 100px),
                 repeating-linear-gradient(90deg,
                     transparent 0px,
                     transparent 99px,
-                    rgba(212,168,83,0.04) 99px,
-                    rgba(212,168,83,0.04) 100px);
+                    rgba(212,168,83,0.015) 99px,
+                    rgba(212,168,83,0.015) 100px);
         }
 
-        /* Energy propagation layers */
-        .energy-wave-1,
-        .energy-wave-2,
-        .energy-wave-3 {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
+        /* Alert state animations - controlled by data-alert attribute */
+        /* NORMAL: Calm, barely visible pulse */
+        [data-alert="normal"] .training-grid {
+            animation: calmPulse 8s ease-in-out infinite;
+        }
+
+        /* WARNING: Gentle breathing */
+        [data-alert="warning"] .training-grid {
             background-image:
                 repeating-linear-gradient(0deg,
                     transparent 0px,
                     transparent 99px,
-                    var(--wave-color) 99px,
-                    var(--wave-color) 100px),
+                    rgba(255,165,2,0.025) 99px,
+                    rgba(255,165,2,0.025) 100px),
                 repeating-linear-gradient(90deg,
                     transparent 0px,
                     transparent 99px,
-                    var(--wave-color) 99px,
-                    var(--wave-color) 100px);
+                    rgba(255,165,2,0.025) 99px,
+                    rgba(255,165,2,0.025) 100px);
+            animation: warnBreath 4s ease-in-out infinite;
+        }
+
+        /* CRITICAL: Urgent but not chaotic */
+        [data-alert="critical"] .training-grid {
+            background-image:
+                repeating-linear-gradient(0deg,
+                    transparent 0px,
+                    transparent 99px,
+                    rgba(255,71,87,0.04) 99px,
+                    rgba(255,71,87,0.04) 100px),
+                repeating-linear-gradient(90deg,
+                    transparent 0px,
+                    transparent 99px,
+                    rgba(255,71,87,0.04) 99px,
+                    rgba(255,71,87,0.04) 100px);
+            animation: criticalPulse 2s ease-in-out infinite;
+        }
+
+        /* SUCCESS: Gentle celebration */
+        [data-alert="success"] .training-grid {
+            background-image:
+                repeating-linear-gradient(0deg,
+                    transparent 0px,
+                    transparent 99px,
+                    rgba(46,213,115,0.025) 99px,
+                    rgba(46,213,115,0.025) 100px),
+                repeating-linear-gradient(90deg,
+                    transparent 0px,
+                    transparent 99px,
+                    rgba(46,213,115,0.025) 99px,
+                    rgba(46,213,115,0.025) 100px);
+            animation: successShimmer 6s ease-in-out infinite;
+        }
+
+        @keyframes calmPulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes warnBreath {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes criticalPulse {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes successShimmer {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 0.95; }
+        }
+
+        /* Remove old wave layers */
+        .energy-wave-1, .energy-wave-2, .energy-wave-3 { display: none; }
+
+        /* Quieter cursor trail - particles on gridlines */
+        .energy-origin {
+            display: none; /* Remove bright origin dot */
+        }
+
+        /* Gridline particle - appears on lines, not vertices */
+        .grid-particle {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: var(--particle-color);
+            border-radius: 50%;
+            pointer-events: none;
             opacity: 0;
-            transform: scale(1);
+            box-shadow: 0 0 4px var(--particle-color);
+            animation: particleFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
-        .energy-wave-1 {
-            --wave-color: rgba(0,229,204,0.6);
-            animation: energyPulse 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-        }
-
-        .energy-wave-2 {
-            --wave-color: rgba(255,0,255,0.5);
-            animation: energyPulse 2s cubic-bezier(0.16, 1, 0.3, 1) 0.3s infinite;
-        }
-
-        .energy-wave-3 {
-            --wave-color: rgba(212,168,83,0.4);
-            animation: energyPulse 2s cubic-bezier(0.16, 1, 0.3, 1) 0.6s infinite;
-        }
-
-        @keyframes energyPulse {
+        @keyframes particleFade {
             0% {
-                opacity: 0;
-                transform: scale(0.95);
-            }
-            30% {
-                opacity: 1;
+                opacity: 0.8;
+                transform: scale(1);
             }
             100% {
                 opacity: 0;
-                transform: scale(1.2);
+                transform: scale(0.3);
             }
         }
 
-        /* Cursor hotspot - where energy originates */
-        .energy-origin {
-            position: fixed;
-            width: 8px;
-            height: 8px;
-            background: radial-gradient(circle,
-                rgba(212,168,83,1) 0%,
-                rgba(0,229,204,0.8) 40%,
-                transparent 70%);
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 1;
-            filter: blur(2px);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        /* Grid intersection pulse at cursor */
-        .grid-intersections {
+        /* Line glow effect - subtle brightening of gridline near cursor */
+        .line-glow {
             position: absolute;
-            inset: 0;
+            background: linear-gradient(90deg,
+                transparent,
+                var(--glow-color) 50%,
+                transparent);
+            height: 1px;
+            width: 200px;
             pointer-events: none;
-            overflow: hidden;
-        }
-
-        .grid-node {
-            position: absolute;
-            width: 6px;
-            height: 6px;
-            background: var(--gold);
-            border-radius: 50%;
             opacity: 0;
-            box-shadow: 0 0 12px var(--gold);
-            animation: nodePulse 1.5s ease-out forwards;
+            animation: lineGlowFade 1.2s ease-out forwards;
         }
 
-        @keyframes nodePulse {
+        .line-glow.vertical {
+            width: 1px;
+            height: 200px;
+            background: linear-gradient(180deg,
+                transparent,
+                var(--glow-color) 50%,
+                transparent);
+        }
+
+        @keyframes lineGlowFade {
             0% {
-                opacity: 0;
-                transform: scale(0);
+                opacity: 0.6;
             }
+            100% {
+                opacity: 0;
+            }
+        }
+
             50% {
                 opacity: 1;
                 transform: scale(1.5);
@@ -1736,89 +1795,103 @@ Step    410: loss=<span class="info">12.79</span>   <span class="dim">← Curren
         });
 
 
-        // Network energy effect - cursor as energy source
-        const energyOrigin = document.getElementById('energyOrigin');
+
+        // Quiet cursor effects - particles on gridlines, not vertices
         const gridIntersections = document.getElementById('gridIntersections');
-        let lastPulseTime = 0;
-        const GRID_SIZE = 100; // 100px grid
+        let lastParticleTime = 0;
+        const GRID_SIZE = 100;
+        const PARTICLE_THROTTLE = 80; // ms between particles
+
+        // Determine alert state from current loss
+        function updateAlertState() {
+            // This would be updated by auto-updater with real loss data
+            const currentLoss = 11.11; // Will be replaced by updater
+            const body = document.body;
+
+            if (currentLoss < 5) {
+                body.setAttribute('data-alert', 'success');
+            } else if (currentLoss < 15) {
+                body.setAttribute('data-alert', 'normal');
+            } else if (currentLoss < 30) {
+                body.setAttribute('data-alert', 'warning');
+            } else {
+                body.setAttribute('data-alert', 'critical');
+            }
+        }
+
+        updateAlertState();
+        setInterval(updateAlertState, 10000); // Update alert state every 10s
 
         document.addEventListener('mousemove', (e) => {
             const x = e.clientX;
             const y = e.clientY;
 
-            // Position energy origin
-            energyOrigin.style.left = (x - 4) + 'px';
-            energyOrigin.style.top = (y - 4) + 'px';
-
-            // Mark cursor as active
-            document.body.classList.add('cursor-active');
-
-            // Pulse grid nodes near cursor (throttled)
             const now = Date.now();
-            if (now - lastPulseTime > 150) {
-                createGridPulse(x, y);
-                lastPulseTime = now;
+            if (now - lastParticleTime < PARTICLE_THROTTLE) return;
+            lastParticleTime = now;
+
+            // Snap to nearest gridlines (not vertices)
+            const gridX = Math.round(x / GRID_SIZE) * GRID_SIZE;
+            const gridY = Math.round(y / GRID_SIZE) * GRID_SIZE;
+
+            // Decide: particle on horizontal or vertical line
+            const distToVertical = Math.abs(x - gridX);
+            const distToHorizontal = Math.abs(y - gridY);
+
+            if (distToVertical < distToHorizontal) {
+                // Closer to vertical line - place particle there
+                createLineParticle(gridX, y, 'vertical');
+                createLineGlow(gridX, y, 'vertical');
+            } else {
+                // Closer to horizontal line
+                createLineParticle(x, gridY, 'horizontal');
+                createLineGlow(x, gridY, 'horizontal');
             }
         });
 
-        // Remove active state after 300ms of no movement
-        let cursorTimeout;
-        document.addEventListener('mousemove', () => {
-            clearTimeout(cursorTimeout);
-            cursorTimeout = setTimeout(() => {
-                document.body.classList.remove('cursor-active');
-            }, 300);
-        });
+        function createLineParticle(x, y, orientation) {
+            const particle = document.createElement('div');
+            particle.className = 'grid-particle';
 
-        function createGridPulse(mx, my) {
-            // Find nearest grid intersections
-            const gridX = Math.round(mx / GRID_SIZE) * GRID_SIZE;
-            const gridY = Math.round(my / GRID_SIZE) * GRID_SIZE;
+            // Choose color based on alert state
+            const alertState = document.body.getAttribute('data-alert') || 'normal';
+            const colors = {
+                'normal': 'rgba(212,168,83,0.8)',
+                'warning': 'rgba(255,165,2,0.8)',
+                'critical': 'rgba(255,71,87,0.8)',
+                'success': 'rgba(46,213,115,0.8)'
+            };
+            const color = colors[alertState];
 
-            // Create pulse at intersection
-            const node = document.createElement('div');
-            node.className = 'grid-node';
-            node.style.left = (gridX - 3) + 'px';
-            node.style.top = (gridY - 3) + 'px';
+            particle.style.setProperty('--particle-color', color);
+            particle.style.left = (x - 1) + 'px';
+            particle.style.top = (y - 1) + 'px';
 
-            // Randomize color (cyan, magenta, or gold)
-            const colors = [
-                'rgba(0,229,204,1)',
-                'rgba(255,0,255,1)',
-                'rgba(212,168,83,1)'
-            ];
-            const color = colors[Math.floor(Math.random() * colors.length)];
-            node.style.background = color;
-            node.style.boxShadow = `0 0 12px ${color}`;
-
-            gridIntersections.appendChild(node);
-
-            // Also pulse nearby intersections (spreading energy)
-            setTimeout(() => {
-                if (Math.random() > 0.5) createNeighborPulse(gridX + GRID_SIZE, gridY, color);
-                if (Math.random() > 0.5) createNeighborPulse(gridX - GRID_SIZE, gridY, color);
-                if (Math.random() > 0.5) createNeighborPulse(gridX, gridY + GRID_SIZE, color);
-                if (Math.random() > 0.5) createNeighborPulse(gridX, gridY - GRID_SIZE, color);
-            }, 200);
-
-            // Remove after animation
-            setTimeout(() => node.remove(), 1500);
+            gridIntersections.appendChild(particle);
+            setTimeout(() => particle.remove(), 800);
         }
 
-        function createNeighborPulse(x, y, color) {
-            if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return;
+        function createLineGlow(x, y, orientation) {
+            const glow = document.createElement('div');
+            glow.className = `line-glow ${orientation}`;
 
-            const node = document.createElement('div');
-            node.className = 'grid-node';
-            node.style.left = (x - 3) + 'px';
-            node.style.top = (y - 3) + 'px';
-            node.style.background = color;
-            node.style.boxShadow = `0 0 8px ${color}`;
-            node.style.animationDelay = '0.1s';
+            const alertState = document.body.getAttribute('data-alert') || 'normal';
+            const colors = {
+                'normal': 'rgba(212,168,83,0.3)',
+                'warning': 'rgba(255,165,2,0.3)',
+                'critical': 'rgba(255,71,87,0.3)',
+                'success': 'rgba(46,213,115,0.3)'
+            };
+            const color = colors[alertState];
 
-            gridIntersections.appendChild(node);
-            setTimeout(() => node.remove(), 1600);
+            glow.style.setProperty('--glow-color', color);
+            glow.style.left = (x - 100) + 'px';
+            glow.style.top = (y - 100) + 'px';
+
+            gridIntersections.appendChild(glow);
+            setTimeout(() => glow.remove(), 1200);
         }
+
 
 
     </script>
