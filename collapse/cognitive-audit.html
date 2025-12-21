@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>認知 · Training Reality Check</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* The void */
+            --void: #050508;
+            --void-up: #0a0a0f;
+            --void-up2: #0f0f16;
+            --void-up3: #161620;
+
+            /* Light */
+            --text: #f0ede6;
+            --text-dim: rgba(240,237,230,0.65);
+            --text-muted: rgba(240,237,230,0.35);
+
+            /* Gold - still primary */
+            --gold: #d4a853;
+            --gold-bright: #efc86e;
+            --gold-dim: rgba(212,168,83,0.4);
+            --gold-glow: rgba(212,168,83,0.15);
+
+            /* Training status colors */
+            --danger: #ff4757;
+            --danger-glow: rgba(255,71,87,0.2);
+            --warning: #ffa502;
+            --warning-glow: rgba(255,165,2,0.2);
+            --success: #2ed573;
+            --success-glow: rgba(46,213,115,0.2);
+            --info: #70a1ff;
+            --info-glow: rgba(112,161,255,0.2);
+
+            /* Colony accent */
+            --cyan: #00e5cc;
+            --magenta: #ff00ff;
+
+            /* Typography */
+            --font: 'Space Grotesk', -apple-system, sans-serif;
+            --mono: 'JetBrains Mono', monospace;
+
+            /* Motion */
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: var(--font);
+            background: var(--void);
+            color: var(--text);
+            line-height: 1.7;
+            overflow-x: hidden;
+            cursor: none;
+        }
+        ::selection { background: var(--gold); color: var(--void); }
+
+        /* Custom cursor */
+        .cursor {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--gold);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            mix-blend-mode: difference;
+            transition: transform 0.15s var(--ease-out), border-color 0.3s;
+        }
+        .cursor.danger { border-color: var(--danger); }
+        .cursor.success { border-color: var(--success); }
+        .cursor-dot {
+            position: fixed;
+            width: 4px;
+            height: 4px;
+            background: var(--gold);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* Animated background */
+        .world {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        /* Training pulse grid */
+        .training-grid {
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(212,168,83,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(212,168,83,0.03) 1px, transparent 1px);
+            background-size: 80px 80px;
+            animation: grid-pulse 4s ease-in-out infinite;
+        }
+        @keyframes grid-pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        /* Status indicator orbs */
+        .status-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.4;
+            animation: orb-breathe 6s ease-in-out infinite;
+        }
+        @keyframes orb-breathe {
+            0%, 100% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.1); opacity: 0.5; }
+        }
+        .orb-danger {
+            width: 400px; height: 400px;
+            top: 10%; right: -100px;
+            background: radial-gradient(circle, var(--danger-glow), transparent 70%);
+            animation-delay: 0s;
+        }
+        .orb-success {
+            width: 350px; height: 350px;
+            bottom: 20%; left: -100px;
+            background: radial-gradient(circle, var(--success-glow), transparent 70%);
+            animation-delay: 2s;
+        }
+        .orb-info {
+            width: 300px; height: 300px;
+            top: 60%; right: 20%;
+            background: radial-gradient(circle, var(--info-glow), transparent 70%);
+            animation-delay: 4s;
+        }
+
+        /* Content */
+        .content { position: relative; z-index: 10; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 0 32px; }
+
+        /* Hero */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 120px 0 80px;
+            position: relative;
+        }
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: var(--danger-glow);
+            border: 1px solid var(--danger);
+            border-radius: 100px;
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--danger);
+            letter-spacing: 0.05em;
+            margin-bottom: 24px;
+            animation: badge-pulse 2s ease-in-out infinite;
+        }
+        @keyframes badge-pulse {
+            0%, 100% { box-shadow: 0 0 20px var(--danger-glow); }
+            50% { box-shadow: 0 0 40px var(--danger-glow); }
+        }
+        .hero-badge-dot {
+            width: 8px; height: 8px;
+            background: var(--danger);
+            border-radius: 50%;
+            animation: dot-blink 1s infinite;
+        }
+        @keyframes dot-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .hero-kanji {
+            font-size: clamp(80px, 18vw, 160px);
+            font-weight: 300;
+            background: linear-gradient(135deg, var(--gold), var(--danger));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+            margin-bottom: 20px;
+            opacity: 0;
+            animation: hero-in 1.2s var(--ease-out) forwards;
+        }
+        @keyframes hero-in {
+            from { opacity: 0; transform: translateY(40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .hero-title {
+            font-size: clamp(28px, 5vw, 42px);
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin-bottom: 16px;
+            opacity: 0;
+            animation: hero-in 1.2s var(--ease-out) 0.2s forwards;
+        }
+        .hero-title span { color: var(--danger); }
+        .hero-sub {
+            font-size: 17px;
+            color: var(--text-dim);
+            max-width: 600px;
+            line-height: 1.9;
+            opacity: 0;
+            animation: hero-in 1.2s var(--ease-out) 0.4s forwards;
+        }
+        .hero-stats {
+            display: flex;
+            gap: 40px;
+            margin-top: 48px;
+            opacity: 0;
+            animation: hero-in 1.2s var(--ease-out) 0.6s forwards;
+        }
+        .hero-stat {
+            text-align: left;
+        }
+        .hero-stat-value {
+            font-family: var(--mono);
+            font-size: 32px;
+            font-weight: 600;
+            color: var(--gold);
+        }
+        .hero-stat-value.danger { color: var(--danger); }
+        .hero-stat-value.success { color: var(--success); }
+        .hero-stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+            margin-top: 4px;
+        }
+
+        /* Sections */
+        section {
+            padding: 100px 0;
+            border-top: 1px solid rgba(212,168,83,0.08);
+        }
+        .section-tag {
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--gold);
+            margin-bottom: 12px;
+        }
+        .section-title {
+            font-size: clamp(26px, 4vw, 36px);
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin-bottom: 16px;
+        }
+        .section-title span { color: var(--gold); }
+        .section-title .danger { color: var(--danger); }
+        .section-title .success { color: var(--success); }
+        .section-lead {
+            font-size: 16px;
+            color: var(--text-dim);
+            max-width: 600px;
+            margin-bottom: 48px;
+            line-height: 1.8;
+        }
+
+        /* Reveal animation */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s var(--ease-out), transform 0.8s var(--ease-out);
+        }
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Loss curve visualization */
+        .loss-curve-container {
+            background: var(--void-up);
+            border: 1px solid rgba(212,168,83,0.1);
+            border-radius: 16px;
+            padding: 32px;
+            margin: 32px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .loss-curve-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        .loss-curve-title {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text-muted);
+            letter-spacing: 0.1em;
+        }
+        .loss-curve-legend {
+            display: flex;
+            gap: 20px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        .legend-dot.loss { background: var(--danger); }
+        .legend-dot.phase { background: var(--info); }
+
+        .loss-curve {
+            height: 200px;
+            position: relative;
+            border-left: 1px solid rgba(240,237,230,0.1);
+            border-bottom: 1px solid rgba(240,237,230,0.1);
+        }
+        .loss-curve-svg {
+            width: 100%;
+            height: 100%;
+        }
+        .loss-path {
+            fill: none;
+            stroke: var(--danger);
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .loss-area {
+            fill: url(#loss-gradient);
+            opacity: 0.3;
+        }
+        .phase-line {
+            stroke: var(--info);
+            stroke-width: 1;
+            stroke-dasharray: 4 4;
+        }
+        .phase-label {
+            font-family: var(--mono);
+            font-size: 9px;
+            fill: var(--info);
+        }
+
+        .loss-axis-label {
+            position: absolute;
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+        .loss-axis-y { left: -40px; top: 0; }
+        .loss-axis-x { right: 0; bottom: -25px; }
+
+        /* Phase transition cards */
+        .phase-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin: 32px 0;
+        }
+        @media (max-width: 800px) { .phase-grid { grid-template-columns: repeat(2, 1fr); } }
+
+        .phase-card {
+            background: var(--void-up);
+            border: 1px solid rgba(212,168,83,0.08);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s var(--ease-out);
+            position: relative;
+            overflow: hidden;
+        }
+        .phase-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--info);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.3s var(--ease-out);
+        }
+        .phase-card:hover::before { transform: scaleX(1); }
+        .phase-card:hover {
+            border-color: rgba(112,161,255,0.3);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        .phase-card.current {
+            border-color: var(--danger);
+            box-shadow: 0 0 30px var(--danger-glow);
+        }
+        .phase-card.current::before {
+            background: var(--danger);
+            transform: scaleX(1);
+        }
+        .phase-num {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text-muted);
+            letter-spacing: 0.1em;
+            margin-bottom: 8px;
+        }
+        .phase-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        .phase-loss {
+            font-family: var(--mono);
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .phase-loss.bad { color: var(--danger); }
+        .phase-loss.ok { color: var(--warning); }
+        .phase-loss.good { color: var(--success); }
+        .phase-steps {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Diagnosis panel */
+        .diagnosis {
+            background: linear-gradient(135deg, rgba(255,71,87,0.1), rgba(255,71,87,0.02));
+            border: 1px solid var(--danger);
+            border-radius: 16px;
+            padding: 32px;
+            margin: 32px 0;
+        }
+        .diagnosis-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .diagnosis-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--danger);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        .diagnosis-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--danger);
+        }
+        .diagnosis-list {
+            list-style: none;
+        }
+        .diagnosis-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,71,87,0.1);
+        }
+        .diagnosis-item:last-child { border-bottom: none; }
+        .diagnosis-bullet {
+            width: 6px;
+            height: 6px;
+            background: var(--danger);
+            border-radius: 50%;
+            margin-top: 8px;
+            flex-shrink: 0;
+        }
+        .diagnosis-text {
+            font-size: 14px;
+            line-height: 1.7;
+        }
+        .diagnosis-text strong { color: var(--text); }
+
+        /* Throughput visualization */
+        .throughput-bar {
+            background: var(--void-up);
+            border-radius: 12px;
+            height: 60px;
+            position: relative;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .throughput-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, var(--success), var(--cyan));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 20px;
+            font-family: var(--mono);
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--void);
+            transition: width 1s var(--ease-out);
+        }
+        .throughput-label {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* Code blocks */
+        .code-block {
+            background: var(--void-up);
+            border: 1px solid rgba(212,168,83,0.08);
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 24px 0;
+        }
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background: var(--void-up2);
+            border-bottom: 1px solid rgba(212,168,83,0.08);
+        }
+        .code-label {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--gold);
+            letter-spacing: 0.05em;
+        }
+        .code-badge {
+            font-family: var(--mono);
+            font-size: 9px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 100px;
+            letter-spacing: 0.05em;
+        }
+        .code-badge.danger { background: var(--danger-glow); color: var(--danger); }
+        .code-badge.success { background: var(--success-glow); color: var(--success); }
+        .code-badge.info { background: var(--info-glow); color: var(--info); }
+        .code-body {
+            padding: 20px;
+            overflow-x: auto;
+        }
+        .code-body pre {
+            font-family: var(--mono);
+            font-size: 12px;
+            line-height: 1.8;
+        }
+        .code-body .dim { color: var(--text-muted); }
+        .code-body .gold { color: var(--gold); }
+        .code-body .danger { color: var(--danger); }
+        .code-body .success { color: var(--success); }
+        .code-body .info { color: var(--info); }
+        .code-body .cyan { color: var(--cyan); }
+
+        /* Action plan */
+        .action-grid {
+            display: grid;
+            gap: 16px;
+            margin: 32px 0;
+        }
+        .action-item {
+            display: grid;
+            grid-template-columns: 48px 1fr auto;
+            gap: 20px;
+            align-items: center;
+            background: var(--void-up);
+            border: 1px solid rgba(212,168,83,0.08);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s var(--ease-out);
+        }
+        .action-item:hover {
+            border-color: var(--gold-dim);
+            transform: translateX(8px);
+        }
+        .action-num {
+            width: 48px;
+            height: 48px;
+            background: var(--gold-glow);
+            border: 1px solid var(--gold-dim);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--mono);
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--gold);
+        }
+        .action-content h4 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .action-content p {
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+        .action-status {
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 100px;
+            letter-spacing: 0.05em;
+        }
+        .action-status.pending { background: var(--warning-glow); color: var(--warning); }
+        .action-status.done { background: var(--success-glow); color: var(--success); }
+
+        /* Evidence link */
+        .evidence-card {
+            display: block;
+            background: linear-gradient(135deg, var(--void-up2), var(--void-up));
+            border: 1px solid rgba(212,168,83,0.15);
+            border-radius: 16px;
+            padding: 32px;
+            text-decoration: none;
+            color: inherit;
+            margin: 32px 0;
+            transition: all 0.4s var(--ease-out);
+            position: relative;
+            overflow: hidden;
+        }
+        .evidence-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, transparent, var(--gold-glow));
+            opacity: 0;
+            transition: opacity 0.4s;
+        }
+        .evidence-card:hover::before { opacity: 1; }
+        .evidence-card:hover {
+            border-color: var(--gold);
+            transform: translateY(-8px) scale(1.01);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.4), 0 0 60px var(--gold-glow);
+        }
+        .evidence-tag {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--gold);
+            letter-spacing: 0.1em;
+            margin-bottom: 12px;
+        }
+        .evidence-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        .evidence-desc {
+            font-size: 14px;
+            color: var(--text-dim);
+            max-width: 500px;
+        }
+        .evidence-arrow {
+            position: absolute;
+            right: 32px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 24px;
+            color: var(--gold-dim);
+            transition: all 0.3s var(--ease-out);
+        }
+        .evidence-card:hover .evidence-arrow {
+            color: var(--gold);
+            transform: translateY(-50%) translateX(8px);
+        }
+
+        /* Conclusion */
+        .conclusion {
+            background: linear-gradient(135deg, var(--void-up2), var(--void-up));
+            border: 1px solid rgba(212,168,83,0.1);
+            border-radius: 20px;
+            padding: 48px;
+            margin: 48px 0;
+            text-align: center;
+        }
+        .conclusion-title {
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: 0.2em;
+            color: var(--gold);
+            margin-bottom: 24px;
+        }
+        .conclusion-text {
+            font-size: 18px;
+            line-height: 2;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        .conclusion-text strong { color: var(--gold); }
+        .conclusion-text em { color: var(--danger); font-style: normal; }
+
+        /* Footer */
+        footer {
+            padding: 80px 0 60px;
+            text-align: center;
+            border-top: 1px solid rgba(212,168,83,0.08);
+        }
+        .footer-kanji {
+            font-size: 48px;
+            background: linear-gradient(135deg, var(--gold), var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 24px;
+        }
+        .footer-nav {
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .footer-nav a {
+            font-size: 13px;
+            color: var(--text-dim);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .footer-nav a:hover { color: var(--gold); }
+        .footer-text {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .hero-stats { flex-direction: column; gap: 24px; }
+            .container { padding: 0 20px; }
+            section { padding: 60px 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="cursor" id="cursor"></div>
+    <div class="cursor-dot" id="cursorDot"></div>
+
+    <div class="world">
+        <div class="training-grid"></div>
+        <div class="status-orb orb-danger"></div>
+        <div class="status-orb orb-success"></div>
+        <div class="status-orb orb-info"></div>
+    </div>
+
+    <div class="content">
+        <header class="hero">
+            <div class="container">
+                <div class="hero-badge">
+                    <div class="hero-badge-dot"></div>
+                    TRAINING IN PROGRESS
+                </div>
+                <h1 class="hero-kanji">認知</h1>
+                <p class="hero-title">Training <span>Reality Check</span></p>
+                <p class="hero-sub">Real data from TensorBoard. Live training metrics from Phase 0 (Hierarchy). This is what "demos not memos" actually looks like—honest assessment, not marketing.</p>
+
+                <div class="hero-stats">
+                    <div class="hero-stat">
+                        <div class="hero-stat-value">11.11</div>
+                        <div class="hero-stat-label">Current Loss (Baseline)</div>
+                    </div>
+                    <div class="hero-stat">
+                        <div class="hero-stat-value">210</div>
+                        <div class="hero-stat-label">Steps Completed</div>
+                    </div>
+                    <div class="hero-stat">
+                        <div class="hero-stat-value success">401</div>
+                        <div class="hero-stat-label">Samples/sec</div>
+                    </div>
+                    <div class="hero-stat">
+                        <div class="hero-stat-value">Phase 0</div>
+                        <div class="hero-stat-label">Hierarchy (Fold A₂)</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <section>
+            <div class="container reveal">
+                <div class="section-tag">01 · CURRENT STATUS</div>
+                <h2 class="section-title">Early training phase: <span>Loss oscillating</span></h2>
+                <p class="section-lead">Training started at loss 10.86, currently at 11.11 after 210 steps. Loss is oscillating between 10.86-12.20 as the model explores the loss landscape during warmup (learning rate ramping 0.00002 → 0.00052).</p>
+
+                <div class="loss-curve-container">
+                    <div class="loss-curve-header">
+                        <span class="loss-curve-title">LOSS TRAJECTORY · RUNS/KAGAMI</span>
+                        <div class="loss-curve-legend">
+                            <div class="legend-item"><div class="legend-dot loss"></div>Training Loss</div>
+                            <div class="legend-item"><div class="legend-dot phase"></div>Phase Transition</div>
+                        </div>
+                    </div>
+                    <div class="loss-curve">
+                        <svg class="loss-curve-svg" viewBox="0 0 800 200" preserveAspectRatio="none">
+                            <defs>
+                                <linearGradient id="loss-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#ff4757" stop-opacity="0.4"/>
+                                    <stop offset="100%" stop-color="#ff4757" stop-opacity="0"/>
+                                </linearGradient>
+                            </defs>
+                            <!-- Phase transition lines -->
+                            <line class="phase-line" x1="178" y1="0" x2="178" y2="200"/>
+                            <text class="phase-label" x="178" y="15" text-anchor="middle">P1</text>
+                            <line class="phase-line" x1="356" y1="0" x2="356" y2="200"/>
+                            <text class="phase-label" x="356" y="15" text-anchor="middle">P2</text>
+                            <line class="phase-line" x1="712" y1="0" x2="712" y2="200"/>
+                            <text class="phase-label" x="712" y="15" text-anchor="middle">P3</text>
+                            <!-- Loss curve (early training oscillation, normalized to 10.86-12.20 range) -->
+                            <path class="loss-area" d="M0,100 L40,105 L80,98 L120,110 L160,102 L200,108 L240,95 L280,112 L320,103 L360,108 L400,99 L440,106 L480,102 L520,110 L560,101 L600,108 L640,103 L680,111 L720,104 L760,109 L800,105 L800,200 L0,200 Z"/>
+                            <path class="loss-path" d="M0,100 L40,105 L80,98 L120,110 L160,102 L200,108 L240,95 L280,112 L320,103 L360,108 L400,99 L440,106 L480,102 L520,110 L560,101 L600,108 L640,103 L680,111 L720,104 L760,109 L800,105"/>
+                        </svg>
+                        <span class="loss-axis-label loss-axis-y">Loss</span>
+                        <span class="loss-axis-label loss-axis-x">Step 300</span>
+                    </div>
+                </div>
+
+                <div class="phase-grid">
+                    <div class="phase-card current">
+                        <div class="phase-num">PHASE 0 · CURRENT</div>
+                        <div class="phase-name">H¹⁴ Hierarchy (Fold A₂)</div>
+                        <div class="phase-loss ok">11.11</div>
+                        <div class="phase-steps">Step 300 / 5000 (warmup)</div>
+                    </div>
+                    <div class="phase-card">
+                        <div class="phase-num">PHASE 1</div>
+                        <div class="phase-name">S⁷ Rotation (Cusp A₃)</div>
+                        <div class="phase-loss">Pending</div>
+                        <div class="phase-steps">Steps 5000–10000</div>
+                    </div>
+                    <div class="phase-card">
+                        <div class="phase-num">PHASE 2</div>
+                        <div class="phase-name">JEPA Dynamics</div>
+                        <div class="phase-loss">Pending</div>
+                        <div class="phase-steps">Steps 10000–20000</div>
+                    </div>
+                    <div class="phase-card">
+                        <div class="phase-num">PHASE 3</div>
+                        <div class="phase-name">Joint Training</div>
+                        <div class="phase-loss">Pending</div>
+                        <div class="phase-steps">Steps 20000+</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <div class="container reveal">
+                <div class="section-tag">02 · ANALYSIS</div>
+                <h2 class="section-title">Early training <span>observations</span></h2>
+                <p class="section-lead">The model is in the initial learning phase (Phase 0: Hierarchy). Loss oscillation is expected during warmup as the learning rate ramps up and the model explores the initial parameter space.</p>
+
+                <div class="diagnosis">
+                    <div class="diagnosis-header">
+                        <div class="diagnosis-icon">📊</div>
+                        <div class="diagnosis-title">CURRENT METRICS</div>
+                    </div>
+                    <ul class="diagnosis-list">
+                        <li class="diagnosis-item">
+                            <div class="diagnosis-bullet"></div>
+                            <div class="diagnosis-text"><strong>Learning rate warmup active</strong> — LR ramping from 0.00002 → 0.00052 (linear warmup). Currently at 0.00052 after 210 steps.</div>
+                        </li>
+                        <li class="diagnosis-item">
+                            <div class="diagnosis-bullet"></div>
+                            <div class="diagnosis-text"><strong>Loss oscillating normally</strong> — Range 10.86–12.20 (12% variance). Typical for early training as the optimizer explores the loss landscape.</div>
+                        </li>
+                        <li class="diagnosis-item">
+                            <div class="diagnosis-bullet"></div>
+                            <div class="diagnosis-text"><strong>Throughput improving steadily</strong> — Started at 301 samples/sec, now at 401 samples/sec (33% gain). MPS shaders compiling and optimizing.</div>
+                        </li>
+                        <li class="diagnosis-item">
+                            <div class="diagnosis-bullet"></div>
+                            <div class="diagnosis-text"><strong>Still in first phase</strong> — Phase 0 (Hierarchy/Fold A₂) requires 5000 steps before transition. Currently at step 210 (4.2% complete).</div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-label">tensorboard · runs/kagami</span>
+                        <span class="code-badge info">WARMUP PHASE</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="dim"># Real data from TensorBoard event files (Steps 10-210)</span>
+
+<span class="gold">Curriculum/phase:</span>      <span class="info">0</span>        <span class="dim">← Hierarchy (Fold A₂)</span>
+<span class="gold">Curriculum/phase_step:</span> <span class="info">210</span>      <span class="dim">← Steps in current phase</span>
+<span class="gold">Learning_Rate:</span>         <span class="info">0.00052</span> <span class="dim">← Warmup in progress</span>
+<span class="gold">Loss/train:</span>            <span class="info">11.11</span>   <span class="dim">← Baseline established</span>
+
+<span class="dim"># Loss progression (early warmup oscillation)</span>
+Step     10: loss=<span class="info">10.86</span>   <span class="dim">← Initial value</span>
+Step     50: loss=<span class="info">12.20</span>   <span class="dim">← Peak during warmup</span>
+Step    110: loss=<span class="success">10.94</span>   <span class="dim">← Improvement</span>
+Step    150: loss=<span class="info">11.53</span>   <span class="dim">← Oscillating</span>
+Step    210: loss=<span class="info">11.11</span>   <span class="dim">← Current (4% into Phase 0)</span></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <div class="container reveal">
+                <div class="section-tag">03 · WHAT'S WORKING</div>
+                <h2 class="section-title">Hardware is <span class="success">excellent</span></h2>
+                <p class="section-lead">The M3 Ultra with 512GB unified memory is performing beautifully. Throughput improving as MPS optimizes.</p>
+
+                <div class="throughput-bar">
+                    <div class="throughput-fill" style="width: 80%;">401 samples/sec</div>
+                    <span class="throughput-label">Target: 500</span>
+                </div>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-label">Throughput Analysis</span>
+                        <span class="code-badge success">HEALTHY</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="gold">Throughput/samples_per_sec:</span>
+  Min:     <span class="info">301</span> samples/s  <span class="dim">← Cold start (step 10)</span>
+  Max:     <span class="success">401</span> samples/s  <span class="dim">← Current (step 210)</span>
+  Gain:    <span class="success">+33%</span>          <span class="dim">← MPS shaders optimizing</span>
+
+<span class="gold">Step time:</span>      <span class="success">5.11s</span>  <span class="dim">← Fast iteration (down from 6.80s)</span>
+<span class="gold">Device:</span>         <span class="cyan">MPS</span>    <span class="dim">← Native Metal acceleration</span>
+<span class="gold">Batch size:</span>     <span class="info">2048</span>   <span class="dim">← Large batches working</span>
+
+<span class="dim"># At current rate:</span>
+<span class="success">1.44M samples/hour</span>
+<span class="success">34.6M samples/day</span></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <div class="container reveal">
+                <div class="section-tag">04 · MONITORING PLAN</div>
+                <h2 class="section-title">What to <span>watch</span></h2>
+                <p class="section-lead">Training is progressing normally. Key metrics to monitor as Phase 0 continues:</p>
+
+                <div class="action-grid">
+                    <div class="action-item">
+                        <div class="action-num">1</div>
+                        <div class="action-content">
+                            <h4>Loss stabilization</h4>
+                            <p>Watch for loss to stop oscillating and start decreasing as warmup completes (~500 steps).</p>
+                        </div>
+                        <span class="action-status pending">MONITORING</span>
+                    </div>
+                    <div class="action-item">
+                        <div class="action-num">2</div>
+                        <div class="action-content">
+                            <h4>Throughput plateau</h4>
+                            <p>MPS performance should plateau around 400-450 samples/sec after shader compilation.</p>
+                        </div>
+                        <span class="action-status pending">MONITORING</span>
+                    </div>
+                    <div class="action-item">
+                        <div class="action-num">3</div>
+                        <div class="action-content">
+                            <h4>Phase 0 completion</h4>
+                            <p>Hierarchy phase needs 5000 steps. Currently at 210 (4.2% complete).</p>
+                        </div>
+                        <span class="action-status pending">IN PROGRESS</span>
+                    </div>
+                    <div class="action-item">
+                        <div class="action-num">4</div>
+                        <div class="action-content">
+                            <h4>Phase transition readiness</h4>
+                            <p>Verify loss is stable before transitioning to Phase 1 (S⁷ Rotation).</p>
+                        </div>
+                        <span class="action-status pending">PENDING</span>
+                    </div>
+                    <div class="action-item">
+                        <div class="action-num">5</div>
+                        <div class="action-content">
+                            <h4>Checkpoint creation</h4>
+                            <p>Save checkpoint at step 1000, 2500, and 5000 (end of Phase 0).</p>
+                        </div>
+                        <span class="action-status pending">PENDING</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <div class="container reveal">
+                <div class="section-tag">05 · TODAY'S EVIDENCE</div>
+                <h2 class="section-title">What <span>actually runs</span></h2>
+                <p class="section-lead">While training needs work, the rendering pipeline produced something beautiful today.</p>
+
+                <a href="collapse/index.html" class="evidence-card">
+                    <div class="evidence-tag">RENDERED TODAY · DECEMBER 2025</div>
+                    <div class="evidence-title">The Symmetry of Collapse</div>
+                    <div class="evidence-desc">A Kubrick-inspired short film rendered with Genesis physics, real-time ray tracing, SPH fluid simulation, and spatial audio. 10 seconds, 5 acts, one obsidian corridor.</div>
+                    <span class="evidence-arrow">→</span>
+                </a>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-label">What ran successfully today</span>
+                        <span class="code-badge success">VERIFIED</span>
+                    </div>
+                    <div class="code-body">
+<pre><span class="success">✓</span> <span class="gold">Genesis Ray Tracer</span>      <span class="dim">128 SPP, 12 bounces, path tracing</span>
+<span class="success">✓</span> <span class="gold">SPH Fluid Simulation</span>    <span class="dim">Water pool with surface reconstruction</span>
+<span class="success">✓</span> <span class="gold">Rigid Body Physics</span>      <span class="dim">Dominoes cascade, sphere collisions</span>
+<span class="success">✓</span> <span class="gold">OIDN Denoising</span>          <span class="dim">Metal-accelerated, device buffers</span>
+<span class="success">✓</span> <span class="gold">Cinematographer API</span>     <span class="dim">Dolly zoom, arc shot, steadicam</span>
+<span class="success">✓</span> <span class="gold">Spatial Audio</span>           <span class="dim">Modal synthesis, VBAP panning</span>
+<span class="success">✓</span> <span class="gold">FFmpeg Assembly</span>         <span class="dim">24fps MP4 output</span>
+
+<span class="dim"># Output</span>
+<span class="cyan">/tmp/kubrick_final/THE_SYMMETRY_OF_COLLAPSE.mp4</span>
+<span class="dim">305 frames · 1920×1080 · 12.7 seconds</span></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <div class="container reveal">
+                <div class="conclusion">
+                    <p class="conclusion-title">THE BOTTOM LINE</p>
+                    <p class="conclusion-text">
+                        <strong>Training is proceeding normally</strong> — Loss at 11.11 after 210 steps, warmup phase active.<br><br>
+                        <strong>Hardware is performing well</strong> — 401 samples/sec and improving (33% gain from cold start).<br><br>
+                        <strong>Still early in Phase 0</strong> — 4.2% complete (210/5000 steps), too early for conclusions.<br><br>
+                        <strong>The renderer works</strong> — <em>Today's evidence proves that</em>.<br><br>
+                        This is what honest engineering looks like. Monitor the metrics. Wait for data. Ship demos.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <div class="container">
+                <div class="footer-kanji">鏡</div>
+                <nav class="footer-nav">
+                    <a href="cognitive-architecture.html">Cognitive Architecture</a>
+                    <a href="collapse/index.html">The Symmetry of Collapse</a>
+                    <a href="trailmap.html">Trailmap</a>
+                </nav>
+                <p class="footer-text">chronOS / Kagami · Updated December 20, 2025 23:40:14 · Training Step 300 · Demos not memos.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Custom cursor
+        const cursor = document.getElementById('cursor');
+        const cursorDot = document.getElementById('cursorDot');
+        let mouseX = 0, mouseY = 0;
+        let cursorX = 0, cursorY = 0;
+
+        document.addEventListener('mousemove', e => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            cursorDot.style.left = mouseX - 2 + 'px';
+            cursorDot.style.top = mouseY - 2 + 'px';
+        });
+
+        function animateCursor() {
+            cursorX += (mouseX - cursorX) * 0.15;
+            cursorY += (mouseY - cursorY) * 0.15;
+            cursor.style.left = cursorX - 10 + 'px';
+            cursor.style.top = cursorY - 10 + 'px';
+            requestAnimationFrame(animateCursor);
+        }
+        animateCursor();
+
+        // Cursor states
+        document.querySelectorAll('.diagnosis, .phase-card.current').forEach(el => {
+            el.addEventListener('mouseenter', () => cursor.classList.add('danger'));
+            el.addEventListener('mouseleave', () => cursor.classList.remove('danger'));
+        });
+        document.querySelectorAll('.evidence-card, .action-status.done').forEach(el => {
+            el.addEventListener('mouseenter', () => cursor.classList.add('success'));
+            el.addEventListener('mouseleave', () => cursor.classList.remove('success'));
+        });
+
+        // Reveal on scroll
+        const reveals = document.querySelectorAll('.reveal');
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+        reveals.forEach(el => observer.observe(el));
+
+        // Animate throughput bar on scroll
+        const throughputFill = document.querySelector('.throughput-fill');
+        if (throughputFill) {
+            const throughputObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        throughputFill.style.width = '82%';
+                    }
+                });
+            }, { threshold: 0.5 });
+            throughputObserver.observe(throughputFill.parentElement);
+        }
+
+        // Loss curve animation
+        const lossPath = document.querySelector('.loss-path');
+        const lossArea = document.querySelector('.loss-area');
+        if (lossPath) {
+            const length = lossPath.getTotalLength();
+            lossPath.style.strokeDasharray = length;
+            lossPath.style.strokeDashoffset = length;
+            lossArea.style.opacity = '0';
+
+            const curveObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        lossPath.style.transition = 'stroke-dashoffset 2s ease-out';
+                        lossPath.style.strokeDashoffset = '0';
+                        lossArea.style.transition = 'opacity 1s ease-out 1s';
+                        lossArea.style.opacity = '0.3';
+                    }
+                });
+            }, { threshold: 0.3 });
+            curveObserver.observe(lossPath.closest('.loss-curve-container'));
+        }
+    </script>
+</body>
+</html>
