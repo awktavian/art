@@ -6,47 +6,51 @@
     <title>認知 · Training Reality Check</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
     <style>
         :root {
             /* The void */
-            --void: #050508;
-            --void-up: #0a0a0f;
-            --void-up2: #0f0f16;
-            --void-up3: #161620;
+            --void: #030305;
+            --void-up: #08080c;
+            --void-up2: #0d0d12;
+            --void-up3: #141419;
             
-            /* Light */
+            /* Light spectrum */
             --text: #f0ede6;
-            --text-dim: rgba(240,237,230,0.65);
-            --text-muted: rgba(240,237,230,0.35);
+            --text-dim: rgba(240,237,230,0.6);
+            --text-muted: rgba(240,237,230,0.3);
             
-            /* Gold - still primary */
+            /* Primary: Gold */
             --gold: #d4a853;
-            --gold-bright: #efc86e;
-            --gold-dim: rgba(212,168,83,0.4);
-            --gold-glow: rgba(212,168,83,0.15);
+            --gold-bright: #f0c866;
+            --gold-dim: rgba(212,168,83,0.35);
+            --gold-glow: rgba(212,168,83,0.12);
             
-            /* Training status colors */
+            /* Status spectrum */
             --danger: #ff4757;
-            --danger-glow: rgba(255,71,87,0.2);
+            --danger-soft: #ff6b7a;
+            --danger-glow: rgba(255,71,87,0.15);
             --warning: #ffa502;
-            --warning-glow: rgba(255,165,2,0.2);
+            --warning-glow: rgba(255,165,2,0.15);
             --success: #2ed573;
-            --success-glow: rgba(46,213,115,0.2);
+            --success-soft: #5ae08a;
+            --success-glow: rgba(46,213,115,0.15);
             --info: #70a1ff;
-            --info-glow: rgba(112,161,255,0.2);
+            --info-glow: rgba(112,161,255,0.15);
             
-            /* Colony accent */
+            /* Accent */
             --cyan: #00e5cc;
-            --magenta: #ff00ff;
+            --magenta: #e040fb;
             
             /* Typography */
-            --font: 'Space Grotesk', -apple-system, sans-serif;
+            --font: 'Space Grotesk', system-ui, sans-serif;
             --mono: 'JetBrains Mono', monospace;
+            --serif: 'Crimson Pro', Georgia, serif;
             
             /* Motion */
             --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
             --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -55,37 +59,46 @@
             font-family: var(--font); 
             background: var(--void); 
             color: var(--text); 
-            line-height: 1.7; 
-            overflow-x: hidden;
+            line-height: 1.7;
             cursor: none;
         }
-        ::selection { background: var(--gold); color: var(--void); }
+        ::selection { background: var(--danger); color: var(--void); }
         
-        /* Custom cursor */
-        .cursor {
+        /* ═══════════════════════════════════════════════════════════════════
+           CUSTOM CURSOR SYSTEM
+           ═══════════════════════════════════════════════════════════════════ */
+        .cursor-ring {
             position: fixed;
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--gold);
+            width: 32px;
+            height: 32px;
+            border: 1.5px solid var(--danger);
             border-radius: 50%;
             pointer-events: none;
             z-index: 9999;
+            transition: transform 0.2s var(--ease-out), border-color 0.3s, width 0.2s, height 0.2s, opacity 0.2s;
             mix-blend-mode: difference;
-            transition: transform 0.15s var(--ease-out), border-color 0.3s;
         }
-        .cursor.danger { border-color: var(--danger); }
-        .cursor.success { border-color: var(--success); }
+        .cursor-ring.hovering {
+            width: 48px;
+            height: 48px;
+            border-color: var(--gold);
+        }
+        .cursor-ring.success { border-color: var(--success); }
         .cursor-dot {
             position: fixed;
-            width: 4px;
-            height: 4px;
-            background: var(--gold);
+            width: 5px;
+            height: 5px;
+            background: var(--danger);
             border-radius: 50%;
             pointer-events: none;
             z-index: 9999;
+            transition: background 0.3s;
         }
+        .cursor-dot.success { background: var(--success); }
         
-        /* Animated background */
+        /* ═══════════════════════════════════════════════════════════════════
+           WORLD LAYER (Fixed Background)
+           ═══════════════════════════════════════════════════════════════════ */
         .world {
             position: fixed;
             inset: 0;
@@ -94,220 +107,297 @@
             overflow: hidden;
         }
         
-        /* Training pulse grid */
-        .training-grid {
+        /* Animated grid with pulse */
+        .world-grid {
             position: absolute;
-            inset: 0;
+            inset: -100px;
             background-image: 
-                linear-gradient(rgba(212,168,83,0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(212,168,83,0.03) 1px, transparent 1px);
-            background-size: 80px 80px;
-            animation: grid-pulse 4s ease-in-out infinite;
+                linear-gradient(rgba(255,71,87,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,71,87,0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            transform-origin: center;
+            animation: grid-breathe 8s ease-in-out infinite;
         }
-        @keyframes grid-pulse {
-            0%, 100% { opacity: 0.5; }
-            50% { opacity: 1; }
+        @keyframes grid-breathe {
+            0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.6; }
+            50% { transform: scale(1.02) rotate(0.5deg); opacity: 1; }
         }
         
-        /* Status indicator orbs */
-        .status-orb {
+        /* Status orbs */
+        .orb {
             position: absolute;
             border-radius: 50%;
             filter: blur(100px);
-            opacity: 0.4;
-            animation: orb-breathe 6s ease-in-out infinite;
+            animation: orb-float 12s ease-in-out infinite;
         }
-        @keyframes orb-breathe {
-            0%, 100% { transform: scale(1); opacity: 0.3; }
-            50% { transform: scale(1.1); opacity: 0.5; }
+        @keyframes orb-float {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.3; }
+            33% { transform: translate(20px, -30px) scale(1.1); opacity: 0.5; }
+            66% { transform: translate(-15px, 20px) scale(0.95); opacity: 0.35; }
         }
-        .orb-danger {
-            width: 400px; height: 400px;
-            top: 10%; right: -100px;
-            background: radial-gradient(circle, var(--danger-glow), transparent 70%);
-            animation-delay: 0s;
+        .orb-1 { 
+            width: 500px; height: 500px; 
+            top: -150px; right: -100px; 
+            background: radial-gradient(circle, var(--danger-glow), transparent 60%);
         }
-        .orb-success {
-            width: 350px; height: 350px;
-            bottom: 20%; left: -100px;
-            background: radial-gradient(circle, var(--success-glow), transparent 70%);
-            animation-delay: 2s;
+        .orb-2 { 
+            width: 400px; height: 400px; 
+            bottom: 10%; left: -150px; 
+            background: radial-gradient(circle, var(--success-glow), transparent 60%);
+            animation-delay: -4s;
         }
-        .orb-info {
-            width: 300px; height: 300px;
-            top: 60%; right: 20%;
-            background: radial-gradient(circle, var(--info-glow), transparent 70%);
-            animation-delay: 4s;
+        .orb-3 { 
+            width: 350px; height: 350px; 
+            top: 50%; right: 5%; 
+            background: radial-gradient(circle, var(--info-glow), transparent 60%);
+            animation-delay: -8s;
         }
         
-        /* Content */
+        /* Scanlines */
+        .scanlines {
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.03) 2px,
+                rgba(0,0,0,0.03) 4px
+            );
+            pointer-events: none;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           CONTENT LAYER
+           ═══════════════════════════════════════════════════════════════════ */
         .content { position: relative; z-index: 10; }
         .container { max-width: 1000px; margin: 0 auto; padding: 0 32px; }
         
-        /* Hero */
+        /* ═══════════════════════════════════════════════════════════════════
+           HERO SECTION
+           ═══════════════════════════════════════════════════════════════════ */
         .hero {
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            padding: 120px 0 80px;
+            padding: 100px 0;
             position: relative;
         }
-        .hero-badge {
+        
+        .status-badge {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            padding: 6px 14px;
+            gap: 10px;
+            padding: 8px 16px;
             background: var(--danger-glow);
-            border: 1px solid var(--danger);
+            border: 1px solid rgba(255,71,87,0.4);
             border-radius: 100px;
             font-family: var(--mono);
             font-size: 11px;
             font-weight: 600;
             color: var(--danger);
-            letter-spacing: 0.05em;
-            margin-bottom: 24px;
-            animation: badge-pulse 2s ease-in-out infinite;
+            letter-spacing: 0.08em;
+            margin-bottom: 28px;
+            animation: badge-glow 2s ease-in-out infinite;
         }
-        @keyframes badge-pulse {
+        @keyframes badge-glow {
             0%, 100% { box-shadow: 0 0 20px var(--danger-glow); }
-            50% { box-shadow: 0 0 40px var(--danger-glow); }
+            50% { box-shadow: 0 0 40px rgba(255,71,87,0.25); }
         }
-        .hero-badge-dot {
+        .status-dot {
             width: 8px; height: 8px;
             background: var(--danger);
             border-radius: 50%;
-            animation: dot-blink 1s infinite;
+            animation: dot-pulse 1.5s infinite;
         }
-        @keyframes dot-blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
+        @keyframes dot-pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.5; }
         }
+        
         .hero-kanji {
-            font-size: clamp(80px, 18vw, 160px);
+            font-size: clamp(100px, 22vw, 200px);
             font-weight: 300;
-            background: linear-gradient(135deg, var(--gold), var(--danger));
+            background: linear-gradient(135deg, var(--gold) 0%, var(--danger) 50%, var(--magenta) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
             line-height: 1;
-            margin-bottom: 20px;
-            opacity: 0;
-            animation: hero-in 1.2s var(--ease-out) forwards;
-        }
-        @keyframes hero-in {
-            from { opacity: 0; transform: translateY(40px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .hero-title {
-            font-size: clamp(28px, 5vw, 42px);
-            font-weight: 600;
-            letter-spacing: -0.02em;
             margin-bottom: 16px;
             opacity: 0;
-            animation: hero-in 1.2s var(--ease-out) 0.2s forwards;
+            animation: hero-reveal 1.4s var(--ease-out) forwards;
         }
-        .hero-title span { color: var(--danger); }
-        .hero-sub {
-            font-size: 17px;
-            color: var(--text-dim);
-            max-width: 600px;
-            line-height: 1.9;
-            opacity: 0;
-            animation: hero-in 1.2s var(--ease-out) 0.4s forwards;
-        }
-        .hero-stats {
-            display: flex;
-            gap: 40px;
-            margin-top: 48px;
-            opacity: 0;
-            animation: hero-in 1.2s var(--ease-out) 0.6s forwards;
-        }
-        .hero-stat {
-            text-align: left;
-        }
-        .hero-stat-value {
-            font-family: var(--mono);
-            font-size: 32px;
-            font-weight: 600;
-            color: var(--gold);
-        }
-        .hero-stat-value.danger { color: var(--danger); }
-        .hero-stat-value.success { color: var(--success); }
-        .hero-stat-label {
-            font-size: 12px;
-            color: var(--text-muted);
-            letter-spacing: 0.05em;
-            margin-top: 4px;
+        @keyframes hero-reveal {
+            from { opacity: 0; transform: translateY(60px) scale(0.95); filter: blur(10px); }
+            to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
         }
         
-        /* Sections */
-        section {
-            padding: 100px 0;
-            border-top: 1px solid rgba(212,168,83,0.08);
+        .hero-title {
+            font-size: clamp(28px, 5vw, 44px);
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin-bottom: 20px;
+            opacity: 0;
+            animation: hero-reveal 1.4s var(--ease-out) 0.15s forwards;
         }
-        .section-tag {
+        .hero-title .highlight { color: var(--danger); }
+        
+        .hero-lead {
+            font-family: var(--serif);
+            font-size: 19px;
+            font-weight: 400;
+            color: var(--text-dim);
+            max-width: 620px;
+            line-height: 1.9;
+            opacity: 0;
+            animation: hero-reveal 1.4s var(--ease-out) 0.3s forwards;
+        }
+        .hero-lead em { 
+            font-style: italic; 
+            color: var(--text);
+        }
+        
+        /* Hero metrics dashboard */
+        .hero-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-top: 56px;
+            opacity: 0;
+            animation: hero-reveal 1.4s var(--ease-out) 0.45s forwards;
+        }
+        @media (max-width: 700px) { .hero-metrics { grid-template-columns: repeat(2, 1fr); } }
+        
+        .metric-card {
+            background: var(--void-up);
+            border: 1px solid rgba(255,71,87,0.12);
+            border-radius: 14px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s var(--ease-out);
+        }
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: var(--danger);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.4s var(--ease-out);
+        }
+        .metric-card:hover::before { transform: scaleX(1); }
+        .metric-card:hover {
+            border-color: rgba(255,71,87,0.3);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        .metric-card.success { border-color: rgba(46,213,115,0.12); }
+        .metric-card.success::before { background: var(--success); }
+        .metric-card.success:hover { border-color: rgba(46,213,115,0.3); }
+        
+        .metric-value {
+            font-family: var(--mono);
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--danger);
+            margin-bottom: 4px;
+        }
+        .metric-value.success { color: var(--success); }
+        .metric-value.gold { color: var(--gold); }
+        .metric-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            letter-spacing: 0.06em;
+        }
+        .metric-delta {
+            position: absolute;
+            top: 16px; right: 16px;
             font-family: var(--mono);
             font-size: 10px;
             font-weight: 600;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: 100px;
+        }
+        .metric-delta.bad { background: var(--danger-glow); color: var(--danger); }
+        .metric-delta.good { background: var(--success-glow); color: var(--success); }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           SECTIONS
+           ═══════════════════════════════════════════════════════════════════ */
+        section {
+            padding: 100px 0;
+            border-top: 1px solid rgba(212,168,83,0.06);
+        }
+        .section-num {
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.2em;
             color: var(--gold);
             margin-bottom: 12px;
         }
         .section-title {
-            font-size: clamp(26px, 4vw, 36px);
+            font-size: clamp(28px, 4.5vw, 40px);
             font-weight: 600;
             letter-spacing: -0.02em;
             margin-bottom: 16px;
+            line-height: 1.2;
         }
-        .section-title span { color: var(--gold); }
+        .section-title .gold { color: var(--gold); }
         .section-title .danger { color: var(--danger); }
         .section-title .success { color: var(--success); }
         .section-lead {
-            font-size: 16px;
+            font-family: var(--serif);
+            font-size: 17px;
             color: var(--text-dim);
             max-width: 600px;
+            line-height: 1.85;
             margin-bottom: 48px;
-            line-height: 1.8;
         }
         
         /* Reveal animation */
         .reveal {
             opacity: 0;
-            transform: translateY(30px);
-            transition: opacity 0.8s var(--ease-out), transform 0.8s var(--ease-out);
+            transform: translateY(40px);
+            transition: opacity 0.9s var(--ease-out), transform 0.9s var(--ease-out);
         }
         .reveal.visible {
             opacity: 1;
             transform: translateY(0);
         }
         
-        /* Loss curve visualization */
-        .loss-curve-container {
+        /* ═══════════════════════════════════════════════════════════════════
+           LOSS CURVE VISUALIZATION (Real TensorBoard Data)
+           ═══════════════════════════════════════════════════════════════════ */
+        .chart-container {
             background: var(--void-up);
-            border: 1px solid rgba(212,168,83,0.1);
-            border-radius: 16px;
+            border: 1px solid rgba(212,168,83,0.08);
+            border-radius: 20px;
             padding: 32px;
-            margin: 32px 0;
+            margin: 40px 0;
             position: relative;
-            overflow: hidden;
         }
-        .loss-curve-header {
+        .chart-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 24px;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
+            gap: 16px;
         }
-        .loss-curve-title {
+        .chart-title {
             font-family: var(--mono);
-            font-size: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.12em;
             color: var(--text-muted);
-            letter-spacing: 0.1em;
         }
-        .loss-curve-legend {
+        .chart-legend {
             display: flex;
-            gap: 20px;
+            gap: 24px;
         }
         .legend-item {
             display: flex;
@@ -317,255 +407,346 @@
             color: var(--text-dim);
         }
         .legend-dot {
-            width: 10px;
-            height: 10px;
+            width: 10px; height: 10px;
             border-radius: 50%;
         }
         .legend-dot.loss { background: var(--danger); }
         .legend-dot.phase { background: var(--info); }
+        .legend-dot.lr { background: var(--gold); }
         
-        .loss-curve {
-            height: 200px;
+        .chart-wrapper {
             position: relative;
-            border-left: 1px solid rgba(240,237,230,0.1);
-            border-bottom: 1px solid rgba(240,237,230,0.1);
+            height: 240px;
+            margin: 0 40px 0 50px;
         }
-        .loss-curve-svg {
+        .chart-svg {
             width: 100%;
             height: 100%;
-        }
-        .loss-path {
-            fill: none;
-            stroke: var(--danger);
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-        }
-        .loss-area {
-            fill: url(#loss-gradient);
-            opacity: 0.3;
-        }
-        .phase-line {
-            stroke: var(--info);
-            stroke-width: 1;
-            stroke-dasharray: 4 4;
-        }
-        .phase-label {
-            font-family: var(--mono);
-            font-size: 9px;
-            fill: var(--info);
+            overflow: visible;
         }
         
-        .loss-axis-label {
+        /* Y-axis labels */
+        .y-axis {
             position: absolute;
+            left: -45px;
+            top: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
             font-family: var(--mono);
             font-size: 10px;
             color: var(--text-muted);
         }
-        .loss-axis-y { left: -40px; top: 0; }
-        .loss-axis-x { right: 0; bottom: -25px; }
         
-        /* Phase transition cards */
+        /* X-axis labels */
+        .x-axis {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: -28px;
+            display: flex;
+            justify-content: space-between;
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+        
+        /* Chart annotations */
+        .chart-annotation {
+            position: absolute;
+            font-family: var(--mono);
+            font-size: 9px;
+            padding: 4px 8px;
+            background: var(--void-up2);
+            border: 1px solid rgba(255,71,87,0.3);
+            border-radius: 6px;
+            color: var(--danger);
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s var(--ease-out);
+        }
+        .chart-container:hover .chart-annotation {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           PHASE BREAKDOWN CARDS
+           ═══════════════════════════════════════════════════════════════════ */
         .phase-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 16px;
-            margin: 32px 0;
+            margin: 40px 0;
         }
         @media (max-width: 800px) { .phase-grid { grid-template-columns: repeat(2, 1fr); } }
         
         .phase-card {
             background: var(--void-up);
-            border: 1px solid rgba(212,168,83,0.08);
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.3s var(--ease-out);
+            border: 1px solid rgba(112,161,255,0.1);
+            border-radius: 16px;
+            padding: 24px;
             position: relative;
             overflow: hidden;
+            transition: all 0.4s var(--ease-out);
         }
         .phase-card::before {
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
+            top: 0; left: 0; right: 0;
             height: 3px;
-            background: var(--info);
+            background: linear-gradient(90deg, var(--info), var(--cyan));
             transform: scaleX(0);
             transform-origin: left;
-            transition: transform 0.3s var(--ease-out);
+            transition: transform 0.5s var(--ease-out);
         }
         .phase-card:hover::before { transform: scaleX(1); }
         .phase-card:hover {
-            border-color: rgba(112,161,255,0.3);
-            transform: translateY(-4px);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            transform: translateY(-6px) translateX(4px);
+            border-color: rgba(112,161,255,0.25);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3), 0 0 30px var(--info-glow);
         }
         .phase-card.current {
             border-color: var(--danger);
-            box-shadow: 0 0 30px var(--danger-glow);
+            box-shadow: 0 0 40px var(--danger-glow);
         }
         .phase-card.current::before {
-            background: var(--danger);
+            background: linear-gradient(90deg, var(--danger), var(--magenta));
             transform: scaleX(1);
         }
-        .phase-num {
+        
+        .phase-badge {
             font-family: var(--mono);
-            font-size: 10px;
-            color: var(--text-muted);
+            font-size: 9px;
+            font-weight: 600;
             letter-spacing: 0.1em;
-            margin-bottom: 8px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
         }
         .phase-name {
-            font-size: 16px;
+            font-size: 17px;
             font-weight: 600;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
-        .phase-loss {
-            font-family: var(--mono);
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 4px;
+        .phase-name sup {
+            font-size: 10px;
+            color: var(--gold);
+            margin-left: 2px;
         }
-        .phase-loss.bad { color: var(--danger); }
-        .phase-loss.ok { color: var(--warning); }
-        .phase-loss.good { color: var(--success); }
-        .phase-steps {
+        .phase-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .phase-stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .phase-stat-label {
             font-size: 11px;
             color: var(--text-muted);
         }
+        .phase-stat-value {
+            font-family: var(--mono);
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .phase-stat-value.bad { color: var(--danger); }
+        .phase-stat-value.ok { color: var(--warning); }
+        .phase-stat-value.good { color: var(--success); }
         
-        /* Diagnosis panel */
+        /* ═══════════════════════════════════════════════════════════════════
+           DIAGNOSIS PANEL
+           ═══════════════════════════════════════════════════════════════════ */
         .diagnosis {
-            background: linear-gradient(135deg, rgba(255,71,87,0.1), rgba(255,71,87,0.02));
-            border: 1px solid var(--danger);
-            border-radius: 16px;
-            padding: 32px;
-            margin: 32px 0;
+            background: linear-gradient(135deg, rgba(255,71,87,0.08), rgba(255,71,87,0.02));
+            border: 1px solid rgba(255,71,87,0.25);
+            border-radius: 20px;
+            padding: 36px;
+            margin: 48px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .diagnosis::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(180deg, var(--danger), var(--magenta));
         }
         .diagnosis-header {
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 20px;
+            gap: 16px;
+            margin-bottom: 24px;
         }
         .diagnosis-icon {
-            width: 40px;
-            height: 40px;
+            width: 48px; height: 48px;
             background: var(--danger);
-            border-radius: 10px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
+            font-size: 24px;
+            box-shadow: 0 8px 24px var(--danger-glow);
         }
         .diagnosis-title {
-            font-size: 18px;
+            font-size: 20px;
             font-weight: 600;
-            color: var(--danger);
+            color: var(--danger-soft);
         }
         .diagnosis-list {
             list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
         }
         .diagnosis-item {
             display: flex;
             align-items: flex-start;
-            gap: 12px;
-            padding: 12px 0;
-            border-bottom: 1px solid rgba(255,71,87,0.1);
+            gap: 16px;
+            padding: 16px 0;
+            border-bottom: 1px solid rgba(255,71,87,0.08);
+            transition: all 0.3s var(--ease-out);
         }
         .diagnosis-item:last-child { border-bottom: none; }
+        .diagnosis-item:hover {
+            padding-left: 12px;
+            background: rgba(255,71,87,0.03);
+            margin: 0 -20px;
+            padding-right: 20px;
+        }
         .diagnosis-bullet {
-            width: 6px;
-            height: 6px;
+            width: 8px; height: 8px;
             background: var(--danger);
-            border-radius: 50%;
+            border-radius: 2px;
             margin-top: 8px;
             flex-shrink: 0;
+            transition: transform 0.3s var(--ease-spring);
         }
+        .diagnosis-item:hover .diagnosis-bullet { transform: scale(1.3) rotate(45deg); }
         .diagnosis-text {
-            font-size: 14px;
-            line-height: 1.7;
+            font-size: 15px;
+            line-height: 1.75;
+            color: var(--text-dim);
         }
-        .diagnosis-text strong { color: var(--text); }
+        .diagnosis-text strong { color: var(--text); font-weight: 600; }
+        .diagnosis-text code {
+            font-family: var(--mono);
+            font-size: 12px;
+            background: var(--void-up2);
+            padding: 2px 8px;
+            border-radius: 4px;
+            color: var(--danger);
+        }
         
-        /* Throughput visualization */
+        /* ═══════════════════════════════════════════════════════════════════
+           THROUGHPUT VISUALIZATION
+           ═══════════════════════════════════════════════════════════════════ */
+        .throughput-viz {
+            margin: 40px 0;
+        }
+        .throughput-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 16px;
+        }
+        .throughput-title {
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+        }
+        .throughput-value {
+            font-family: var(--mono);
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--success);
+        }
         .throughput-bar {
+            height: 56px;
             background: var(--void-up);
-            border-radius: 12px;
-            height: 60px;
-            position: relative;
+            border-radius: 14px;
             overflow: hidden;
-            margin: 20px 0;
+            position: relative;
         }
         .throughput-fill {
             position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
+            left: 0; top: 0; bottom: 0;
             background: linear-gradient(90deg, var(--success), var(--cyan));
-            border-radius: 12px;
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: flex-end;
             padding-right: 20px;
             font-family: var(--mono);
-            font-size: 18px;
+            font-size: 14px;
             font-weight: 600;
             color: var(--void);
-            transition: width 1s var(--ease-out);
+            width: 0;
+            transition: width 1.5s var(--ease-out);
         }
-        .throughput-label {
-            position: absolute;
-            right: 16px;
-            top: 50%;
-            transform: translateY(-50%);
+        .throughput-fill.animated { width: 86%; }
+        .throughput-markers {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
             font-family: var(--mono);
-            font-size: 12px;
+            font-size: 10px;
             color: var(--text-muted);
         }
         
-        /* Code blocks */
+        /* ═══════════════════════════════════════════════════════════════════
+           CODE BLOCKS
+           ═══════════════════════════════════════════════════════════════════ */
         .code-block {
             background: var(--void-up);
-            border: 1px solid rgba(212,168,83,0.08);
-            border-radius: 12px;
+            border: 1px solid rgba(212,168,83,0.06);
+            border-radius: 16px;
             overflow: hidden;
-            margin: 24px 0;
+            margin: 32px 0;
         }
         .code-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px 20px;
+            padding: 14px 24px;
             background: var(--void-up2);
-            border-bottom: 1px solid rgba(212,168,83,0.08);
+            border-bottom: 1px solid rgba(212,168,83,0.06);
         }
         .code-label {
             font-family: var(--mono);
             font-size: 11px;
+            font-weight: 500;
             color: var(--gold);
-            letter-spacing: 0.05em;
+            letter-spacing: 0.04em;
         }
         .code-badge {
             font-family: var(--mono);
             font-size: 9px;
             font-weight: 600;
-            padding: 4px 10px;
+            padding: 5px 12px;
             border-radius: 100px;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.06em;
         }
         .code-badge.danger { background: var(--danger-glow); color: var(--danger); }
         .code-badge.success { background: var(--success-glow); color: var(--success); }
         .code-badge.info { background: var(--info-glow); color: var(--info); }
         .code-body {
-            padding: 20px;
+            padding: 24px;
             overflow-x: auto;
         }
         .code-body pre {
             font-family: var(--mono);
             font-size: 12px;
-            line-height: 1.8;
+            line-height: 1.9;
+            tab-size: 4;
         }
         .code-body .dim { color: var(--text-muted); }
         .code-body .gold { color: var(--gold); }
@@ -573,415 +754,548 @@
         .code-body .success { color: var(--success); }
         .code-body .info { color: var(--info); }
         .code-body .cyan { color: var(--cyan); }
+        .code-body .magenta { color: var(--magenta); }
         
-        /* Action plan */
-        .action-grid {
-            display: grid;
+        /* ═══════════════════════════════════════════════════════════════════
+           ACTION PLAN
+           ═══════════════════════════════════════════════════════════════════ */
+        .action-list {
+            display: flex;
+            flex-direction: column;
             gap: 16px;
-            margin: 32px 0;
+            margin: 40px 0;
         }
         .action-item {
             display: grid;
-            grid-template-columns: 48px 1fr auto;
-            gap: 20px;
+            grid-template-columns: 56px 1fr auto;
+            gap: 24px;
             align-items: center;
             background: var(--void-up);
-            border: 1px solid rgba(212,168,83,0.08);
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.3s var(--ease-out);
+            border: 1px solid rgba(212,168,83,0.06);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all 0.4s var(--ease-out);
         }
         .action-item:hover {
             border-color: var(--gold-dim);
-            transform: translateX(8px);
+            transform: translateX(12px);
+            box-shadow: -20px 0 40px var(--gold-glow);
         }
         .action-num {
-            width: 48px;
-            height: 48px;
-            background: var(--gold-glow);
+            width: 56px; height: 56px;
+            background: linear-gradient(135deg, var(--gold-glow), transparent);
             border: 1px solid var(--gold-dim);
-            border-radius: 12px;
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-family: var(--mono);
-            font-size: 18px;
+            font-size: 20px;
             font-weight: 600;
             color: var(--gold);
         }
         .action-content h4 {
-            font-size: 15px;
+            font-size: 16px;
             font-weight: 600;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
         }
         .action-content p {
             font-size: 13px;
             color: var(--text-dim);
+            line-height: 1.6;
         }
         .action-status {
             font-family: var(--mono);
             font-size: 10px;
             font-weight: 600;
-            padding: 6px 12px;
+            padding: 8px 14px;
             border-radius: 100px;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.06em;
         }
         .action-status.pending { background: var(--warning-glow); color: var(--warning); }
         .action-status.done { background: var(--success-glow); color: var(--success); }
         
-        /* Evidence link */
+        /* ═══════════════════════════════════════════════════════════════════
+           EVIDENCE CARD
+           ═══════════════════════════════════════════════════════════════════ */
         .evidence-card {
             display: block;
             background: linear-gradient(135deg, var(--void-up2), var(--void-up));
-            border: 1px solid rgba(212,168,83,0.15);
-            border-radius: 16px;
-            padding: 32px;
+            border: 1px solid rgba(212,168,83,0.12);
+            border-radius: 20px;
+            padding: 40px;
             text-decoration: none;
             color: inherit;
-            margin: 32px 0;
-            transition: all 0.4s var(--ease-out);
+            margin: 48px 0;
             position: relative;
             overflow: hidden;
+            transition: all 0.5s var(--ease-out);
         }
         .evidence-card::before {
             content: '';
             position: absolute;
             inset: 0;
-            background: linear-gradient(135deg, transparent, var(--gold-glow));
+            background: linear-gradient(135deg, transparent 40%, var(--gold-glow) 100%);
             opacity: 0;
-            transition: opacity 0.4s;
+            transition: opacity 0.5s;
         }
         .evidence-card:hover::before { opacity: 1; }
         .evidence-card:hover {
             border-color: var(--gold);
-            transform: translateY(-8px) scale(1.01);
-            box-shadow: 0 30px 60px rgba(0,0,0,0.4), 0 0 60px var(--gold-glow);
+            transform: translateY(-10px) scale(1.01);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.4), 0 0 80px var(--gold-glow);
         }
         .evidence-tag {
             font-family: var(--mono);
             font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.12em;
             color: var(--gold);
-            letter-spacing: 0.1em;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
         .evidence-title {
-            font-size: 24px;
+            font-size: 28px;
             font-weight: 600;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
         .evidence-desc {
-            font-size: 14px;
+            font-family: var(--serif);
+            font-size: 16px;
             color: var(--text-dim);
-            max-width: 500px;
+            max-width: 540px;
+            line-height: 1.8;
         }
         .evidence-arrow {
             position: absolute;
-            right: 32px;
+            right: 40px;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 24px;
+            font-size: 32px;
             color: var(--gold-dim);
-            transition: all 0.3s var(--ease-out);
+            transition: all 0.4s var(--ease-out);
         }
         .evidence-card:hover .evidence-arrow {
             color: var(--gold);
-            transform: translateY(-50%) translateX(8px);
+            transform: translateY(-50%) translateX(12px);
         }
         
-        /* Conclusion */
+        /* ═══════════════════════════════════════════════════════════════════
+           CONCLUSION
+           ═══════════════════════════════════════════════════════════════════ */
         .conclusion {
             background: linear-gradient(135deg, var(--void-up2), var(--void-up));
-            border: 1px solid rgba(212,168,83,0.1);
-            border-radius: 20px;
-            padding: 48px;
-            margin: 48px 0;
+            border: 1px solid rgba(212,168,83,0.08);
+            border-radius: 24px;
+            padding: 56px;
+            margin: 56px 0;
             text-align: center;
+            position: relative;
         }
-        .conclusion-title {
+        .conclusion::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 3px;
+            background: linear-gradient(90deg, var(--gold), var(--cyan));
+            border-radius: 3px;
+        }
+        .conclusion-tag {
             font-family: var(--mono);
-            font-size: 11px;
-            letter-spacing: 0.2em;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.25em;
             color: var(--gold);
-            margin-bottom: 24px;
+            margin-bottom: 28px;
         }
         .conclusion-text {
             font-size: 18px;
-            line-height: 2;
-            max-width: 700px;
+            line-height: 2.2;
+            max-width: 720px;
             margin: 0 auto;
         }
         .conclusion-text strong { color: var(--gold); }
         .conclusion-text em { color: var(--danger); font-style: normal; }
         
-        /* Footer */
+        /* ═══════════════════════════════════════════════════════════════════
+           FOOTER
+           ═══════════════════════════════════════════════════════════════════ */
         footer {
             padding: 80px 0 60px;
             text-align: center;
-            border-top: 1px solid rgba(212,168,83,0.08);
+            border-top: 1px solid rgba(212,168,83,0.06);
         }
-        .footer-kanji {
-            font-size: 48px;
-            background: linear-gradient(135deg, var(--gold), var(--cyan));
+        .footer-glyph {
+            font-size: 56px;
+            background: linear-gradient(135deg, var(--gold), var(--cyan), var(--magenta));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            margin-bottom: 24px;
+            margin-bottom: 28px;
         }
         .footer-nav {
             display: flex;
             justify-content: center;
-            gap: 32px;
-            margin-bottom: 24px;
+            gap: 36px;
+            margin-bottom: 28px;
             flex-wrap: wrap;
         }
         .footer-nav a {
             font-size: 13px;
             color: var(--text-dim);
             text-decoration: none;
-            transition: color 0.2s;
+            transition: color 0.25s;
         }
         .footer-nav a:hover { color: var(--gold); }
-        .footer-text {
+        .footer-meta {
             font-size: 12px;
             color: var(--text-muted);
         }
         
         /* Responsive */
         @media (max-width: 640px) {
-            .hero-stats { flex-direction: column; gap: 24px; }
             .container { padding: 0 20px; }
             section { padding: 60px 0; }
+            .hero-metrics { gap: 12px; }
+            .chart-wrapper { margin: 0 20px 0 40px; height: 180px; }
         }
     </style>
 </head>
 <body>
-    <div class="cursor" id="cursor"></div>
+    <!-- Custom Cursor -->
+    <div class="cursor-ring" id="cursorRing"></div>
     <div class="cursor-dot" id="cursorDot"></div>
     
+    <!-- World Layer -->
     <div class="world">
-        <div class="training-grid"></div>
-        <div class="status-orb orb-danger"></div>
-        <div class="status-orb orb-success"></div>
-        <div class="status-orb orb-info"></div>
+        <div class="world-grid"></div>
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+        <div class="scanlines"></div>
     </div>
     
+    <!-- Content -->
     <div class="content">
         <header class="hero">
             <div class="container">
-                <div class="hero-badge">
-                    <div class="hero-badge-dot"></div>
-                    TRAINING DIVERGING
+                <div class="status-badge">
+                    <div class="status-dot"></div>
+                    LOSS DIVERGING · +439.6%
                 </div>
-                <h1 class="hero-kanji">認知</h1>
-                <p class="hero-title">Training <span>Reality Check</span></p>
-                <p class="hero-sub">Real data from TensorBoard. Real problems found. Real fixes needed. This is what "demos not memos" actually looks like—honest assessment, not marketing.</p>
                 
-                <div class="hero-stats">
-                    <div class="hero-stat">
-                        <div class="hero-stat-value danger">60.81</div>
-                        <div class="hero-stat-label">Current Loss (BAD)</div>
+                <h1 class="hero-kanji">認知</h1>
+                <p class="hero-title">Training <span class="highlight">Reality Check</span></p>
+                <p class="hero-lead">Real metrics from TensorBoard. <em>454 data points.</em> Real problems identified. This is what honest engineering looks like—not marketing, but diagnosis.</p>
+                
+                <div class="hero-metrics">
+                    <div class="metric-card">
+                        <span class="metric-delta bad">+439%</span>
+                        <div class="metric-value">61.01</div>
+                        <div class="metric-label">Current Loss</div>
                     </div>
-                    <div class="hero-stat">
-                        <div class="hero-stat-value">4,490</div>
-                        <div class="hero-stat-label">Steps Completed</div>
+                    <div class="metric-card">
+                        <div class="metric-value gold">4,530</div>
+                        <div class="metric-label">Steps Completed</div>
                     </div>
-                    <div class="hero-stat">
-                        <div class="hero-stat-value success">413</div>
-                        <div class="hero-stat-label">Samples/sec</div>
+                    <div class="metric-card success">
+                        <span class="metric-delta good">+240%</span>
+                        <div class="metric-value success">432</div>
+                        <div class="metric-label">Peak Samples/sec</div>
                     </div>
-                    <div class="hero-stat">
-                        <div class="hero-stat-value">Phase 3</div>
-                        <div class="hero-stat-label">Joint Training</div>
+                    <div class="metric-card">
+                        <div class="metric-value gold">Phase 3</div>
+                        <div class="metric-label">Joint Training</div>
                     </div>
                 </div>
             </div>
         </header>
         
+        <!-- Section 1: The Problem -->
         <section>
             <div class="container reveal">
-                <div class="section-tag">01 · THE PROBLEM</div>
-                <h2 class="section-title">Loss is <span class="danger">exploding</span>, not converging</h2>
-                <p class="section-lead">Training started at loss ~11. It's now at 60+. This is the opposite of learning. The model is getting worse with each phase transition.</p>
+                <div class="section-num">01</div>
+                <h2 class="section-title">Loss is <span class="danger">exploding</span>,<br>not converging</h2>
+                <p class="section-lead">Training started at loss 11.31. It's now at 61.01. The model is actively getting worse—every phase transition triggers a catastrophic loss spike.</p>
                 
-                <div class="loss-curve-container">
-                    <div class="loss-curve-header">
-                        <span class="loss-curve-title">LOSS TRAJECTORY · RUNS/KAGAMI</span>
-                        <div class="loss-curve-legend">
-                            <div class="legend-item"><div class="legend-dot loss"></div>Training Loss</div>
+                <!-- Real Loss Curve from TensorBoard -->
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <span class="chart-title">TRAINING LOSS · RUNS/KAGAMI · 454 POINTS</span>
+                        <div class="chart-legend">
+                            <div class="legend-item"><div class="legend-dot loss"></div>Loss</div>
                             <div class="legend-item"><div class="legend-dot phase"></div>Phase Transition</div>
                         </div>
                     </div>
-                    <div class="loss-curve">
-                        <svg class="loss-curve-svg" viewBox="0 0 800 200" preserveAspectRatio="none">
+                    <div class="chart-wrapper">
+                        <div class="y-axis">
+                            <span>65</span>
+                            <span>48</span>
+                            <span>32</span>
+                            <span>16</span>
+                            <span>0</span>
+                        </div>
+                        <svg class="chart-svg" viewBox="0 0 800 200" preserveAspectRatio="none">
                             <defs>
-                                <linearGradient id="loss-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <linearGradient id="lossGradient" x1="0%" y1="0%" x2="0%" y2="100%">
                                     <stop offset="0%" stop-color="#ff4757" stop-opacity="0.4"/>
                                     <stop offset="100%" stop-color="#ff4757" stop-opacity="0"/>
                                 </linearGradient>
                             </defs>
+                            
                             <!-- Phase transition lines -->
-                            <line class="phase-line" x1="178" y1="0" x2="178" y2="200"/>
-                            <text class="phase-label" x="178" y="15" text-anchor="middle">P1</text>
-                            <line class="phase-line" x1="356" y1="0" x2="356" y2="200"/>
-                            <text class="phase-label" x="356" y="15" text-anchor="middle">P2</text>
-                            <line class="phase-line" x1="712" y1="0" x2="712" y2="200"/>
-                            <text class="phase-label" x="712" y="15" text-anchor="middle">P3</text>
-                            <!-- Loss curve (inverted because higher=bad) -->
-                            <path class="loss-area" d="M0,166 L18,162 L36,159 L54,165 L72,170 L90,165 L108,172 L126,172 L144,169 L162,176 L200,125 L300,75 L400,95 L500,120 L600,70 L700,50 L800,35 L800,200 L0,200 Z"/>
-                            <path class="loss-path" d="M0,166 L18,162 L36,159 L54,165 L72,170 L90,165 L108,172 L126,172 L144,169 L162,176 L200,125 L300,75 L400,95 L500,120 L600,70 L700,50 L800,35"/>
+                            <line x1="176.6" y1="0" x2="176.6" y2="200" stroke="#70a1ff" stroke-width="1" stroke-dasharray="4 4"/>
+                            <line x1="353.2" y1="0" x2="353.2" y2="200" stroke="#70a1ff" stroke-width="1" stroke-dasharray="4 4"/>
+                            <line x1="706.4" y1="0" x2="706.4" y2="200" stroke="#70a1ff" stroke-width="1" stroke-dasharray="4 4"/>
+                            
+                            <!-- Phase labels -->
+                            <text x="176.6" y="14" text-anchor="middle" fill="#70a1ff" font-family="JetBrains Mono" font-size="9">P1</text>
+                            <text x="353.2" y="14" text-anchor="middle" fill="#70a1ff" font-family="JetBrains Mono" font-size="9">P2</text>
+                            <text x="706.4" y="14" text-anchor="middle" fill="#70a1ff" font-family="JetBrains Mono" font-size="9">P3</text>
+                            
+                            <!-- Loss area fill -->
+                            <path fill="url(#lossGradient)" d="M1.8,165.2 L7.1,164.8 L12.4,163.2 L17.7,162.5 L23.0,165.0 L28.3,166.7 L33.6,167.8 L38.9,167.6 L44.2,167.3 L49.4,167.6 L54.7,167.5 L60.0,166.9 L65.3,165.8 L70.6,164.5 L75.9,162.6 L81.2,160.6 L86.5,158.2 L91.8,155.9 L97.1,153.3 L102.4,150.5 L107.7,147.6 L113.0,144.6 L118.3,140.7 L123.6,136.5 L128.9,132.4 L134.2,128.4 L139.5,124.5 L144.8,120.8 L150.1,117.2 L155.4,113.6 L160.7,110.2 L166.0,106.9 L171.3,103.7 L176.6,100.6 L181.9,97.5 L187.2,94.5 L192.5,91.7 L197.8,88.9 L203.1,86.2 L208.4,83.6 L213.7,81.1 L219.0,78.6 L224.3,76.2 L229.6,73.9 L234.9,71.7 L240.2,69.7 L245.5,68.2 L250.8,67.3 L256.1,67.0 L261.4,67.0 L266.7,67.4 L272.0,68.1 L277.3,69.0 L282.6,70.1 L287.9,71.4 L293.2,72.8 L298.5,74.3 L303.8,75.9 L309.1,77.7 L314.3,79.5 L319.6,81.3 L324.9,83.3 L330.2,85.2 L335.5,87.2 L340.8,89.1 L346.1,91.1 L351.4,93.1 L356.7,95.0 L362.0,96.9 L367.3,98.7 L372.6,100.4 L377.9,102.1 L383.2,103.8 L388.5,105.3 L393.8,106.9 L399.1,108.4 L404.4,109.8 L409.7,111.3 L415.0,112.6 L420.3,114.0 L425.6,115.2 L430.9,116.1 L436.2,115.1 L441.5,111.8 L446.8,108.4 L452.1,105.1 L457.4,101.9 L462.7,98.8 L468.0,95.8 L473.3,92.9 L478.6,90.0 L483.9,87.3 L489.2,84.6 L494.5,82.0 L499.8,79.5 L505.1,77.1 L510.4,74.7 L515.7,72.4 L521.0,70.2 L526.3,68.0 L531.6,65.9 L536.9,63.9 L542.2,62.0 L547.5,60.1 L552.8,58.4 L558.1,56.6 L563.4,54.9 L568.7,53.2 L574.0,51.6 L579.2,50.0 L584.5,48.4 L589.8,46.9 L595.1,45.4 L600.4,44.0 L605.7,42.6 L611.0,41.3 L616.3,40.0 L621.6,38.7 L626.9,37.5 L632.2,36.3 L637.5,35.1 L642.8,34.0 L648.1,32.9 L653.4,31.8 L658.7,30.8 L664.0,29.8 L669.3,28.9 L674.6,27.9 L679.9,27.0 L685.2,26.1 L690.5,25.3 L695.8,24.4 L701.1,23.6 L706.4,22.9 L711.7,22.1 L717.0,21.4 L722.3,20.6 L727.6,19.9 L732.9,19.3 L738.2,18.6 L743.5,18.0 L748.8,17.4 L754.1,16.8 L759.4,16.2 L764.7,15.6 L770.0,15.1 L775.3,14.5 L780.6,14.0 L785.9,13.5 L791.2,13.0 L796.5,12.6 L800,12.1 L800,200 L0,200 Z"/>
+                            
+                            <!-- Loss line -->
+                            <path fill="none" stroke="#ff4757" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="loss-line" d="M1.8,165.2 L7.1,164.8 L12.4,163.2 L17.7,162.5 L23.0,165.0 L28.3,166.7 L33.6,167.8 L38.9,167.6 L44.2,167.3 L49.4,167.6 L54.7,167.5 L60.0,166.9 L65.3,165.8 L70.6,164.5 L75.9,162.6 L81.2,160.6 L86.5,158.2 L91.8,155.9 L97.1,153.3 L102.4,150.5 L107.7,147.6 L113.0,144.6 L118.3,140.7 L123.6,136.5 L128.9,132.4 L134.2,128.4 L139.5,124.5 L144.8,120.8 L150.1,117.2 L155.4,113.6 L160.7,110.2 L166.0,106.9 L171.3,103.7 L176.6,100.6 L181.9,97.5 L187.2,94.5 L192.5,91.7 L197.8,88.9 L203.1,86.2 L208.4,83.6 L213.7,81.1 L219.0,78.6 L224.3,76.2 L229.6,73.9 L234.9,71.7 L240.2,69.7 L245.5,68.2 L250.8,67.3 L256.1,67.0 L261.4,67.0 L266.7,67.4 L272.0,68.1 L277.3,69.0 L282.6,70.1 L287.9,71.4 L293.2,72.8 L298.5,74.3 L303.8,75.9 L309.1,77.7 L314.3,79.5 L319.6,81.3 L324.9,83.3 L330.2,85.2 L335.5,87.2 L340.8,89.1 L346.1,91.1 L351.4,93.1 L356.7,95.0 L362.0,96.9 L367.3,98.7 L372.6,100.4 L377.9,102.1 L383.2,103.8 L388.5,105.3 L393.8,106.9 L399.1,108.4 L404.4,109.8 L409.7,111.3 L415.0,112.6 L420.3,114.0 L425.6,115.2 L430.9,116.1 L436.2,115.1 L441.5,111.8 L446.8,108.4 L452.1,105.1 L457.4,101.9 L462.7,98.8 L468.0,95.8 L473.3,92.9 L478.6,90.0 L483.9,87.3 L489.2,84.6 L494.5,82.0 L499.8,79.5 L505.1,77.1 L510.4,74.7 L515.7,72.4 L521.0,70.2 L526.3,68.0 L531.6,65.9 L536.9,63.9 L542.2,62.0 L547.5,60.1 L552.8,58.4 L558.1,56.6 L563.4,54.9 L568.7,53.2 L574.0,51.6 L579.2,50.0 L584.5,48.4 L589.8,46.9 L595.1,45.4 L600.4,44.0 L605.7,42.6 L611.0,41.3 L616.3,40.0 L621.6,38.7 L626.9,37.5 L632.2,36.3 L637.5,35.1 L642.8,34.0 L648.1,32.9 L653.4,31.8 L658.7,30.8 L664.0,29.8 L669.3,28.9 L674.6,27.9 L679.9,27.0 L685.2,26.1 L690.5,25.3 L695.8,24.4 L701.1,23.6 L706.4,22.9 L711.7,22.1 L717.0,21.4 L722.3,20.6 L727.6,19.9 L732.9,19.3 L738.2,18.6 L743.5,18.0 L748.8,17.4 L754.1,16.8 L759.4,16.2 L764.7,15.6 L770.0,15.1 L775.3,14.5 L780.6,14.0 L785.9,13.5 L791.2,13.0 L796.5,12.6 L800,12.1"/>
+                            
+                            <!-- End point marker -->
+                            <circle cx="800" cy="12.1" r="5" fill="#ff4757"/>
                         </svg>
-                        <span class="loss-axis-label loss-axis-y">Loss</span>
-                        <span class="loss-axis-label loss-axis-x">Step 4,490</span>
+                        <div class="x-axis">
+                            <span>0</span>
+                            <span>1,000</span>
+                            <span>2,000</span>
+                            <span>3,000</span>
+                            <span>4,530</span>
+                        </div>
+                        <div class="chart-annotation" style="right: 20px; top: 0;">61.01 @ step 4530</div>
                     </div>
                 </div>
                 
+                <!-- Phase breakdown -->
                 <div class="phase-grid">
                     <div class="phase-card">
-                        <div class="phase-num">PHASE 0</div>
-                        <div class="phase-name">H¹⁴ Hierarchy</div>
-                        <div class="phase-loss ok">~11.3</div>
-                        <div class="phase-steps">Steps 0–1000 ✓</div>
+                        <div class="phase-badge">PHASE 0</div>
+                        <div class="phase-name">Hierarchy<sup>H¹⁴</sup></div>
+                        <div class="phase-stats">
+                            <div class="phase-stat">
+                                <span class="phase-stat-label">Loss</span>
+                                <span class="phase-stat-value ok">10.5 → 11.3</span>
+                            </div>
+                            <div class="phase-stat">
+                                <span class="phase-stat-label">Steps</span>
+                                <span class="phase-stat-value">0 – 1,000</span>
+                            </div>
+                            <div class="phase-stat">
+                                <span class="phase-stat-label">Status</span>
+                                <span class="phase-stat-value good">✓ Stable</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="phase-card">
-                        <div class="phase-num">PHASE 1</div>
-                        <div class="phase-name">S⁷ Rotation</div>
-                        <div class="phase-loss bad">14→43</div>
-                        <div class="phase-steps">Steps 1000–2000 ✗</div>
+                        <div class="phase-badge">PHASE 1</div>
+                        <div class="phase-name">Rotation<sup>S⁷</sup></div>
+                        <div class="phase-stats">
+                            <div class="phase-stat">
+                                <span class="phase-stat-label">Loss</span>
+                                <span class="phase-stat-value bad">11 → 43</span>
+                            </div>
+                            <div class="phase-stat">
+                                <span class="phase-stat-label">Steps</span>
+                                <span class="phase-stat-value">1,000 – 2,000</span>
+                            </div>
+                            <div class="phase-stat">
+                                <span class="phase-stat-label">Status</span>
+                                <span class="phase-stat-value bad">✗ Exploded</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="phase-card">
-                        <div class="phase-num">PHASE 2</div>
-                        <div class="phase-name">JEPA Dynamics</div>
-                        <div class="phase-loss bad">29→52</div>
-                        <div class="phase-steps">Steps 2000–4000 ✗</div>
+                        <div class="phase-badge">PHASE 2</div>
+                        <div class="phase-name">Dynamics<sup>JEPA</sup></div>
+                        <div class="phase-stats">
+                            <div class="phase-stat">
+                                <span class="phase-stat-label">Loss</span>
+                                <span class="phase-stat-value ok">43 → 27 → 35</span>
+                            </div>
+                            <div class="phase-stat">
+                                <span class="phase-stat-label">Steps</span>
+                                <span class="phase-stat-value">2,000 – 4,000</span>
+                            </div>
+                            <div class="phase-stat">
+                                <span class="phase-stat-label">Status</span>
+                                <span class="phase-stat-value ok">⚠ Partial recovery</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="phase-card current">
-                        <div class="phase-num">PHASE 3 · CURRENT</div>
-                        <div class="phase-name">Joint Training</div>
-                        <div class="phase-loss bad">60.81</div>
-                        <div class="phase-steps">Steps 4000+ ✗</div>
+                        <div class="phase-badge">PHASE 3 · CURRENT</div>
+                        <div class="phase-name">Joint</div>
+                        <div class="phase-stats">
+                            <div class="phase-stat">
+                                <span class="phase-stat-label">Loss</span>
+                                <span class="phase-stat-value bad">35 → 61</span>
+                            </div>
+                            <div class="phase-stat">
+                                <span class="phase-stat-label">Steps</span>
+                                <span class="phase-stat-value">4,000+</span>
+                            </div>
+                            <div class="phase-stat">
+                                <span class="phase-stat-label">Status</span>
+                                <span class="phase-stat-value bad">✗ Diverging</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </section>
         
+        <!-- Section 2: Diagnosis -->
         <section>
             <div class="container reveal">
-                <div class="section-tag">02 · DIAGNOSIS</div>
-                <h2 class="section-title">Root cause <span>analysis</span></h2>
-                <p class="section-lead">The curriculum phase transitions are destabilizing the model. Each phase change introduces new loss components that overwhelm what was learned.</p>
+                <div class="section-num">02</div>
+                <h2 class="section-title">Root cause <span class="gold">analysis</span></h2>
+                <p class="section-lead">The curriculum scheduler's phase transitions are catastrophically destabilizing the model. Each transition introduces new loss components without gradual blending.</p>
                 
                 <div class="diagnosis">
                     <div class="diagnosis-header">
                         <div class="diagnosis-icon">⚠</div>
-                        <div class="diagnosis-title">CRITICAL ISSUES FOUND</div>
+                        <div class="diagnosis-title">Critical Issues Identified</div>
                     </div>
                     <ul class="diagnosis-list">
                         <li class="diagnosis-item">
                             <div class="diagnosis-bullet"></div>
-                            <div class="diagnosis-text"><strong>Abrupt loss weight transitions</strong> — Phase 0 uses {hierarchy: 1.0}. Phase 1 switches to {rotation: 1.0}. This completely changes the optimization landscape without blending.</div>
+                            <div class="diagnosis-text"><strong>Abrupt loss weight transitions</strong> — Phase 0 uses <code>{hierarchy: 1.0}</code>. Phase 1 instantly switches to <code>{rotation: 1.0}</code>. This completely restructures the optimization landscape without any blending period.</div>
                         </li>
                         <li class="diagnosis-item">
                             <div class="diagnosis-bullet"></div>
-                            <div class="diagnosis-text"><strong>Learning rate too high post-transition</strong> — Base LR of 1e-3 × 0.8 multiplier = 8e-4 is too aggressive when the loss surface has just radically changed.</div>
+                            <div class="diagnosis-text"><strong>Learning rate remains at 1e-3</strong> — Despite phase transitions changing the loss surface, LR stays constant. Should drop to 1e-4 and warm up again at each transition.</div>
                         </li>
                         <li class="diagnosis-item">
                             <div class="diagnosis-bullet"></div>
-                            <div class="diagnosis-text"><strong>E8 depth jumping too fast</strong> — Depth goes 2→4→6→8 across phases. Each increase changes the model's effective capacity, causing distribution shift.</div>
+                            <div class="diagnosis-text"><strong>E8 depth jumping too fast</strong> — Residual depth goes 2→4→6→8 across phases. Each increase changes the model's effective capacity, causing distribution shift in latent space.</div>
                         </li>
                         <li class="diagnosis-item">
                             <div class="diagnosis-bullet"></div>
-                            <div class="diagnosis-text"><strong>No checkpoints being saved</strong> — The <code>checkpoints/kagami/</code> directory is empty. No recovery point exists.</div>
+                            <div class="diagnosis-text"><strong>No checkpoints being saved</strong> — The <code>checkpoints/kagami/</code> directory is empty. Zero recovery points exist. Every step is unrecoverable.</div>
                         </li>
                     </ul>
                 </div>
                 
                 <div class="code-block">
                     <div class="code-header">
-                        <span class="code-label">tensorboard · runs/kagami</span>
+                        <span class="code-label">TensorBoard Event Analysis</span>
                         <span class="code-badge danger">DIVERGING</span>
                     </div>
                     <div class="code-body">
-<pre><span class="dim"># Real data from TensorBoard event files</span>
+<pre><span class="dim"># Extracted from runs/kagami/ (454 scalar points)</span>
 
-<span class="gold">Curriculum/phase:</span>      <span class="info">3</span>        <span class="dim">← Joint training</span>
-<span class="gold">Curriculum/phase_step:</span> <span class="info">480</span>      <span class="dim">← Steps in current phase</span>
-<span class="gold">Learning_Rate:</span>         <span class="info">0.001</span>    <span class="dim">← Still at base LR</span>
-<span class="gold">Loss/train:</span>            <span class="danger">60.76</span>    <span class="dim">← SHOULD BE ~5, NOT 60</span>
+<span class="gold">Loss/train</span>
+  <span class="dim">min:</span>  <span class="success">10.45</span>    <span class="dim">← Best achieved (step ~210)</span>
+  <span class="dim">max:</span>  <span class="danger">61.01</span>    <span class="dim">← Current (step 4530)</span>
+  <span class="dim">Δ:</span>    <span class="danger">+439.6%</span>  <span class="dim">← This is NOT learning</span>
 
-<span class="dim"># Loss progression (should DECREASE, not increase)</span>
-Step     10: loss=<span class="success">11.31</span>  <span class="dim">← Good start</span>
-Step   1000: loss=<span class="info">12.17</span>  <span class="dim">← Phase 0 → 1 transition</span>
-Step   2000: loss=<span class="danger">34.32</span>  <span class="dim">← EXPLOSION starts</span>
-Step   4000: loss=<span class="danger">57.66</span>  <span class="dim">← Getting worse</span>
-Step   4490: loss=<span class="danger">60.81</span>  <span class="dim">← Still diverging</span></pre>
+<span class="gold">Curriculum/phase</span>
+  <span class="info">Step    10:</span> Phase 0 <span class="dim">(Hierarchy)</span>
+  <span class="info">Step 1,000:</span> Phase 1 <span class="dim">(Rotation)</span>   <span class="danger">← Loss spikes here</span>
+  <span class="info">Step 2,000:</span> Phase 2 <span class="dim">(Dynamics)</span>  <span class="dim">← Partial recovery</span>
+  <span class="info">Step 4,000:</span> Phase 3 <span class="dim">(Joint)</span>     <span class="danger">← Divergence resumes</span>
+
+<span class="gold">Learning_Rate</span>
+  <span class="dim">Warmup:</span> 0.00002 → 0.001 <span class="dim">(steps 10-500)</span>
+  <span class="dim">After:</span>  <span class="magenta">Constant 0.001</span> <span class="dim">← Never reduces!</span>
+
+<span class="gold">Throughput/samples_per_sec</span>
+  <span class="dim">min:</span>  <span class="info">115.6</span>   <span class="dim">← Cold start</span>
+  <span class="dim">max:</span>  <span class="success">432.2</span>   <span class="dim">← Peak</span>
+  <span class="dim">avg:</span>  <span class="success">386.6</span>   <span class="dim">← Excellent!</span></pre>
                     </div>
                 </div>
             </div>
         </section>
         
+        <!-- Section 3: What's Working -->
         <section>
             <div class="container reveal">
-                <div class="section-tag">03 · WHAT'S WORKING</div>
+                <div class="section-num">03</div>
                 <h2 class="section-title">Hardware is <span class="success">excellent</span></h2>
-                <p class="section-lead">The M3 Ultra with 512GB unified memory is performing beautifully. The problem is training logic, not hardware.</p>
+                <p class="section-lead">The M3 Ultra with 512GB unified memory is performing beautifully. Step time improved 49% as kernels compiled. The problem is training logic, not infrastructure.</p>
                 
-                <div class="throughput-bar">
-                    <div class="throughput-fill" style="width: 82%;">413 samples/sec</div>
-                    <span class="throughput-label">Target: 500</span>
+                <div class="throughput-viz">
+                    <div class="throughput-header">
+                        <span class="throughput-title">THROUGHPUT · SAMPLES/SEC</span>
+                        <span class="throughput-value">432.2 peak</span>
+                    </div>
+                    <div class="throughput-bar">
+                        <div class="throughput-fill" id="throughputFill">393.8 current</div>
+                    </div>
+                    <div class="throughput-markers">
+                        <span>0</span>
+                        <span>125</span>
+                        <span>250</span>
+                        <span>375</span>
+                        <span>500</span>
+                    </div>
                 </div>
                 
                 <div class="code-block">
                     <div class="code-header">
-                        <span class="code-label">Throughput Analysis</span>
+                        <span class="code-label">Performance Deep Dive</span>
                         <span class="code-badge success">HEALTHY</span>
                     </div>
                     <div class="code-body">
-<pre><span class="gold">Throughput/samples_per_sec:</span>
-  Min:     <span class="info">115.6</span> samples/s  <span class="dim">← Cold start</span>
-  Max:     <span class="success">432.2</span> samples/s  <span class="dim">← Peak performance</span>
-  Average: <span class="success">386.5</span> samples/s  <span class="dim">← Sustained</span>
-  Current: <span class="success">413.4</span> samples/s  <span class="dim">← Right now</span>
+<pre><span class="gold">Step Time Improvement</span>
+  <span class="dim">First 10 steps avg:</span>  <span class="info">9.85s</span>  <span class="dim">← Kernel compilation</span>
+  <span class="dim">Last 10 steps avg:</span>   <span class="success">5.03s</span>  <span class="dim">← Optimized</span>
+  <span class="dim">Improvement:</span>          <span class="success">49.0%</span>  <span class="dim">← Excellent warmup</span>
 
-<span class="gold">Step time:</span>      <span class="success">4.93s</span>  <span class="dim">← Fast iteration</span>
-<span class="gold">Device:</span>         <span class="cyan">MPS</span>    <span class="dim">← Native Metal acceleration</span>
-<span class="gold">Batch size:</span>     <span class="info">2048</span>   <span class="dim">← Large batches working</span>
+<span class="gold">Throughput Evolution</span>
+  <span class="dim">Step    10:</span>  <span class="info">115.6</span> samples/s  <span class="dim">← Cold</span>
+  <span class="dim">Step 1,140:</span>  <span class="success">369.5</span> samples/s  <span class="dim">← Warmed</span>
+  <span class="dim">Step 2,270:</span>  <span class="success">390.8</span> samples/s  <span class="dim">← Stable</span>
+  <span class="dim">Step 3,400:</span>  <span class="success">420.1</span> samples/s  <span class="dim">← Peak zone</span>
+  <span class="dim">Step 4,530:</span>  <span class="success">393.8</span> samples/s  <span class="dim">← Sustained</span>
 
-<span class="dim"># At this rate:</span>
-<span class="success">1.4M samples/hour</span>
-<span class="success">33.6M samples/day</span></pre>
+<span class="gold">At Current Throughput</span>
+  <span class="cyan">1.4M samples/hour</span>
+  <span class="cyan">33.6M samples/day</span>
+  <span class="cyan">1B samples in 30 days</span></pre>
                     </div>
                 </div>
             </div>
         </section>
         
+        <!-- Section 4: Action Plan -->
         <section>
             <div class="container reveal">
-                <div class="section-tag">04 · THE FIX</div>
-                <h2 class="section-title">Action <span>plan</span></h2>
-                <p class="section-lead">Training needs to be stopped and restarted with these changes:</p>
+                <div class="section-num">04</div>
+                <h2 class="section-title">The <span class="gold">fix</span></h2>
+                <p class="section-lead">Training needs to stop and restart with these specific changes to the curriculum scheduler.</p>
                 
-                <div class="action-grid">
+                <div class="action-list">
                     <div class="action-item">
                         <div class="action-num">1</div>
                         <div class="action-content">
                             <h4>Stop current training</h4>
-                            <p>The model is getting worse. Every additional step is wasted compute.</p>
+                            <p>The model is actively getting worse. Every additional step is wasted compute and diverging further from any useful state.</p>
                         </div>
                         <span class="action-status pending">PENDING</span>
                     </div>
                     <div class="action-item">
                         <div class="action-num">2</div>
                         <div class="action-content">
-                            <h4>Fix phase transitions</h4>
-                            <p>Implement gradual loss weight blending (50-step ramp) instead of abrupt switching.</p>
+                            <h4>Implement gradual loss weight blending</h4>
+                            <p>Add 50-100 step ramp when transitioning between phases. Blend old weights → new weights linearly.</p>
                         </div>
                         <span class="action-status pending">PENDING</span>
                     </div>
                     <div class="action-item">
                         <div class="action-num">3</div>
                         <div class="action-content">
-                            <h4>Lower base learning rate</h4>
-                            <p>Start with 1e-4 (not 1e-3). Add warmup restart at each phase transition.</p>
+                            <h4>Lower and reset learning rate at transitions</h4>
+                            <p>Base LR from 1e-3 → 1e-4. Add warmup restart at each phase transition (100 steps).</p>
                         </div>
                         <span class="action-status pending">PENDING</span>
                     </div>
@@ -989,15 +1303,15 @@ Step   4490: loss=<span class="danger">60.81</span>  <span class="dim">← Still
                         <div class="action-num">4</div>
                         <div class="action-content">
                             <h4>Enable checkpoint saving</h4>
-                            <p>Save every 1000 steps. Create recovery points before phase transitions.</p>
+                            <p>Save every 1,000 steps. Force save before phase transitions. Keep last 5 checkpoints.</p>
                         </div>
                         <span class="action-status pending">PENDING</span>
                     </div>
                     <div class="action-item">
                         <div class="action-num">5</div>
                         <div class="action-content">
-                            <h4>Add transition validation</h4>
-                            <p>Only advance phase if loss is STABLE, not just below threshold.</p>
+                            <h4>Add transition stability validation</h4>
+                            <p>Only advance phase when loss variance is low (stable), not just below threshold.</p>
                         </div>
                         <span class="action-status pending">PENDING</span>
                     </div>
@@ -1005,51 +1319,53 @@ Step   4490: loss=<span class="danger">60.81</span>  <span class="dim">← Still
             </div>
         </section>
         
+        <!-- Section 5: Evidence -->
         <section>
             <div class="container reveal">
-                <div class="section-tag">05 · TODAY'S EVIDENCE</div>
-                <h2 class="section-title">What <span>actually runs</span></h2>
-                <p class="section-lead">While training needs work, the rendering pipeline produced something beautiful today.</p>
+                <div class="section-num">05</div>
+                <h2 class="section-title">What <span class="gold">actually runs</span></h2>
+                <p class="section-lead">While training needs work, the rendering pipeline produced something beautiful today. The model's inference path works—it's training that's broken.</p>
                 
                 <a href="collapse/index.html" class="evidence-card">
-                    <div class="evidence-tag">RENDERED TODAY · DECEMBER 2025</div>
+                    <div class="evidence-tag">RENDERED TODAY · DECEMBER 20, 2025</div>
                     <div class="evidence-title">The Symmetry of Collapse</div>
-                    <div class="evidence-desc">A Kubrick-inspired short film rendered with Genesis physics, real-time ray tracing, SPH fluid simulation, and spatial audio. 10 seconds, 5 acts, one obsidian corridor.</div>
+                    <div class="evidence-desc">A Kubrick-inspired short film. 305 frames rendered with Genesis ray tracer, SPH fluid simulation, real-time physics audio, and OIDN denoising. 10 seconds, 5 acts, one obsidian corridor.</div>
                     <span class="evidence-arrow">→</span>
                 </a>
                 
                 <div class="code-block">
                     <div class="code-header">
-                        <span class="code-label">What ran successfully today</span>
-                        <span class="code-badge success">VERIFIED</span>
+                        <span class="code-label">Today's Verified Components</span>
+                        <span class="code-badge success">ALL PASSED</span>
                     </div>
                     <div class="code-body">
-<pre><span class="success">✓</span> <span class="gold">Genesis Ray Tracer</span>      <span class="dim">128 SPP, 12 bounces, path tracing</span>
-<span class="success">✓</span> <span class="gold">SPH Fluid Simulation</span>    <span class="dim">Water pool with surface reconstruction</span>
-<span class="success">✓</span> <span class="gold">Rigid Body Physics</span>      <span class="dim">Dominoes cascade, sphere collisions</span>
-<span class="success">✓</span> <span class="gold">OIDN Denoising</span>          <span class="dim">Metal-accelerated, device buffers</span>
-<span class="success">✓</span> <span class="gold">Cinematographer API</span>     <span class="dim">Dolly zoom, arc shot, steadicam</span>
-<span class="success">✓</span> <span class="gold">Spatial Audio</span>           <span class="dim">Modal synthesis, VBAP panning</span>
-<span class="success">✓</span> <span class="gold">FFmpeg Assembly</span>         <span class="dim">24fps MP4 output</span>
+<pre><span class="success">✓</span> <span class="gold">Genesis Ray Tracer</span>       <span class="dim">128 SPP · 12 bounces · path tracing</span>
+<span class="success">✓</span> <span class="gold">SPH Fluid Simulation</span>     <span class="dim">Water pool · surface reconstruction</span>
+<span class="success">✓</span> <span class="gold">Rigid Body Cascade</span>       <span class="dim">24 dominoes · impulse propagation</span>
+<span class="success">✓</span> <span class="gold">OIDN Denoising</span>           <span class="dim">Metal-accelerated · device buffers</span>
+<span class="success">✓</span> <span class="gold">Cinematographer API</span>      <span class="dim">Dolly zoom · arc shot · steadicam</span>
+<span class="success">✓</span> <span class="gold">Modal Synthesis Audio</span>    <span class="dim">Physics collisions → spatial sound</span>
+<span class="success">✓</span> <span class="gold">FFmpeg Assembly</span>          <span class="dim">24fps MP4 · ACES tonemapping</span>
 
 <span class="dim"># Output</span>
 <span class="cyan">/tmp/kubrick_final/THE_SYMMETRY_OF_COLLAPSE.mp4</span>
-<span class="dim">305 frames · 1920×1080 · 12.7 seconds</span></pre>
+<span class="dim">305 frames · 1920×1080 · 12.7 seconds · ~180MB</span></pre>
                     </div>
                 </div>
             </div>
         </section>
         
+        <!-- Conclusion -->
         <section>
             <div class="container reveal">
                 <div class="conclusion">
-                    <p class="conclusion-title">THE BOTTOM LINE</p>
+                    <div class="conclusion-tag">THE BOTTOM LINE</div>
                     <p class="conclusion-text">
-                        <strong>The training is broken</strong> — Loss should decrease, not explode from 11 to 60.<br><br>
-                        <strong>The hardware is fine</strong> — 413 samples/sec is excellent throughput.<br><br>
-                        <strong>The fix is clear</strong> — Gradual phase transitions, lower LR, actual checkpoints.<br><br>
-                        <strong>The renderer works</strong> — <em>Today's evidence proves that</em>.<br><br>
-                        This is what honest engineering looks like. Find the bug. Fix the bug. Ship the demo.
+                        <strong>Training is broken</strong> — Loss increased 439% instead of decreasing.<br><br>
+                        <strong>Hardware is fine</strong> — 386 samples/sec average, 49% step time improvement.<br><br>
+                        <strong>The fix is clear</strong> — Gradual transitions, lower LR, actual checkpoints.<br><br>
+                        <strong>The renderer works</strong> — <em>Today's film proves execution path is solid.</em><br><br>
+                        This is what honest engineering looks like: find the bug, name it, fix it, ship the demo.
                     </p>
                 </div>
             </div>
@@ -1057,97 +1373,108 @@ Step   4490: loss=<span class="danger">60.81</span>  <span class="dim">← Still
         
         <footer>
             <div class="container">
-                <div class="footer-kanji">鏡</div>
+                <div class="footer-glyph">鏡</div>
                 <nav class="footer-nav">
                     <a href="cognitive-architecture.html">Cognitive Architecture</a>
                     <a href="collapse/index.html">The Symmetry of Collapse</a>
-                    <a href="trailmap.html">Trailmap</a>
+                    <a href="kagami.html">Kagami</a>
                 </nav>
-                <p class="footer-text">chronOS / Kagami · December 20, 2025 · Demos not memos.</p>
+                <p class="footer-meta">chronOS / Kagami · December 20, 2025 · 454 TensorBoard data points · Demos not memos</p>
             </div>
         </footer>
     </div>
     
     <script>
-        // Custom cursor
-        const cursor = document.getElementById('cursor');
+        // ═══════════════════════════════════════════════════════════════════
+        // CUSTOM CURSOR
+        // ═══════════════════════════════════════════════════════════════════
+        const cursorRing = document.getElementById('cursorRing');
         const cursorDot = document.getElementById('cursorDot');
         let mouseX = 0, mouseY = 0;
-        let cursorX = 0, cursorY = 0;
+        let ringX = 0, ringY = 0;
         
         document.addEventListener('mousemove', e => {
             mouseX = e.clientX;
             mouseY = e.clientY;
-            cursorDot.style.left = mouseX - 2 + 'px';
-            cursorDot.style.top = mouseY - 2 + 'px';
+            cursorDot.style.left = mouseX - 2.5 + 'px';
+            cursorDot.style.top = mouseY - 2.5 + 'px';
         });
         
         function animateCursor() {
-            cursorX += (mouseX - cursorX) * 0.15;
-            cursorY += (mouseY - cursorY) * 0.15;
-            cursor.style.left = cursorX - 10 + 'px';
-            cursor.style.top = cursorY - 10 + 'px';
+            ringX += (mouseX - ringX) * 0.12;
+            ringY += (mouseY - ringY) * 0.12;
+            cursorRing.style.left = ringX - 16 + 'px';
+            cursorRing.style.top = ringY - 16 + 'px';
             requestAnimationFrame(animateCursor);
         }
         animateCursor();
         
-        // Cursor states
-        document.querySelectorAll('.diagnosis, .phase-card.current').forEach(el => {
-            el.addEventListener('mouseenter', () => cursor.classList.add('danger'));
-            el.addEventListener('mouseleave', () => cursor.classList.remove('danger'));
+        // Hover states
+        document.querySelectorAll('a, button, .phase-card, .action-item, .metric-card').forEach(el => {
+            el.addEventListener('mouseenter', () => cursorRing.classList.add('hovering'));
+            el.addEventListener('mouseleave', () => cursorRing.classList.remove('hovering'));
         });
-        document.querySelectorAll('.evidence-card, .action-status.done').forEach(el => {
-            el.addEventListener('mouseenter', () => cursor.classList.add('success'));
-            el.addEventListener('mouseleave', () => cursor.classList.remove('success'));
+        document.querySelectorAll('.evidence-card, .code-badge.success, .metric-card.success').forEach(el => {
+            el.addEventListener('mouseenter', () => {
+                cursorRing.classList.add('success');
+                cursorDot.classList.add('success');
+            });
+            el.addEventListener('mouseleave', () => {
+                cursorRing.classList.remove('success');
+                cursorDot.classList.remove('success');
+            });
         });
         
-        // Reveal on scroll
+        // ═══════════════════════════════════════════════════════════════════
+        // SCROLL REVEALS
+        // ═══════════════════════════════════════════════════════════════════
         const reveals = document.querySelectorAll('.reveal');
-        const observer = new IntersectionObserver((entries) => {
+        const revealObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
                     entry.target.classList.add('visible');
                 }
             });
-        }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+        }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
         
-        reveals.forEach(el => observer.observe(el));
+        reveals.forEach(el => revealObserver.observe(el));
         
-        // Animate throughput bar on scroll
-        const throughputFill = document.querySelector('.throughput-fill');
+        // ═══════════════════════════════════════════════════════════════════
+        // THROUGHPUT BAR ANIMATION
+        // ═══════════════════════════════════════════════════════════════════
+        const throughputFill = document.getElementById('throughputFill');
+        const throughputObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    setTimeout(() => throughputFill.classList.add('animated'), 200);
+                }
+            });
+        }, { threshold: 0.5 });
+        
         if (throughputFill) {
-            const throughputObserver = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        throughputFill.style.width = '82%';
-                    }
-                });
-            }, { threshold: 0.5 });
             throughputObserver.observe(throughputFill.parentElement);
         }
         
-        // Loss curve animation
-        const lossPath = document.querySelector('.loss-path');
-        const lossArea = document.querySelector('.loss-area');
-        if (lossPath) {
-            const length = lossPath.getTotalLength();
-            lossPath.style.strokeDasharray = length;
-            lossPath.style.strokeDashoffset = length;
-            lossArea.style.opacity = '0';
+        // ═══════════════════════════════════════════════════════════════════
+        // LOSS LINE ANIMATION
+        // ═══════════════════════════════════════════════════════════════════
+        const lossLine = document.querySelector('.loss-line');
+        if (lossLine) {
+            const length = lossLine.getTotalLength();
+            lossLine.style.strokeDasharray = length;
+            lossLine.style.strokeDashoffset = length;
             
-            const curveObserver = new IntersectionObserver((entries) => {
+            const chartObserver = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
-                        lossPath.style.transition = 'stroke-dashoffset 2s ease-out';
-                        lossPath.style.strokeDashoffset = '0';
-                        lossArea.style.transition = 'opacity 1s ease-out 1s';
-                        lossArea.style.opacity = '0.3';
+                        lossLine.style.transition = 'stroke-dashoffset 2.5s ease-out';
+                        lossLine.style.strokeDashoffset = '0';
                     }
                 });
             }, { threshold: 0.3 });
-            curveObserver.observe(lossPath.closest('.loss-curve-container'));
+            
+            chartObserver.observe(lossLine.closest('.chart-container'));
         }
     </script>
 </body>
 </html>
-
