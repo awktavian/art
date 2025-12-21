@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0a0a0c">
+    <title>対称 — Technical Deep Dive</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Space+Grotesk:wght@300;400;500&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --void: #0a0a0c;
+            --obsidian: #12121a;
+            --text: #e8e4dc;
+            --text-dim: rgba(232, 228, 220, 0.6);
+            --text-whisper: rgba(232, 228, 220, 0.25);
+            --gold: #d4af37;
+            --cyan: #00ffff;
+            --magenta: #ff00ff;
+            --green: #00ff88;
+            --neon-cyan: #00d4ff;
+            --neon-pink: #ff44aa;
+            --glass: rgba(255, 255, 255, 0.03);
+            --font-display: 'Cormorant Garamond', Georgia, serif;
+            --font-body: 'Space Grotesk', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; background: var(--void); }
+
+        body {
+            font-family: var(--font-body);
+            color: var(--text);
+            background: var(--void);
+            overflow-x: hidden;
+            cursor: none;
+            font-size: 16px;
+            line-height: 1.8;
+        }
+
+        /* === CUSTOM CURSOR === */
+        .cursor {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            border: 1px solid var(--cyan);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 10000;
+            transition: transform 0.15s ease, border-color 0.3s, background 0.3s;
+            mix-blend-mode: difference;
+        }
+        .cursor-dot {
+            position: fixed;
+            width: 4px;
+            height: 4px;
+            background: var(--cyan);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 10001;
+        }
+        .cursor.hover {
+            transform: scale(2);
+            background: rgba(0, 255, 255, 0.1);
+        }
+
+        /* === NEON GRID BACKGROUND === */
+        .grid-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .grid-lines {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 200%;
+            height: 200%;
+            transform: translate(-50%, -50%) perspective(500px) rotateX(60deg);
+            background: 
+                linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            animation: gridMove 20s linear infinite;
+        }
+
+        @keyframes gridMove {
+            0% { transform: translate(-50%, -50%) perspective(500px) rotateX(60deg) translateY(0); }
+            100% { transform: translate(-50%, -50%) perspective(500px) rotateX(60deg) translateY(60px); }
+        }
+
+        .gradient-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at center, transparent 0%, var(--void) 70%);
+        }
+
+        /* Floating particles */
+        .particle {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: var(--cyan);
+            border-radius: 50%;
+            opacity: 0.4;
+            animation: drift 15s ease-in-out infinite;
+        }
+
+        @keyframes drift {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+            50% { transform: translate(30px, -50px) scale(1.5); opacity: 0.8; }
+        }
+
+        /* === NAV === */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 1.5rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(180deg, var(--void) 0%, transparent 100%);
+        }
+        .nav-logo {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            letter-spacing: 0.15em;
+            color: var(--cyan);
+        }
+        .nav-links {
+            display: flex;
+            gap: 2.5rem;
+        }
+        .nav-links a {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            text-decoration: none;
+            position: relative;
+            padding: 0.5rem 0;
+        }
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 1px;
+            background: var(--cyan);
+            transition: width 0.3s ease;
+        }
+        .nav-links a:hover::after,
+        .nav-links a.active::after { width: 100%; }
+        .nav-links a:hover,
+        .nav-links a.active { color: var(--text); }
+
+        /* === LAYOUT === */
+        .hero {
+            min-height: 60vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 8rem 2rem 4rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .section {
+            padding: 4rem 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .section-wide {
+            max-width: 1100px;
+        }
+
+        /* === TYPOGRAPHY === */
+        .hero-label {
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            letter-spacing: 0.3em;
+            color: var(--text-whisper);
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2.5rem, 6vw, 4rem);
+            font-weight: 300;
+            color: var(--gold);
+            margin-bottom: 1.5rem;
+            line-height: 1.2;
+        }
+
+        h2 {
+            font-family: var(--font-display);
+            font-size: 2rem;
+            font-weight: 300;
+            font-style: italic;
+            color: var(--gold);
+            margin-bottom: 1.5rem;
+        }
+
+        h3 {
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            letter-spacing: 0.25em;
+            color: var(--text-whisper);
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+        }
+
+        h4 {
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            font-weight: 400;
+            color: var(--text);
+            margin-bottom: 1rem;
+            margin-top: 2rem;
+        }
+
+        p { margin-bottom: 1.5rem; color: var(--text-dim); }
+        .lead { font-size: 1.1rem; color: var(--text-dim); max-width: 600px; }
+
+        /* === DIVIDER === */
+        .divider {
+            width: 60px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+            margin: 2rem 0;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            margin: 4rem 0;
+        }
+
+        /* === CODE === */
+        code {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            background: var(--glass);
+            padding: 0.2em 0.5em;
+            border-radius: 4px;
+            color: var(--cyan);
+        }
+
+        pre {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.7;
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.03) 0%, rgba(255, 0, 255, 0.02) 100%);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 2px solid var(--cyan);
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            position: relative;
+        }
+
+        pre::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(0, 255, 255, 0.05), transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        pre:hover::before { opacity: 1; }
+
+        .comment { color: var(--text-whisper); }
+        .keyword { color: var(--cyan); }
+        .value { color: var(--magenta); }
+        .string { color: var(--green); }
+        .function { color: var(--gold); }
+
+        /* === EQUATION === */
+        .equation {
+            font-family: var(--font-mono);
+            font-size: 1.1rem;
+            text-align: center;
+            padding: 2rem;
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.05) 0%, transparent 100%);
+            border-radius: 8px;
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            margin: 2rem 0;
+            color: var(--gold);
+        }
+
+        /* === CARDS === */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .card {
+            background: var(--glass);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 1.5rem;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3px;
+            height: 100%;
+            background: var(--cyan);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px) translateX(5px);
+            border-color: rgba(0, 255, 255, 0.2);
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+        }
+
+        .card:hover::before { opacity: 1; }
+
+        .card h4 {
+            margin-top: 0;
+            color: var(--cyan);
+            font-size: 0.8rem;
+        }
+
+        .card p {
+            font-size: 0.9rem;
+            margin-bottom: 0;
+        }
+
+        /* === TABLE === */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2rem 0;
+            font-size: 0.9rem;
+        }
+
+        th {
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            font-weight: 500;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-whisper);
+            text-align: left;
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--text-dim);
+            transition: background 0.2s;
+        }
+
+        tr:hover td {
+            background: rgba(0, 255, 255, 0.03);
+        }
+
+        td:first-child {
+            color: var(--text);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+        }
+
+        /* === CALLOUT === */
+        .callout {
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.05) 0%, rgba(255, 0, 255, 0.02) 100%);
+            border-left: 2px solid var(--cyan);
+            padding: 1.5rem;
+            margin: 2rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .callout::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(0, 255, 255, 0.1), transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .callout:hover::before { opacity: 1; }
+
+        .callout-label {
+            font-family: var(--font-mono);
+            font-size: 0.55rem;
+            letter-spacing: 0.2em;
+            color: var(--cyan);
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .callout p { margin: 0; font-size: 0.9rem; }
+
+        /* === IMAGES === */
+        .frame {
+            width: 100%;
+            border-radius: 8px;
+            margin: 2rem 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .frame img {
+            width: 100%;
+            display: block;
+            transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .frame:hover img {
+            transform: scale(1.03);
+        }
+
+        .frame::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            pointer-events: none;
+        }
+
+        .frame:hover::after {
+            border-color: rgba(0, 255, 255, 0.3);
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.1);
+        }
+
+        .frame-pair {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        /* === PIPELINE DIAGRAM === */
+        .pipeline-container {
+            max-width: 100%;
+            margin: 3rem 0;
+        }
+
+        .pipeline-stage {
+            background: linear-gradient(135deg, rgba(20, 20, 25, 0.9) 0%, rgba(15, 15, 18, 0.95) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .pipeline-stage::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .pipeline-stage:hover {
+            transform: translateX(8px);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .stage-setup::before { background: var(--gold); }
+        .stage-physics::before { background: var(--cyan); }
+        .stage-render::before { background: var(--magenta); }
+        .stage-post::before { background: var(--green); }
+
+        .stage-setup:hover { box-shadow: 0 10px 40px rgba(212, 175, 55, 0.15); }
+        .stage-physics:hover { box-shadow: 0 10px 40px rgba(0, 255, 255, 0.15); }
+        .stage-render:hover { box-shadow: 0 10px 40px rgba(255, 0, 255, 0.15); }
+        .stage-post:hover { box-shadow: 0 10px 40px rgba(0, 255, 136, 0.15); }
+
+        .stage-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .stage-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+        }
+
+        .stage-setup .stage-icon { background: rgba(212, 175, 55, 0.15); }
+        .stage-physics .stage-icon { background: rgba(0, 255, 255, 0.15); }
+        .stage-render .stage-icon { background: rgba(255, 0, 255, 0.15); }
+        .stage-post .stage-icon { background: rgba(0, 255, 136, 0.15); }
+
+        .stage-title {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            margin: 0;
+        }
+
+        .stage-setup .stage-title { color: var(--gold); }
+        .stage-physics .stage-title { color: var(--cyan); }
+        .stage-render .stage-title { color: var(--magenta); }
+        .stage-post .stage-title { color: var(--green); }
+
+        .stage-meta {
+            font-family: var(--font-mono);
+            font-size: 0.55rem;
+            color: var(--text-whisper);
+            letter-spacing: 0.1em;
+            margin-top: 0.25rem;
+        }
+
+        .stage-expand {
+            margin-left: auto;
+            color: var(--text-whisper);
+            transition: transform 0.3s;
+        }
+
+        .pipeline-stage.active .stage-expand {
+            transform: rotate(180deg);
+        }
+
+        .stage-items {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            margin-top: 0;
+        }
+
+        .pipeline-stage:hover .stage-items,
+        .pipeline-stage.active .stage-items {
+            max-height: 300px;
+            opacity: 1;
+            margin-top: 1.25rem;
+        }
+
+        .stage-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .stage-item:first-child { border-top: none; padding-top: 0; }
+
+        .item-bullet {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .stage-setup .item-bullet { background: var(--gold); }
+        .stage-physics .item-bullet { background: var(--cyan); }
+        .stage-render .item-bullet { background: var(--magenta); }
+        .stage-post .item-bullet { background: var(--green); }
+
+        .item-code {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            margin-left: auto;
+        }
+
+        .connector {
+            display: flex;
+            justify-content: center;
+            padding: 0.5rem 0;
+        }
+
+        .connector-line {
+            width: 2px;
+            height: 40px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .connector-line::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, var(--from), var(--to));
+            opacity: 0.4;
+        }
+
+        .connector-line::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            width: 100%;
+            height: 50%;
+            background: linear-gradient(180deg, transparent, var(--to), transparent);
+            animation: flowDown 1.5s ease-in-out infinite;
+        }
+
+        @keyframes flowDown {
+            0% { top: -50%; opacity: 0; }
+            50% { opacity: 1; }
+            100% { top: 150%; opacity: 0; }
+        }
+
+        .c1 { --from: var(--gold); --to: var(--cyan); }
+        .c2 { --from: var(--cyan); --to: var(--magenta); }
+        .c3 { --from: var(--magenta); --to: var(--green); }
+
+        .c1 .connector-line::after { animation-delay: 0s; }
+        .c2 .connector-line::after { animation-delay: 0.5s; }
+        .c3 .connector-line::after { animation-delay: 1s; }
+
+        .output-badge {
+            display: flex;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+
+        .output-badge-inner {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background: rgba(0, 255, 136, 0.08);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: 50px;
+            padding: 0.75rem 1.5rem;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.2); }
+            50% { box-shadow: 0 0 20px 5px rgba(0, 255, 136, 0.1); }
+        }
+
+        .output-text {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--green);
+            letter-spacing: 0.05em;
+        }
+
+        .output-specs {
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            color: var(--text-whisper);
+        }
+
+        /* === TOC === */
+        .toc {
+            background: var(--glass);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 2rem;
+            border-radius: 8px;
+            margin: 2rem 0;
+        }
+
+        .toc ol {
+            list-style: none;
+            counter-reset: toc;
+        }
+
+        .toc li {
+            counter-increment: toc;
+            margin: 0.5rem 0;
+        }
+
+        .toc li::before {
+            content: counter(toc) ".";
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--cyan);
+            margin-right: 0.75rem;
+        }
+
+        .toc a {
+            color: var(--text-dim);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .toc a:hover { color: var(--gold); }
+
+        /* === FOOTER === */
+        .footer {
+            text-align: center;
+            padding: 4rem 2rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .footer-logo {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            letter-spacing: 0.2em;
+            color: var(--cyan);
+            opacity: 0.6;
+        }
+
+        /* === SCROLL ANIMATIONS === */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .delay-1 { transition-delay: 0.1s; }
+        .delay-2 { transition-delay: 0.2s; }
+        .delay-3 { transition-delay: 0.3s; }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 768px) {
+            .frame-pair { grid-template-columns: 1fr; }
+            .card-grid { grid-template-columns: 1fr; }
+            .nav { padding: 1rem 1.5rem; }
+            body { cursor: auto; }
+            .cursor, .cursor-dot { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Custom Cursor -->
+    <div class="cursor"></div>
+    <div class="cursor-dot"></div>
+
+    <!-- Grid Background -->
+    <div class="grid-bg">
+        <div class="grid-lines"></div>
+        <div class="gradient-overlay"></div>
+        <!-- Particles -->
+        <div class="particle" style="top: 20%; left: 15%; animation-delay: 0s;"></div>
+        <div class="particle" style="top: 40%; left: 80%; animation-delay: -3s;"></div>
+        <div class="particle" style="top: 70%; left: 25%; animation-delay: -6s;"></div>
+        <div class="particle" style="top: 30%; left: 60%; animation-delay: -9s;"></div>
+        <div class="particle" style="top: 80%; left: 70%; animation-delay: -12s;"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-logo">TECHNICAL DEEP DIVE</div>
+        <div class="nav-links">
+            <a href="index.html">Gallery</a>
+            <a href="technical.html" class="active">Technical</a>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <header class="hero">
+        <span class="hero-label reveal">Rendering & Simulation</span>
+        <h1 class="reveal delay-1">Understanding the Pipeline</h1>
+        <p class="lead reveal delay-2">
+            A complete technical breakdown of global illumination, physically-based materials,
+            rigid body dynamics, and the Genesis rendering engine.
+        </p>
+        <div class="divider reveal delay-3"></div>
+    </header>
+
+    <!-- TOC -->
+    <section class="section">
+        <div class="toc reveal">
+            <h3>Contents</h3>
+            <ol>
+                <li><a href="#gi">Global Illumination & Path Tracing</a></li>
+                <li><a href="#materials">Physically-Based Materials</a></li>
+                <li><a href="#reflection">Reflection: BRDF & Fresnel</a></li>
+                <li><a href="#refraction">Refraction: Snell's Law</a></li>
+                <li><a href="#camera">Camera: DOF & Bokeh</a></li>
+                <li><a href="#denoising">OIDN Denoising</a></li>
+                <li><a href="#physics">Rigid Body Simulation</a></li>
+                <li><a href="#pipeline">The Complete Pipeline</a></li>
+                <li><a href="#forge">Forge: Cinematography Engine</a></li>
+                <li><a href="#world-model">World Model Integration</a></li>
+            </ol>
+        </div>
+    </section>
+
+    <!-- Section 1: GI -->
+    <section class="section" id="gi">
+        <h3 class="reveal">Section 1</h3>
+        <h2 class="reveal delay-1">Global Illumination & Path Tracing</h2>
+        
+        <p class="reveal delay-2">
+            <span style="color: var(--gold);">Global illumination (GI)</span> simulates how light bounces between surfaces,
+            creating soft shadows, color bleeding, and realistic ambient lighting. Unlike rasterization
+            (which only computes direct lighting), GI accounts for <em>all</em> light paths.
+        </p>
+
+        <div class="frame reveal delay-3">
+            <img src="assets/symmetry/act1_opening.png" alt="Global illumination example">
+        </div>
+
+        <h4 class="reveal">The Rendering Equation</h4>
+        <p class="reveal delay-1">All physically-based rendering solves the same equation, formulated by James Kajiya in 1986:</p>
+
+        <div class="equation reveal delay-2">
+            L<sub>o</sub>(x, ω<sub>o</sub>) = L<sub>e</sub>(x, ω<sub>o</sub>) + ∫<sub>Ω</sub> f<sub>r</sub>(x, ω<sub>i</sub>, ω<sub>o</sub>) L<sub>i</sub>(x, ω<sub>i</sub>) (ω<sub>i</sub> · n) dω<sub>i</sub>
+        </div>
+
+        <p class="reveal delay-3" style="color: var(--text-whisper);">
+            In words: <em>outgoing light = emitted light + integral of (BRDF × incoming light × cosine) over hemisphere</em>.
+        </p>
+
+        <h4 class="reveal">Path Tracing</h4>
+        <p class="reveal delay-1">Genesis uses <span style="color: var(--cyan);">Monte Carlo path tracing</span> to solve this integral stochastically:</p>
+
+        <pre class="reveal delay-2"><span class="comment">// Simplified path tracing</span>
+<span class="keyword">for</span> sample <span class="keyword">in</span> <span class="value">1..SPP</span>:
+    ray = <span class="function">camera.generate_ray</span>(pixel)
+    color = <span class="function">trace_path</span>(ray, depth=<span class="value">12</span>)
+    
+<span class="keyword">def</span> <span class="function">trace_path</span>(ray, depth):
+    hit = <span class="function">scene.intersect</span>(ray)
+    <span class="keyword">if</span> hit.material.is_emissive:
+        <span class="keyword">return</span> hit.emission
+    
+    wi = <span class="function">hit.material.sample</span>(wo, normal)
+    Li = <span class="function">trace_path</span>(Ray(hit.point, wi), depth - <span class="value">1</span>)
+    <span class="keyword">return</span> brdf * Li * <span class="function">cos</span>(theta) / pdf</pre>
+
+        <div class="card-grid reveal delay-3">
+            <div class="card">
+                <h4>SPP (Samples Per Pixel)</h4>
+                <p>128 random paths traced per pixel, then averaged. More samples = less noise.</p>
+            </div>
+            <div class="card">
+                <h4>Bounce Depth</h4>
+                <p>Each path bounces up to 12 times. More bounces capture indirect lighting.</p>
+            </div>
+            <div class="card">
+                <h4>Russian Roulette</h4>
+                <p>After 4 bounces, paths are randomly terminated based on throughput. Unbiased.</p>
+            </div>
+        </div>
+    </section>
+
+    <hr>
+
+    <!-- Section 2: Materials -->
+    <section class="section" id="materials">
+        <h3 class="reveal">Section 2</h3>
+        <h2 class="reveal delay-1">Physically-Based Materials</h2>
+
+        <p class="reveal delay-2">
+            Every surface has a <span style="color: var(--gold);">material</span> defining how light interacts with it.
+            Modern renderers use PBR—materials based on real physics, not arbitrary parameters.
+        </p>
+
+        <table class="reveal delay-3">
+            <thead>
+                <tr>
+                    <th>Material</th>
+                    <th>Type</th>
+                    <th>Key Parameters</th>
+                    <th>Used For</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Metal</td>
+                    <td>Conductor</td>
+                    <td>color, roughness</td>
+                    <td>Gold sphere, obsidian floor</td>
+                </tr>
+                <tr>
+                    <td>Glass</td>
+                    <td>Dielectric</td>
+                    <td>color, IOR</td>
+                    <td>Crystal dominoes, diamond orb</td>
+                </tr>
+                <tr>
+                    <td>Default</td>
+                    <td>Diffuse/Glossy</td>
+                    <td>color, roughness</td>
+                    <td>Corridor walls</td>
+                </tr>
+                <tr>
+                    <td>Emission</td>
+                    <td>Light source</td>
+                    <td>emissive RGB</td>
+                    <td>Neon bars, ceiling lights</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="frame-pair reveal delay-3">
+            <div class="frame">
+                <img src="assets/symmetry/act1_opening.png" alt="Low roughness">
+            </div>
+            <div class="frame">
+                <img src="assets/symmetry/act4_chaos.png" alt="Mixed materials">
+            </div>
+        </div>
+    </section>
+
+    <hr>
+
+    <!-- Section 3: Reflection -->
+    <section class="section" id="reflection">
+        <h3 class="reveal">Section 3</h3>
+        <h2 class="reveal delay-1">Reflection: BRDF & Fresnel</h2>
+
+        <p class="reveal delay-2">
+            The <span style="color: var(--gold);">BRDF</span> describes what fraction of incoming light reflects in each outgoing direction.
+            For metals, most light reflects; for dielectrics, the Fresnel equations determine reflection vs. transmission.
+        </p>
+
+        <h4 class="reveal">Fresnel Equations</h4>
+        <p class="reveal delay-1">All materials reflect more light at <span style="color: var(--cyan);">grazing angles</span>:</p>
+
+        <div class="equation reveal delay-2">
+            F(θ) = F<sub>0</sub> + (1 - F<sub>0</sub>)(1 - cos θ)<sup>5</sup>
+        </div>
+
+        <div class="callout reveal delay-3">
+            <div class="callout-label">Fresnel in Action</div>
+            <p>
+                Look at the obsidian floor. Near the camera (grazing angle), it's almost a perfect mirror. 
+                Directly below the lights (normal incidence), it's darker. That gradient is Fresnel.
+            </p>
+        </div>
+    </section>
+
+    <hr>
+
+    <!-- Section 4: Refraction -->
+    <section class="section" id="refraction">
+        <h3 class="reveal">Section 4</h3>
+        <h2 class="reveal delay-1">Refraction: Snell's Law</h2>
+
+        <p class="reveal delay-2">When light crosses a boundary (air → glass), it bends according to <span style="color: var(--gold);">Snell's Law</span>:</p>
+
+        <div class="equation reveal delay-2">
+            n<sub>1</sub> sin(θ<sub>1</sub>) = n<sub>2</sub> sin(θ<sub>2</sub>)
+        </div>
+
+        <table class="reveal delay-3">
+            <thead>
+                <tr><th>Material</th><th>IOR</th><th>Visual Effect</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Ice</td><td>1.31</td><td>Subtle distortion</td></tr>
+                <tr><td>Glass / Quartz</td><td>1.54–1.55</td><td>Moderate bending</td></tr>
+                <tr><td>Ruby</td><td>1.77</td><td>Strong bending</td></tr>
+                <tr><td>Diamond</td><td>2.417</td><td>Extreme brilliance</td></tr>
+            </tbody>
+        </table>
+
+        <div class="frame reveal delay-3">
+            <img src="assets/symmetry/act3_vertigo.png" alt="Refraction in dominoes">
+        </div>
+    </section>
+
+    <hr>
+
+    <!-- Section 5: Camera -->
+    <section class="section" id="camera">
+        <h3 class="reveal">Section 5</h3>
+        <h2 class="reveal delay-1">Camera: DOF & Bokeh</h2>
+
+        <p class="reveal delay-2">
+            Genesis simulates a <span style="color: var(--gold);">thin-lens camera</span>. 
+            Objects at the wrong distance appear blurry—just like a real camera.
+        </p>
+
+        <div class="card-grid reveal delay-3">
+            <div class="card">
+                <h4>Aperture (f-stop)</h4>
+                <p>Lower f-stop = larger aperture = shallower DOF. The film uses f/2.0 for cinematic bokeh.</p>
+            </div>
+            <div class="card">
+                <h4>Focus Distance</h4>
+                <p>Objects at this distance are sharp. The rack focus shot animates this from 1m to 9m.</p>
+            </div>
+            <div class="card">
+                <h4>Circle of Confusion</h4>
+                <p>Out-of-focus points blur into discs. Diameter: d ∝ aperture × |z - focus| / z</p>
+            </div>
+        </div>
+
+        <div class="frame reveal delay-3">
+            <img src="assets/symmetry/act5_finale.png" alt="Bokeh visible">
+        </div>
+    </section>
+
+    <hr>
+
+    <!-- Section 6: Denoising -->
+    <section class="section" id="denoising">
+        <h3 class="reveal">Section 6</h3>
+        <h2 class="reveal delay-1">OIDN Denoising</h2>
+
+        <p class="reveal delay-2">
+            Even at 128 SPP, Monte Carlo noise is visible. We use 
+            <span style="color: var(--gold);">Intel Open Image Denoise (OIDN)</span>—a neural network
+            trained to remove path tracing noise while preserving detail.
+        </p>
+
+        <pre class="reveal delay-3"><span class="comment"># HDR denoising pipeline</span>
+rgb_float = camera.<span class="function">render</span>()        <span class="comment"># float32 [0, ∞)</span>
+rgb_float = <span class="function">clip</span>(rgb_float, <span class="value">0</span>, <span class="value">1</span>)
+rgb_clean = denoiser.<span class="function">denoise</span>(rgb_float)  <span class="comment"># OIDN Metal</span>
+rgb_uint8 = (rgb_clean * <span class="value">255</span>).<span class="function">astype</span>(uint8)</pre>
+    </section>
+
+    <hr>
+
+    <!-- Section 7: Physics -->
+    <section class="section" id="physics">
+        <h3 class="reveal">Section 7</h3>
+        <h2 class="reveal delay-1">Rigid Body Simulation</h2>
+
+        <p class="reveal delay-2">
+            The domino cascade isn't animated by hand—it's <span style="color: var(--gold);">simulated</span>.
+            Genesis solves Newton's equations of motion at 60 Hz.
+        </p>
+
+        <div class="equation reveal delay-2">
+            F = ma &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; τ = Iα
+        </div>
+
+        <pre class="reveal delay-3"><span class="comment"># Collision response</span>
+<span class="keyword">for</span> (A, B) <span class="keyword">in</span> <span class="function">find_collisions</span>():
+    v_rel = A.velocity - B.velocity
+    impulse = -(1 + restitution) * <span class="function">dot</span>(v_rel, normal) / 
+              (1/A.mass + 1/B.mass)
+    
+    A.velocity += impulse * normal / A.mass
+    B.velocity -= impulse * normal / B.mass</pre>
+
+        <div class="frame reveal delay-3">
+            <img src="assets/symmetry/act4_chaos.png" alt="Physics simulation">
+        </div>
+    </section>
+
+    <hr>
+
+    <!-- Section 8: Pipeline -->
+    <section class="section section-wide" id="pipeline">
+        <h3 class="reveal">Section 8</h3>
+        <h2 class="reveal delay-1">The Complete Pipeline</h2>
+        <p class="reveal delay-2" style="text-align: center; margin-bottom: 2rem;">Click each stage to explore. Watch the data flow.</p>
+
+        <div class="pipeline-container">
+            <!-- Setup -->
+            <div class="pipeline-stage stage-setup reveal delay-1" onclick="this.classList.toggle('active')">
+                <div class="stage-header">
+                    <div class="stage-icon">🎬</div>
+                    <div>
+                        <h4 class="stage-title">SCENE SETUP</h4>
+                        <div class="stage-meta">INITIALIZATION · ONE-TIME</div>
+                    </div>
+                    <div class="stage-expand">▼</div>
+                </div>
+                <div class="stage-items">
+                    <div class="stage-item"><div class="item-bullet"></div>Define geometry<span class="item-code">Box, Sphere, Plane</span></div>
+                    <div class="stage-item"><div class="item-bullet"></div>Assign materials<span class="item-code">Metal, Glass, Emission</span></div>
+                    <div class="stage-item"><div class="item-bullet"></div>Configure camera<span class="item-code">thinlens · f/2.0 · 35° FOV</span></div>
+                    <div class="stage-item"><div class="item-bullet"></div>Set physics options<span class="item-code">dt=1/60 · substeps=4</span></div>
+                </div>
+            </div>
+
+            <div class="connector c1"><div class="connector-line"></div></div>
+
+            <!-- Physics -->
+            <div class="pipeline-stage stage-physics reveal delay-2" onclick="this.classList.toggle('active')">
+                <div class="stage-header">
+                    <div class="stage-icon">⚡</div>
+                    <div>
+                        <h4 class="stage-title">PHYSICS LOOP</h4>
+                        <div class="stage-meta">60 HZ · PER-FRAME</div>
+                    </div>
+                    <div class="stage-expand">▼</div>
+                </div>
+                <div class="stage-items">
+                    <div class="stage-item"><div class="item-bullet"></div>Integrate velocities → positions<span class="item-code">Newton's Laws</span></div>
+                    <div class="stage-item"><div class="item-bullet"></div>Detect collisions<span class="item-code">SAT · GJK</span></div>
+                    <div class="stage-item"><div class="item-bullet"></div>Solve constraints<span class="item-code">impulse response</span></div>
+                    <div class="stage-item"><div class="item-bullet"></div>Generate collision audio<span class="item-code">modal synthesis</span></div>
+                </div>
+            </div>
+
+            <div class="connector c2"><div class="connector-line"></div></div>
+
+            <!-- Render -->
+            <div class="pipeline-stage stage-render reveal delay-2" onclick="this.classList.toggle('active')">
+                <div class="stage-header">
+                    <div class="stage-icon">🔮</div>
+                    <div>
+                        <h4 class="stage-title">RENDER LOOP</h4>
+                        <div class="stage-meta">24 FPS · PATH TRACING</div>
+                    </div>
+                    <div class="stage-expand">▼</div>
+                </div>
+                <div class="stage-items">
+                    <div class="stage-item"><div class="item-bullet"></div>Update camera pose<span class="item-code">Cinematographer</span></div>
+                    <div class="stage-item"><div class="item-bullet"></div>Path trace scene<span class="item-code">128 SPP · 12 bounces</span></div>
+                    <div class="stage-item"><div class="item-bullet"></div>Denoise HDR frame<span class="item-code">OIDN Metal</span></div>
+                    <div class="stage-item"><div class="item-bullet"></div>Tonemap & save PNG<span class="item-code">float32 → uint8</span></div>
+                    <div class="stage-item"><div class="item-bullet"></div>Record physics audio<span class="item-code">VBAP spatial</span></div>
+                </div>
+            </div>
+
+            <div class="connector c3"><div class="connector-line"></div></div>
+
+            <!-- Post -->
+            <div class="pipeline-stage stage-post reveal delay-3" onclick="this.classList.toggle('active')">
+                <div class="stage-header">
+                    <div class="stage-icon">🎞️</div>
+                    <div>
+                        <h4 class="stage-title">POST-PROCESS</h4>
+                        <div class="stage-meta">ASSEMBLY · FINAL OUTPUT</div>
+                    </div>
+                    <div class="stage-expand">▼</div>
+                </div>
+                <div class="stage-items">
+                    <div class="stage-item"><div class="item-bullet"></div>Assemble frames → video<span class="item-code">FFmpeg · H.264</span></div>
+                    <div class="stage-item"><div class="item-bullet"></div>Mix spatial audio<span class="item-code">VBAP · AAC</span></div>
+                    <div class="stage-item"><div class="item-bullet"></div>Color grade & finalize<span class="item-code">CRF 18</span></div>
+                </div>
+            </div>
+
+            <div class="output-badge reveal delay-3">
+                <div class="output-badge-inner">
+                    <span style="font-size: 1.5rem;">📽️</span>
+                    <div>
+                        <div class="output-text">OUTPUT READY</div>
+                        <div class="output-specs">1920×1080 · MP4 · 24fps · Spatial Audio</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <hr>
+
+    <!-- Section 9: Forge -->
+    <section class="section" id="forge">
+        <h3 class="reveal">Section 9</h3>
+        <h2 class="reveal delay-1">Forge: The Cinematography Engine</h2>
+
+        <p class="reveal delay-2">
+            <span style="color: var(--gold);">Forge</span> is Kagami's construction colony—the engine that abstracts 
+            camera movements into composable, named shot types.
+        </p>
+
+        <pre class="reveal delay-3"><span class="keyword">from</span> kairos.core.services.forge.modules.genesis.cinematography <span class="keyword">import</span> (
+    Cinematographer, Shot, Sequence,
+)
+
+sequence = Sequence(
+    name=<span class="string">"The Symmetry of Collapse"</span>,
+    shots=[
+        Cinematographer.<span class="function">create_one_point_perspective_shot</span>(...),
+        Cinematographer.<span class="function">create_rack_focus_shot</span>(...),
+        Cinematographer.<span class="function">create_dolly_zoom_shot</span>(...),
+        Cinematographer.<span class="function">create_steadicam_follow_shot</span>(...),
+        Cinematographer.<span class="function">create_arc_shot</span>(...),
+    ]
+)</pre>
+
+        <table class="reveal delay-3">
+            <thead>
+                <tr><th>Shot Type</th><th>Camera Motion</th><th>Psychological Effect</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>One-Point Perspective</td><td>Slow dolly forward</td><td>Inevitability, dread</td></tr>
+                <tr><td>Rack Focus</td><td>Static, focus shifts</td><td>Revelation, connection</td></tr>
+                <tr><td>Dolly Zoom</td><td>Dolly back + zoom in</td><td>Vertigo, realization</td></tr>
+                <tr><td>Steadicam</td><td>Smooth path</td><td>Immersion, presence</td></tr>
+                <tr><td>Arc Shot</td><td>Orbit around subject</td><td>Power, contemplation</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <hr>
+
+    <!-- Section 10: World Model -->
+    <section class="section" id="world-model">
+        <h3 class="reveal">Section 10</h3>
+        <h2 class="reveal delay-1">World Model Integration</h2>
+
+        <p class="reveal delay-2">
+            How does this connect to Kagami's <span style="color: var(--gold);">world model</span>?
+            Genesis provides the substrate for imagination—the world model can predict
+            "what happens if I push this domino?" and Genesis makes that prediction visible.
+        </p>
+
+        <div class="callout reveal delay-3">
+            <div class="callout-label">The Loop Closes</div>
+            <p>
+                The world model predicts. Genesis renders the prediction. The encoder compresses the render.
+                The world model updates. This is the <em>imagination loop</em>—dreaming in physics,
+                learning from synthetic experience.
+            </p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-logo">KAGAMI × GENESIS × FORGE</div>
+        <p style="color: var(--text-whisper); font-size: 0.8rem; margin-top: 1rem;">
+            December 2025 · chronOS · Colony Forge × Spark × Crystal
+        </p>
+    </footer>
+
+    <script>
+        // === CUSTOM CURSOR ===
+        const cursor = document.querySelector('.cursor');
+        const cursorDot = document.querySelector('.cursor-dot');
+        const particles = document.querySelectorAll('.particle');
+
+        let mouseX = 0, mouseY = 0;
+        let cursorX = 0, cursorY = 0;
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            cursorDot.style.left = mouseX - 2 + 'px';
+            cursorDot.style.top = mouseY - 2 + 'px';
+
+            // Influence particles
+            particles.forEach((p, i) => {
+                const rect = p.getBoundingClientRect();
+                const dx = mouseX - (rect.left + rect.width / 2);
+                const dy = mouseY - (rect.top + rect.height / 2);
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 200) {
+                    const push = (200 - dist) / 200 * 30;
+                    p.style.transform = `translate(${-dx / dist * push}px, ${-dy / dist * push}px)`;
+                }
+            });
+        });
+
+        function animateCursor() {
+            cursorX += (mouseX - cursorX) * 0.15;
+            cursorY += (mouseY - cursorY) * 0.15;
+            cursor.style.left = cursorX - 10 + 'px';
+            cursor.style.top = cursorY - 10 + 'px';
+            requestAnimationFrame(animateCursor);
+        }
+        animateCursor();
+
+        // Hover state
+        const hoverables = document.querySelectorAll('a, button, .card, .pipeline-stage, .frame, .callout, pre');
+        hoverables.forEach(el => {
+            el.addEventListener('mouseenter', () => cursor.classList.add('hover'));
+            el.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+        });
+
+        // === SCROLL REVEAL ===
+        const reveals = document.querySelectorAll('.reveal');
+        const revealObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) entry.target.classList.add('visible');
+            });
+        }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+        reveals.forEach(el => revealObserver.observe(el));
+    </script>
+
+</body>
+</html>

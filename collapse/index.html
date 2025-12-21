@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0a0a0c">
+    <title>対称 — The Symmetry of Collapse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Space+Grotesk:wght@300;400;500&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --void: #0a0a0c;
+            --obsidian: #12121a;
+            --text: #e8e4dc;
+            --text-dim: rgba(232, 228, 220, 0.6);
+            --text-whisper: rgba(232, 228, 220, 0.25);
+            --gold: #d4af37;
+            --cyan: #00ffff;
+            --magenta: #ff00ff;
+            --neon-cyan: #00d4ff;
+            --neon-pink: #ff44aa;
+            --glass: rgba(255, 255, 255, 0.05);
+            --font-display: 'Cormorant Garamond', Georgia, serif;
+            --font-body: 'Space Grotesk', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html {
+            scroll-behavior: smooth;
+            background: var(--void);
+        }
+
+        body {
+            font-family: var(--font-body);
+            color: var(--text);
+            background: var(--void);
+            overflow-x: hidden;
+            cursor: none;
+        }
+
+        /* === CUSTOM CURSOR === */
+        .cursor {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            border: 1px solid var(--gold);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 10000;
+            transition: transform 0.15s ease, border-color 0.3s;
+            mix-blend-mode: difference;
+        }
+
+        .cursor-dot {
+            position: fixed;
+            width: 4px;
+            height: 4px;
+            background: var(--gold);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 10001;
+        }
+
+        .cursor.hover {
+            transform: scale(2);
+            border-color: var(--cyan);
+        }
+
+        /* === NEON CORRIDOR BACKGROUND === */
+        .corridor-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        /* Perspective floor */
+        .floor-reflection {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 50%;
+            background: linear-gradient(180deg, 
+                transparent 0%,
+                rgba(0, 0, 0, 0.8) 30%,
+                var(--obsidian) 100%
+            );
+            transform: perspective(500px) rotateX(60deg);
+            transform-origin: bottom center;
+        }
+
+        /* Neon bars */
+        .neon-bar {
+            position: absolute;
+            width: 3px;
+            height: 100vh;
+            filter: blur(0.5px);
+            opacity: 0.4;
+            transition: opacity 0.5s ease, filter 0.5s ease;
+        }
+
+        .neon-bar.left { left: 5%; background: linear-gradient(180deg, var(--magenta), transparent 80%); }
+        .neon-bar.left-2 { left: 12%; background: linear-gradient(180deg, var(--neon-cyan), transparent 70%); }
+        .neon-bar.right { right: 5%; background: linear-gradient(180deg, var(--neon-cyan), transparent 80%); }
+        .neon-bar.right-2 { right: 12%; background: linear-gradient(180deg, var(--neon-pink), transparent 70%); }
+
+        .corridor-bg:hover .neon-bar {
+            opacity: 0.7;
+            filter: blur(2px);
+        }
+
+        /* Floating orbs */
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, white, rgba(255, 255, 255, 0.3));
+            filter: blur(1px);
+            animation: float 8s ease-in-out infinite;
+            transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .orb-1 { width: 60px; height: 60px; top: 10%; left: 45%; animation-delay: 0s; }
+        .orb-2 { width: 40px; height: 40px; top: 20%; left: 48%; animation-delay: -2s; opacity: 0.7; }
+        .orb-3 { width: 30px; height: 30px; top: 30%; left: 50%; animation-delay: -4s; opacity: 0.5; }
+        .orb-4 { width: 20px; height: 20px; top: 40%; left: 49%; animation-delay: -6s; opacity: 0.3; }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0); }
+            25% { transform: translateY(-10px) translateX(5px); }
+            50% { transform: translateY(5px) translateX(-3px); }
+            75% { transform: translateY(-5px) translateX(2px); }
+        }
+
+        /* Scan line effect */
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 0, 0, 0.03) 2px,
+                rgba(0, 0, 0, 0.03) 4px
+            );
+            pointer-events: none;
+        }
+
+        /* === NAV === */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 1.5rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(180deg, rgba(10, 10, 12, 0.9) 0%, transparent 100%);
+        }
+
+        .nav-logo {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            color: var(--gold);
+            letter-spacing: 0.1em;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2.5rem;
+        }
+
+        .nav-links a {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            text-decoration: none;
+            position: relative;
+            padding: 0.5rem 0;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 1px;
+            background: var(--cyan);
+            transition: width 0.3s ease;
+        }
+
+        .nav-links a:hover::after,
+        .nav-links a.active::after {
+            width: 100%;
+        }
+
+        .nav-links a:hover,
+        .nav-links a.active {
+            color: var(--text);
+        }
+
+        /* === HERO === */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 4rem 2rem;
+            position: relative;
+        }
+
+        .hero-kanji {
+            font-size: clamp(8rem, 25vw, 16rem);
+            font-weight: 300;
+            color: transparent;
+            -webkit-text-stroke: 1px var(--gold);
+            text-stroke: 1px var(--gold);
+            line-height: 1;
+            opacity: 0;
+            transform: translateY(50px);
+            animation: revealKanji 1.5s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
+            transition: text-shadow 0.5s ease;
+        }
+
+        .hero-kanji:hover {
+            text-shadow: 0 0 80px rgba(212, 175, 55, 0.4);
+        }
+
+        @keyframes revealKanji {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .hero-title {
+            font-family: var(--font-display);
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            font-weight: 300;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            margin-top: 2rem;
+            opacity: 0;
+            animation: fadeUp 1s ease 0.8s forwards;
+        }
+
+        .hero-subtitle {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 0.3em;
+            color: var(--text-whisper);
+            margin-top: 1rem;
+            opacity: 0;
+            animation: fadeUp 1s ease 1s forwards;
+        }
+
+        @keyframes fadeUp {
+            to { opacity: 1; }
+        }
+
+        .hero-scroll {
+            position: absolute;
+            bottom: 3rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            opacity: 0;
+            animation: fadeUp 1s ease 1.5s forwards;
+        }
+
+        .hero-scroll span {
+            font-family: var(--font-mono);
+            font-size: 0.55rem;
+            letter-spacing: 0.2em;
+            color: var(--text-whisper);
+        }
+
+        .scroll-line {
+            width: 1px;
+            height: 40px;
+            background: linear-gradient(180deg, var(--gold), transparent);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; height: 40px; }
+            50% { opacity: 1; height: 60px; }
+        }
+
+        /* === SECTIONS === */
+        .section {
+            padding: 8rem 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .section-label {
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            letter-spacing: 0.3em;
+            color: var(--text-whisper);
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        .section-title {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 300;
+            font-style: italic;
+            color: var(--gold);
+            margin-bottom: 2rem;
+        }
+
+        /* === VIDEO HERO === */
+        .video-section {
+            padding: 4rem 0;
+        }
+
+        .video-container {
+            position: relative;
+            max-width: 1100px;
+            margin: 0 auto;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 
+                0 0 0 1px rgba(255, 255, 255, 0.05),
+                0 50px 100px -20px rgba(0, 0, 0, 0.8);
+            transform: perspective(1000px) rotateX(2deg);
+            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.6s ease;
+        }
+
+        .video-container:hover {
+            transform: perspective(1000px) rotateX(0deg) scale(1.02);
+            box-shadow: 
+                0 0 0 1px rgba(0, 255, 255, 0.2),
+                0 0 60px -10px rgba(0, 255, 255, 0.3),
+                0 60px 120px -20px rgba(0, 0, 0, 0.9);
+        }
+
+        .video-container video {
+            width: 100%;
+            display: block;
+        }
+
+        .video-meta {
+            text-align: center;
+            margin-top: 2rem;
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            letter-spacing: 0.2em;
+            color: var(--text-whisper);
+        }
+
+        /* === IMAGE GRID === */
+        .image-reveal {
+            position: relative;
+            overflow: hidden;
+            border-radius: 6px;
+            background: var(--obsidian);
+        }
+
+        .image-reveal img {
+            width: 100%;
+            display: block;
+            transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), filter 0.5s ease;
+        }
+
+        .image-reveal:hover img {
+            transform: scale(1.05);
+        }
+
+        /* Glass refraction overlay on hover */
+        .image-reveal::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255, 255, 255, 0.1),
+                transparent
+            );
+            transform: skewX(-20deg);
+            transition: left 0.8s ease;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .image-reveal:hover::before {
+            left: 150%;
+        }
+
+        /* Neon glow border on hover */
+        .image-reveal::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            pointer-events: none;
+        }
+
+        .image-reveal:hover::after {
+            border-color: rgba(0, 255, 255, 0.3);
+            box-shadow: inset 0 0 30px rgba(0, 255, 255, 0.1);
+        }
+
+        .image-caption {
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            letter-spacing: 0.15em;
+            color: var(--text-whisper);
+            text-transform: uppercase;
+            margin-top: 1rem;
+            text-align: center;
+        }
+
+        /* === ANALYSIS CARDS === */
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: start;
+            margin: 4rem 0;
+        }
+
+        .analysis-text h3 {
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            letter-spacing: 0.2em;
+            color: var(--text-whisper);
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+        }
+
+        .analysis-text h2 {
+            font-family: var(--font-display);
+            font-size: 1.8rem;
+            font-weight: 300;
+            color: var(--gold);
+            margin-bottom: 1.5rem;
+        }
+
+        .analysis-text p {
+            font-size: 1rem;
+            line-height: 1.8;
+            color: var(--text-dim);
+            margin-bottom: 1.5rem;
+        }
+
+        /* Technical callout */
+        .callout {
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.05) 0%, rgba(255, 0, 255, 0.03) 100%);
+            border-left: 2px solid var(--cyan);
+            padding: 1.5rem;
+            margin: 2rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .callout::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(0, 255, 255, 0.1), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .callout:hover::before {
+            opacity: 1;
+        }
+
+        .callout-label {
+            font-family: var(--font-mono);
+            font-size: 0.55rem;
+            letter-spacing: 0.2em;
+            color: var(--cyan);
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .callout p {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            margin: 0;
+        }
+
+        /* === FILMSTRIP === */
+        .filmstrip {
+            display: flex;
+            gap: 0;
+            margin: 4rem 0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 40px 80px -20px rgba(0, 0, 0, 0.6);
+        }
+
+        .filmstrip .image-reveal {
+            flex: 1;
+            border-radius: 0;
+            aspect-ratio: 1;
+        }
+
+        .filmstrip .image-reveal img {
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .filmstrip .image-reveal:hover img {
+            transform: scale(1.15);
+        }
+
+        /* === PARALLAX IMAGE === */
+        .parallax-frame {
+            position: relative;
+            height: 80vh;
+            overflow: hidden;
+            margin: 6rem 0;
+            border-radius: 8px;
+        }
+
+        .parallax-frame img {
+            position: absolute;
+            top: -20%;
+            left: 0;
+            width: 100%;
+            height: 140%;
+            object-fit: cover;
+            will-change: transform;
+        }
+
+        .parallax-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, 
+                var(--void) 0%,
+                transparent 20%,
+                transparent 80%,
+                var(--void) 100%
+            );
+        }
+
+        .parallax-text {
+            position: absolute;
+            bottom: 10%;
+            left: 5%;
+            right: 5%;
+            text-align: center;
+        }
+
+        .parallax-text blockquote {
+            font-family: var(--font-display);
+            font-size: clamp(1.2rem, 3vw, 2rem);
+            font-style: italic;
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        /* === CAMERA SHOTS GRID === */
+        .shots-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            margin: 4rem 0;
+        }
+
+        .shot-card {
+            background: var(--glass);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s;
+        }
+
+        .shot-card:hover {
+            transform: translateY(-10px);
+            border-color: rgba(212, 175, 55, 0.3);
+        }
+
+        .shot-card .image-reveal {
+            border-radius: 0;
+        }
+
+        .shot-info {
+            padding: 1.5rem;
+        }
+
+        .shot-info h4 {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 0.15em;
+            color: var(--gold);
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .shot-info p {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            line-height: 1.6;
+        }
+
+        /* === CTA SECTION === */
+        .cta-section {
+            text-align: center;
+            padding: 8rem 2rem;
+            position: relative;
+        }
+
+        .cta-button {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--gold);
+            text-decoration: none;
+            padding: 1.25rem 3rem;
+            border: 1px solid var(--gold);
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+            transition: color 0.3s, border-color 0.3s;
+        }
+
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: var(--gold);
+            transition: left 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: -1;
+        }
+
+        .cta-button:hover {
+            color: var(--void);
+            border-color: var(--gold);
+        }
+
+        .cta-button:hover::before {
+            left: 0;
+        }
+
+        /* === FOOTER === */
+        .footer {
+            text-align: center;
+            padding: 4rem 2rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .footer-glyph {
+            font-size: 3rem;
+            color: var(--gold);
+            opacity: 0.4;
+            transition: opacity 0.3s, text-shadow 0.3s;
+        }
+
+        .footer-glyph:hover {
+            opacity: 1;
+            text-shadow: 0 0 40px rgba(212, 175, 55, 0.5);
+        }
+
+        .footer-text {
+            font-family: var(--font-mono);
+            font-size: 0.55rem;
+            letter-spacing: 0.2em;
+            color: var(--text-whisper);
+            margin-top: 1rem;
+        }
+
+        /* === SCROLL ANIMATIONS === */
+        .reveal {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .reveal-left {
+            opacity: 0;
+            transform: translateX(-40px);
+            transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .reveal-left.visible {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .reveal-right {
+            opacity: 0;
+            transform: translateX(40px);
+            transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .reveal-right.visible {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* Staggered delays */
+        .delay-1 { transition-delay: 0.1s; }
+        .delay-2 { transition-delay: 0.2s; }
+        .delay-3 { transition-delay: 0.3s; }
+        .delay-4 { transition-delay: 0.4s; }
+        .delay-5 { transition-delay: 0.5s; }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 900px) {
+            .analysis-grid { grid-template-columns: 1fr; gap: 2rem; }
+            .shots-grid { grid-template-columns: 1fr; }
+            .filmstrip { flex-direction: column; }
+            .nav { padding: 1rem 1.5rem; }
+            .nav-links { gap: 1.5rem; }
+        }
+
+        @media (max-width: 600px) {
+            .section { padding: 4rem 1rem; }
+            body { cursor: auto; }
+            .cursor, .cursor-dot { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Custom Cursor -->
+    <div class="cursor"></div>
+    <div class="cursor-dot"></div>
+
+    <!-- Corridor Background -->
+    <div class="corridor-bg">
+        <div class="neon-bar left"></div>
+        <div class="neon-bar left-2"></div>
+        <div class="neon-bar right"></div>
+        <div class="neon-bar right-2"></div>
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+        <div class="orb orb-4"></div>
+        <div class="floor-reflection"></div>
+        <div class="scanlines"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-logo">対称</div>
+        <div class="nav-links">
+            <a href="index.html" class="active">Gallery</a>
+            <a href="technical.html">Technical</a>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <header class="hero">
+        <div class="hero-kanji">対称</div>
+        <h1 class="hero-title">The Symmetry of Collapse</h1>
+        <p class="hero-subtitle">A Kubrick-Inspired Genesis Film · December 2025</p>
+        <div class="hero-scroll">
+            <span>Scroll to Enter</span>
+            <div class="scroll-line"></div>
+        </div>
+    </header>
+
+    <!-- The Film -->
+    <section class="video-section">
+        <div class="section" style="text-align: center;">
+            <span class="section-label reveal">The Film</span>
+            <h2 class="section-title reveal delay-1">15 Seconds of Controlled Destruction</h2>
+        </div>
+        <div class="video-container reveal delay-2">
+            <video controls loop poster="assets/symmetry/act1_opening.png">
+                <source src="assets/symmetry/THE_SYMMETRY_OF_COLLAPSE.mp4" type="video/mp4">
+            </video>
+        </div>
+        <p class="video-meta reveal delay-3">1920×1080 · 24 FPS · 128 SPP · OIDN Denoised · Genesis RayTracer</p>
+    </section>
+
+    <!-- Opening Analysis -->
+    <section class="section">
+        <div class="analysis-grid">
+            <div class="image-reveal reveal-left">
+                <img src="assets/symmetry/act1_opening.png" alt="Opening shot - The Kubrick Corridor">
+            </div>
+            <div class="analysis-text reveal-right">
+                <h3>Frame 001 · Act I</h3>
+                <h2>The Kubrick Corridor</h2>
+                <p>
+                    The opening frame establishes perfect one-point perspective—every line converges 
+                    to a single vanishing point at the corridor's end. This is Kubrick's signature 
+                    visual language, seen in The Shining's Overlook Hotel.
+                </p>
+                <p style="color: var(--text-whisper);">
+                    Notice the bilateral symmetry: neon bars on the left match those on the right,
+                    ceiling lights recede in perfect rhythm. The obsidian floor acts as a mirror,
+                    doubling the geometry and creating infinite depth.
+                </p>
+                <div class="callout">
+                    <div class="callout-label">Global Illumination</div>
+                    <p>
+                        The ceiling lights don't just emit—they bounce. Each white sphere casts light
+                        that reflects off walls, floor, and other surfaces. This is path-traced
+                        global illumination: 12 bounces of physically accurate light transport.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Reflection Deep Dive -->
+    <section class="section">
+        <div style="text-align: center; margin-bottom: 4rem;">
+            <span class="section-label reveal">Visual Analysis</span>
+            <h2 class="section-title reveal delay-1">Reflections: The Mirror Floor</h2>
+        </div>
+        
+        <div class="image-reveal reveal delay-2" style="max-width: 1100px; margin: 0 auto;">
+            <img src="assets/symmetry/act1_opening.png" alt="Reflection analysis">
+        </div>
+        
+        <div class="analysis-grid" style="margin-top: 4rem;">
+            <div class="reveal-left">
+                <h3 style="font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--cyan); margin-bottom: 1rem;">SPECULAR REFLECTION</h3>
+                <p style="color: var(--text-dim); line-height: 1.8;">
+                    The obsidian floor has a roughness of 0.08—nearly a perfect mirror.
+                    Light rays hitting this surface reflect at the incident angle, creating sharp reflections
+                    of the neon bars, ceiling lights, and crystal dominoes.
+                </p>
+                <p style="color: var(--text-whisper); font-size: 0.9rem; line-height: 1.8;">
+                    In the BRDF, low roughness means the microfacets are nearly aligned. 
+                    The GGX distribution produces physically accurate specular highlights.
+                </p>
+            </div>
+            <div class="reveal-right delay-2">
+                <h3 style="font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--magenta); margin-bottom: 1rem;">FRESNEL EFFECT</h3>
+                <p style="color: var(--text-dim); line-height: 1.8;">
+                    Reflections are stronger at grazing angles (near the camera) and weaker 
+                    when looking straight down. This is the Fresnel effect—all materials 
+                    reflect more light at shallow angles.
+                </p>
+                <p style="color: var(--text-whisper); font-size: 0.9rem; line-height: 1.8;">
+                    The Schlick approximation models this: reflectance increases as the view angle
+                    approaches 90°. Even non-metallic surfaces become mirrors at the horizon.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- The Cascade -->
+    <section class="section">
+        <div style="text-align: center; margin-bottom: 3rem;">
+            <span class="section-label reveal">Animation</span>
+            <h2 class="section-title reveal delay-1">The Domino Cascade</h2>
+        </div>
+
+        <div class="filmstrip reveal delay-2">
+            <div class="image-reveal">
+                <img src="assets/symmetry/act1_opening.png" alt="Dominoes standing">
+            </div>
+            <div class="image-reveal">
+                <img src="assets/symmetry/act2_rackfocus.png" alt="First fall">
+            </div>
+            <div class="image-reveal">
+                <img src="assets/symmetry/act3_vertigo.png" alt="Mid cascade">
+            </div>
+            <div class="image-reveal">
+                <img src="assets/symmetry/act4_chaos.png" alt="Scattered">
+            </div>
+            <div class="image-reveal">
+                <img src="assets/symmetry/act5_finale.png" alt="Final state">
+            </div>
+        </div>
+        <p class="image-caption reveal delay-3">The cascade from order to chaos across 15 seconds</p>
+
+        <div class="analysis-grid" style="margin-top: 4rem;">
+            <div class="reveal-left">
+                <h3 style="font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--gold); margin-bottom: 1rem;">RIGID BODY DYNAMICS</h3>
+                <p style="color: var(--text-dim); line-height: 1.8;">
+                    Each domino is a physics object with mass, moment of inertia, and collision geometry.
+                    Genesis solves Newton's equations of motion at 60 Hz (16.67ms per physics step).
+                </p>
+                <p style="color: var(--text-whisper); font-size: 0.9rem; line-height: 1.8;">
+                    The cascade isn't scripted—it's simulated. The first domino receives an initial
+                    velocity impulse, then pure physics takes over.
+                </p>
+            </div>
+            <div class="reveal-right delay-2">
+                <h3 style="font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--gold); margin-bottom: 1rem;">COLLISION DETECTION</h3>
+                <p style="color: var(--text-dim); line-height: 1.8;">
+                    Every frame, Genesis checks for interpenetration between all rigid bodies.
+                    When dominoes collide, the impulse response is computed: how much velocity 
+                    to add to separate them while conserving momentum.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Refraction -->
+    <section class="section">
+        <div class="analysis-grid" style="flex-direction: row-reverse;">
+            <div class="image-reveal reveal-right">
+                <img src="assets/symmetry/act3_vertigo.png" alt="Glass dominoes refraction">
+            </div>
+            <div class="analysis-text reveal-left">
+                <h3>Material Science</h3>
+                <h2>Refraction: Glass Dominoes</h2>
+                <p>
+                    Each domino is rendered as glass with physically accurate Index of Refraction (IOR):
+                </p>
+                <ul style="list-style: none; margin: 1rem 0; color: var(--text-dim);">
+                    <li style="padding: 0.3rem 0;">• Quartz crystal: <span style="color: var(--cyan);">IOR 1.55</span></li>
+                    <li style="padding: 0.3rem 0;">• Rose quartz: <span style="color: var(--cyan);">IOR 1.54</span></li>
+                    <li style="padding: 0.3rem 0;">• Ice: <span style="color: var(--cyan);">IOR 1.31</span></li>
+                    <li style="padding: 0.3rem 0;">• Diamond orb: <span style="color: var(--cyan);">IOR 2.417</span></li>
+                </ul>
+                <div class="callout">
+                    <div class="callout-label">Total Internal Reflection</div>
+                    <p>
+                        At steep angles inside glass, light can't escape—it bounces internally.
+                        This creates the bright edges and sparkle in the crystal dominoes.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Parallax Hero -->
+    <div class="parallax-frame reveal">
+        <img src="assets/symmetry/act4_steadicam.png" alt="Hero elements" class="parallax-img">
+        <div class="parallax-overlay"></div>
+        <div class="parallax-text">
+            <blockquote>
+                "The gold sphere reflects everything. The diamond refracts everything.
+                Together, they are the eyes of the corridor."
+            </blockquote>
+        </div>
+    </div>
+
+    <!-- Camera Shots -->
+    <section class="section">
+        <div style="text-align: center; margin-bottom: 4rem;">
+            <span class="section-label reveal">Camera Language</span>
+            <h2 class="section-title reveal delay-1">Five Acts, Five Techniques</h2>
+        </div>
+
+        <div class="shots-grid">
+            <div class="shot-card reveal delay-1">
+                <div class="image-reveal">
+                    <img src="assets/symmetry/act1_opening.png" alt="One-point perspective">
+                </div>
+                <div class="shot-info">
+                    <h4>Act I: One-Point Perspective</h4>
+                    <p>Camera advances slowly down the corridor. Deep focus keeps everything sharp. FOV 32° creates compressed perspective.</p>
+                </div>
+            </div>
+            <div class="shot-card reveal delay-2">
+                <div class="image-reveal">
+                    <img src="assets/symmetry/act2_rackfocus.png" alt="Rack focus">
+                </div>
+                <div class="shot-info">
+                    <h4>Act II: Rack Focus</h4>
+                    <p>Focus shifts from 1m to 9m. Foreground blurs, background sharpens. f/1.4 aperture creates extreme bokeh.</p>
+                </div>
+            </div>
+            <div class="shot-card reveal delay-3">
+                <div class="image-reveal">
+                    <img src="assets/symmetry/act3_vertigo.png" alt="Dolly zoom">
+                </div>
+                <div class="shot-info">
+                    <h4>Act III: Dolly Zoom</h4>
+                    <p>Camera retreats while FOV increases (30°→70°). Subject stays same size, background warps. The "Vertigo effect."</p>
+                </div>
+            </div>
+            <div class="shot-card reveal delay-4">
+                <div class="image-reveal">
+                    <img src="assets/symmetry/act4_steadicam.png" alt="Steadicam">
+                </div>
+                <div class="shot-info">
+                    <h4>Act IV: Steadicam Follow</h4>
+                    <p>Smooth path through the chaos. Camera weaves between fallen dominoes, maintaining focus on the hero elements.</p>
+                </div>
+            </div>
+            <div class="shot-card reveal delay-5">
+                <div class="image-reveal">
+                    <img src="assets/symmetry/act5_arc.png" alt="Arc shot">
+                </div>
+                <div class="shot-info">
+                    <h4>Act V: Arc Shot</h4>
+                    <p>Camera arcs 40° around the center. The background slides, creating parallax. A reveal of the final state.</p>
+                </div>
+            </div>
+            <div class="shot-card reveal delay-5">
+                <div class="image-reveal">
+                    <img src="assets/symmetry/act5_finale.png" alt="Final state">
+                </div>
+                <div class="shot-info">
+                    <h4>Resolution: Bokeh & DOF</h4>
+                    <p>f/2.0 aperture blurs the neons into soft circles. Out-of-focus highlights reveal the aperture shape.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Final State -->
+    <section class="section">
+        <div style="text-align: center; margin-bottom: 3rem;">
+            <span class="section-label reveal">Resolution</span>
+            <h2 class="section-title reveal delay-1">Order → Chaos → New Pattern</h2>
+        </div>
+
+        <div class="image-reveal reveal delay-2" style="max-width: 1100px; margin: 0 auto;">
+            <img src="assets/symmetry/act5_finale.png" alt="Final state">
+        </div>
+
+        <div style="max-width: 700px; margin: 4rem auto 0; text-align: center;">
+            <blockquote class="reveal delay-3" style="font-family: var(--font-display); font-size: 1.4rem; font-style: italic; color: var(--text-dim); line-height: 1.8;">
+                "The dominoes didn't fail—they transformed. Each one found a new position,
+                a new relationship to light, a new way to refract the neon glow.
+                Entropy isn't destruction. It's <span style="color: var(--gold);">redistribution</span>."
+            </blockquote>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+        <span class="section-label reveal">Continue Learning</span>
+        <h2 class="section-title reveal delay-1">The Technical Deep Dive</h2>
+        <p class="reveal delay-2" style="color: var(--text-dim); max-width: 500px; margin: 0 auto 2rem; line-height: 1.8;">
+            Understand the rendering pipeline: path tracing algorithms, denoising,
+            physically-based materials, and the Genesis physics engine.
+        </p>
+        <a href="technical.html" class="cta-button reveal delay-3">Enter Technical →</a>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-glyph">鏡</div>
+        <p class="footer-text">December 2025 · chronOS · Forge × Spark × Crystal</p>
+    </footer>
+
+    <script>
+        // === CUSTOM CURSOR ===
+        const cursor = document.querySelector('.cursor');
+        const cursorDot = document.querySelector('.cursor-dot');
+        const orbs = document.querySelectorAll('.orb');
+        const neonBars = document.querySelectorAll('.neon-bar');
+
+        let mouseX = 0, mouseY = 0;
+        let cursorX = 0, cursorY = 0;
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+
+            // Dot follows exactly
+            cursorDot.style.left = mouseX - 2 + 'px';
+            cursorDot.style.top = mouseY - 2 + 'px';
+
+            // Influence orbs (subtle pull)
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            const pullStrength = 30;
+
+            orbs.forEach((orb, i) => {
+                const factor = (4 - i) / 4; // Closer orbs move more
+                const dx = (mouseX - centerX) / centerX * pullStrength * factor;
+                const dy = (mouseY - centerY) / centerY * pullStrength * factor;
+                orb.style.transform = `translateX(${dx}px) translateY(${dy}px)`;
+            });
+
+            // Influence neon brightness based on cursor X position
+            const normX = mouseX / window.innerWidth;
+            neonBars.forEach(bar => {
+                if (bar.classList.contains('left') || bar.classList.contains('left-2')) {
+                    bar.style.opacity = 0.3 + (1 - normX) * 0.5;
+                } else {
+                    bar.style.opacity = 0.3 + normX * 0.5;
+                }
+            });
+        });
+
+        // Smooth cursor follow
+        function animateCursor() {
+            cursorX += (mouseX - cursorX) * 0.15;
+            cursorY += (mouseY - cursorY) * 0.15;
+            cursor.style.left = cursorX - 10 + 'px';
+            cursor.style.top = cursorY - 10 + 'px';
+            requestAnimationFrame(animateCursor);
+        }
+        animateCursor();
+
+        // Hover state for interactive elements
+        const hoverables = document.querySelectorAll('a, button, .image-reveal, .shot-card, .callout, video');
+        hoverables.forEach(el => {
+            el.addEventListener('mouseenter', () => cursor.classList.add('hover'));
+            el.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+        });
+
+        // === SCROLL REVEAL ===
+        const reveals = document.querySelectorAll('.reveal, .reveal-left, .reveal-right');
+        
+        const revealObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+        reveals.forEach(el => revealObserver.observe(el));
+
+        // === PARALLAX ===
+        const parallaxImg = document.querySelector('.parallax-img');
+        if (parallaxImg) {
+            window.addEventListener('scroll', () => {
+                const rect = parallaxImg.parentElement.getBoundingClientRect();
+                if (rect.top < window.innerHeight && rect.bottom > 0) {
+                    const progress = (window.innerHeight - rect.top) / (window.innerHeight + rect.height);
+                    const offset = (progress - 0.5) * 100;
+                    parallaxImg.style.transform = `translateY(${offset}px)`;
+                }
+            });
+        }
+
+        // === KANJI GLOW ON SCROLL ===
+        const kanji = document.querySelector('.hero-kanji');
+        window.addEventListener('scroll', () => {
+            const scrollY = window.scrollY;
+            const opacity = Math.max(0, 1 - scrollY / 500);
+            if (kanji) {
+                kanji.style.opacity = opacity;
+                kanji.style.transform = `translateY(${scrollY * 0.3}px) scale(${1 + scrollY * 0.0005})`;
+            }
+        });
+    </script>
+
+</body>
+</html>
