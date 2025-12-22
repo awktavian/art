@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// ROOM I: THE IGNITION
-// Click to ignite. Watch the universe begin.
+// ROOM I: IGNITION
+// The first spark. From void to fire.
+// Crystal-verified: Canvas explosion, particle physics, content reveal
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { CONFIG } from '../config.js';
@@ -9,14 +10,16 @@ export class IgnitionRoom {
     constructor(container, soundSystem = null) {
         this.container = container;
         this.sound = soundSystem;
-        this.spark = document.getElementById('the-spark');
-        this.voidOverlay = document.getElementById('void-overlay');
-        this.content = document.getElementById('ignition-content');
-        this.canvas = document.getElementById('explosion-canvas');
+        this.canvas = document.getElementById('ignition-canvas');
         this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
+        
         this.particles = [];
         this.isIgnited = false;
         this.animationId = null;
+        
+        this.voidOverlay = document.getElementById('void-overlay');
+        this.sparkTrigger = document.getElementById('spark-trigger');
+        this.ignitionReveal = document.getElementById('ignition-reveal');
         
         this.init();
     }
@@ -25,20 +28,22 @@ export class IgnitionRoom {
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
         
-        // Click spark to ignite
-        if (this.spark) {
-            this.spark.addEventListener('click', () => this.ignite());
+        // Click to ignite
+        if (this.sparkTrigger) {
+            this.sparkTrigger.addEventListener('click', (e) => {
+                if (!this.isIgnited) {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    this.ignite(x, y);
+                }
+            });
         }
         
-        // Also allow clicking anywhere in the room before ignition
-        this.container.addEventListener('click', (e) => {
-            if (!this.isIgnited && e.target !== this.spark) {
-                this.ignite();
-            }
-        });
+        // Start render loop
+        this.startAnimation();
         
-        // Start ambient particle animation
-        this.startAmbientParticles();
+        console.log('✨ Ignition room initialized');
     }
     
     resizeCanvas() {
@@ -48,111 +53,165 @@ export class IgnitionRoom {
         }
     }
     
-    ignite() {
+    async ignite(clickX, clickY) {
         if (this.isIgnited) return;
         this.isIgnited = true;
         
-        // Play explosion sound
+        // Play ignition sound
         if (this.sound) {
+            await this.sound.init();
             this.sound.playIgnition();
         }
         
-        // Create explosion particles
-        this.createExplosion(
-            this.spark.getBoundingClientRect().left + 50,
-            this.spark.getBoundingClientRect().top + 50
-        );
+        // Create explosion at click point
+        const centerX = clickX || this.canvas.width / 2;
+        const centerY = clickY || this.canvas.height / 2;
         
-        // Animate spark exploding
-        this.spark.classList.add('ignited');
+        // Multi-wave explosion
+        this.createExplosion(centerX, centerY, 150, 0);
+        setTimeout(() => this.createExplosion(centerX, centerY, 100, 1), 80);
+        setTimeout(() => this.createExplosion(centerX, centerY, 80, 2), 160);
+        setTimeout(() => this.createExplosion(centerX, centerY, 50, 3), 250);
         
-        // Fade void overlay
-        setTimeout(() => {
-            this.voidOverlay.classList.add('ignited');
-        }, 200);
-        
-        // Reveal content
-        setTimeout(() => {
-            this.content.classList.add('visible');
-        }, 500);
-        
-        // Start ambient crackle sound
-        if (this.sound) {
+        // Fade out void overlay
+        if (this.voidOverlay) {
+            this.voidOverlay.style.transition = 'opacity 1.5s ease-out';
+            this.voidOverlay.style.opacity = '0';
             setTimeout(() => {
-                this.sound.startAmbientCrackle();
-            }, 1000);
+                this.voidOverlay.style.display = 'none';
+            }, 1500);
+        }
+        
+        // Hide spark trigger
+        if (this.sparkTrigger) {
+            this.sparkTrigger.style.transition = 'opacity 0.3s ease-out';
+            this.sparkTrigger.style.opacity = '0';
+            setTimeout(() => {
+                this.sparkTrigger.style.display = 'none';
+            }, 300);
+        }
+        
+        // Reveal content after explosion settles
+        setTimeout(() => {
+            if (this.ignitionReveal) {
+                this.ignitionReveal.classList.add('revealed');
+            }
+            // Start ambient particles
+            this.startAmbientParticles();
+        }, 800);
+    }
+    
+    createExplosion(x, y, count, wave) {
+        const colors = [
+            CONFIG.COLORS.WHITE_HOT,
+            CONFIG.COLORS.YELLOW,
+            CONFIG.COLORS.GOLD,
+            CONFIG.COLORS.FLAME,
+            CONFIG.COLORS.EMBER,
+        ];
+        
+        for (let i = 0; i < count; i++) {
+            const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3;
+            const speed = 8 + Math.random() * 18 - wave * 2;
+            const size = 2 + Math.random() * 8 - wave * 0.5;
+            
+            this.particles.push({
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                size: Math.max(1, size),
+                color: colors[Math.floor(Math.random() * colors.length)],
+                life: 1600 + Math.random() * 800 - wave * 200,
+                maxLife: 2400 - wave * 200,
+                gravity: 0.08 + wave * 0.02,
+                drag: 0.985,
+                wave: wave,
+            });
         }
     }
     
-    createExplosion(x, y) {
+    startAmbientParticles() {
+        // Continuously spawn ambient sparks
+        const spawnAmbient = () => {
+            if (!this.isIgnited) return;
+            
+            // Random sparks from edges and bottom
+            if (Math.random() < 0.12) {
+                const edge = Math.floor(Math.random() * 3);
+                let x, y;
+                
+                if (edge === 0) { // Bottom
+                    x = Math.random() * this.canvas.width;
+                    y = this.canvas.height + 10;
+                } else if (edge === 1) { // Left
+                    x = -10;
+                    y = Math.random() * this.canvas.height;
+                } else { // Right
+                    x = this.canvas.width + 10;
+                    y = Math.random() * this.canvas.height;
+                }
+                
+                const angle = Math.atan2(this.canvas.height / 2 - y, this.canvas.width / 2 - x);
+                const speed = 1 + Math.random() * 3;
+                
+                this.particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed + (Math.random() - 0.5) * 2,
+                    vy: Math.sin(angle) * speed + (Math.random() - 0.5) * 2,
+                    size: 1 + Math.random() * 3,
+                    color: this.getRandomColor(),
+                    life: 500 + Math.random() * 800,
+                    maxLife: 1300,
+                    gravity: -0.02,
+                    drag: 0.995,
+                    ambient: true,
+                });
+            }
+            
+            requestAnimationFrame(spawnAmbient);
+        };
+        
+        spawnAmbient();
+    }
+    
+    getRandomColor() {
         const colors = [
             CONFIG.COLORS.FLAME,
             CONFIG.COLORS.EMBER,
             CONFIG.COLORS.GOLD,
             CONFIG.COLORS.YELLOW,
-            CONFIG.COLORS.WHITE_HOT,
-            CONFIG.COLORS.ELECTRIC,
-            CONFIG.COLORS.PLASMA,
         ];
-        
-        for (let i = 0; i < CONFIG.EXPLOSION.PARTICLE_COUNT; i++) {
-            const angle = (Math.PI * 2 * i) / CONFIG.EXPLOSION.PARTICLE_COUNT + Math.random() * 0.5;
-            const velocity = CONFIG.EXPLOSION.MIN_VELOCITY + 
-                Math.random() * (CONFIG.EXPLOSION.MAX_VELOCITY - CONFIG.EXPLOSION.MIN_VELOCITY);
-            
-            this.particles.push({
-                x: x,
-                y: y,
-                vx: Math.cos(angle) * velocity,
-                vy: Math.sin(angle) * velocity,
-                radius: 2 + Math.random() * 6,
-                color: colors[Math.floor(Math.random() * colors.length)],
-                life: CONFIG.EXPLOSION.PARTICLE_LIFE,
-                maxLife: CONFIG.EXPLOSION.PARTICLE_LIFE,
-                gravity: CONFIG.EXPLOSION.GRAVITY * (0.5 + Math.random()),
-            });
-        }
-        
-        // Secondary burst
-        setTimeout(() => {
-            for (let i = 0; i < 50; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const velocity = 2 + Math.random() * 8;
-                
-                this.particles.push({
-                    x: x + (Math.random() - 0.5) * 100,
-                    y: y + (Math.random() - 0.5) * 100,
-                    vx: Math.cos(angle) * velocity,
-                    vy: Math.sin(angle) * velocity,
-                    radius: 1 + Math.random() * 3,
-                    color: colors[Math.floor(Math.random() * colors.length)],
-                    life: 800,
-                    maxLife: 800,
-                    gravity: 0.05,
-                });
-            }
-        }, 100);
+        return colors[Math.floor(Math.random() * colors.length)];
     }
     
-    startAmbientParticles() {
+    startAnimation() {
         const animate = () => {
             this.animationId = requestAnimationFrame(animate);
             
-            if (!this.ctx) return;
+            if (!this.ctx || !this.canvas) return;
             
-            // Clear with fade (creates trails)
-            this.ctx.fillStyle = 'rgba(10, 10, 10, 0.1)';
-            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            const ctx = this.ctx;
+            const width = this.canvas.width;
+            const height = this.canvas.height;
+            
+            if (width === 0 || height === 0) return;
+            
+            // Clear with fade trail
+            ctx.fillStyle = this.isIgnited ? 'rgba(5, 5, 5, 0.12)' : 'rgba(5, 5, 5, 1)';
+            ctx.fillRect(0, 0, width, height);
             
             // Update and draw particles
             for (let i = this.particles.length - 1; i >= 0; i--) {
                 const p = this.particles[i];
                 
-                // Update
+                // Physics
                 p.x += p.vx;
                 p.y += p.vy;
                 p.vy += p.gravity;
-                p.vx *= 0.99;
+                p.vx *= p.drag;
+                p.vy *= p.drag;
                 p.life -= 16;
                 
                 // Remove dead particles
@@ -161,35 +220,35 @@ export class IgnitionRoom {
                     continue;
                 }
                 
-                // Draw
-                const alpha = p.life / p.maxLife;
-                this.ctx.beginPath();
-                this.ctx.arc(p.x, p.y, p.radius * alpha, 0, Math.PI * 2);
-                this.ctx.fillStyle = this.hexToRgba(p.color, alpha);
-                this.ctx.fill();
+                // Calculate alpha based on life
+                const lifeRatio = p.life / p.maxLife;
+                const alpha = Math.pow(lifeRatio, 0.5);
+                const size = p.size * lifeRatio;
                 
-                // Add glow
-                this.ctx.shadowBlur = 20;
-                this.ctx.shadowColor = p.color;
-                this.ctx.fill();
-                this.ctx.shadowBlur = 0;
-            }
-            
-            // Spawn random ambient sparks after ignition
-            if (this.isIgnited && Math.random() < 0.03) {
-                const x = Math.random() * this.canvas.width;
-                const y = Math.random() * this.canvas.height;
-                this.particles.push({
-                    x: x,
-                    y: y,
-                    vx: (Math.random() - 0.5) * 2,
-                    vy: -Math.random() * 3,
-                    radius: 1 + Math.random() * 2,
-                    color: [CONFIG.COLORS.FLAME, CONFIG.COLORS.GOLD, CONFIG.COLORS.EMBER][Math.floor(Math.random() * 3)],
-                    life: 500,
-                    maxLife: 500,
-                    gravity: -0.02,
-                });
+                // Draw glow
+                const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size * 4);
+                gradient.addColorStop(0, this.hexToRgba(p.color, alpha * 0.8));
+                gradient.addColorStop(0.4, this.hexToRgba(p.color, alpha * 0.3));
+                gradient.addColorStop(1, 'transparent');
+                
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, size * 4, 0, Math.PI * 2);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                // Draw core
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+                ctx.fillStyle = this.hexToRgba(p.color, alpha);
+                ctx.fill();
+                
+                // Bright inner core for fresh particles
+                if (lifeRatio > 0.7) {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, size * 0.4, 0, Math.PI * 2);
+                    ctx.fillStyle = this.hexToRgba(CONFIG.COLORS.WHITE_HOT, alpha * 0.8);
+                    ctx.fill();
+                }
             }
         };
         
@@ -209,4 +268,3 @@ export class IgnitionRoom {
         }
     }
 }
-
