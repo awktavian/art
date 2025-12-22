@@ -127,30 +127,42 @@ export class RecoveryRoom {
         
         this.addLogEntry(`[HEAL] Fixing ${error.type.type}...`, 'heal');
         
-        // Create healing wave
-        this.healingWaves.push({
-            x: error.x,
-            y: error.y,
-            radius: 0,
-            maxRadius: 100,
-            color: CONFIG.COLORS.HEALING_GREEN,
-        });
+        // Create healing wave (multiple rings for delight!)
+        for (let i = 0; i < 3; i++) {
+            setTimeout(() => {
+                this.healingWaves.push({
+                    x: error.x,
+                    y: error.y,
+                    radius: 0,
+                    maxRadius: 80 + i * 30,
+                    color: i === 0 ? CONFIG.COLORS.HEALING_GREEN : CONFIG.COLORS.CYAN,
+                });
+            }, i * 80);
+        }
+        
+        // Create healing particles
+        this.createHealingParticles(error.x, error.y);
         
         if (this.sound && this.sound.initialized) {
             this.sound.playHeal();
         }
         
-        // Animate DOM element
+        // Animate DOM element with spin!
         const el = document.getElementById(`error-${error.id}`);
         if (el) {
             el.style.borderColor = CONFIG.COLORS.HEALING_GREEN;
             el.style.color = CONFIG.COLORS.HEALING_GREEN;
-            el.style.transform = 'translate(-50%, -50%) scale(0)';
-            el.style.opacity = '0';
+            el.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            el.style.transform = 'translate(-50%, -50%) scale(1.2) rotate(180deg)';
+            
+            setTimeout(() => {
+                el.style.transform = 'translate(-50%, -50%) scale(0) rotate(360deg)';
+                el.style.opacity = '0';
+            }, 100);
             
             setTimeout(() => {
                 el.remove();
-            }, 300);
+            }, 500);
         }
         
         // Remove from array after animation
@@ -160,7 +172,25 @@ export class RecoveryRoom {
                 this.errors.splice(index, 1);
             }
             this.addLogEntry(`[SUCCESS] ${error.type.type} resolved.`, 'success');
-        }, 300);
+        }, 400);
+    }
+    
+    createHealingParticles(x, y) {
+        // Add sparkle particles around the healed bug
+        for (let i = 0; i < 12; i++) {
+            const angle = (Math.PI * 2 * i) / 12;
+            this.healingWaves.push({
+                x: x,
+                y: y,
+                type: 'particle',
+                vx: Math.cos(angle) * 3,
+                vy: Math.sin(angle) * 3,
+                size: 4,
+                life: 600,
+                maxLife: 600,
+                color: CONFIG.COLORS.HEALING_GREEN,
+            });
+        }
     }
     
     healAll() {
@@ -276,9 +306,41 @@ export class RecoveryRoom {
                 }
             });
             
-            // Draw healing waves
+            // Draw healing waves and particles
             for (let i = this.healingWaves.length - 1; i >= 0; i--) {
                 const wave = this.healingWaves[i];
+                
+                // Handle healing particles
+                if (wave.type === 'particle') {
+                    wave.x += wave.vx;
+                    wave.y += wave.vy;
+                    wave.vx *= 0.95;
+                    wave.vy *= 0.95;
+                    wave.life -= 16;
+                    
+                    if (wave.life <= 0) {
+                        this.healingWaves.splice(i, 1);
+                        continue;
+                    }
+                    
+                    const alpha = wave.life / wave.maxLife;
+                    const size = wave.size * alpha;
+                    
+                    // Sparkle effect
+                    const glow = ctx.createRadialGradient(wave.x, wave.y, 0, wave.x, wave.y, size * 2);
+                    glow.addColorStop(0, this.hexToRgba(wave.color, alpha));
+                    glow.addColorStop(0.5, this.hexToRgba(wave.color, alpha * 0.3));
+                    glow.addColorStop(1, 'transparent');
+                    
+                    ctx.beginPath();
+                    ctx.arc(wave.x, wave.y, size * 2, 0, Math.PI * 2);
+                    ctx.fillStyle = glow;
+                    ctx.fill();
+                    
+                    continue;
+                }
+                
+                // Regular healing waves
                 wave.radius += 5;
                 
                 const alpha = 1 - (wave.radius / wave.maxRadius);

@@ -184,32 +184,68 @@ export class FoundryRoom {
             
             if (width === 0 || height === 0) return;
             
-            // Clear with fade
-            ctx.fillStyle = 'rgba(10, 10, 10, 0.1)';
+            // Clear completely for fresh redraw
+            ctx.fillStyle = 'rgba(10, 10, 10, 1)';
             ctx.fillRect(0, 0, width, height);
             
-            // Draw crucible/pool at bottom
-            const poolHeight = 80;
+            // Draw crucible/pool at bottom - ALWAYS visible
+            const poolHeight = 100;
             const poolGradient = ctx.createLinearGradient(0, height - poolHeight, 0, height);
             poolGradient.addColorStop(0, this.temperatureToColor(this.temperature));
             poolGradient.addColorStop(0.3, this.temperatureToColor(this.temperature * 0.8));
             poolGradient.addColorStop(1, this.temperatureToColor(this.temperature * 0.5));
             
+            // Draw pool ellipse
             ctx.fillStyle = poolGradient;
             ctx.beginPath();
-            ctx.ellipse(width / 2, height - poolHeight / 2, width / 2 - 50, poolHeight / 2, 0, 0, Math.PI * 2);
+            ctx.ellipse(width / 2, height - poolHeight / 2, width / 2 - 30, poolHeight / 2, 0, 0, Math.PI * 2);
             ctx.fill();
             
-            // Pool glow
+            // Pool surface highlight
             if (this.temperature > 500) {
+                ctx.save();
+                ctx.globalAlpha = 0.4;
+                const surfaceGradient = ctx.createLinearGradient(
+                    width * 0.3, height - poolHeight,
+                    width * 0.7, height - poolHeight + 20
+                );
+                surfaceGradient.addColorStop(0, 'transparent');
+                surfaceGradient.addColorStop(0.5, this.temperatureToColor(this.temperature * 1.1));
+                surfaceGradient.addColorStop(1, 'transparent');
+                ctx.fillStyle = surfaceGradient;
+                ctx.beginPath();
+                ctx.ellipse(width / 2, height - poolHeight + 15, width / 3, 15, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+            
+            // Pool glow (radiant heat)
+            if (this.temperature > 400) {
+                const glowIntensity = Math.min((this.temperature - 400) / 1100, 0.6);
                 const glowGradient = ctx.createRadialGradient(
                     width / 2, height - poolHeight / 2, 0,
-                    width / 2, height - poolHeight / 2, width / 2
+                    width / 2, height - poolHeight / 2, width * 0.6
                 );
-                glowGradient.addColorStop(0, `rgba(255, 107, 0, ${(this.temperature - 500) / 1000 * 0.5})`);
+                glowGradient.addColorStop(0, `rgba(255, 107, 0, ${glowIntensity})`);
+                glowGradient.addColorStop(0.5, `rgba(255, 69, 0, ${glowIntensity * 0.4})`);
                 glowGradient.addColorStop(1, 'transparent');
                 ctx.fillStyle = glowGradient;
-                ctx.fillRect(0, height - 200, width, 200);
+                ctx.fillRect(0, height - 250, width, 250);
+            }
+            
+            // Bubbling effect on hot pool
+            if (this.temperature > 800) {
+                const bubbleCount = Math.floor((this.temperature - 800) / 100);
+                for (let i = 0; i < bubbleCount; i++) {
+                    const bubbleX = width * 0.3 + Math.sin(this.time * 2 + i * 1.7) * (width * 0.2);
+                    const bubbleY = height - poolHeight + 10 + Math.sin(this.time * 3 + i) * 5;
+                    const bubbleSize = 3 + Math.sin(this.time * 5 + i * 2) * 2;
+                    
+                    ctx.beginPath();
+                    ctx.arc(bubbleX, bubbleY, bubbleSize, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 200, 100, ${0.3 + Math.sin(this.time * 4 + i) * 0.2})`;
+                    ctx.fill();
+                }
             }
             
             // Heat shimmer

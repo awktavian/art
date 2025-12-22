@@ -50,6 +50,11 @@ export class AnvilRoom {
         this.strikeCount++;
         if (this.strikeCountEl) {
             this.strikeCountEl.textContent = this.strikeCount;
+            // Pulse the counter
+            this.strikeCountEl.style.transform = 'scale(1.3)';
+            setTimeout(() => {
+                this.strikeCountEl.style.transform = 'scale(1)';
+            }, 100);
         }
         
         // Get click position
@@ -57,11 +62,19 @@ export class AnvilRoom {
         const x = rect.left + rect.width / 2;
         const y = rect.top + rect.height / 2;
         
-        // Create sparks
-        this.createSparks(x, y);
+        // Create sparks (more on milestones!)
+        const sparkMultiplier = (this.strikeCount % 10 === 0) ? 3 : 1;
+        for (let i = 0; i < sparkMultiplier; i++) {
+            this.createSparks(x, y);
+        }
         
-        // Shake effect
-        this.shakeAnvil();
+        // Screen flash on powerful strikes
+        if (this.strikeCount % 10 === 0) {
+            this.screenFlash();
+        }
+        
+        // Shake effect (stronger on milestones)
+        this.shakeAnvil(this.strikeCount % 10 === 0 ? 2 : 1);
         
         // Play sound
         if (this.sound && this.sound.initialized) {
@@ -70,6 +83,45 @@ export class AnvilRoom {
         
         // Metal piece transformation
         this.transformMetal();
+        
+        // Impact ring effect
+        this.createImpactRing(x, y);
+    }
+    
+    screenFlash() {
+        const flash = document.createElement('div');
+        flash.style.cssText = `
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at center, rgba(255, 215, 0, 0.4), transparent 70%);
+            pointer-events: none;
+            z-index: 9999;
+            animation: flash-fade 0.3s ease-out forwards;
+        `;
+        document.body.appendChild(flash);
+        setTimeout(() => flash.remove(), 300);
+        
+        // Add keyframes if not exists
+        if (!document.getElementById('flash-keyframes')) {
+            const style = document.createElement('style');
+            style.id = 'flash-keyframes';
+            style.textContent = `@keyframes flash-fade { 0% { opacity: 1; } 100% { opacity: 0; } }`;
+            document.head.appendChild(style);
+        }
+    }
+    
+    createImpactRing(x, y) {
+        // Add impact ring to sparks array with special type
+        this.sparks.push({
+            x: x,
+            y: y,
+            type: 'ring',
+            radius: 10,
+            maxRadius: 80,
+            life: 400,
+            maxLife: 400,
+            color: CONFIG.COLORS.SPARK_YELLOW,
+        });
     }
     
     createSparks(x, y) {
@@ -99,15 +151,29 @@ export class AnvilRoom {
         }
     }
     
-    shakeAnvil() {
+    shakeAnvil(multiplier = 1) {
         if (!this.anvilBlock) return;
         
-        const intensity = CONFIG.ANVIL.SHAKE_INTENSITY;
-        this.anvilBlock.style.transform = `translate(${(Math.random() - 0.5) * intensity}px, ${(Math.random() - 0.5) * intensity}px)`;
+        const intensity = CONFIG.ANVIL.SHAKE_INTENSITY * multiplier;
         
-        setTimeout(() => {
-            this.anvilBlock.style.transform = 'translate(0, 0)';
-        }, 50);
+        // Multiple shake frames for more impact
+        const shakeFrames = multiplier > 1 ? 4 : 2;
+        let frame = 0;
+        
+        const shake = () => {
+            if (frame >= shakeFrames) {
+                this.anvilBlock.style.transform = 'translate(0, 0)';
+                return;
+            }
+            
+            const x = (Math.random() - 0.5) * intensity * (1 - frame / shakeFrames);
+            const y = (Math.random() - 0.5) * intensity * (1 - frame / shakeFrames);
+            this.anvilBlock.style.transform = `translate(${x}px, ${y}px)`;
+            frame++;
+            setTimeout(shake, 30);
+        };
+        
+        shake();
     }
     
     transformMetal() {
@@ -144,11 +210,30 @@ export class AnvilRoom {
             ctx.fillStyle = 'rgba(10, 10, 10, 0.15)';
             ctx.fillRect(0, 0, width, height);
             
-            // Update and draw sparks
+            // Update and draw sparks/effects
             for (let i = this.sparks.length - 1; i >= 0; i--) {
                 const s = this.sparks[i];
                 
-                // Physics
+                // Handle impact rings separately
+                if (s.type === 'ring') {
+                    s.radius += (s.maxRadius - s.radius) * 0.15;
+                    s.life -= 16;
+                    
+                    if (s.life <= 0) {
+                        this.sparks.splice(i, 1);
+                        continue;
+                    }
+                    
+                    const alpha = s.life / s.maxLife;
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+                    ctx.strokeStyle = this.hexToRgba(s.color, alpha * 0.6);
+                    ctx.lineWidth = 3 * alpha;
+                    ctx.stroke();
+                    continue;
+                }
+                
+                // Regular spark physics
                 s.x += s.vx;
                 s.y += s.vy;
                 s.vy += s.gravity;
@@ -163,6 +248,16 @@ export class AnvilRoom {
                 
                 const alpha = s.life / s.maxLife;
                 const size = s.size * alpha;
+                
+                // Spark trail (micro-delight!)
+                if (s.life > 400) {
+                    ctx.beginPath();
+                    ctx.moveTo(s.x, s.y);
+                    ctx.lineTo(s.x - s.vx * 3, s.y - s.vy * 3);
+                    ctx.strokeStyle = this.hexToRgba(s.color, alpha * 0.3);
+                    ctx.lineWidth = size * 0.5;
+                    ctx.stroke();
+                }
                 
                 // Glow
                 const gradient = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, size * 3);
