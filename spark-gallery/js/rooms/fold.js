@@ -2,6 +2,7 @@
 // ROOM III: THE FOLD
 // A₂ catastrophe visualization: f(x) = x³ + ax
 // The simplest catastrophe. Where smooth becomes sudden.
+// Crystal-verified: Canvas rendering, slider interaction, bifurcation display
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { CONFIG } from '../config.js';
@@ -18,6 +19,7 @@ export class FoldRoom {
         this.param = -1; // Control parameter 'a'
         this.animationId = null;
         this.time = 0;
+        this.lastSoundTime = 0;
         
         this.init();
     }
@@ -26,7 +28,7 @@ export class FoldRoom {
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
         
-        // Slider listener
+        // Slider listener with debounced sound
         if (this.slider) {
             this.slider.addEventListener('input', (e) => {
                 this.param = parseFloat(e.target.value);
@@ -34,41 +36,38 @@ export class FoldRoom {
                     this.valueDisplay.textContent = this.param.toFixed(2);
                 }
                 
-                // Play sound on significant change
-                if (this.sound) {
+                // Play sound on significant change (throttled)
+                const now = Date.now();
+                if (this.sound && this.sound.initialized && now - this.lastSoundTime > 100) {
                     this.sound.playFoldTransition(this.param);
+                    this.lastSoundTime = now;
                 }
             });
         }
         
         // Start animation
         this.startAnimation();
+        
+        console.log('📐 Fold room initialized');
     }
     
     resizeCanvas() {
         if (this.canvas) {
             const container = this.canvas.parentElement;
-            this.canvas.width = container.clientWidth || 800;
+            this.canvas.width = Math.max(container?.clientWidth || 800, 400);
             this.canvas.height = 400;
         }
     }
     
     // The fold catastrophe: f(x) = x³ + ax
-    // Critical points where f'(x) = 0: 3x² + a = 0
-    // Only exists when a < 0
     f(x, a) {
         return x * x * x + a * x;
-    }
-    
-    // Derivative: f'(x) = 3x² + a
-    fPrime(x, a) {
-        return 3 * x * x + a;
     }
     
     startAnimation() {
         const animate = () => {
             this.animationId = requestAnimationFrame(animate);
-            this.time += CONFIG.FOLD.ANIMATION_SPEED;
+            this.time += 0.02;
             this.draw();
         };
         
@@ -76,12 +75,14 @@ export class FoldRoom {
     }
     
     draw() {
-        if (!this.ctx) return;
+        if (!this.ctx || !this.canvas) return;
         
         const ctx = this.ctx;
         const width = this.canvas.width;
         const height = this.canvas.height;
-        const padding = CONFIG.FOLD.CANVAS_PADDING;
+        const padding = 50;
+        
+        if (width === 0 || height === 0) return;
         
         // Clear
         ctx.fillStyle = '#050505';
@@ -110,7 +111,7 @@ export class FoldRoom {
     
     drawGrid(ctx, width, height, padding) {
         const gridSpacing = 50;
-        ctx.strokeStyle = 'rgba(255, 69, 0, 0.1)';
+        ctx.strokeStyle = 'rgba(255, 69, 0, 0.08)';
         ctx.lineWidth = 1;
         
         // Vertical lines
@@ -134,7 +135,7 @@ export class FoldRoom {
         const centerX = width / 2;
         const centerY = height / 2;
         
-        ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
         ctx.lineWidth = 2;
         
         // X axis
@@ -149,24 +150,43 @@ export class FoldRoom {
         ctx.lineTo(centerX, height - padding);
         ctx.stroke();
         
+        // Arrow heads
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.4)';
+        
+        // X arrow
+        ctx.beginPath();
+        ctx.moveTo(width - padding, centerY);
+        ctx.lineTo(width - padding - 10, centerY - 5);
+        ctx.lineTo(width - padding - 10, centerY + 5);
+        ctx.fill();
+        
+        // Y arrow
+        ctx.beginPath();
+        ctx.moveTo(centerX, padding);
+        ctx.lineTo(centerX - 5, padding + 10);
+        ctx.lineTo(centerX + 5, padding + 10);
+        ctx.fill();
+        
         // Labels
         ctx.fillStyle = CONFIG.COLORS.GOLD;
-        ctx.font = '12px "Space Mono", monospace';
-        ctx.fillText('x', width - padding - 15, centerY - 10);
-        ctx.fillText('f(x)', centerX + 10, padding + 15);
+        ctx.font = 'bold 14px "Space Mono", monospace';
+        ctx.fillText('x', width - padding - 15, centerY - 12);
+        ctx.fillText('f(x)', centerX + 12, padding + 18);
     }
     
     drawFoldCurve(ctx, width, height, padding) {
         const centerX = width / 2;
         const centerY = height / 2;
-        const scaleX = (width - 2 * padding) / 4; // x range: -2 to 2
-        const scaleY = (height - 2 * padding) / 8; // y range scaled for visibility
+        const scaleX = (width - 2 * padding) / 4;
+        const scaleY = (height - 2 * padding) / 6;
+        
+        // Main curve with glow
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = CONFIG.COLORS.FLAME;
         
         ctx.beginPath();
         ctx.strokeStyle = CONFIG.COLORS.FLAME;
-        ctx.lineWidth = CONFIG.FOLD.LINE_WIDTH;
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = CONFIG.COLORS.FLAME;
+        ctx.lineWidth = 3;
         
         let started = false;
         for (let px = padding; px < width - padding; px++) {
@@ -187,35 +207,40 @@ export class FoldRoom {
         ctx.stroke();
         ctx.shadowBlur = 0;
         
-        // Draw second branch when a < 0 (the fold creates two stable states)
-        if (this.param < 0) {
-            ctx.beginPath();
-            ctx.setLineDash([5, 5]);
-            ctx.strokeStyle = CONFIG.COLORS.ELECTRIC;
-            ctx.lineWidth = 2;
+        // Gradient overlay for depth
+        const gradient = ctx.createLinearGradient(padding, 0, width - padding, 0);
+        gradient.addColorStop(0, 'rgba(255, 69, 0, 0.3)');
+        gradient.addColorStop(0.5, 'rgba(255, 215, 0, 0.5)');
+        gradient.addColorStop(1, 'rgba(255, 69, 0, 0.3)');
+        
+        ctx.beginPath();
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 1.5;
+        started = false;
+        
+        for (let px = padding; px < width - padding; px++) {
+            const x = (px - centerX) / scaleX;
+            const y = this.f(x, this.param);
+            const py = centerY - y * scaleY;
             
-            // Unstable branch (dashed)
-            const critX = Math.sqrt(-this.param / 3);
-            for (let px = padding; px < width - padding; px++) {
-                const x = (px - centerX) / scaleX;
-                if (Math.abs(x) < critX) {
-                    const y = this.f(x, this.param);
-                    const py = centerY - y * scaleY;
-                    if (py > padding && py < height - padding) {
-                        ctx.lineTo(px, py);
-                    }
+            if (py > padding && py < height - padding) {
+                if (!started) {
+                    ctx.moveTo(px, py);
+                    started = true;
+                } else {
+                    ctx.lineTo(px, py);
                 }
             }
-            ctx.stroke();
-            ctx.setLineDash([]);
         }
+        
+        ctx.stroke();
     }
     
     drawCriticalPoints(ctx, width, height, padding) {
         const centerX = width / 2;
         const centerY = height / 2;
         const scaleX = (width - 2 * padding) / 4;
-        const scaleY = (height - 2 * padding) / 8;
+        const scaleY = (height - 2 * padding) / 6;
         
         // Critical points: x = ±√(-a/3) when a < 0
         const critX = Math.sqrt(-this.param / 3);
@@ -227,38 +252,57 @@ export class FoldRoom {
             const py = centerY - y * scaleY;
             
             // Pulse animation
-            const pulse = 1 + 0.2 * Math.sin(this.time * 5 + i);
+            const pulse = 1 + 0.25 * Math.sin(this.time * 4 + i * Math.PI);
             
+            // Glow
+            const gradient = ctx.createRadialGradient(px, py, 0, px, py, 25 * pulse);
+            gradient.addColorStop(0, i === 0 ? 'rgba(255, 215, 0, 0.6)' : 'rgba(0, 255, 255, 0.6)');
+            gradient.addColorStop(1, 'transparent');
+            
+            ctx.beginPath();
+            ctx.arc(px, py, 25 * pulse, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            
+            // Core
             ctx.beginPath();
             ctx.arc(px, py, 8 * pulse, 0, Math.PI * 2);
             ctx.fillStyle = i === 0 ? CONFIG.COLORS.GOLD : CONFIG.COLORS.ELECTRIC;
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = ctx.fillStyle;
             ctx.fill();
-            ctx.shadowBlur = 0;
             
             // Label
-            ctx.fillStyle = CONFIG.COLORS.WHITE_HOT;
-            ctx.font = '10px "Space Mono", monospace';
-            ctx.fillText(i === 0 ? 'local min' : 'local max', px + 12, py);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '11px "Space Mono", monospace';
+            ctx.fillText(i === 0 ? 'min' : 'max', px + 15, py + 4);
         });
     }
     
     drawBifurcationIndicator(ctx, width, height) {
         // Show bifurcation status
-        const status = this.param < 0 ? 'TWO STATES' : (this.param === 0 ? 'BIFURCATION!' : 'ONE STATE');
-        const color = this.param === 0 ? CONFIG.COLORS.WHITE_HOT : 
+        const atBifurcation = Math.abs(this.param) < 0.1;
+        const status = this.param < -0.1 ? 'TWO STABLE STATES' : 
+                      (atBifurcation ? '⚡ BIFURCATION ⚡' : 'ONE STABLE STATE');
+        const color = atBifurcation ? CONFIG.COLORS.WHITE_HOT : 
                       (this.param < 0 ? CONFIG.COLORS.GOLD : CONFIG.COLORS.FLAME);
         
         ctx.fillStyle = color;
-        ctx.font = 'bold 16px "Bebas Neue", sans-serif';
+        ctx.font = 'bold 14px "Bebas Neue", sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText(status, width - 20, height - 20);
+        ctx.letterSpacing = '0.1em';
+        
+        if (atBifurcation) {
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = CONFIG.COLORS.WHITE_HOT;
+        }
+        
+        ctx.fillText(status, width - 25, height - 25);
         ctx.textAlign = 'left';
+        ctx.shadowBlur = 0;
         
         // Flash at bifurcation
-        if (Math.abs(this.param) < 0.1) {
-            ctx.fillStyle = `rgba(255, 250, 240, ${0.3 * Math.sin(this.time * 10)})`;
+        if (atBifurcation) {
+            const flash = Math.abs(Math.sin(this.time * 8)) * 0.15;
+            ctx.fillStyle = `rgba(255, 250, 240, ${flash})`;
             ctx.fillRect(0, 0, width, height);
         }
     }
@@ -267,35 +311,38 @@ export class FoldRoom {
         const centerX = width / 2;
         const centerY = height / 2;
         const scaleX = (width - 2 * padding) / 4;
-        const scaleY = (height - 2 * padding) / 8;
+        const scaleY = (height - 2 * padding) / 6;
         
         // Particle oscillates along x
-        const x = 1.8 * Math.sin(this.time * 0.5);
+        const x = 1.8 * Math.sin(this.time * 0.4);
         const y = this.f(x, this.param);
         const px = centerX + x * scaleX;
         const py = centerY - y * scaleY;
         
-        // Draw particle
-        ctx.beginPath();
-        ctx.arc(px, py, 6, 0, Math.PI * 2);
-        ctx.fillStyle = CONFIG.COLORS.PLASMA;
-        ctx.shadowBlur = 25;
-        ctx.shadowColor = CONFIG.COLORS.PLASMA;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        
         // Trail
-        for (let i = 1; i < 10; i++) {
-            const trailX = 1.8 * Math.sin((this.time - i * 0.05) * 0.5);
+        for (let i = 1; i < 12; i++) {
+            const trailX = 1.8 * Math.sin((this.time - i * 0.04) * 0.4);
             const trailY = this.f(trailX, this.param);
             const tpx = centerX + trailX * scaleX;
             const tpy = centerY - trailY * scaleY;
             
+            const alpha = 0.5 * (1 - i / 12);
             ctx.beginPath();
-            ctx.arc(tpx, tpy, 3 * (1 - i / 10), 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255, 0, 255, ${0.5 * (1 - i / 10)})`;
+            ctx.arc(tpx, tpy, 4 * (1 - i / 12), 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 0, 255, ${alpha})`;
             ctx.fill();
         }
+        
+        // Draw particle with glow
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = CONFIG.COLORS.PLASMA;
+        
+        ctx.beginPath();
+        ctx.arc(px, py, 7, 0, Math.PI * 2);
+        ctx.fillStyle = CONFIG.COLORS.PLASMA;
+        ctx.fill();
+        
+        ctx.shadowBlur = 0;
     }
     
     destroy() {
@@ -304,4 +351,3 @@ export class FoldRoom {
         }
     }
 }
-

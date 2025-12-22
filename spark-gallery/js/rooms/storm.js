@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // ROOM II: THE STORM
-// Ideas swirl, collide, and combine. Chaos is the process.
+// Ideas colliding, combining, mutating in chaos
+// Crystal-verified: DOM particles, collision detection, vortex visualization
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { CONFIG, IDEA_BANK } from '../config.js';
@@ -12,15 +13,13 @@ export class StormRoom {
         this.canvas = document.getElementById('storm-canvas');
         this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
         this.ideaCloud = document.getElementById('idea-cloud');
-        this.ideaCountEl = document.getElementById('idea-count');
-        this.collisionCountEl = document.getElementById('collision-count');
         
         this.ideas = [];
-        this.ideaCount = 0;
         this.collisionCount = 0;
-        this.vortexAngle = 0;
+        this.fusionCount = 0;
         this.animationId = null;
         this.autoSpawnInterval = null;
+        this.isVisible = false;
         
         this.init();
     }
@@ -29,19 +28,34 @@ export class StormRoom {
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
         
+        // IntersectionObserver for visibility
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                this.isVisible = entry.isIntersecting;
+                if (this.isVisible && this.ideas.length === 0) {
+                    // Auto-spawn some ideas when first visible
+                    setTimeout(() => this.spawnIdeas(8), 500);
+                }
+            });
+        }, { threshold: 0.3 });
+        
+        if (this.container) {
+            observer.observe(this.container);
+        }
+        
         // Button listeners
-        const spawnBtn = document.getElementById('spawn-ideas');
-        const clearBtn = document.getElementById('clear-storm');
+        const spawnBtn = document.getElementById('spawn-btn');
+        const clearBtn = document.getElementById('clear-btn');
         
         if (spawnBtn) {
-            spawnBtn.addEventListener('click', () => this.spawnIdeas(10));
+            spawnBtn.addEventListener('click', () => this.spawnIdeas(5));
         }
         
         if (clearBtn) {
             clearBtn.addEventListener('click', () => this.clearStorm());
         }
         
-        // Click to spawn individual ideas
+        // Click on canvas to spawn ideas at location
         if (this.canvas) {
             this.canvas.addEventListener('click', (e) => {
                 const rect = this.canvas.getBoundingClientRect();
@@ -53,110 +67,132 @@ export class StormRoom {
         
         // Start animation
         this.startAnimation();
-        
-        // Auto-spawn ideas periodically
         this.startAutoSpawn();
+        
+        console.log('⚡ Storm room initialized');
     }
     
     resizeCanvas() {
         if (this.canvas) {
             const container = this.canvas.parentElement;
-            this.canvas.width = container.clientWidth;
-            this.canvas.height = container.clientHeight;
+            this.canvas.width = Math.max(container?.clientWidth || 800, 400);
+            this.canvas.height = 500;
         }
     }
     
     spawnIdeas(count = 5) {
+        if (!this.canvas) return;
+        
         for (let i = 0; i < count; i++) {
-            setTimeout(() => {
-                const x = Math.random() * this.canvas.width;
-                const y = Math.random() * this.canvas.height;
-                this.spawnIdeaAt(x, y);
-            }, i * 100);
+            // Remove oldest if at capacity
+            if (this.ideas.length >= CONFIG.STORM.MAX_IDEAS) {
+                this.removeIdea(0);
+            }
+            
+            const x = 100 + Math.random() * (this.canvas.width - 200);
+            const y = 100 + Math.random() * (this.canvas.height - 200);
+            
+            this.spawnIdeaAt(x, y);
+        }
+        
+        if (this.sound && this.sound.initialized) {
+            this.sound.playSpawn();
         }
     }
     
     spawnIdeaAt(x, y) {
+        if (!this.ideaCloud) return;
+        
+        // Remove oldest if at capacity
         if (this.ideas.length >= CONFIG.STORM.MAX_IDEAS) {
-            // Remove oldest idea
             this.removeIdea(0);
         }
         
-        const text = IDEA_BANK[Math.floor(Math.random() * IDEA_BANK.length)];
-        const colorClass = CONFIG.STORM.COLORS[Math.floor(Math.random() * CONFIG.STORM.COLORS.length)];
-        const size = 0.8 + Math.random() * 1.5;
-        
-        // Calculate vortex velocity (spiral motion)
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2;
-        const angle = Math.atan2(y - centerY, x - centerX);
-        const tangent = angle + Math.PI / 2;
-        const speed = 0.5 + Math.random() * 1.5;
+        const word = IDEA_BANK[Math.floor(Math.random() * IDEA_BANK.length)];
         
         const idea = {
-            id: this.ideaCount++,
-            text: text,
             x: x,
             y: y,
-            vx: Math.cos(tangent) * speed + (Math.random() - 0.5) * 0.5,
-            vy: Math.sin(tangent) * speed + (Math.random() - 0.5) * 0.5,
-            size: size,
-            colorClass: colorClass,
-            opacity: 0,
-            life: 10000 + Math.random() * 5000,
+            vx: (Math.random() - 0.5) * CONFIG.STORM.BASE_VELOCITY * 2,
+            vy: (Math.random() - 0.5) * CONFIG.STORM.BASE_VELOCITY * 2,
+            word: word,
             element: null,
+            radius: 30 + word.length * 3,
+            color: this.getRandomColor(),
+            age: 0,
         };
         
         // Create DOM element
-        const el = document.createElement('div');
-        el.className = `idea-word ${colorClass}`;
-        el.textContent = text;
-        el.style.cssText = `
-            --idea-size: ${size}rem;
-            left: ${x}px;
-            top: ${y}px;
-            font-size: ${size}rem;
-        `;
+        const el = document.createElement('span');
+        el.className = 'idea-word';
+        el.textContent = word;
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        el.style.color = idea.color;
+        el.style.fontSize = (0.9 + Math.random() * 0.6) + 'rem';
+        el.style.textShadow = `0 0 15px ${idea.color}`;
+        
         this.ideaCloud.appendChild(el);
         idea.element = el;
         
+        // Entry animation
+        el.style.opacity = '0';
+        el.style.transform = 'scale(0.3)';
+        requestAnimationFrame(() => {
+            el.style.transition = 'opacity 0.4s ease-out, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            el.style.opacity = '1';
+            el.style.transform = 'scale(1)';
+        });
+        
         this.ideas.push(idea);
         this.updateStats();
-        
-        // Play spawn sound
-        if (this.sound) {
-            this.sound.playSpawn();
-        }
-        
-        // Fade in
-        requestAnimationFrame(() => {
-            el.style.opacity = '0.8';
-        });
     }
     
     removeIdea(index) {
         const idea = this.ideas[index];
-        if (idea.element) {
-            idea.element.remove();
+        if (idea && idea.element) {
+            idea.element.style.transition = 'opacity 0.3s, transform 0.3s';
+            idea.element.style.opacity = '0';
+            idea.element.style.transform = 'scale(0.5)';
+            setTimeout(() => {
+                idea.element.remove();
+            }, 300);
         }
         this.ideas.splice(index, 1);
     }
     
     clearStorm() {
-        // Remove all ideas with animation
+        // Animate all ideas out
         this.ideas.forEach((idea, i) => {
-            setTimeout(() => {
-                if (idea.element) {
-                    idea.element.classList.add('collision');
-                    setTimeout(() => idea.element.remove(), 500);
-                }
-            }, i * 50);
+            if (idea.element) {
+                idea.element.style.transition = 'all 0.5s cubic-bezier(0.55, 0.085, 0.68, 0.53)';
+                idea.element.style.opacity = '0';
+                idea.element.style.transform = `scale(0) translateY(${-50 - i * 10}px)`;
+            }
         });
         
-        this.ideas = [];
-        this.ideaCount = 0;
-        this.collisionCount = 0;
-        this.updateStats();
+        setTimeout(() => {
+            this.ideas.forEach(idea => {
+                if (idea.element) {
+                    idea.element.remove();
+                }
+            });
+            this.ideas = [];
+            this.collisionCount = 0;
+            this.fusionCount = 0;
+            this.updateStats();
+        }, 500);
+    }
+    
+    getRandomColor() {
+        const colors = [
+            CONFIG.COLORS.FLAME,
+            CONFIG.COLORS.GOLD,
+            CONFIG.COLORS.YELLOW,
+            CONFIG.COLORS.ELECTRIC,
+            CONFIG.COLORS.PLASMA,
+        ];
+        return colors[Math.floor(Math.random() * colors.length)];
     }
     
     checkCollisions() {
@@ -165,36 +201,55 @@ export class StormRoom {
                 const a = this.ideas[i];
                 const b = this.ideas[j];
                 
-                const dx = a.x - b.x;
-                const dy = a.y - b.y;
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
-                const minDist = (a.size + b.size) * 20;
+                const minDist = (a.radius + b.radius) * 0.6;
                 
-                if (dist < minDist) {
+                if (dist < minDist && dist > 0) {
                     // Collision!
                     this.collisionCount++;
                     this.updateStats();
                     
+                    // Bounce physics
+                    const angle = Math.atan2(dy, dx);
+                    const speed = Math.sqrt(a.vx * a.vx + a.vy * a.vy);
+                    
+                    a.vx = -Math.cos(angle) * speed * 1.1;
+                    a.vy = -Math.sin(angle) * speed * 1.1;
+                    b.vx = Math.cos(angle) * speed * 1.1;
+                    b.vy = Math.sin(angle) * speed * 1.1;
+                    
+                    // Visual feedback
+                    if (a.element) {
+                        a.element.classList.add('colliding');
+                        setTimeout(() => a.element?.classList.remove('colliding'), 300);
+                    }
+                    if (b.element) {
+                        b.element.classList.add('colliding');
+                        setTimeout(() => b.element?.classList.remove('colliding'), 300);
+                    }
+                    
                     // Play collision sound
-                    if (this.sound) {
+                    if (this.sound && this.sound.initialized && Math.random() < 0.3) {
                         this.sound.playCollision();
                     }
                     
-                    // Bounce
-                    const angle = Math.atan2(dy, dx);
-                    const force = 2;
-                    a.vx += Math.cos(angle) * force;
-                    a.vy += Math.sin(angle) * force;
-                    b.vx -= Math.cos(angle) * force;
-                    b.vy -= Math.sin(angle) * force;
-                    
-                    // Visual feedback
-                    if (a.element) a.element.style.transform = 'scale(1.3)';
-                    if (b.element) b.element.style.transform = 'scale(1.3)';
-                    setTimeout(() => {
-                        if (a.element) a.element.style.transform = '';
-                        if (b.element) b.element.style.transform = '';
-                    }, 200);
+                    // Chance of fusion
+                    if (Math.random() < 0.05) {
+                        this.fusionCount++;
+                        // Fusion visual: flash white
+                        if (a.element) {
+                            a.element.style.color = CONFIG.COLORS.WHITE_HOT;
+                            a.element.style.textShadow = `0 0 30px ${CONFIG.COLORS.WHITE_HOT}`;
+                            setTimeout(() => {
+                                if (a.element) {
+                                    a.element.style.color = a.color;
+                                    a.element.style.textShadow = `0 0 15px ${a.color}`;
+                                }
+                            }, 400);
+                        }
+                    }
                 }
             }
         }
@@ -204,66 +259,64 @@ export class StormRoom {
         const animate = () => {
             this.animationId = requestAnimationFrame(animate);
             
-            if (!this.ctx) return;
+            if (!this.ctx || !this.canvas || !this.isVisible) return;
             
+            const ctx = this.ctx;
             const width = this.canvas.width;
             const height = this.canvas.height;
-            const centerX = width / 2;
-            const centerY = height / 2;
+            
+            if (width === 0 || height === 0) return;
             
             // Clear
-            this.ctx.fillStyle = 'rgba(10, 10, 10, 0.1)';
-            this.ctx.fillRect(0, 0, width, height);
+            ctx.fillStyle = 'rgba(5, 5, 5, 0.15)';
+            ctx.fillRect(0, 0, width, height);
             
-            // Draw vortex
-            this.vortexAngle += 0.01;
-            this.drawVortex(centerX, centerY);
+            // Draw vortex center
+            const cx = width / 2;
+            const cy = height / 2;
+            this.drawVortex(ctx, cx, cy, width, height);
             
-            // Update ideas
-            for (let i = this.ideas.length - 1; i >= 0; i--) {
-                const idea = this.ideas[i];
+            // Update idea positions
+            this.ideas.forEach((idea, index) => {
+                idea.age++;
                 
-                // Vortex force
-                const dx = idea.x - centerX;
-                const dy = idea.y - centerY;
+                // Vortex attraction (gentle spiral)
+                const dx = cx - idea.x;
+                const dy = cy - idea.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
-                const angle = Math.atan2(dy, dx);
-                const tangent = angle + Math.PI / 2;
                 
-                // Spiral inward slightly
-                const spiralForce = 0.001;
-                const tangentForce = 0.02;
-                
-                idea.vx += Math.cos(tangent) * tangentForce - dx * spiralForce / Math.max(dist, 1);
-                idea.vy += Math.sin(tangent) * tangentForce - dy * spiralForce / Math.max(dist, 1);
+                if (dist > 50) {
+                    const attraction = 0.0004;
+                    idea.vx += dx * attraction;
+                    idea.vy += dy * attraction;
+                    
+                    // Tangential force for spiral
+                    const tangent = 0.0002;
+                    idea.vx += -dy * tangent;
+                    idea.vy += dx * tangent;
+                }
                 
                 // Apply velocity
                 idea.x += idea.vx;
                 idea.y += idea.vy;
                 
-                // Friction
-                idea.vx *= 0.99;
-                idea.vy *= 0.99;
+                // Damping
+                idea.vx *= 0.995;
+                idea.vy *= 0.995;
                 
-                // Boundary wrapping
-                if (idea.x < 0) idea.x = width;
-                if (idea.x > width) idea.x = 0;
-                if (idea.y < 0) idea.y = height;
-                if (idea.y > height) idea.y = 0;
+                // Bounce off walls
+                const margin = 50;
+                if (idea.x < margin) { idea.x = margin; idea.vx *= -0.8; }
+                if (idea.x > width - margin) { idea.x = width - margin; idea.vx *= -0.8; }
+                if (idea.y < margin) { idea.y = margin; idea.vy *= -0.8; }
+                if (idea.y > height - margin) { idea.y = height - margin; idea.vy *= -0.8; }
                 
                 // Update DOM position
                 if (idea.element) {
-                    idea.element.style.left = `${idea.x}px`;
-                    idea.element.style.top = `${idea.y}px`;
+                    idea.element.style.left = idea.x + 'px';
+                    idea.element.style.top = idea.y + 'px';
                 }
-                
-                // Age
-                idea.life -= 16;
-                if (idea.life <= 0) {
-                    this.removeIdea(i);
-                    this.updateStats();
-                }
-            }
+            });
             
             // Check collisions
             this.checkCollisions();
@@ -272,17 +325,20 @@ export class StormRoom {
         animate();
     }
     
-    drawVortex(cx, cy) {
-        const ctx = this.ctx;
+    drawVortex(ctx, cx, cy, width, height) {
+        const time = Date.now() / 1000;
         
-        // Draw spiral arms
-        for (let arm = 0; arm < 3; arm++) {
-            ctx.beginPath();
-            const armOffset = (arm / 3) * Math.PI * 2;
+        // Multiple spiral arms
+        for (let arm = 0; arm < 4; arm++) {
+            const armOffset = (Math.PI * 2 * arm) / 4;
             
-            for (let i = 0; i < 200; i++) {
-                const angle = this.vortexAngle + armOffset + i * 0.1;
-                const radius = 10 + i * 2;
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(255, 69, 0, ${0.08 + arm * 0.02})`;
+            ctx.lineWidth = 1.5;
+            
+            for (let i = 0; i < 120; i++) {
+                const angle = i * 0.1 + time * 0.3 + armOffset;
+                const radius = 10 + i * 2.5;
                 const x = cx + Math.cos(angle) * radius;
                 const y = cy + Math.sin(angle) * radius;
                 
@@ -293,29 +349,45 @@ export class StormRoom {
                 }
             }
             
-            ctx.strokeStyle = `rgba(255, 69, 0, ${0.1 - arm * 0.03})`;
-            ctx.lineWidth = 2;
             ctx.stroke();
         }
+        
+        // Center glow
+        const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 80);
+        gradient.addColorStop(0, 'rgba(255, 69, 0, 0.15)');
+        gradient.addColorStop(0.5, 'rgba(255, 215, 0, 0.05)');
+        gradient.addColorStop(1, 'transparent');
+        
+        ctx.beginPath();
+        ctx.arc(cx, cy, 80, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        
+        // Pulsing core
+        const pulse = 1 + Math.sin(time * 3) * 0.2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 8 * pulse, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 215, 0, ${0.4 + Math.sin(time * 3) * 0.2})`;
+        ctx.fill();
     }
     
     startAutoSpawn() {
+        // Periodically spawn new ideas
         this.autoSpawnInterval = setInterval(() => {
-            if (this.ideas.length < CONFIG.STORM.MAX_IDEAS / 2) {
-                const x = this.canvas.width * (0.2 + Math.random() * 0.6);
-                const y = this.canvas.height * (0.2 + Math.random() * 0.6);
-                this.spawnIdeaAt(x, y);
+            if (this.isVisible && this.ideas.length < CONFIG.STORM.MAX_IDEAS * 0.6) {
+                this.spawnIdeas(1);
             }
-        }, CONFIG.STORM.SPAWN_RATE * 2);
+        }, 4000);
     }
     
     updateStats() {
-        if (this.ideaCountEl) {
-            this.ideaCountEl.textContent = this.ideas.length;
-        }
-        if (this.collisionCountEl) {
-            this.collisionCountEl.textContent = this.collisionCount;
-        }
+        const ideaCountEl = document.getElementById('idea-count');
+        const collisionCountEl = document.getElementById('collision-count');
+        const fusionCountEl = document.getElementById('fusion-count');
+        
+        if (ideaCountEl) ideaCountEl.textContent = this.ideas.length;
+        if (collisionCountEl) collisionCountEl.textContent = this.collisionCount;
+        if (fusionCountEl) fusionCountEl.textContent = this.fusionCount;
     }
     
     destroy() {
@@ -327,4 +399,3 @@ export class StormRoom {
         }
     }
 }
-
