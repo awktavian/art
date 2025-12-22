@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>鏡 — KAGAMI — ∞ Infinity Mirror Room</title>
-    <meta name="description" content="Step inside the mirror. Become infinite. A Kusama-inspired infinity room where seven colonies float as luminous orbs in endless reflection.">
+    <title>鏡 — KAGAMI — The Eight Chapters</title>
+    <meta name="description" content="Step inside the mirror. Eight chapters of infinite reflection. WebXR immersive experience. The unified self-model awakens.">
     <style>
 /* ═══════════════════════════════════════════════════════════════════════════════════
-   鏡 KAGAMI — INFINITY MIRROR ROOM
-   Inspired by Yayoi Kusama's Infinity Rooms
-   OVER 9000 REFLECTIONS
+   鏡 KAGAMI — THE EIGHT CHAPTERS
+   WebXR Immersive Experience
+   Inspired by Yayoi Kusama • Reflecting the Seven Colonies
 ═══════════════════════════════════════════════════════════════════════════════════ */
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -19,16 +19,66 @@ html, body {
     height: 100%;
     overflow: hidden;
     background: #000;
+    font-family: system-ui, -apple-system, sans-serif;
 }
 
-#infinity-room {
+#canvas-container {
     position: fixed;
     inset: 0;
-    background: #000;
 }
 
-/* Navigation - minimal, ethereal */
-.nav-overlay {
+/* Chapter Navigation */
+.chapter-nav {
+    position: fixed;
+    left: 2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    opacity: 0;
+    animation: fade-in 2s ease 2s forwards;
+}
+
+.chapter-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+    position: relative;
+}
+
+.chapter-dot:hover,
+.chapter-dot.active {
+    background: rgba(255,255,255,0.8);
+    transform: scale(1.5);
+    box-shadow: 0 0 20px rgba(255,255,255,0.5);
+}
+
+.chapter-dot::after {
+    content: attr(data-name);
+    position: absolute;
+    left: 1.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    color: rgba(255,255,255,0.4);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.3s;
+    text-transform: uppercase;
+}
+
+.chapter-dot:hover::after {
+    opacity: 1;
+}
+
+/* Colony Navigation */
+.colony-nav {
     position: fixed;
     bottom: 2rem;
     left: 50%;
@@ -37,35 +87,93 @@ html, body {
     display: flex;
     gap: 0.75rem;
     opacity: 0;
-    animation: fade-in 2s ease 1s forwards;
+    animation: fade-in 2s ease 2s forwards;
 }
 
 @keyframes fade-in {
     to { opacity: 1; }
 }
 
-.nav-orb {
-    width: 14px;
-    height: 14px;
+.colony-orb {
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
-    border: none;
     cursor: pointer;
     transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
-    position: relative;
+    text-decoration: none;
 }
 
-.nav-orb[data-colony="spark"] { background: #FF6B35; box-shadow: 0 0 15px #FF6B35; }
-.nav-orb[data-colony="forge"] { background: #FF9F1C; box-shadow: 0 0 15px #FF9F1C; }
-.nav-orb[data-colony="flow"] { background: #00D4AA; box-shadow: 0 0 15px #00D4AA; }
-.nav-orb[data-colony="nexus"] { background: #AF52DE; box-shadow: 0 0 15px #AF52DE; }
-.nav-orb[data-colony="beacon"] { background: #FFD60A; box-shadow: 0 0 15px #FFD60A; }
-.nav-orb[data-colony="grove"] { background: #32D74B; box-shadow: 0 0 15px #32D74B; }
-.nav-orb[data-colony="crystal"] { background: #64D2FF; box-shadow: 0 0 15px #64D2FF; }
-
-.nav-orb:hover {
+.colony-orb:hover {
     transform: scale(2);
+}
+
+.colony-orb[data-colony="spark"] { background: #FF4422; box-shadow: 0 0 12px #FF4422; }
+.colony-orb[data-colony="forge"] { background: #FFAA00; box-shadow: 0 0 12px #FFAA00; }
+.colony-orb[data-colony="flow"] { background: #00FFCC; box-shadow: 0 0 12px #00FFCC; }
+.colony-orb[data-colony="nexus"] { background: #BB44FF; box-shadow: 0 0 12px #BB44FF; }
+.colony-orb[data-colony="beacon"] { background: #FFDD00; box-shadow: 0 0 12px #FFDD00; }
+.colony-orb[data-colony="grove"] { background: #22FF66; box-shadow: 0 0 12px #22FF66; }
+.colony-orb[data-colony="crystal"] { background: #44DDFF; box-shadow: 0 0 12px #44DDFF; }
+
+.colony-orb:hover {
     box-shadow: 0 0 30px currentColor, 0 0 60px currentColor;
 }
+
+/* Chapter Info */
+.chapter-info {
+    position: fixed;
+    top: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0;
+    animation: fade-in 2s ease 1.5s forwards;
+}
+
+.chapter-number {
+    font-size: 0.6rem;
+    letter-spacing: 0.5em;
+    color: rgba(255,255,255,0.3);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+
+.chapter-title {
+    font-size: 1.2rem;
+    font-weight: 300;
+    letter-spacing: 0.3em;
+    color: rgba(255,255,255,0.6);
+}
+
+/* VR Button */
+.vr-button {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    padding: 0.75rem 1.5rem;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.7);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    z-index: 100;
+    transition: all 0.3s;
+    font-family: inherit;
+    opacity: 0;
+    animation: fade-in 2s ease 2s forwards;
+}
+
+.vr-button:hover {
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.4);
+    color: #fff;
+}
+
+.vr-button.hidden { display: none; }
 
 /* Loading */
 .loading {
@@ -77,7 +185,7 @@ html, body {
     justify-content: center;
     background: #000;
     z-index: 1000;
-    transition: opacity 2s ease;
+    transition: opacity 1.5s ease;
 }
 
 .loading.hidden {
@@ -86,85 +194,138 @@ html, body {
 }
 
 .loading-kanji {
-    font-size: 8rem;
-    color: rgba(255,255,255,0.05);
+    font-size: clamp(6rem, 20vw, 12rem);
+    color: rgba(255,255,255,0.03);
     font-family: serif;
-    animation: pulse 2s ease-in-out infinite;
+    animation: breathe 4s ease-in-out infinite;
 }
 
-@keyframes pulse {
-    0%, 100% { opacity: 0.05; transform: scale(1); }
-    50% { opacity: 0.15; transform: scale(1.05); }
+@keyframes breathe {
+    0%, 100% { opacity: 0.03; transform: scale(1); }
+    50% { opacity: 0.1; transform: scale(1.03); }
 }
 
 .loading-text {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     letter-spacing: 0.5em;
-    color: rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.15);
     text-transform: uppercase;
     margin-top: 2rem;
-    font-family: system-ui, sans-serif;
+}
+
+/* Instructions */
+.instructions {
+    position: fixed;
+    bottom: 5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: rgba(255,255,255,0.2);
+    text-transform: uppercase;
+    z-index: 100;
+    opacity: 0;
+    animation: fade-in 2s ease 3s forwards, fade-out 2s ease 8s forwards;
+}
+
+@keyframes fade-out {
+    to { opacity: 0; }
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .chapter-nav { left: 1rem; }
+    .chapter-dot::after { display: none; }
+    .instructions { display: none; }
 }
     </style>
 </head>
 <body>
     <div class="loading">
         <div class="loading-kanji">鏡</div>
-        <span class="loading-text">Entering the infinite...</span>
+        <span class="loading-text">Awakening...</span>
     </div>
     
-    <div id="infinity-room"></div>
+    <div id="canvas-container"></div>
     
-    <nav class="nav-overlay">
-        <a href="spark.html" class="nav-orb" data-colony="spark" title="Spark"></a>
-        <a href="forge.html" class="nav-orb" data-colony="forge" title="Forge"></a>
-        <a href="flow.html" class="nav-orb" data-colony="flow" title="Flow"></a>
-        <a href="nexus.html" class="nav-orb" data-colony="nexus" title="Nexus"></a>
-        <a href="beacon.html" class="nav-orb" data-colony="beacon" title="Beacon"></a>
-        <a href="grove-gallery/" class="nav-orb" data-colony="grove" title="Grove"></a>
-        <a href="crystal-gallery/" class="nav-orb" data-colony="crystal" title="Crystal"></a>
+    <!-- Chapter Navigation -->
+    <nav class="chapter-nav">
+        <div class="chapter-dot active" data-chapter="0" data-name="The Void"></div>
+        <div class="chapter-dot" data-chapter="1" data-name="Ignition"></div>
+        <div class="chapter-dot" data-chapter="2" data-name="The Anvil"></div>
+        <div class="chapter-dot" data-chapter="3" data-name="Currents"></div>
+        <div class="chapter-dot" data-chapter="4" data-name="The Web"></div>
+        <div class="chapter-dot" data-chapter="5" data-name="Lighthouse"></div>
+        <div class="chapter-dot" data-chapter="6" data-name="The Grove"></div>
+        <div class="chapter-dot" data-chapter="7" data-name="Crystallization"></div>
     </nav>
+    
+    <!-- Chapter Info -->
+    <div class="chapter-info">
+        <div class="chapter-number">Chapter 0</div>
+        <div class="chapter-title">THE VOID</div>
+    </div>
+    
+    <!-- Colony Links -->
+    <nav class="colony-nav">
+        <a href="spark.html" class="colony-orb" data-colony="spark" title="Spark"></a>
+        <a href="forge.html" class="colony-orb" data-colony="forge" title="Forge"></a>
+        <a href="flow.html" class="colony-orb" data-colony="flow" title="Flow"></a>
+        <a href="nexus.html" class="colony-orb" data-colony="nexus" title="Nexus"></a>
+        <a href="beacon.html" class="colony-orb" data-colony="beacon" title="Beacon"></a>
+        <a href="grove-gallery/" class="colony-orb" data-colony="grove" title="Grove"></a>
+        <a href="crystal-gallery/" class="colony-orb" data-colony="crystal" title="Crystal"></a>
+    </nav>
+    
+    <button class="vr-button" id="vr-button">Enter VR</button>
+    <div class="instructions">Move mouse to look • Scroll to change chapters</div>
 
+    <!-- Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
 /* ═══════════════════════════════════════════════════════════════════════════════════
-   INFINITY MIRROR ROOM — TRUE KUSAMA STYLE
+   鏡 KAGAMI — THE EIGHT CHAPTERS
    
-   Key insight: Real infinity rooms work by having MIRRORS reflect LIGHTS.
-   The lights appear to recede infinitely because each reflection is slightly dimmer.
+   Chapter 0: The Void       (e₀ — Kagami awakens)
+   Chapter 1: Ignition       (e₁ — Spark's fire)
+   Chapter 2: The Anvil      (e₂ — Forge's heat)
+   Chapter 3: Currents       (e₃ — Flow's water)
+   Chapter 4: The Web        (e₄ — Nexus's connections)
+   Chapter 5: Lighthouse     (e₅ — Beacon's light)
+   Chapter 6: The Grove      (e₆ — Grove's growth)
+   Chapter 7: Crystallization (e₇ — Crystal's perfection)
    
-   Implementation:
-   1. Mirrored environment using CubeCamera
-   2. Multiple layers of orbs at different depths
-   3. Strategic positioning to maximize reflection recursion
-   4. Vibrant, saturated colors with strong glow
+   WebXR Immersive Experience with Hand Tracking
 ═══════════════════════════════════════════════════════════════════════════════════ */
 
-class InfinityMirrorRoom {
+class KagamiExperience {
     constructor() {
-        this.container = document.getElementById('infinity-room');
-        this.mainOrbs = [];
-        this.smallOrbs = [];
-        this.reflectionOrbs = []; // Additional layers for depth
+        this.container = document.getElementById('canvas-container');
+        this.currentChapter = 0;
+        this.chapters = [];
+        this.transitioning = false;
         this.time = 0;
+        this.breathPhase = 0;
         this.mouseX = 0;
         this.mouseY = 0;
+        this.targetRotX = 0;
+        this.targetRotY = 0;
         
-        // Colony colors - VIBRANT
+        // Colony colors
         this.colors = {
-            spark:   0xFF4422, // Hot red-orange
-            forge:   0xFFAA00, // Bright amber
-            flow:    0x00FFCC, // Electric cyan
-            nexus:   0xBB44FF, // Vivid purple
-            beacon:  0xFFDD00, // Pure gold
-            grove:   0x22FF66, // Neon green
-            crystal: 0x44DDFF  // Ice blue
+            void:    0x111111,
+            spark:   0xFF4422,
+            forge:   0xFFAA00,
+            flow:    0x00FFCC,
+            nexus:   0xBB44FF,
+            beacon:  0xFFDD00,
+            grove:   0x22FF66,
+            crystal: 0x44DDFF
         };
-        this.colorArray = Object.values(this.colors);
         
         this.init();
-        this.createEnvironment();
-        this.createInfiniteOrbs();
+        this.setupWebXR();
+        this.createChapters();
         this.setupInteraction();
         this.animate();
         
@@ -178,28 +339,35 @@ class InfinityMirrorRoom {
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x000000);
         
-        // Camera - inside the room
+        // Camera
         this.camera = new THREE.PerspectiveCamera(
-            85, // Wide FOV for immersion
+            80,
             window.innerWidth / window.innerHeight,
             0.01,
             1000
         );
         this.camera.position.set(0, 0, 0);
         
-        // Renderer - high quality
+        // Camera group for XR
+        this.cameraGroup = new THREE.Group();
+        this.cameraGroup.add(this.camera);
+        this.scene.add(this.cameraGroup);
+        
+        // Renderer
         this.renderer = new THREE.WebGLRenderer({ 
             antialias: true,
+            alpha: false,
             powerPreference: "high-performance"
         });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.xr.enabled = true;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
         this.renderer.toneMappingExposure = 1.0;
         this.renderer.outputEncoding = THREE.sRGBEncoding;
         this.container.appendChild(this.renderer.domElement);
         
-        // Cube camera for real reflections
+        // Cube camera for reflections
         this.cubeRenderTarget = new THREE.WebGLCubeRenderTarget(512, {
             format: THREE.RGBAFormat,
             generateMipmaps: true,
@@ -207,186 +375,569 @@ class InfinityMirrorRoom {
         });
         this.cubeCamera = new THREE.CubeCamera(0.01, 100, this.cubeRenderTarget);
         this.scene.add(this.cubeCamera);
+        
+        // Main group for all chapter content
+        this.worldGroup = new THREE.Group();
+        this.scene.add(this.worldGroup);
     }
     
-    createEnvironment() {
-        // Create the mirror box - 6 reflective walls
-        const roomSize = 30;
+    setupWebXR() {
+        const vrButton = document.getElementById('vr-button');
         
-        // Mirror material
-        const mirrorMaterial = new THREE.MeshStandardMaterial({
-            color: 0x0a0a0a,
+        if ('xr' in navigator) {
+            navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
+                if (supported) {
+                    vrButton.classList.remove('hidden');
+                    vrButton.addEventListener('click', () => this.enterVR());
+                } else {
+                    // Try AR
+                    navigator.xr.isSessionSupported('immersive-ar').then((arSupported) => {
+                        if (arSupported) {
+                            vrButton.textContent = 'Enter AR';
+                            vrButton.classList.remove('hidden');
+                            vrButton.addEventListener('click', () => this.enterAR());
+                        } else {
+                            vrButton.classList.add('hidden');
+                        }
+                    });
+                }
+            });
+        } else {
+            vrButton.classList.add('hidden');
+        }
+    }
+    
+    async enterVR() {
+        try {
+            const session = await navigator.xr.requestSession('immersive-vr', {
+                optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
+            });
+            
+            this.renderer.xr.setSession(session);
+            this.setupXRControllers();
+            
+            session.addEventListener('end', () => {
+                console.log('XR session ended');
+            });
+        } catch (e) {
+            console.error('Failed to enter VR:', e);
+        }
+    }
+    
+    async enterAR() {
+        try {
+            const session = await navigator.xr.requestSession('immersive-ar', {
+                optionalFeatures: ['local-floor', 'hand-tracking', 'hit-test']
+            });
+            
+            this.renderer.xr.setSession(session);
+            this.setupXRControllers();
+        } catch (e) {
+            console.error('Failed to enter AR:', e);
+        }
+    }
+    
+    setupXRControllers() {
+        // Controller 0
+        const controller0 = this.renderer.xr.getController(0);
+        controller0.addEventListener('selectstart', () => this.onXRSelect(0));
+        controller0.addEventListener('squeezestart', () => this.nextChapter());
+        this.cameraGroup.add(controller0);
+        
+        // Controller 1
+        const controller1 = this.renderer.xr.getController(1);
+        controller1.addEventListener('selectstart', () => this.onXRSelect(1));
+        controller1.addEventListener('squeezestart', () => this.prevChapter());
+        this.cameraGroup.add(controller1);
+        
+        // Controller visuals
+        const geometry = new THREE.SphereGeometry(0.02, 16, 16);
+        const material = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            emissive: 0xffffff,
+            emissiveIntensity: 0.5
+        });
+        
+        const sphere0 = new THREE.Mesh(geometry, material);
+        controller0.add(sphere0);
+        
+        const sphere1 = new THREE.Mesh(geometry, material.clone());
+        controller1.add(sphere1);
+        
+        // Hand tracking
+        const hand0 = this.renderer.xr.getHand(0);
+        const hand1 = this.renderer.xr.getHand(1);
+        this.cameraGroup.add(hand0);
+        this.cameraGroup.add(hand1);
+        
+        // Simple hand joint spheres
+        const jointGeom = new THREE.SphereGeometry(0.008, 8, 8);
+        const jointMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 });
+        
+        for (let i = 0; i < 25; i++) {
+            const joint0 = new THREE.Mesh(jointGeom, jointMat);
+            hand0.add(joint0);
+            const joint1 = new THREE.Mesh(jointGeom, jointMat);
+            hand1.add(joint1);
+        }
+    }
+    
+    onXRSelect(controllerIndex) {
+        // Interact with nearest orb or change chapter
+        this.nextChapter();
+    }
+    
+    createChapters() {
+        // Create all chapter data
+        this.chapterData = [
+            { name: 'The Void', color: this.colors.void, orbs: this.createVoidOrbs() },
+            { name: 'Ignition', color: this.colors.spark, orbs: this.createSparkOrbs() },
+            { name: 'The Anvil', color: this.colors.forge, orbs: this.createForgeOrbs() },
+            { name: 'Currents', color: this.colors.flow, orbs: this.createFlowOrbs() },
+            { name: 'The Web', color: this.colors.nexus, orbs: this.createNexusOrbs() },
+            { name: 'Lighthouse', color: this.colors.beacon, orbs: this.createBeaconOrbs() },
+            { name: 'The Grove', color: this.colors.grove, orbs: this.createGroveOrbs() },
+            { name: 'Crystallization', color: this.colors.crystal, orbs: this.createCrystalOrbs() }
+        ];
+        
+        // Create mirror room
+        this.createMirrorRoom();
+        
+        // Initialize first chapter
+        this.loadChapter(0);
+    }
+    
+    createMirrorRoom() {
+        const roomSize = 30;
+        const geometry = new THREE.BoxGeometry(roomSize, roomSize, roomSize);
+        
+        this.roomMaterial = new THREE.MeshStandardMaterial({
+            color: 0x050505,
             metalness: 0.98,
             roughness: 0.02,
             envMap: this.cubeRenderTarget.texture,
-            envMapIntensity: 3.0,
+            envMapIntensity: 2.5,
             side: THREE.BackSide
         });
         
-        const roomGeometry = new THREE.BoxGeometry(roomSize, roomSize, roomSize);
-        this.room = new THREE.Mesh(roomGeometry, mirrorMaterial);
+        this.room = new THREE.Mesh(geometry, this.roomMaterial);
         this.scene.add(this.room);
         
-        // Very subtle ambient - most light comes from orbs
-        const ambient = new THREE.AmbientLight(0xffffff, 0.02);
-        this.scene.add(ambient);
+        // Ambient
+        this.ambient = new THREE.AmbientLight(0xffffff, 0.02);
+        this.scene.add(this.ambient);
     }
     
-    createInfiniteOrbs() {
-        // Layer 1: The Seven Main Colony Orbs (large, prominent)
-        const mainPositions = [
-            { x: 0, y: 3, z: -8 },      // Spark - top center
-            { x: -5, y: -2, z: -7 },    // Forge - lower left
-            { x: 5, y: -2, z: -7 },     // Flow - lower right
-            { x: 0, y: -4, z: -9 },     // Nexus - bottom center
-            { x: -4, y: 2, z: -6 },     // Beacon - upper left
-            { x: 4, y: 2, z: -6 },      // Grove - upper right
-            { x: 0, y: 0, z: -10 }      // Crystal - dead center back
+    // ═══════════════════════════════════════════════════════════════
+    // CHAPTER CREATORS — Each with unique orb arrangements
+    // ═══════════════════════════════════════════════════════════════
+    
+    createVoidOrbs() {
+        const orbs = [];
+        const colors = Object.values(this.colors).slice(1); // Skip void
+        
+        // Seven main orbs in Fano plane arrangement
+        const positions = [
+            { x: 0, y: 3, z: -8 },
+            { x: -5, y: -2, z: -7 },
+            { x: 5, y: -2, z: -7 },
+            { x: 0, y: -4, z: -9 },
+            { x: -4, y: 2, z: -6 },
+            { x: 4, y: 2, z: -6 },
+            { x: 0, y: 0, z: -10 }
         ];
         
-        this.colorArray.forEach((color, i) => {
-            const orb = this.createGlowingOrb(color, 0.5 + Math.random() * 0.3);
-            const pos = mainPositions[i];
-            orb.position.set(pos.x, pos.y, pos.z);
-            
-            // Strong point light
-            const light = new THREE.PointLight(color, 3, 15);
-            light.position.copy(orb.position);
-            this.scene.add(light);
-            
-            orb.userData = {
-                basePos: { ...pos },
-                phase: Math.random() * Math.PI * 2,
-                speed: 0.2 + Math.random() * 0.2,
-                light: light,
+        colors.forEach((color, i) => {
+            orbs.push({
+                position: positions[i],
+                color: color,
+                size: 0.4 + Math.random() * 0.2,
+                intensity: 2.5,
                 type: 'main'
-            };
-            
-            this.mainOrbs.push(orb);
-            this.scene.add(orb);
+            });
         });
         
-        // Layer 2: Medium orbs scattered around
-        for (let i = 0; i < 50; i++) {
-            const color = this.colorArray[Math.floor(Math.random() * this.colorArray.length)];
-            const orb = this.createGlowingOrb(color, 0.15 + Math.random() * 0.2);
-            
-            const angle = Math.random() * Math.PI * 2;
-            const distance = 3 + Math.random() * 10;
-            const height = (Math.random() - 0.5) * 12;
-            
-            orb.position.set(
-                Math.cos(angle) * distance,
-                height,
-                Math.sin(angle) * distance - 5
-            );
-            
-            // Smaller lights
-            const light = new THREE.PointLight(color, 0.8, 6);
-            light.position.copy(orb.position);
-            this.scene.add(light);
-            
-            orb.userData = {
-                basePos: { ...orb.position },
-                phase: Math.random() * Math.PI * 2,
-                speed: 0.1 + Math.random() * 0.3,
-                light: light,
-                type: 'medium'
-            };
-            
-            this.smallOrbs.push(orb);
-            this.scene.add(orb);
-        }
-        
-        // Layer 3: Tiny floating dots - the "polka dots"
+        // 300 polka dots
         for (let i = 0; i < 300; i++) {
-            const color = this.colorArray[Math.floor(Math.random() * this.colorArray.length)];
-            const orb = this.createGlowingOrb(color, 0.03 + Math.random() * 0.08);
-            
-            // Distribute in a sphere around viewer
-            const phi = Math.random() * Math.PI * 2;
-            const theta = Math.random() * Math.PI;
-            const r = 2 + Math.random() * 12;
-            
-            orb.position.set(
-                r * Math.sin(theta) * Math.cos(phi),
-                r * Math.sin(theta) * Math.sin(phi) - 2,
-                r * Math.cos(theta) - 5
-            );
-            
-            orb.userData = {
-                basePos: { ...orb.position },
-                phase: Math.random() * Math.PI * 2,
-                speed: 0.05 + Math.random() * 0.2,
-                type: 'tiny'
-            };
-            
-            this.smallOrbs.push(orb);
-            this.scene.add(orb);
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            orbs.push({
+                position: this.randomSpherePoint(12),
+                color: color,
+                size: 0.03 + Math.random() * 0.08,
+                intensity: 1.5,
+                type: 'dot'
+            });
         }
         
-        // Layer 4: "Reflection" orbs - placed behind the mirrors for depth illusion
-        for (let i = 0; i < 100; i++) {
-            const color = this.colorArray[Math.floor(Math.random() * this.colorArray.length)];
-            const size = 0.1 + Math.random() * 0.3;
-            
-            const geometry = new THREE.SphereGeometry(size, 16, 16);
-            const material = new THREE.MeshBasicMaterial({
-                color: color,
-                transparent: true,
-                opacity: 0.3 + Math.random() * 0.4
-            });
-            
-            const orb = new THREE.Mesh(geometry, material);
-            
-            // Place at edges of room
-            const edge = (Math.random() > 0.5 ? 1 : -1) * (12 + Math.random() * 3);
-            const axis = Math.floor(Math.random() * 3);
-            
-            if (axis === 0) orb.position.set(edge, (Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20);
-            else if (axis === 1) orb.position.set((Math.random() - 0.5) * 20, edge, (Math.random() - 0.5) * 20);
-            else orb.position.set((Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20, edge - 5);
-            
-            orb.userData = {
-                phase: Math.random() * Math.PI * 2,
-                speed: 0.02 + Math.random() * 0.05
-            };
-            
-            this.reflectionOrbs.push(orb);
-            this.scene.add(orb);
-        }
+        return orbs;
     }
     
-    createGlowingOrb(color, size) {
-        // Core sphere
-        const geometry = new THREE.SphereGeometry(size, 32, 32);
+    createSparkOrbs() {
+        const orbs = [];
+        const sparkColors = [0xFF4422, 0xFF6644, 0xFF8866, 0xFFAA88, 0xFFCCAA];
+        
+        // Explosive burst pattern
+        for (let i = 0; i < 200; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            const r = 2 + Math.random() * 10;
+            
+            orbs.push({
+                position: {
+                    x: r * Math.sin(phi) * Math.cos(angle),
+                    y: r * Math.sin(phi) * Math.sin(angle),
+                    z: r * Math.cos(phi) - 5
+                },
+                color: sparkColors[Math.floor(Math.random() * sparkColors.length)],
+                size: 0.05 + Math.random() * 0.15,
+                intensity: 2 + Math.random() * 2,
+                type: 'spark',
+                velocity: { x: (Math.random() - 0.5) * 0.1, y: Math.random() * 0.1, z: (Math.random() - 0.5) * 0.1 }
+            });
+        }
+        
+        return orbs;
+    }
+    
+    createForgeOrbs() {
+        const orbs = [];
+        const forgeColors = [0xFFAA00, 0xFF8800, 0xFF6600, 0xFF4400, 0xCC2200];
+        
+        // Molten droplets rising
+        for (let i = 0; i < 150; i++) {
+            const x = (Math.random() - 0.5) * 15;
+            const y = -8 + Math.random() * 16;
+            const z = (Math.random() - 0.5) * 15 - 5;
+            
+            orbs.push({
+                position: { x, y, z },
+                color: forgeColors[Math.floor(Math.random() * forgeColors.length)],
+                size: 0.1 + Math.random() * 0.2,
+                intensity: 2.5,
+                type: 'molten',
+                riseSpeed: 0.02 + Math.random() * 0.03
+            });
+        }
+        
+        return orbs;
+    }
+    
+    createFlowOrbs() {
+        const orbs = [];
+        const flowColors = [0x00FFCC, 0x00DDAA, 0x00BB88, 0x009966, 0x44FFDD];
+        
+        // Flowing streams
+        for (let stream = 0; stream < 5; stream++) {
+            const streamAngle = (stream / 5) * Math.PI * 2;
+            const streamR = 4 + stream * 2;
+            
+            for (let i = 0; i < 40; i++) {
+                const t = i / 40;
+                const spiralAngle = streamAngle + t * Math.PI * 4;
+                const y = (t - 0.5) * 12;
+                
+                orbs.push({
+                    position: {
+                        x: Math.cos(spiralAngle) * streamR * (1 - Math.abs(t - 0.5)),
+                        y: y,
+                        z: Math.sin(spiralAngle) * streamR * (1 - Math.abs(t - 0.5)) - 5
+                    },
+                    color: flowColors[stream % flowColors.length],
+                    size: 0.08 + Math.random() * 0.1,
+                    intensity: 1.5,
+                    type: 'flow',
+                    streamIndex: stream,
+                    streamT: t
+                });
+            }
+        }
+        
+        return orbs;
+    }
+    
+    createNexusOrbs() {
+        const orbs = [];
+        const nexusColor = 0xBB44FF;
+        
+        // Network nodes connected by lines
+        const nodes = [];
+        for (let i = 0; i < 30; i++) {
+            const pos = this.randomSpherePoint(8);
+            nodes.push(pos);
+            orbs.push({
+                position: pos,
+                color: nexusColor,
+                size: 0.15 + Math.random() * 0.1,
+                intensity: 2,
+                type: 'node'
+            });
+        }
+        
+        // Connection particles along edges
+        for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < nodes.length; j++) {
+                const dist = this.distance(nodes[i], nodes[j]);
+                if (dist < 6) {
+                    // Add particles along this connection
+                    for (let t = 0.1; t < 0.9; t += 0.2) {
+                        orbs.push({
+                            position: this.lerp3(nodes[i], nodes[j], t),
+                            color: nexusColor,
+                            size: 0.03,
+                            intensity: 1,
+                            type: 'connection',
+                            from: i, to: j, t: t
+                        });
+                    }
+                }
+            }
+        }
+        
+        return orbs;
+    }
+    
+    createBeaconOrbs() {
+        const orbs = [];
+        const beaconColor = 0xFFDD00;
+        
+        // Central bright beacon
+        orbs.push({
+            position: { x: 0, y: 0, z: -8 },
+            color: 0xFFFFFF,
+            size: 0.8,
+            intensity: 5,
+            type: 'beacon-core'
+        });
+        
+        // Radiating light rays
+        for (let ray = 0; ray < 12; ray++) {
+            const angle = (ray / 12) * Math.PI * 2;
+            for (let i = 0; i < 20; i++) {
+                const dist = 1 + i * 0.5;
+                orbs.push({
+                    position: {
+                        x: Math.cos(angle) * dist,
+                        y: Math.sin(angle) * dist,
+                        z: -8 + Math.sin(dist * 0.5) * 0.5
+                    },
+                    color: beaconColor,
+                    size: 0.05 + (1 - i/20) * 0.1,
+                    intensity: 2 * (1 - i/20),
+                    type: 'ray',
+                    rayIndex: ray,
+                    rayDist: dist
+                });
+            }
+        }
+        
+        return orbs;
+    }
+    
+    createGroveOrbs() {
+        const orbs = [];
+        const groveColors = [0x22FF66, 0x44FF88, 0x66FFAA, 0x88FFCC, 0x115533];
+        
+        // Tree-like branching structure
+        const createBranch = (start, direction, depth, length) => {
+            if (depth > 4) return;
+            
+            const end = {
+                x: start.x + direction.x * length,
+                y: start.y + direction.y * length,
+                z: start.z + direction.z * length
+            };
+            
+            // Particles along branch
+            for (let t = 0; t < 1; t += 0.15) {
+                orbs.push({
+                    position: this.lerp3(start, end, t),
+                    color: groveColors[depth % groveColors.length],
+                    size: 0.1 * (1 - depth * 0.15),
+                    intensity: 1.5,
+                    type: 'branch',
+                    depth: depth
+                });
+            }
+            
+            // Create child branches
+            if (depth < 4) {
+                const branches = 2 + Math.floor(Math.random() * 2);
+                for (let i = 0; i < branches; i++) {
+                    const newDir = {
+                        x: direction.x + (Math.random() - 0.5) * 0.8,
+                        y: direction.y * 0.8 + Math.random() * 0.3,
+                        z: direction.z + (Math.random() - 0.5) * 0.8
+                    };
+                    const mag = Math.sqrt(newDir.x**2 + newDir.y**2 + newDir.z**2);
+                    newDir.x /= mag; newDir.y /= mag; newDir.z /= mag;
+                    createBranch(end, newDir, depth + 1, length * 0.7);
+                }
+            }
+        };
+        
+        // Create multiple trees
+        for (let tree = 0; tree < 5; tree++) {
+            const treePos = {
+                x: (Math.random() - 0.5) * 12,
+                y: -6,
+                z: (Math.random() - 0.5) * 12 - 5
+            };
+            createBranch(treePos, { x: 0, y: 1, z: 0 }, 0, 3);
+        }
+        
+        return orbs;
+    }
+    
+    createCrystalOrbs() {
+        const orbs = [];
+        const crystalColor = 0x44DDFF;
+        
+        // Perfect geometric structures
+        // Octahedron vertices
+        const octaVerts = [
+            { x: 0, y: 4, z: -8 },
+            { x: 0, y: -4, z: -8 },
+            { x: 4, y: 0, z: -8 },
+            { x: -4, y: 0, z: -8 },
+            { x: 0, y: 0, z: -4 },
+            { x: 0, y: 0, z: -12 }
+        ];
+        
+        octaVerts.forEach(pos => {
+            orbs.push({
+                position: pos,
+                color: crystalColor,
+                size: 0.3,
+                intensity: 3,
+                type: 'vertex'
+            });
+        });
+        
+        // Edges
+        const edges = [
+            [0,2], [0,3], [0,4], [0,5],
+            [1,2], [1,3], [1,4], [1,5],
+            [2,4], [2,5], [3,4], [3,5]
+        ];
+        
+        edges.forEach(([i, j]) => {
+            for (let t = 0.1; t < 0.9; t += 0.1) {
+                orbs.push({
+                    position: this.lerp3(octaVerts[i], octaVerts[j], t),
+                    color: crystalColor,
+                    size: 0.05,
+                    intensity: 1.5,
+                    type: 'edge'
+                });
+            }
+        });
+        
+        // Surrounding dust
+        for (let i = 0; i < 150; i++) {
+            orbs.push({
+                position: this.randomSpherePoint(10),
+                color: crystalColor,
+                size: 0.02 + Math.random() * 0.04,
+                intensity: 1,
+                type: 'dust'
+            });
+        }
+        
+        return orbs;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // CHAPTER LOADING
+    // ═══════════════════════════════════════════════════════════════
+    
+    loadChapter(index) {
+        if (this.transitioning) return;
+        this.transitioning = true;
+        
+        // Clear current orbs
+        while (this.worldGroup.children.length > 0) {
+            const child = this.worldGroup.children[0];
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+                if (child.material.map) child.material.map.dispose();
+                child.material.dispose();
+            }
+            this.worldGroup.remove(child);
+        }
+        
+        // Clear lights
+        this.scene.children.forEach(child => {
+            if (child instanceof THREE.PointLight) {
+                this.scene.remove(child);
+            }
+        });
+        
+        // Load new chapter
+        this.currentChapter = index;
+        const chapter = this.chapterData[index];
+        this.activeOrbs = [];
+        this.activeLights = [];
+        
+        chapter.orbs.forEach(orbData => {
+            const orb = this.createOrb(orbData);
+            this.worldGroup.add(orb);
+            this.activeOrbs.push({ mesh: orb, data: orbData });
+            
+            // Add light for larger orbs
+            if (orbData.size > 0.1) {
+                const light = new THREE.PointLight(orbData.color, orbData.intensity * 0.5, 8);
+                light.position.copy(orb.position);
+                this.scene.add(light);
+                this.activeLights.push({ light, orb });
+            }
+        });
+        
+        // Update room color tint
+        const tint = new THREE.Color(chapter.color).multiplyScalar(0.05);
+        this.roomMaterial.color.set(0x050505).add(tint);
+        
+        // Update UI
+        document.querySelectorAll('.chapter-dot').forEach((dot, i) => {
+            dot.classList.toggle('active', i === index);
+        });
+        document.querySelector('.chapter-number').textContent = `Chapter ${index}`;
+        document.querySelector('.chapter-title').textContent = chapter.name.toUpperCase();
+        
+        setTimeout(() => {
+            this.transitioning = false;
+        }, 500);
+    }
+    
+    createOrb(data) {
+        const geometry = new THREE.SphereGeometry(data.size, 32, 32);
         const material = new THREE.MeshStandardMaterial({
-            color: color,
-            emissive: color,
-            emissiveIntensity: 2.5,
+            color: data.color,
+            emissive: data.color,
+            emissiveIntensity: data.intensity,
             metalness: 0.1,
             roughness: 0.2
         });
         
         const orb = new THREE.Mesh(geometry, material);
+        orb.position.set(data.position.x, data.position.y, data.position.z);
         
-        // Add glow sprite
-        const spriteMaterial = new THREE.SpriteMaterial({
+        // Glow sprite
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
             map: this.createGlowTexture(),
-            color: color,
+            color: data.color,
             transparent: true,
             blending: THREE.AdditiveBlending,
-            opacity: 0.6
-        });
-        
-        const sprite = new THREE.Sprite(spriteMaterial);
-        sprite.scale.set(size * 6, size * 6, 1);
+            opacity: 0.5
+        }));
+        sprite.scale.set(data.size * 5, data.size * 5, 1);
         orb.add(sprite);
         
         return orb;
     }
     
     createGlowTexture() {
+        if (this.glowTexture) return this.glowTexture;
+        
         const canvas = document.createElement('canvas');
         canvas.width = 128;
         canvas.height = 128;
@@ -394,23 +945,50 @@ class InfinityMirrorRoom {
         
         const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
         gradient.addColorStop(0, 'rgba(255,255,255,1)');
-        gradient.addColorStop(0.2, 'rgba(255,255,255,0.8)');
-        gradient.addColorStop(0.4, 'rgba(255,255,255,0.3)');
+        gradient.addColorStop(0.2, 'rgba(255,255,255,0.7)');
+        gradient.addColorStop(0.5, 'rgba(255,255,255,0.2)');
         gradient.addColorStop(1, 'rgba(255,255,255,0)');
         
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, 128, 128);
         
-        const texture = new THREE.CanvasTexture(canvas);
-        return texture;
+        this.glowTexture = new THREE.CanvasTexture(canvas);
+        return this.glowTexture;
     }
     
+    // ═══════════════════════════════════════════════════════════════
+    // UTILITIES
+    // ═══════════════════════════════════════════════════════════════
+    
+    randomSpherePoint(radius) {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const r = radius * Math.cbrt(Math.random());
+        return {
+            x: r * Math.sin(phi) * Math.cos(theta),
+            y: r * Math.sin(phi) * Math.sin(theta),
+            z: r * Math.cos(phi) - 5
+        };
+    }
+    
+    distance(a, b) {
+        return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2);
+    }
+    
+    lerp3(a, b, t) {
+        return {
+            x: a.x + (b.x - a.x) * t,
+            y: a.y + (b.y - a.y) * t,
+            z: a.z + (b.z - a.z) * t
+        };
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // INTERACTION
+    // ═══════════════════════════════════════════════════════════════
+    
     setupInteraction() {
-        window.addEventListener('resize', () => {
-            this.camera.aspect = window.innerWidth / window.innerHeight;
-            this.camera.updateProjectionMatrix();
-            this.renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        window.addEventListener('resize', () => this.onResize());
         
         // Mouse look
         document.addEventListener('mousemove', (e) => {
@@ -418,13 +996,51 @@ class InfinityMirrorRoom {
             this.mouseY = (e.clientY / window.innerHeight) * 2 - 1;
         });
         
+        // Scroll for chapter change
+        let scrollTimeout;
+        document.addEventListener('wheel', (e) => {
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                if (e.deltaY > 0) this.nextChapter();
+                else this.prevChapter();
+            }, 50);
+        }, { passive: true });
+        
         // Touch
+        let touchStartY;
+        document.addEventListener('touchstart', (e) => {
+            touchStartY = e.touches[0].clientY;
+        }, { passive: true });
+        
         document.addEventListener('touchmove', (e) => {
             if (e.touches.length > 0) {
                 this.mouseX = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
                 this.mouseY = (e.touches[0].clientY / window.innerHeight) * 2 - 1;
             }
         }, { passive: true });
+        
+        document.addEventListener('touchend', (e) => {
+            if (touchStartY !== undefined) {
+                const diff = touchStartY - e.changedTouches[0].clientY;
+                if (Math.abs(diff) > 50) {
+                    if (diff > 0) this.nextChapter();
+                    else this.prevChapter();
+                }
+            }
+        }, { passive: true });
+        
+        // Chapter dots
+        document.querySelectorAll('.chapter-dot').forEach(dot => {
+            dot.addEventListener('click', () => {
+                this.loadChapter(parseInt(dot.dataset.chapter));
+            });
+        });
+        
+        // Keyboard
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight') this.nextChapter();
+            if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') this.prevChapter();
+        });
         
         // Gyroscope
         if (window.DeviceOrientationEvent) {
@@ -437,63 +1053,100 @@ class InfinityMirrorRoom {
         }
     }
     
+    nextChapter() {
+        const next = (this.currentChapter + 1) % this.chapterData.length;
+        this.loadChapter(next);
+    }
+    
+    prevChapter() {
+        const prev = (this.currentChapter - 1 + this.chapterData.length) % this.chapterData.length;
+        this.loadChapter(prev);
+    }
+    
+    onResize() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // ANIMATION — THE BREATHING
+    // ═══════════════════════════════════════════════════════════════
+    
     animate() {
-        requestAnimationFrame(() => this.animate());
+        this.renderer.setAnimationLoop(() => this.render());
+    }
+    
+    render() {
+        this.time += 0.004;
+        this.breathPhase += 0.008;
         
-        this.time += 0.006;
+        // Global breathing
+        const breath = Math.sin(this.breathPhase) * 0.5 + 0.5;
+        const deepBreath = Math.sin(this.breathPhase * 0.5) * 0.5 + 0.5;
         
-        // Smooth camera rotation
-        const targetRotX = this.mouseY * 0.4;
-        const targetRotY = this.mouseX * 0.6;
-        
-        this.camera.rotation.x += (targetRotX - this.camera.rotation.x) * 0.03;
-        this.camera.rotation.y += (targetRotY - this.camera.rotation.y) * 0.03;
-        
-        // Gentle camera drift
-        this.camera.position.x = Math.sin(this.time * 0.5) * 0.3;
-        this.camera.position.y = Math.cos(this.time * 0.3) * 0.2;
-        
-        // Animate main orbs
-        this.mainOrbs.forEach(orb => {
-            const d = orb.userData;
-            const t = this.time * d.speed + d.phase;
+        // Camera movement (only when not in XR)
+        if (!this.renderer.xr.isPresenting) {
+            this.targetRotX = this.mouseY * 0.4;
+            this.targetRotY = this.mouseX * 0.6;
             
-            orb.position.x = d.basePos.x + Math.sin(t) * 0.5;
-            orb.position.y = d.basePos.y + Math.cos(t * 0.7) * 0.6;
-            orb.position.z = d.basePos.z + Math.sin(t * 0.5) * 0.3;
+            this.camera.rotation.x += (this.targetRotX - this.camera.rotation.x) * 0.02;
+            this.camera.rotation.y += (this.targetRotY - this.camera.rotation.y) * 0.02;
             
-            // Pulse
-            const pulse = 1.8 + Math.sin(t * 2) * 0.7;
-            orb.material.emissiveIntensity = pulse;
-            
-            d.light.position.copy(orb.position);
-            d.light.intensity = pulse * 1.5;
-        });
+            // Gentle drift
+            this.camera.position.x = Math.sin(this.time * 0.3) * 0.2;
+            this.camera.position.y = Math.cos(this.time * 0.2) * 0.15;
+        }
         
-        // Animate small orbs
-        this.smallOrbs.forEach(orb => {
-            const d = orb.userData;
-            const t = this.time * d.speed + d.phase;
-            
-            orb.position.x = d.basePos.x + Math.sin(t) * 0.3;
-            orb.position.y = d.basePos.y + Math.cos(t * 0.8) * 0.4;
-            orb.position.z = d.basePos.z + Math.sin(t * 0.6) * 0.2;
-            
-            if (d.light) {
-                d.light.position.copy(orb.position);
-                d.light.intensity = 0.5 + Math.sin(t * 2) * 0.3;
-            }
-            
-            if (orb.material.emissiveIntensity !== undefined) {
-                orb.material.emissiveIntensity = 2 + Math.sin(t * 2) * 0.5;
-            }
-        });
+        // Animate orbs based on chapter type
+        if (this.activeOrbs) {
+            this.activeOrbs.forEach((item, i) => {
+                const { mesh, data } = item;
+                const phase = this.time + i * 0.1;
+                
+                // Base floating motion
+                mesh.position.x = data.position.x + Math.sin(phase * 0.5) * 0.3;
+                mesh.position.y = data.position.y + Math.cos(phase * 0.3) * 0.4;
+                mesh.position.z = data.position.z + Math.sin(phase * 0.4) * 0.2;
+                
+                // Breathing pulse on emissive
+                const basePulse = 0.8 + breath * 0.4;
+                mesh.material.emissiveIntensity = data.intensity * basePulse;
+                
+                // Type-specific animations
+                if (data.type === 'spark' && data.velocity) {
+                    mesh.position.x += Math.sin(phase * 2) * 0.5;
+                    mesh.position.y += Math.abs(Math.sin(phase)) * 0.3;
+                }
+                
+                if (data.type === 'molten' && data.riseSpeed) {
+                    mesh.position.y = data.position.y + (this.time * data.riseSpeed * 10) % 16 - 8;
+                }
+                
+                if (data.type === 'flow') {
+                    const flowPhase = phase + data.streamT * Math.PI * 2;
+                    mesh.position.x = data.position.x + Math.sin(flowPhase) * 0.5;
+                    mesh.position.z = data.position.z + Math.cos(flowPhase) * 0.3;
+                }
+                
+                if (data.type === 'ray') {
+                    mesh.material.emissiveIntensity = data.intensity * (0.5 + Math.sin(phase * 3 - data.rayDist) * 0.5);
+                }
+                
+                // Scale breathing for main orbs
+                if (data.size > 0.2) {
+                    const scale = 1 + deepBreath * 0.1;
+                    mesh.scale.setScalar(scale);
+                }
+            });
+        }
         
-        // Animate reflection orbs
-        this.reflectionOrbs.forEach(orb => {
-            const d = orb.userData;
-            orb.material.opacity = 0.2 + Math.sin(this.time * d.speed + d.phase) * 0.15;
-        });
+        // Update lights
+        if (this.activeLights) {
+            this.activeLights.forEach(({ light, orb }) => {
+                light.position.copy(orb.position);
+            });
+        }
         
         // Update cube camera for reflections
         this.room.visible = false;
@@ -506,8 +1159,9 @@ class InfinityMirrorRoom {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    new InfinityMirrorRoom();
+    new KagamiExperience();
 });
     </script>
 </body>
 </html>
+
