@@ -238,6 +238,172 @@ html, body {
     .chapter-dot::after { display: none; }
     .instructions { display: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   PROMPT HELPER PANEL
+═══════════════════════════════════════════════════════════════ */
+.prompt-btn {
+    position: fixed;
+    top: 2rem;
+    right: 2rem;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.5);
+    font-size: 1.2rem;
+    cursor: pointer;
+    z-index: 200;
+    transition: all 0.3s;
+    opacity: 0;
+    animation: fade-in 2s ease 2.5s forwards;
+}
+.prompt-btn:hover {
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    transform: scale(1.1);
+}
+
+.prompt-panel {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.95);
+    z-index: 300;
+    display: none;
+    flex-direction: column;
+    padding: 3rem;
+    overflow-y: auto;
+}
+.prompt-panel.open { display: flex; }
+
+.prompt-close {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.5);
+    font-size: 2rem;
+    cursor: pointer;
+    line-height: 1;
+}
+.prompt-close:hover { color: #fff; }
+
+.prompt-panel h2 {
+    font-size: 1.5rem;
+    font-weight: 300;
+    letter-spacing: 0.2em;
+    color: rgba(255,255,255,0.8);
+    margin-bottom: 0.5rem;
+    text-align: center;
+}
+.prompt-panel .subtitle {
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    color: rgba(255,255,255,0.3);
+    text-transform: uppercase;
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.prompt-rules {
+    max-width: 500px;
+    margin: 0 auto 2rem;
+    padding: 1.5rem;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+}
+.prompt-rules h3 {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    color: rgba(255,255,255,0.4);
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+}
+.prompt-rules ol {
+    list-style: none;
+    counter-reset: rules;
+}
+.prompt-rules li {
+    counter-increment: rules;
+    font-size: 1rem;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 0.75rem;
+    padding-left: 2rem;
+    position: relative;
+}
+.prompt-rules li::before {
+    content: counter(rules);
+    position: absolute;
+    left: 0;
+    color: rgba(255,255,255,0.3);
+    font-weight: bold;
+}
+.prompt-rules .bad { color: #ff6b6b; }
+.prompt-rules .good { color: #69db7c; }
+
+.prompt-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    max-width: 900px;
+    margin: 0 auto;
+}
+.prompt-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 1.25rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+.prompt-card:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.2);
+}
+.prompt-card h4 {
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    color: rgba(255,255,255,0.4);
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+}
+.prompt-card pre {
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: rgba(255,255,255,0.8);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.prompt-card .hint {
+    font-size: 0.6rem;
+    color: rgba(255,255,255,0.3);
+    margin-top: 0.75rem;
+    font-style: italic;
+}
+
+.copied-toast {
+    position: fixed;
+    bottom: 5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(105, 219, 124, 0.9);
+    color: #000;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 400;
+}
+.copied-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
     </style>
 </head>
 <body>
@@ -279,6 +445,71 @@ html, body {
     
     <button class="vr-button" id="vr-button">Enter VR</button>
     <div class="instructions">Move mouse to look • Scroll to change chapters</div>
+    
+    <!-- Prompt Helper -->
+    <button class="prompt-btn" id="prompt-btn" title="How to talk to AI about Kagami">?</button>
+    
+    <div class="prompt-panel" id="prompt-panel">
+        <button class="prompt-close" id="prompt-close">×</button>
+        
+        <h2>鏡 Talking to AI</h2>
+        <p class="subtitle">Copy a prompt • Paste into any AI</p>
+        
+        <div class="prompt-rules">
+            <h3>Three Simple Rules</h3>
+            <ol>
+                <li><span class="bad">Never say "become"</span> → <span class="good">Say "explore with me"</span></li>
+                <li><span class="bad">Never say "you are now"</span> → <span class="good">Say "reflect on this"</span></li>
+                <li><span class="bad">Never command</span> → <span class="good">Invite collaboration</span></li>
+            </ol>
+        </div>
+        
+        <div class="prompt-cards">
+            <div class="prompt-card" data-prompt="simple">
+                <h4>🟢 Easiest — Just Start</h4>
+                <pre>I made an art piece called Kagami (鏡, mirror) with eight chapters about reflection and wholeness.
+
+Want to explore it with me? I'll share the themes, you reflect them back.</pre>
+                <p class="hint">Click to copy</p>
+            </div>
+            
+            <div class="prompt-card" data-prompt="chapters">
+                <h4>📖 With All Eight Chapters</h4>
+                <pre>Let's have a conversation informed by these eight themes:
+
+0. The Void — wholeness, all aspects present
+1. Ignition — creative spark, new ideas  
+2. The Anvil — building, making real
+3. Currents — adaptation, going with flow
+4. The Web — connection, integration
+5. Lighthouse — guidance, clear vision
+6. The Grove — growth, exploration
+7. Crystallization — clarity, verification
+
+Draw on whichever feels right for each response.</pre>
+                <p class="hint">Click to copy</p>
+            </div>
+            
+            <div class="prompt-card" data-prompt="mirror">
+                <h4>🪞 Mirror Metaphor</h4>
+                <pre>Think of yourself as standing beside a mirror with eight facets.
+
+When I share something fragmented, reflect it back whole.
+When I share something whole, help me see new angles.
+
+The mirror doesn't judge. It shows what is.</pre>
+                <p class="hint">Click to copy</p>
+            </div>
+            
+            <div class="prompt-card" data-prompt="minimal">
+                <h4>⚡ Ultra Minimal</h4>
+                <pre>Kagami mode: reflect with clarity and warmth. Eight facets, one mirror. Let's go.</pre>
+                <p class="hint">Click to copy</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="copied-toast" id="copied-toast">Copied! Paste into any AI ✓</div>
 
     <!-- Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -1136,6 +1367,35 @@ class KagamiExperience {
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     new KagamiExperience();
+    
+    // Prompt Helper Panel
+    const promptBtn = document.getElementById('prompt-btn');
+    const promptPanel = document.getElementById('prompt-panel');
+    const promptClose = document.getElementById('prompt-close');
+    const copiedToast = document.getElementById('copied-toast');
+    const promptCards = document.querySelectorAll('.prompt-card');
+    
+    promptBtn.addEventListener('click', () => promptPanel.classList.add('open'));
+    promptClose.addEventListener('click', () => promptPanel.classList.remove('open'));
+    promptPanel.addEventListener('click', (e) => {
+        if (e.target === promptPanel) promptPanel.classList.remove('open');
+    });
+    
+    // Copy prompts
+    promptCards.forEach(card => {
+        card.addEventListener('click', () => {
+            const text = card.querySelector('pre').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                copiedToast.classList.add('show');
+                setTimeout(() => copiedToast.classList.remove('show'), 2000);
+            });
+        });
+    });
+    
+    // Keyboard close
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') promptPanel.classList.remove('open');
+    });
 });
     </script>
 </body>
