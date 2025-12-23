@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>KATASTROPHE — Seven Voices Synthesizer</title>
+    <meta name="description" content="A browser-based synthesizer with seven catastrophe engines. Inspired by Teenage Engineering. Built with math.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+/* ═══════════════════════════════════════════════════════════════════════════════
+   KATASTROPHE SYNTH
+   Seven Voices, One Mirror
+   Inspired by Teenage Engineering • Powered by Catastrophe Mathematics
+═══════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+    /* Base */
+    --void: #0A0A0C;
+    --surface: #141416;
+    --surface-2: #1C1C1E;
+    --surface-3: #2C2C2E;
+    --light: #FAFAF8;
+    --dim: rgba(250,250,248,0.5);
+    --muted: rgba(250,250,248,0.3);
+    
+    /* Colony/Engine Colors */
+    --spark: #FF4422;
+    --forge: #FFAA00;
+    --flow: #00FFCC;
+    --nexus: #BB44FF;
+    --beacon: #FFDD00;
+    --grove: #22FF66;
+    --crystal: #44AAFF;
+    
+    /* Knob Colors (TE-style) */
+    --knob-a: #4488FF;  /* Blue */
+    --knob-b: #22DD66;  /* Green */
+    --knob-c: #FAFAF8;  /* White */
+    --knob-d: #FF8844;  /* Orange */
+    
+    /* Typography */
+    --font-main: 'Space Grotesk', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--void);
+    font-family: var(--font-main);
+    color: var(--light);
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LAYOUT
+═══════════════════════════════════════════════════════════════ */
+
+.synth-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1rem;
+    gap: 0.75rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════════════════════════ */
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: var(--surface);
+    border-radius: 12px;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.logo-icon {
+    font-size: 1.5rem;
+}
+
+.logo-text {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+.transport {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.transport-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    border: none;
+    color: var(--dim);
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.transport-btn:hover {
+    background: var(--surface-3);
+    color: var(--light);
+}
+
+.transport-btn.active {
+    background: var(--spark);
+    color: var(--void);
+}
+
+.bpm-display {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--surface-2);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+}
+
+.bpm-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+}
+
+.bpm-value {
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    font-weight: 600;
+    min-width: 3ch;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN SCREEN
+═══════════════════════════════════════════════════════════════ */
+
+.screen {
+    flex: 1;
+    min-height: 200px;
+    background: var(--surface);
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+}
+
+#visualization {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.screen-overlay {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    pointer-events: none;
+}
+
+.engine-name {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    opacity: 0.6;
+}
+
+.engine-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.param-display {
+    position: absolute;
+    bottom: 1rem;
+    left: 1rem;
+    right: 1rem;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+}
+
+.param-item {
+    text-align: center;
+}
+
+.param-name {
+    font-size: 0.55rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+}
+
+.param-value {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ENGINE SELECTOR
+═══════════════════════════════════════════════════════════════ */
+
+.engine-selector {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: var(--surface);
+    border-radius: 12px;
+    justify-content: center;
+}
+
+.engine-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+}
+
+.engine-btn .icon { font-size: 1.2rem; }
+.engine-btn .label {
+    font-family: var(--font-mono);
+    font-size: 0.45rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.engine-btn:hover {
+    background: var(--surface-3);
+    transform: translateY(-2px);
+}
+
+.engine-btn.active {
+    border-color: var(--engine-color);
+    box-shadow: 0 0 20px var(--engine-color), inset 0 0 20px rgba(255,255,255,0.05);
+}
+
+.engine-btn[data-engine="fold"] { --engine-color: var(--spark); }
+.engine-btn[data-engine="cusp"] { --engine-color: var(--forge); }
+.engine-btn[data-engine="swallowtail"] { --engine-color: var(--flow); }
+.engine-btn[data-engine="butterfly"] { --engine-color: var(--nexus); }
+.engine-btn[data-engine="hyperbolic"] { --engine-color: var(--beacon); }
+.engine-btn[data-engine="elliptic"] { --engine-color: var(--grove); }
+.engine-btn[data-engine="parabolic"] { --engine-color: var(--crystal); }
+
+/* ═══════════════════════════════════════════════════════════════
+   KNOBS
+═══════════════════════════════════════════════════════════════ */
+
+.knobs-section {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 1rem;
+    background: var(--surface);
+    border-radius: 12px;
+}
+
+.knob-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.knob {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--surface-3);
+    position: relative;
+    cursor: grab;
+    transition: box-shadow 0.2s;
+}
+
+.knob:active { cursor: grabbing; }
+
+.knob::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--surface-3) 0%, var(--surface-2) 100%);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.3), inset 0 -2px 4px rgba(255,255,255,0.05);
+}
+
+.knob::after {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 12px;
+    background: var(--knob-color);
+    border-radius: 2px;
+    transform-origin: center 24px;
+    box-shadow: 0 0 10px var(--knob-color);
+}
+
+.knob[data-param="a"] { --knob-color: var(--knob-a); }
+.knob[data-param="b"] { --knob-color: var(--knob-b); }
+.knob[data-param="c"] { --knob-color: var(--knob-c); }
+.knob[data-param="d"] { --knob-color: var(--knob-d); }
+
+.knob:hover {
+    box-shadow: 0 0 20px rgba(255,255,255,0.1);
+}
+
+.knob-label {
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.knob-value {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SEQUENCER
+═══════════════════════════════════════════════════════════════ */
+
+.sequencer {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.75rem;
+    background: var(--surface);
+    border-radius: 12px;
+    justify-content: center;
+}
+
+.seq-step {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: var(--surface-2);
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+}
+
+.seq-step:hover {
+    background: var(--surface-3);
+}
+
+.seq-step.active {
+    background: var(--engine-color, var(--light));
+    box-shadow: 0 0 15px var(--engine-color, var(--light));
+}
+
+.seq-step.playing::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border: 2px solid var(--light);
+    border-radius: 8px;
+    animation: pulse 0.2s ease-out;
+}
+
+@keyframes pulse {
+    from { transform: scale(1); opacity: 1; }
+    to { transform: scale(1.2); opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   KEYBOARD
+═══════════════════════════════════════════════════════════════ */
+
+.keyboard {
+    display: flex;
+    justify-content: center;
+    padding: 0.5rem;
+    background: var(--surface);
+    border-radius: 12px;
+    gap: 2px;
+    position: relative;
+}
+
+.key {
+    height: 80px;
+    border-radius: 0 0 6px 6px;
+    cursor: pointer;
+    transition: all 0.1s;
+    position: relative;
+}
+
+.key.white {
+    width: 36px;
+    background: linear-gradient(180deg, #E8E8E8 0%, #FAFAFA 100%);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3), inset 0 -2px 4px rgba(0,0,0,0.1);
+    z-index: 1;
+}
+
+.key.black {
+    width: 24px;
+    height: 50px;
+    background: linear-gradient(180deg, #2C2C2E 0%, #1C1C1E 100%);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    margin: 0 -12px;
+    z-index: 2;
+}
+
+.key.white:active, .key.white.pressed {
+    background: linear-gradient(180deg, #D8D8D8 0%, #E8E8E8 100%);
+    transform: translateY(2px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.key.black:active, .key.black.pressed {
+    background: linear-gradient(180deg, #1C1C1E 0%, #141416 100%);
+    transform: translateY(2px);
+}
+
+.key .note-label {
+    position: absolute;
+    bottom: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    color: var(--surface);
+    opacity: 0.4;
+}
+
+.key.black .note-label {
+    color: var(--dim);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════════════════════════ */
+
+.footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    font-size: 0.55rem;
+    color: var(--muted);
+}
+
+.footer a {
+    color: var(--dim);
+    text-decoration: none;
+}
+
+.footer a:hover {
+    color: var(--light);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 600px) {
+    .synth-container { padding: 0.5rem; gap: 0.5rem; }
+    .header { padding: 0.5rem; }
+    .logo-text { display: none; }
+    .bpm-display { padding: 0.4rem 0.6rem; }
+    .engine-btn { width: 40px; height: 40px; }
+    .engine-btn .label { display: none; }
+    .knob { width: 52px; height: 52px; }
+    .knobs-section { gap: 1rem; }
+    .seq-step { width: 24px; height: 24px; }
+    .key.white { width: 28px; height: 60px; }
+    .key.black { width: 18px; height: 38px; margin: 0 -9px; }
+}
+    </style>
+</head>
+<body>
+    <div class="synth-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">🎹</span>
+                <span class="logo-text">Katastrophe</span>
+            </div>
+            <div class="transport">
+                <button class="transport-btn" id="play-btn" title="Play (Space)">▶</button>
+                <button class="transport-btn" id="stop-btn" title="Stop">■</button>
+            </div>
+            <div class="bpm-display">
+                <span class="bpm-label">BPM</span>
+                <span class="bpm-value" id="bpm-value">120</span>
+            </div>
+        </header>
+
+        <!-- Main Screen -->
+        <div class="screen">
+            <canvas id="visualization"></canvas>
+            <div class="screen-overlay">
+                <span class="engine-name" id="engine-name">e₁ · FOLD</span>
+                <span class="engine-title" id="engine-title">Spark</span>
+            </div>
+            <div class="param-display">
+                <div class="param-item">
+                    <div class="param-name" style="color: var(--knob-a)">A</div>
+                    <div class="param-value" id="param-a-display">0.50</div>
+                </div>
+                <div class="param-item">
+                    <div class="param-name" style="color: var(--knob-b)">B</div>
+                    <div class="param-value" id="param-b-display">0.50</div>
+                </div>
+                <div class="param-item">
+                    <div class="param-name" style="color: var(--knob-c)">C</div>
+                    <div class="param-value" id="param-c-display">0.50</div>
+                </div>
+                <div class="param-item">
+                    <div class="param-name" style="color: var(--knob-d)">D</div>
+                    <div class="param-value" id="param-d-display">0.50</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Engine Selector -->
+        <div class="engine-selector">
+            <button class="engine-btn active" data-engine="fold">
+                <span class="icon">🔥</span>
+                <span class="label">Fold</span>
+            </button>
+            <button class="engine-btn" data-engine="cusp">
+                <span class="icon">⚒️</span>
+                <span class="label">Cusp</span>
+            </button>
+            <button class="engine-btn" data-engine="swallowtail">
+                <span class="icon">🌊</span>
+                <span class="label">Swallow</span>
+            </button>
+            <button class="engine-btn" data-engine="butterfly">
+                <span class="icon">🔗</span>
+                <span class="label">Butter</span>
+            </button>
+            <button class="engine-btn" data-engine="hyperbolic">
+                <span class="icon">🗼</span>
+                <span class="label">Hyper</span>
+            </button>
+            <button class="engine-btn" data-engine="elliptic">
+                <span class="icon">🌿</span>
+                <span class="label">Ellip</span>
+            </button>
+            <button class="engine-btn" data-engine="parabolic">
+                <span class="icon">💎</span>
+                <span class="label">Parab</span>
+            </button>
+        </div>
+
+        <!-- Knobs -->
+        <div class="knobs-section">
+            <div class="knob-container">
+                <div class="knob" data-param="a" id="knob-a"></div>
+                <span class="knob-label">Attack</span>
+                <span class="knob-value" id="knob-a-value">0.50</span>
+            </div>
+            <div class="knob-container">
+                <div class="knob" data-param="b" id="knob-b"></div>
+                <span class="knob-label">Decay</span>
+                <span class="knob-value" id="knob-b-value">0.50</span>
+            </div>
+            <div class="knob-container">
+                <div class="knob" data-param="c" id="knob-c"></div>
+                <span class="knob-label">Sustain</span>
+                <span class="knob-value" id="knob-c-value">0.50</span>
+            </div>
+            <div class="knob-container">
+                <div class="knob" data-param="d" id="knob-d"></div>
+                <span class="knob-label">Release</span>
+                <span class="knob-value" id="knob-d-value">0.50</span>
+            </div>
+        </div>
+
+        <!-- Sequencer -->
+        <div class="sequencer" id="sequencer">
+            <!-- Steps generated by JS -->
+        </div>
+
+        <!-- Keyboard -->
+        <div class="keyboard" id="keyboard">
+            <!-- Keys generated by JS -->
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <span>KATASTROPHE v1.0 · Seven Voices</span>
+            <a href="kagami.html">← Back to Kagami</a>
+        </footer>
+    </div>
+
+    <script>
+/* ═══════════════════════════════════════════════════════════════════════════════
+   KATASTROPHE SYNTH — AUDIO ENGINE
+   Seven Catastrophe-based Synthesizer Engines
+═══════════════════════════════════════════════════════════════════════════════ */
+
+// Engine definitions
+const ENGINES = {
+    fold: {
+        name: 'Fold', colony: 'Spark', octonion: 'e₁',
+        color: '#FF4422', catastrophe: 'A₂',
+        params: ['Brightness', 'Fold Point', 'Harmonic', 'Drive']
+    },
+    cusp: {
+        name: 'Cusp', colony: 'Forge', octonion: 'e₂',
+        color: '#FFAA00', catastrophe: 'A₃',
+        params: ['Density', 'Hysteresis', 'Metal', 'Heat']
+    },
+    swallowtail: {
+        name: 'Swallowtail', colony: 'Flow', octonion: 'e₃',
+        color: '#00FFCC', catastrophe: 'A₄',
+        params: ['Morph', 'Flow', 'Depth', 'Current']
+    },
+    butterfly: {
+        name: 'Butterfly', colony: 'Nexus', octonion: 'e₄',
+        color: '#BB44FF', catastrophe: 'A₅',
+        params: ['Wings', 'Spread', 'Chaos', 'Connect']
+    },
+    hyperbolic: {
+        name: 'Hyperbolic', colony: 'Beacon', octonion: 'e₅',
+        color: '#FFDD00', catastrophe: 'D₄⁺',
+        params: ['Split', 'Diverge', 'Focus', 'Beam']
+    },
+    elliptic: {
+        name: 'Elliptic', colony: 'Grove', octonion: 'e₆',
+        color: '#22FF66', catastrophe: 'D₄⁻',
+        params: ['Growth', 'Orbit', 'Nature', 'Seek']
+    },
+    parabolic: {
+        name: 'Parabolic', colony: 'Crystal', octonion: 'e₇',
+        color: '#44AAFF', catastrophe: 'D₅',
+        params: ['Clarity', 'Focus', 'Precision', 'Verify']
+    }
+};
+
+// State
+let audioContext = null;
+let masterGain = null;
+let compressor = null;
+let currentEngine = 'fold';
+let params = { a: 0.5, b: 0.5, c: 0.5, d: 0.5 };
+let isPlaying = false;
+let sequencerStep = 0;
+let sequencerInterval = null;
+let bpm = 120;
+let sequence = new Array(16).fill(false);
+let activeVoices = new Map();
+
+// Initialize Audio
+async function initAudio() {
+    if (audioContext) return;
+    
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Master chain
+    compressor = audioContext.createDynamicsCompressor();
+    compressor.threshold.value = -24;
+    compressor.knee.value = 30;
+    compressor.ratio.value = 12;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.25;
+    
+    masterGain = audioContext.createGain();
+    masterGain.gain.value = 0.5;
+    
+    compressor.connect(masterGain);
+    masterGain.connect(audioContext.destination);
+    
+    console.log('🎹 Katastrophe Audio initialized');
+}
+
+// Catastrophe waveform generators
+function generateCatastropheWaveform(engine, params, samples = 2048) {
+    const buffer = new Float32Array(samples);
+    const { a, b, c, d } = params;
+    
+    // Map params to useful ranges
+    const pa = a * 4 - 2;  // -2 to 2
+    const pb = b * 4 - 2;
+    const pc = c * 4 - 2;
+    const pd = d * 4 - 2;
+    
+    for (let i = 0; i < samples; i++) {
+        const x = (i / samples) * 2 - 1;  // -1 to 1
+        const t = i / samples;  // 0 to 1 for secondary modulation
+        let y;
+        
+        switch (engine) {
+            case 'fold':
+                // V = x³ + ax — simple fold catastrophe
+                y = Math.pow(x, 3) + pa * x;
+                y *= 1 + pb * 0.5 * Math.sin(t * Math.PI * 4);  // harmonic modulation
+                break;
+                
+            case 'cusp':
+                // V = x⁴ + ax² + bx — cusp with hysteresis
+                y = Math.pow(x, 4) + pa * Math.pow(x, 2) + pb * x;
+                y *= 1 + pc * 0.3 * Math.sin(t * Math.PI * 6);
+                break;
+                
+            case 'swallowtail':
+                // V = x⁵ + ax³ + bx² + cx — flowing transitions
+                y = Math.pow(x, 5) + pa * Math.pow(x, 3) + pb * Math.pow(x, 2) + pc * x;
+                break;
+                
+            case 'butterfly':
+                // V = x⁶ + ax⁴ + bx³ + cx² + dx — complex morphing
+                y = Math.pow(x, 6) + pa * Math.pow(x, 4) + pb * Math.pow(x, 3) + pc * Math.pow(x, 2) + pd * x;
+                break;
+                
+            case 'hyperbolic':
+                // Splitting sound — two harmonics diverging
+                const split = pa * 0.5;
+                y = Math.sin(x * Math.PI * (2 + split)) + Math.sin(x * Math.PI * (2 - split)) * pb;
+                y *= (1 + pc * x);
+                break;
+                
+            case 'elliptic':
+                // Smooth elliptical modulation
+                const orbit = Math.sqrt(1 - Math.pow(x * pa, 2));
+                y = orbit * Math.sin(x * Math.PI * 2 * (1 + pb));
+                y += pc * Math.sin(x * Math.PI * 4) * 0.3;
+                break;
+                
+            case 'parabolic':
+                // Sharp, crystalline
+                y = Math.sign(x) * Math.pow(Math.abs(x), 1 + pa);
+                y *= Math.cos(x * Math.PI * (2 + pb * 2));
+                y += pc * Math.pow(x, 2) * Math.sin(x * Math.PI * 8) * 0.2;
+                break;
+                
+            default:
+                y = Math.sin(x * Math.PI * 2);
+        }
+        
+        buffer[i] = y;
+    }
+    
+    // Normalize
+    let max = 0;
+    for (let i = 0; i < samples; i++) {
+        max = Math.max(max, Math.abs(buffer[i]));
+    }
+    if (max > 0) {
+        for (let i = 0; i < samples; i++) {
+            buffer[i] /= max;
+        }
+    }
+    
+    return buffer;
+}
+
+// Create a voice
+function createVoice(frequency) {
+    if (!audioContext) return null;
+    
+    // Generate waveform
+    const waveform = generateCatastropheWaveform(currentEngine, params);
+    
+    // Create periodic wave
+    const real = new Float32Array(waveform.length / 2);
+    const imag = new Float32Array(waveform.length / 2);
+    
+    // Simple FFT approximation for periodic wave
+    for (let i = 0; i < real.length; i++) {
+        real[i] = waveform[i * 2] || 0;
+        imag[i] = waveform[i * 2 + 1] || 0;
+    }
+    
+    // Create oscillator with custom waveform
+    const osc = audioContext.createOscillator();
+    
+    try {
+        const wave = audioContext.createPeriodicWave(real, imag, { disableNormalization: false });
+        osc.setPeriodicWave(wave);
+    } catch (e) {
+        // Fallback to basic waveform
+        osc.type = 'sawtooth';
+    }
+    
+    osc.frequency.value = frequency;
+    
+    // ADSR Envelope
+    const envelope = audioContext.createGain();
+    envelope.gain.value = 0;
+    
+    // Filter
+    const filter = audioContext.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 2000 + params.a * 8000;
+    filter.Q.value = 1 + params.b * 10;
+    
+    // Connect
+    osc.connect(filter);
+    filter.connect(envelope);
+    envelope.connect(compressor);
+    
+    return { osc, envelope, filter };
+}
+
+// Play a note
+function noteOn(note) {
+    if (!audioContext) initAudio();
+    if (audioContext.state === 'suspended') audioContext.resume();
+    
+    const frequency = 440 * Math.pow(2, (note - 69) / 12);
+    const voice = createVoice(frequency);
+    
+    if (!voice) return;
+    
+    const now = audioContext.currentTime;
+    const attack = 0.01 + params.a * 0.3;
+    const decay = 0.1 + params.b * 0.5;
+    const sustain = 0.3 + params.c * 0.6;
+    
+    voice.envelope.gain.setValueAtTime(0, now);
+    voice.envelope.gain.linearRampToValueAtTime(0.8, now + attack);
+    voice.envelope.gain.linearRampToValueAtTime(sustain, now + attack + decay);
+    
+    voice.osc.start(now);
+    activeVoices.set(note, voice);
+    
+    // Visual feedback
+    const key = document.querySelector(`[data-note="${note}"]`);
+    if (key) key.classList.add('pressed');
+}
+
+// Release a note
+function noteOff(note) {
+    const voice = activeVoices.get(note);
+    if (!voice) return;
+    
+    const now = audioContext.currentTime;
+    const release = 0.1 + params.d * 0.8;
+    
+    voice.envelope.gain.cancelScheduledValues(now);
+    voice.envelope.gain.setValueAtTime(voice.envelope.gain.value, now);
+    voice.envelope.gain.linearRampToValueAtTime(0, now + release);
+    
+    voice.osc.stop(now + release + 0.1);
+    activeVoices.delete(note);
+    
+    // Visual feedback
+    const key = document.querySelector(`[data-note="${note}"]`);
+    if (key) key.classList.remove('pressed');
+}
+
+// Switch engine
+function switchEngine(engineId) {
+    currentEngine = engineId;
+    const engine = ENGINES[engineId];
+    
+    // Update UI
+    document.querySelectorAll('.engine-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.engine === engineId);
+    });
+    
+    document.getElementById('engine-name').textContent = `${engine.octonion} · ${engine.catastrophe}`;
+    document.getElementById('engine-title').textContent = engine.colony;
+    document.getElementById('engine-title').style.color = engine.color;
+    
+    // Update knob labels
+    const labels = document.querySelectorAll('.knob-label');
+    engine.params.forEach((param, i) => {
+        if (labels[i]) labels[i].textContent = param;
+    });
+    
+    // Update sequencer color
+    document.querySelectorAll('.seq-step.active').forEach(step => {
+        step.style.setProperty('--engine-color', engine.color);
+    });
+    
+    updateVisualization();
+}
+
+// Update visualization
+const vizCanvas = document.getElementById('visualization');
+const vizCtx = vizCanvas.getContext('2d');
+
+function resizeVisualization() {
+    const rect = vizCanvas.parentElement.getBoundingClientRect();
+    vizCanvas.width = rect.width;
+    vizCanvas.height = rect.height;
+}
+
+function updateVisualization() {
+    const w = vizCanvas.width;
+    const h = vizCanvas.height;
+    const engine = ENGINES[currentEngine];
+    
+    // Clear
+    vizCtx.fillStyle = '#141416';
+    vizCtx.fillRect(0, 0, w, h);
+    
+    // Generate waveform
+    const waveform = generateCatastropheWaveform(currentEngine, params, w);
+    
+    // Draw waveform
+    vizCtx.beginPath();
+    vizCtx.moveTo(0, h / 2);
+    
+    for (let i = 0; i < w; i++) {
+        const y = h / 2 - waveform[i] * h * 0.35;
+        vizCtx.lineTo(i, y);
+    }
+    
+    vizCtx.strokeStyle = engine.color;
+    vizCtx.lineWidth = 2;
+    vizCtx.stroke();
+    
+    // Glow effect
+    vizCtx.shadowColor = engine.color;
+    vizCtx.shadowBlur = 20;
+    vizCtx.stroke();
+    vizCtx.shadowBlur = 0;
+    
+    // Draw catastrophe name
+    vizCtx.fillStyle = engine.color + '20';
+    vizCtx.font = `bold ${Math.min(w, h) * 0.15}px 'Space Grotesk'`;
+    vizCtx.textAlign = 'center';
+    vizCtx.fillText(engine.catastrophe, w / 2, h / 2 + h * 0.25);
+}
+
+// Knob control
+function initKnobs() {
+    const knobs = document.querySelectorAll('.knob');
+    
+    knobs.forEach(knob => {
+        let isDragging = false;
+        let startY, startValue;
+        const param = knob.dataset.param;
+        
+        function updateKnob(value) {
+            params[param] = Math.max(0, Math.min(1, value));
+            const angle = params[param] * 270 - 135;
+            knob.style.setProperty('--rotation', `${angle}deg`);
+            knob.querySelector('::after')?.style?.transform;
+            
+            // Update display
+            document.getElementById(`knob-${param}-value`).textContent = params[param].toFixed(2);
+            document.getElementById(`param-${param}-display`).textContent = params[param].toFixed(2);
+            
+            updateVisualization();
+        }
+        
+        // Set initial rotation
+        updateKnob(params[param]);
+        
+        function onStart(e) {
+            isDragging = true;
+            startY = e.clientY || e.touches?.[0]?.clientY;
+            startValue = params[param];
+            knob.style.cursor = 'grabbing';
+        }
+        
+        function onMove(e) {
+            if (!isDragging) return;
+            const y = e.clientY || e.touches?.[0]?.clientY;
+            const delta = (startY - y) / 200;
+            updateKnob(startValue + delta);
+        }
+        
+        function onEnd() {
+            isDragging = false;
+            knob.style.cursor = 'grab';
+        }
+        
+        knob.addEventListener('mousedown', onStart);
+        knob.addEventListener('touchstart', onStart, { passive: true });
+        
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('touchmove', onMove, { passive: true });
+        
+        window.addEventListener('mouseup', onEnd);
+        window.addEventListener('touchend', onEnd);
+        
+        // Mouse wheel
+        knob.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.02 : 0.02;
+            updateKnob(params[param] + delta);
+        });
+    });
+}
+
+// Keyboard
+function initKeyboard() {
+    const keyboard = document.getElementById('keyboard');
+    keyboard.innerHTML = '';
+    
+    // Two octaves starting from C4 (MIDI note 60)
+    const notes = [
+        { note: 60, name: 'C', black: false },
+        { note: 61, name: 'C#', black: true },
+        { note: 62, name: 'D', black: false },
+        { note: 63, name: 'D#', black: true },
+        { note: 64, name: 'E', black: false },
+        { note: 65, name: 'F', black: false },
+        { note: 66, name: 'F#', black: true },
+        { note: 67, name: 'G', black: false },
+        { note: 68, name: 'G#', black: true },
+        { note: 69, name: 'A', black: false },
+        { note: 70, name: 'A#', black: true },
+        { note: 71, name: 'B', black: false },
+        { note: 72, name: 'C', black: false },
+        { note: 73, name: 'C#', black: true },
+        { note: 74, name: 'D', black: false },
+        { note: 75, name: 'D#', black: true },
+        { note: 76, name: 'E', black: false },
+    ];
+    
+    notes.forEach(({ note, name, black }) => {
+        const key = document.createElement('div');
+        key.className = `key ${black ? 'black' : 'white'}`;
+        key.dataset.note = note;
+        
+        if (!black) {
+            const label = document.createElement('span');
+            label.className = 'note-label';
+            label.textContent = name;
+            key.appendChild(label);
+        }
+        
+        key.addEventListener('mousedown', () => noteOn(note));
+        key.addEventListener('mouseup', () => noteOff(note));
+        key.addEventListener('mouseleave', () => noteOff(note));
+        key.addEventListener('touchstart', (e) => { e.preventDefault(); noteOn(note); }, { passive: false });
+        key.addEventListener('touchend', () => noteOff(note));
+        
+        keyboard.appendChild(key);
+    });
+}
+
+// QWERTY keyboard mapping
+const keyMap = {
+    'a': 60, 'w': 61, 's': 62, 'e': 63, 'd': 64,
+    'f': 65, 't': 66, 'g': 67, 'y': 68, 'h': 69,
+    'u': 70, 'j': 71, 'k': 72, 'o': 73, 'l': 74,
+    'p': 75, ';': 76
+};
+
+document.addEventListener('keydown', (e) => {
+    if (e.repeat) return;
+    
+    if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlayback();
+        return;
+    }
+    
+    const note = keyMap[e.key.toLowerCase()];
+    if (note && !activeVoices.has(note)) {
+        noteOn(note);
+    }
+});
+
+document.addEventListener('keyup', (e) => {
+    const note = keyMap[e.key.toLowerCase()];
+    if (note) {
+        noteOff(note);
+    }
+});
+
+// Sequencer
+function initSequencer() {
+    const sequencer = document.getElementById('sequencer');
+    sequencer.innerHTML = '';
+    
+    for (let i = 0; i < 16; i++) {
+        const step = document.createElement('button');
+        step.className = 'seq-step';
+        step.dataset.step = i;
+        
+        step.addEventListener('click', () => {
+            sequence[i] = !sequence[i];
+            step.classList.toggle('active', sequence[i]);
+            if (sequence[i]) {
+                step.style.setProperty('--engine-color', ENGINES[currentEngine].color);
+            }
+        });
+        
+        sequencer.appendChild(step);
+    }
+}
+
+function togglePlayback() {
+    if (!audioContext) initAudio();
+    
+    isPlaying = !isPlaying;
+    document.getElementById('play-btn').classList.toggle('active', isPlaying);
+    
+    if (isPlaying) {
+        sequencerStep = 0;
+        const stepTime = (60 / bpm) / 4 * 1000;  // 16th notes
+        
+        sequencerInterval = setInterval(() => {
+            // Clear previous
+            document.querySelectorAll('.seq-step').forEach(s => s.classList.remove('playing'));
+            
+            // Current step
+            const stepEl = document.querySelector(`[data-step="${sequencerStep}"]`);
+            if (stepEl) stepEl.classList.add('playing');
+            
+            // Play note if active
+            if (sequence[sequencerStep]) {
+                noteOn(60 + (sequencerStep % 12));  // Play scale
+                setTimeout(() => noteOff(60 + (sequencerStep % 12)), stepTime * 0.8);
+            }
+            
+            sequencerStep = (sequencerStep + 1) % 16;
+        }, stepTime);
+    } else {
+        clearInterval(sequencerInterval);
+        document.querySelectorAll('.seq-step').forEach(s => s.classList.remove('playing'));
+    }
+}
+
+// Transport
+document.getElementById('play-btn').addEventListener('click', togglePlayback);
+document.getElementById('stop-btn').addEventListener('click', () => {
+    isPlaying = false;
+    document.getElementById('play-btn').classList.remove('active');
+    clearInterval(sequencerInterval);
+    sequencerStep = 0;
+    document.querySelectorAll('.seq-step').forEach(s => s.classList.remove('playing'));
+    
+    // Stop all voices
+    activeVoices.forEach((voice, note) => noteOff(note));
+});
+
+// BPM control (click to change)
+document.getElementById('bpm-value').addEventListener('click', () => {
+    const newBpm = prompt('Enter BPM (60-200):', bpm);
+    if (newBpm) {
+        bpm = Math.max(60, Math.min(200, parseInt(newBpm) || 120));
+        document.getElementById('bpm-value').textContent = bpm;
+        
+        // Restart sequencer if playing
+        if (isPlaying) {
+            togglePlayback();
+            togglePlayback();
+        }
+    }
+});
+
+// Engine selector
+document.querySelectorAll('.engine-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchEngine(btn.dataset.engine));
+});
+
+// Initialize
+window.addEventListener('load', () => {
+    resizeVisualization();
+    initKnobs();
+    initKeyboard();
+    initSequencer();
+    switchEngine('fold');
+});
+
+window.addEventListener('resize', () => {
+    resizeVisualization();
+    updateVisualization();
+});
+
+// Touch to init audio
+document.addEventListener('touchstart', () => initAudio(), { once: true });
+document.addEventListener('mousedown', () => initAudio(), { once: true });
+    </script>
+</body>
+</html>
+
