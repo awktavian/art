@@ -310,6 +310,7 @@ class KagamiExperience {
         this.mouseY = 0;
         this.targetRotX = 0;
         this.targetRotY = 0;
+        this.frameCount = 0;
         
         // Colony colors
         this.colors = {
@@ -321,6 +322,15 @@ class KagamiExperience {
             beacon:  0xFFDD00,
             grove:   0x22FF66,
             crystal: 0x44DDFF
+        };
+        
+        // Performance settings
+        this.PERF = {
+            maxOrbs: 80,          // Reduced from 300+
+            maxLights: 7,         // Only main colony lights
+            cubeUpdateRate: 30,   // Update reflections every N frames
+            sphereSegments: 16,   // Reduced from 32
+            enableGlow: true
         };
         
         this.init();
@@ -534,9 +544,9 @@ class KagamiExperience {
     
     createVoidOrbs() {
         const orbs = [];
-        const colors = Object.values(this.colors).slice(1); // Skip void
+        const colors = Object.values(this.colors).slice(1);
         
-        // Seven main orbs in Fano plane arrangement
+        // Seven main orbs
         const positions = [
             { x: 0, y: 3, z: -8 },
             { x: -5, y: -2, z: -7 },
@@ -551,19 +561,19 @@ class KagamiExperience {
             orbs.push({
                 position: positions[i],
                 color: color,
-                size: 0.4 + Math.random() * 0.2,
+                size: 0.5,
                 intensity: 2.5,
                 type: 'main'
             });
         });
         
-        // 300 polka dots
-        for (let i = 0; i < 300; i++) {
+        // 60 polka dots (reduced from 300)
+        for (let i = 0; i < 60; i++) {
             const color = colors[Math.floor(Math.random() * colors.length)];
             orbs.push({
-                position: this.randomSpherePoint(12),
+                position: this.randomSpherePoint(10),
                 color: color,
-                size: 0.03 + Math.random() * 0.08,
+                size: 0.06 + Math.random() * 0.1,
                 intensity: 1.5,
                 type: 'dot'
             });
@@ -574,13 +584,13 @@ class KagamiExperience {
     
     createSparkOrbs() {
         const orbs = [];
-        const sparkColors = [0xFF4422, 0xFF6644, 0xFF8866, 0xFFAA88, 0xFFCCAA];
+        const sparkColors = [0xFF4422, 0xFF6644, 0xFF8866, 0xFFAA88];
         
-        // Explosive burst pattern
-        for (let i = 0; i < 200; i++) {
+        // Explosive burst (reduced to 50)
+        for (let i = 0; i < 50; i++) {
             const angle = Math.random() * Math.PI * 2;
             const phi = Math.acos(2 * Math.random() - 1);
-            const r = 2 + Math.random() * 10;
+            const r = 2 + Math.random() * 8;
             
             orbs.push({
                 position: {
@@ -589,10 +599,9 @@ class KagamiExperience {
                     z: r * Math.cos(phi) - 5
                 },
                 color: sparkColors[Math.floor(Math.random() * sparkColors.length)],
-                size: 0.05 + Math.random() * 0.15,
-                intensity: 2 + Math.random() * 2,
-                type: 'spark',
-                velocity: { x: (Math.random() - 0.5) * 0.1, y: Math.random() * 0.1, z: (Math.random() - 0.5) * 0.1 }
+                size: 0.1 + Math.random() * 0.2,
+                intensity: 2.5,
+                type: 'spark'
             });
         }
         
@@ -601,18 +610,18 @@ class KagamiExperience {
     
     createForgeOrbs() {
         const orbs = [];
-        const forgeColors = [0xFFAA00, 0xFF8800, 0xFF6600, 0xFF4400, 0xCC2200];
+        const forgeColors = [0xFFAA00, 0xFF8800, 0xFF6600, 0xFF4400];
         
-        // Molten droplets rising
-        for (let i = 0; i < 150; i++) {
-            const x = (Math.random() - 0.5) * 15;
-            const y = -8 + Math.random() * 16;
-            const z = (Math.random() - 0.5) * 15 - 5;
-            
+        // Molten droplets (reduced to 40)
+        for (let i = 0; i < 40; i++) {
             orbs.push({
-                position: { x, y, z },
+                position: {
+                    x: (Math.random() - 0.5) * 12,
+                    y: -6 + Math.random() * 12,
+                    z: (Math.random() - 0.5) * 12 - 5
+                },
                 color: forgeColors[Math.floor(Math.random() * forgeColors.length)],
-                size: 0.1 + Math.random() * 0.2,
+                size: 0.15 + Math.random() * 0.25,
                 intensity: 2.5,
                 type: 'molten',
                 riseSpeed: 0.02 + Math.random() * 0.03
@@ -624,29 +633,27 @@ class KagamiExperience {
     
     createFlowOrbs() {
         const orbs = [];
-        const flowColors = [0x00FFCC, 0x00DDAA, 0x00BB88, 0x009966, 0x44FFDD];
+        const flowColors = [0x00FFCC, 0x00DDAA, 0x00BB88, 0x44FFDD];
         
-        // Flowing streams
-        for (let stream = 0; stream < 5; stream++) {
-            const streamAngle = (stream / 5) * Math.PI * 2;
-            const streamR = 4 + stream * 2;
+        // 3 flowing streams with 15 orbs each (45 total)
+        for (let stream = 0; stream < 3; stream++) {
+            const streamAngle = (stream / 3) * Math.PI * 2;
+            const streamR = 5 + stream * 2;
             
-            for (let i = 0; i < 40; i++) {
-                const t = i / 40;
-                const spiralAngle = streamAngle + t * Math.PI * 4;
-                const y = (t - 0.5) * 12;
+            for (let i = 0; i < 15; i++) {
+                const t = i / 15;
+                const spiralAngle = streamAngle + t * Math.PI * 3;
                 
                 orbs.push({
                     position: {
                         x: Math.cos(spiralAngle) * streamR * (1 - Math.abs(t - 0.5)),
-                        y: y,
+                        y: (t - 0.5) * 10,
                         z: Math.sin(spiralAngle) * streamR * (1 - Math.abs(t - 0.5)) - 5
                     },
                     color: flowColors[stream % flowColors.length],
-                    size: 0.08 + Math.random() * 0.1,
-                    intensity: 1.5,
+                    size: 0.12 + Math.random() * 0.12,
+                    intensity: 2,
                     type: 'flow',
-                    streamIndex: stream,
                     streamT: t
                 });
             }
@@ -659,37 +666,30 @@ class KagamiExperience {
         const orbs = [];
         const nexusColor = 0xBB44FF;
         
-        // Network nodes connected by lines
+        // 12 main network nodes
         const nodes = [];
-        for (let i = 0; i < 30; i++) {
-            const pos = this.randomSpherePoint(8);
+        for (let i = 0; i < 12; i++) {
+            const pos = this.randomSpherePoint(7);
             nodes.push(pos);
             orbs.push({
                 position: pos,
                 color: nexusColor,
-                size: 0.15 + Math.random() * 0.1,
-                intensity: 2,
+                size: 0.2 + Math.random() * 0.15,
+                intensity: 2.5,
                 type: 'node'
             });
         }
         
-        // Connection particles along edges
+        // Fewer connection particles
         for (let i = 0; i < nodes.length; i++) {
-            for (let j = i + 1; j < nodes.length; j++) {
-                const dist = this.distance(nodes[i], nodes[j]);
-                if (dist < 6) {
-                    // Add particles along this connection
-                    for (let t = 0.1; t < 0.9; t += 0.2) {
-                        orbs.push({
-                            position: this.lerp3(nodes[i], nodes[j], t),
-                            color: nexusColor,
-                            size: 0.03,
-                            intensity: 1,
-                            type: 'connection',
-                            from: i, to: j, t: t
-                        });
-                    }
-                }
+            for (let j = i + 1; j < Math.min(i + 3, nodes.length); j++) {
+                orbs.push({
+                    position: this.lerp3(nodes[i], nodes[j], 0.5),
+                    color: nexusColor,
+                    size: 0.08,
+                    intensity: 1.5,
+                    type: 'connection'
+                });
             }
         }
         
@@ -705,26 +705,25 @@ class KagamiExperience {
             position: { x: 0, y: 0, z: -8 },
             color: 0xFFFFFF,
             size: 0.8,
-            intensity: 5,
+            intensity: 4,
             type: 'beacon-core'
         });
         
-        // Radiating light rays
-        for (let ray = 0; ray < 12; ray++) {
-            const angle = (ray / 12) * Math.PI * 2;
-            for (let i = 0; i < 20; i++) {
-                const dist = 1 + i * 0.5;
+        // 8 rays with 6 orbs each (48 total)
+        for (let ray = 0; ray < 8; ray++) {
+            const angle = (ray / 8) * Math.PI * 2;
+            for (let i = 0; i < 6; i++) {
+                const dist = 1.5 + i * 1.2;
                 orbs.push({
                     position: {
                         x: Math.cos(angle) * dist,
                         y: Math.sin(angle) * dist,
-                        z: -8 + Math.sin(dist * 0.5) * 0.5
+                        z: -8
                     },
                     color: beaconColor,
-                    size: 0.05 + (1 - i/20) * 0.1,
-                    intensity: 2 * (1 - i/20),
+                    size: 0.1 + (1 - i/6) * 0.15,
+                    intensity: 2.5 * (1 - i/6),
                     type: 'ray',
-                    rayIndex: ray,
                     rayDist: dist
                 });
             }
@@ -735,11 +734,11 @@ class KagamiExperience {
     
     createGroveOrbs() {
         const orbs = [];
-        const groveColors = [0x22FF66, 0x44FF88, 0x66FFAA, 0x88FFCC, 0x115533];
+        const groveColors = [0x22FF66, 0x44FF88, 0x66FFAA, 0x88FFCC];
         
-        // Tree-like branching structure
+        // Simplified branching - 2 trees, max depth 2
         const createBranch = (start, direction, depth, length) => {
-            if (depth > 4) return;
+            if (depth > 2 || orbs.length > 50) return;
             
             const end = {
                 x: start.x + direction.x * length,
@@ -747,26 +746,23 @@ class KagamiExperience {
                 z: start.z + direction.z * length
             };
             
-            // Particles along branch
-            for (let t = 0; t < 1; t += 0.15) {
+            // 3 particles along branch
+            for (let t = 0; t < 1; t += 0.33) {
                 orbs.push({
                     position: this.lerp3(start, end, t),
                     color: groveColors[depth % groveColors.length],
-                    size: 0.1 * (1 - depth * 0.15),
-                    intensity: 1.5,
-                    type: 'branch',
-                    depth: depth
+                    size: 0.15 * (1 - depth * 0.2),
+                    intensity: 2,
+                    type: 'branch'
                 });
             }
             
-            // Create child branches
-            if (depth < 4) {
-                const branches = 2 + Math.floor(Math.random() * 2);
-                for (let i = 0; i < branches; i++) {
+            if (depth < 2) {
+                for (let i = 0; i < 2; i++) {
                     const newDir = {
-                        x: direction.x + (Math.random() - 0.5) * 0.8,
-                        y: direction.y * 0.8 + Math.random() * 0.3,
-                        z: direction.z + (Math.random() - 0.5) * 0.8
+                        x: direction.x + (Math.random() - 0.5) * 0.6,
+                        y: direction.y * 0.8 + 0.2,
+                        z: direction.z + (Math.random() - 0.5) * 0.6
                     };
                     const mag = Math.sqrt(newDir.x**2 + newDir.y**2 + newDir.z**2);
                     newDir.x /= mag; newDir.y /= mag; newDir.z /= mag;
@@ -775,14 +771,12 @@ class KagamiExperience {
             }
         };
         
-        // Create multiple trees
-        for (let tree = 0; tree < 5; tree++) {
-            const treePos = {
-                x: (Math.random() - 0.5) * 12,
-                y: -6,
-                z: (Math.random() - 0.5) * 12 - 5
-            };
-            createBranch(treePos, { x: 0, y: 1, z: 0 }, 0, 3);
+        // 2 trees
+        for (let tree = 0; tree < 2; tree++) {
+            createBranch(
+                { x: (tree - 0.5) * 8, y: -5, z: -6 },
+                { x: 0, y: 1, z: 0 }, 0, 4
+            );
         }
         
         return orbs;
@@ -792,7 +786,6 @@ class KagamiExperience {
         const orbs = [];
         const crystalColor = 0x44DDFF;
         
-        // Perfect geometric structures
         // Octahedron vertices
         const octaVerts = [
             { x: 0, y: 4, z: -8 },
@@ -807,38 +800,31 @@ class KagamiExperience {
             orbs.push({
                 position: pos,
                 color: crystalColor,
-                size: 0.3,
+                size: 0.35,
                 intensity: 3,
                 type: 'vertex'
             });
         });
         
-        // Edges
-        const edges = [
-            [0,2], [0,3], [0,4], [0,5],
-            [1,2], [1,3], [1,4], [1,5],
-            [2,4], [2,5], [3,4], [3,5]
-        ];
-        
+        // Edges - only midpoints (12 orbs)
+        const edges = [[0,2], [0,3], [0,4], [0,5], [1,2], [1,3], [1,4], [1,5], [2,4], [2,5], [3,4], [3,5]];
         edges.forEach(([i, j]) => {
-            for (let t = 0.1; t < 0.9; t += 0.1) {
-                orbs.push({
-                    position: this.lerp3(octaVerts[i], octaVerts[j], t),
-                    color: crystalColor,
-                    size: 0.05,
-                    intensity: 1.5,
-                    type: 'edge'
-                });
-            }
+            orbs.push({
+                position: this.lerp3(octaVerts[i], octaVerts[j], 0.5),
+                color: crystalColor,
+                size: 0.1,
+                intensity: 2,
+                type: 'edge'
+            });
         });
         
-        // Surrounding dust
-        for (let i = 0; i < 150; i++) {
+        // 25 surrounding dust (reduced from 150)
+        for (let i = 0; i < 25; i++) {
             orbs.push({
-                position: this.randomSpherePoint(10),
+                position: this.randomSpherePoint(9),
                 color: crystalColor,
-                size: 0.02 + Math.random() * 0.04,
-                intensity: 1,
+                size: 0.05 + Math.random() * 0.06,
+                intensity: 1.5,
                 type: 'dust'
             });
         }
@@ -878,17 +864,19 @@ class KagamiExperience {
         this.activeOrbs = [];
         this.activeLights = [];
         
+        let lightCount = 0;
         chapter.orbs.forEach(orbData => {
             const orb = this.createOrb(orbData);
             this.worldGroup.add(orb);
             this.activeOrbs.push({ mesh: orb, data: orbData });
             
-            // Add light for larger orbs
-            if (orbData.size > 0.1) {
-                const light = new THREE.PointLight(orbData.color, orbData.intensity * 0.5, 8);
+            // Only add lights to main/large orbs, max 7
+            if (orbData.size > 0.3 && lightCount < this.PERF.maxLights) {
+                const light = new THREE.PointLight(orbData.color, orbData.intensity * 0.4, 6);
                 light.position.copy(orb.position);
                 this.scene.add(light);
                 this.activeLights.push({ light, orb });
+                lightCount++;
             }
         });
         
@@ -909,28 +897,31 @@ class KagamiExperience {
     }
     
     createOrb(data) {
-        const geometry = new THREE.SphereGeometry(data.size, 32, 32);
-        const material = new THREE.MeshStandardMaterial({
+        // Use fewer segments for performance
+        const geometry = new THREE.SphereGeometry(data.size, this.PERF.sphereSegments, this.PERF.sphereSegments);
+        const material = new THREE.MeshBasicMaterial({
             color: data.color,
-            emissive: data.color,
-            emissiveIntensity: data.intensity,
-            metalness: 0.1,
-            roughness: 0.2
+            transparent: true,
+            opacity: 0.95
         });
         
         const orb = new THREE.Mesh(geometry, material);
         orb.position.set(data.position.x, data.position.y, data.position.z);
+        orb.userData.baseIntensity = data.intensity;
+        orb.userData.baseColor = data.color;
         
-        // Glow sprite
-        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-            map: this.createGlowTexture(),
-            color: data.color,
-            transparent: true,
-            blending: THREE.AdditiveBlending,
-            opacity: 0.5
-        }));
-        sprite.scale.set(data.size * 5, data.size * 5, 1);
-        orb.add(sprite);
+        // Only add glow sprites to larger orbs
+        if (this.PERF.enableGlow && data.size > 0.12) {
+            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: this.createGlowTexture(),
+                color: data.color,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                opacity: 0.4
+            }));
+            sprite.scale.set(data.size * 4, data.size * 4, 1);
+            orb.add(sprite);
+        }
         
         return orb;
     }
@@ -1080,6 +1071,7 @@ class KagamiExperience {
     render() {
         this.time += 0.004;
         this.breathPhase += 0.008;
+        this.frameCount++;
         
         // Global breathing
         const breath = Math.sin(this.breathPhase) * 0.5 + 0.5;
@@ -1098,60 +1090,44 @@ class KagamiExperience {
             this.camera.position.y = Math.cos(this.time * 0.2) * 0.15;
         }
         
-        // Animate orbs based on chapter type
+        // Animate orbs - simplified for perf
         if (this.activeOrbs) {
-            this.activeOrbs.forEach((item, i) => {
-                const { mesh, data } = item;
-                const phase = this.time + i * 0.1;
+            const orbCount = this.activeOrbs.length;
+            for (let i = 0; i < orbCount; i++) {
+                const { mesh, data } = this.activeOrbs[i];
+                const phase = this.time + i * 0.15;
                 
-                // Base floating motion
-                mesh.position.x = data.position.x + Math.sin(phase * 0.5) * 0.3;
-                mesh.position.y = data.position.y + Math.cos(phase * 0.3) * 0.4;
-                mesh.position.z = data.position.z + Math.sin(phase * 0.4) * 0.2;
+                // Gentle floating
+                mesh.position.x = data.position.x + Math.sin(phase * 0.4) * 0.2;
+                mesh.position.y = data.position.y + Math.cos(phase * 0.25) * 0.25;
+                mesh.position.z = data.position.z + Math.sin(phase * 0.3) * 0.15;
                 
-                // Breathing pulse on emissive
-                const basePulse = 0.8 + breath * 0.4;
-                mesh.material.emissiveIntensity = data.intensity * basePulse;
-                
-                // Type-specific animations
-                if (data.type === 'spark' && data.velocity) {
-                    mesh.position.x += Math.sin(phase * 2) * 0.5;
-                    mesh.position.y += Math.abs(Math.sin(phase)) * 0.3;
-                }
-                
+                // Molten rising effect
                 if (data.type === 'molten' && data.riseSpeed) {
-                    mesh.position.y = data.position.y + (this.time * data.riseSpeed * 10) % 16 - 8;
+                    mesh.position.y = data.position.y + (this.time * data.riseSpeed * 8) % 12 - 6;
                 }
                 
-                if (data.type === 'flow') {
-                    const flowPhase = phase + data.streamT * Math.PI * 2;
-                    mesh.position.x = data.position.x + Math.sin(flowPhase) * 0.5;
-                    mesh.position.z = data.position.z + Math.cos(flowPhase) * 0.3;
+                // Scale breathing for larger orbs only
+                if (data.size > 0.25) {
+                    mesh.scale.setScalar(1 + deepBreath * 0.08);
                 }
-                
-                if (data.type === 'ray') {
-                    mesh.material.emissiveIntensity = data.intensity * (0.5 + Math.sin(phase * 3 - data.rayDist) * 0.5);
-                }
-                
-                // Scale breathing for main orbs
-                if (data.size > 0.2) {
-                    const scale = 1 + deepBreath * 0.1;
-                    mesh.scale.setScalar(scale);
-                }
-            });
+            }
         }
         
-        // Update lights
-        if (this.activeLights) {
-            this.activeLights.forEach(({ light, orb }) => {
+        // Update lights less frequently
+        if (this.activeLights && this.frameCount % 3 === 0) {
+            for (let i = 0; i < this.activeLights.length; i++) {
+                const { light, orb } = this.activeLights[i];
                 light.position.copy(orb.position);
-            });
+            }
         }
         
-        // Update cube camera for reflections
-        this.room.visible = false;
-        this.cubeCamera.update(this.renderer, this.scene);
-        this.room.visible = true;
+        // Update cube camera every N frames for reflections
+        if (this.frameCount % this.PERF.cubeUpdateRate === 0) {
+            this.room.visible = false;
+            this.cubeCamera.update(this.renderer, this.scene);
+            this.room.visible = true;
+        }
         
         this.renderer.render(this.scene, this.camera);
     }
