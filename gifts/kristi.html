@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>For Kristi — The Orrery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Cinzel:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        /*
+         * For Kristi — The Orrery
+         *
+         * This page is a machine for seeing the invisible:
+         * orbital mechanics made tangible,
+         * time made visible,
+         * the solar system made small enough to hold.
+         *
+         * Like the orrery itself, every element here is in motion—
+         * breathing, orbiting, waiting to be discovered.
+         *
+         * Press planets in order. Type "cosmos" in the void.
+         * The console knows secrets.
+         *
+         * 鏡
+         */
+
+        :root {
+            --brass: #d4af37;
+            --brass-dark: #b8941f;
+            --brass-light: #f4d58d;
+            --deep-space: #0a0a1a;
+            --space-blue: #1a1a3e;
+            --space-purple: #2d1b4e;
+            /* Astronomically accurate colors */
+            --mercury: #9ca0a3;
+            --venus: #e8cda2;
+            --earth: #4a9eff;
+            --mars: #c1440e;
+            --jupiter: #c88b3a;
+            --saturn: #fad5a5;
+            --uranus: #4fd0e7;
+            --neptune: #4166f5;
+            --pluto: #a47c6d;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Cormorant Garamond', serif;
+            background: var(--deep-space);
+            color: var(--brass-light);
+            overflow-x: hidden;
+            cursor: none;
+            position: relative;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                cursor: auto;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* Custom Cursor */
+        #custom-cursor {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--brass);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 10000;
+            transition: transform 0.15s ease, opacity 0.3s ease;
+            mix-blend-mode: screen;
+            opacity: 0;
+        }
+
+        #custom-cursor::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border: 1px solid var(--brass);
+            border-radius: 50%;
+            opacity: 0.3;
+            animation: orbit-ring 3s linear infinite;
+        }
+
+        #custom-cursor::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 6px;
+            height: 6px;
+            background: var(--brass);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--brass);
+        }
+
+        @keyframes orbit-ring {
+            0%, 100% { transform: translate(-50%, -50%) rotate(0deg) scale(1); opacity: 0.3; }
+            50% { transform: translate(-50%, -50%) rotate(180deg) scale(1.1); opacity: 0.5; }
+        }
+
+        body.cursor-hover #custom-cursor {
+            transform: scale(1.5);
+        }
+
+        @media (max-width: 768px) {
+            #custom-cursor { display: none; }
+        }
+
+        /* Breathing Background */
+        .background-layers {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .bg-layer {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at center, var(--space-purple) 0%, var(--space-blue) 40%, var(--deep-space) 100%);
+            animation: breathe 8s ease-in-out infinite;
+        }
+
+        .bg-layer:nth-child(2) {
+            background: radial-gradient(ellipse at 30% 50%, rgba(212, 175, 55, 0.03) 0%, transparent 50%);
+            animation: breathe 6s ease-in-out infinite reverse;
+        }
+
+        .bg-layer:nth-child(3) {
+            background: radial-gradient(ellipse at 70% 50%, rgba(74, 144, 226, 0.05) 0%, transparent 60%);
+            animation: breathe 10s ease-in-out infinite;
+        }
+
+        @keyframes breathe {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+
+        /* Particles */
+        #particles-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .star-dust {
+            width: 2px;
+            height: 2px;
+            background: white;
+            box-shadow: 0 0 3px white;
+            animation: twinkle-star 3s ease-in-out infinite;
+        }
+
+        @keyframes twinkle-star {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            20% { opacity: 0.9; transform: scale(1.3); }
+            40% { opacity: 0.5; transform: scale(1.1); }
+            60% { opacity: 1; transform: scale(1.5); }
+            80% { opacity: 0.6; transform: scale(1.2); }
+        }
+
+        /* Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            padding: 4rem 2rem 3rem;
+            opacity: 0;
+            animation: fade-in-up 1.2s ease forwards;
+        }
+
+        @keyframes fade-in-up {
+            to { opacity: 1; transform: translateY(0); }
+            from { opacity: 0; transform: translateY(30px); }
+        }
+
+        .recipient {
+            font-family: 'Cinzel', serif;
+            font-size: 1.1rem;
+            letter-spacing: 0.4em;
+            text-transform: uppercase;
+            color: var(--brass);
+            margin-bottom: 1.5rem;
+            font-weight: 500;
+            opacity: 0.9;
+        }
+
+        h1 {
+            font-family: 'Cinzel', serif;
+            font-size: 5.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            line-height: 1.1;
+            letter-spacing: 0.05em;
+            background: linear-gradient(135deg, var(--brass-light) 0%, var(--brass) 50%, var(--brass-dark) 100%);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: shimmer 4s ease infinite;
+        }
+
+        @keyframes shimmer {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .subtitle {
+            font-size: 1.6rem;
+            color: var(--brass-light);
+            font-weight: 400;
+            font-style: italic;
+            opacity: 0.95;
+            letter-spacing: 0.02em;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 3rem; }
+            .subtitle { font-size: 1.2rem; }
+            .recipient { font-size: 0.9rem; letter-spacing: 0.3em; }
+        }
+
+        /* Hero Orrery */
+        .hero-orrery {
+            width: 100%;
+            max-width: 900px;
+            height: 650px;
+            margin: 5rem auto;
+            position: relative;
+            opacity: 0;
+            animation: fade-in-up 1.5s ease 0.3s forwards;
+        }
+
+        .orrery-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sun {
+            width: 60px;
+            height: 60px;
+            background: radial-gradient(circle, #ffd700 0%, #ff8c00 100%);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 40px #ffa500, 0 0 80px #ff8c00;
+            z-index: 10;
+            animation: pulse-sun 4s ease-in-out infinite;
+        }
+
+        @keyframes pulse-sun {
+            0%, 100% { box-shadow: 0 0 40px #ffa500, 0 0 80px #ff8c00; }
+            50% { box-shadow: 0 0 60px #ffa500, 0 0 120px #ff8c00; }
+        }
+
+        .orbit {
+            position: absolute;
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: border-color 0.3s ease;
+        }
+
+        .planet {
+            position: absolute;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease, filter 0.3s ease;
+            transform-origin: center;
+        }
+
+        .planet:hover {
+            transform: scale(1.4);
+            z-index: 100 !important;
+            filter: brightness(1.3) drop-shadow(0 0 10px currentColor);
+        }
+
+        .planet::after {
+            content: attr(data-name);
+            position: absolute;
+            top: -28px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--brass-light);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            white-space: nowrap;
+            pointer-events: none;
+            text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
+            letter-spacing: 0.05em;
+        }
+
+        .planet:hover::after {
+            opacity: 1;
+        }
+
+        /* Planet specific styles */
+        .mercury {
+            width: 8px;
+            height: 8px;
+            background: var(--mercury);
+            box-shadow: 0 0 10px var(--mercury);
+        }
+        .venus {
+            width: 12px;
+            height: 12px;
+            background: var(--venus);
+            box-shadow: 0 0 12px var(--venus);
+        }
+        .earth {
+            width: 14px;
+            height: 14px;
+            background: var(--earth);
+            box-shadow: 0 0 14px var(--earth);
+        }
+        .mars {
+            width: 10px;
+            height: 10px;
+            background: var(--mars);
+            box-shadow: 0 0 10px var(--mars);
+        }
+        .jupiter {
+            width: 28px;
+            height: 28px;
+            background: var(--jupiter);
+            box-shadow: 0 0 20px var(--jupiter);
+        }
+        .saturn {
+            width: 24px;
+            height: 24px;
+            background: var(--saturn);
+            box-shadow: 0 0 18px var(--saturn);
+        }
+        .uranus {
+            width: 18px;
+            height: 18px;
+            background: var(--uranus);
+            box-shadow: 0 0 15px var(--uranus);
+        }
+        .neptune {
+            width: 16px;
+            height: 16px;
+            background: var(--neptune);
+            box-shadow: 0 0 14px var(--neptune);
+        }
+        .pluto {
+            width: 6px;
+            height: 6px;
+            background: var(--pluto);
+            box-shadow: 0 0 8px var(--pluto);
+        }
+
+        /* Sections */
+        section {
+            margin: 8rem 0;
+            opacity: 0;
+            transform: translateY(50px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+
+        section.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .section-title {
+            font-family: 'Cinzel', serif;
+            font-size: 3.5rem;
+            text-align: center;
+            margin-bottom: 4rem;
+            color: var(--brass);
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            position: relative;
+        }
+
+        .section-title::after {
+            content: '';
+            display: block;
+            width: 120px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--brass), transparent);
+            margin: 1.5rem auto 0;
+        }
+
+        @media (max-width: 768px) {
+            .section-title {
+                font-size: 2.5rem;
+            }
+        }
+
+        /* Note Card */
+        .note-card {
+            background: rgba(26, 26, 62, 0.4);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 16px;
+            padding: 4rem;
+            max-width: 900px;
+            margin: 0 auto 6rem;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.4s ease, box-shadow 0.4s ease;
+        }
+
+        .note-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(212, 175, 55, 0.1) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            pointer-events: none;
+        }
+
+        .note-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 50px rgba(212, 175, 55, 0.25);
+        }
+
+        .note-card:hover::before {
+            opacity: 1;
+        }
+
+        .note-content {
+            font-size: 1.4rem;
+            line-height: 2;
+            color: var(--brass-light);
+            font-style: italic;
+            position: relative;
+            z-index: 1;
+            font-weight: 400;
+        }
+
+        .note-signature {
+            margin-top: 3rem;
+            font-size: 1.35rem;
+            text-align: right;
+            color: var(--brass);
+            font-weight: 500;
+        }
+
+        @media (max-width: 768px) {
+            .note-card {
+                padding: 2.5rem;
+            }
+            .note-content {
+                font-size: 1.2rem;
+                line-height: 1.9;
+            }
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2.5rem;
+            margin: 4rem 0;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+        }
+
+        .card {
+            background: rgba(26, 26, 62, 0.4);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 16px;
+            padding: 2.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.4s ease, box-shadow 0.4s ease;
+            cursor: pointer;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(212, 175, 55, 0.2) 0%, transparent 70%);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s ease, height 0.6s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 15px 50px rgba(212, 175, 55, 0.3);
+        }
+
+        .card:hover::before {
+            width: 500px;
+            height: 500px;
+        }
+
+        .card-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .card-title {
+            font-family: 'Cinzel', serif;
+            font-size: 2rem;
+            color: var(--brass);
+            margin-bottom: 1.25rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+
+        .card-text {
+            font-size: 1.15rem;
+            line-height: 1.8;
+            color: var(--brass-light);
+            opacity: 0.95;
+        }
+
+        /* Planet Info Cards */
+        .planet-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1.5rem;
+            margin: 4rem 0;
+        }
+
+        .planet-info-card {
+            background: rgba(26, 26, 62, 0.5);
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            border-radius: 12px;
+            padding: 1.8rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .planet-info-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--brass);
+            box-shadow: 0 8px 25px rgba(212, 175, 55, 0.25);
+        }
+
+        .planet-icon {
+            width: 45px;
+            height: 45px;
+            margin: 0 auto 1.2rem;
+            border-radius: 50%;
+            transition: transform 0.3s ease, filter 0.3s ease;
+        }
+
+        .planet-info-card:hover .planet-icon {
+            transform: scale(1.2);
+            filter: brightness(1.2);
+        }
+
+        .planet-name {
+            font-family: 'Cinzel', serif;
+            font-size: 1rem;
+            color: var(--brass);
+            margin-bottom: 0.6rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        .planet-detail {
+            font-size: 0.9rem;
+            color: var(--brass-light);
+            opacity: 0.8;
+        }
+
+        /* Room Suggestions */
+        .room-suggestions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin: 4rem 0;
+        }
+
+        .room-card {
+            background: rgba(26, 26, 62, 0.3);
+            border: 1px solid rgba(212, 175, 55, 0.25);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .room-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--brass-dark), var(--brass), var(--brass-dark));
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .room-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .room-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--brass);
+            box-shadow: 0 10px 30px rgba(212, 175, 55, 0.2);
+        }
+
+        .room-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            filter: grayscale(0.3) brightness(1.2);
+        }
+
+        .room-title {
+            font-family: 'Cinzel', serif;
+            font-size: 1.3rem;
+            color: var(--brass);
+            margin-bottom: 0.8rem;
+            font-weight: 600;
+        }
+
+        .room-description {
+            font-size: 1rem;
+            line-height: 1.7;
+            color: var(--brass-light);
+            opacity: 0.9;
+        }
+
+        /* CTA Button */
+        .cta-container {
+            text-align: center;
+            margin: 6rem 0;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 1.5rem 4.5rem;
+            background: linear-gradient(135deg, var(--brass) 0%, var(--brass-dark) 100%);
+            color: var(--deep-space);
+            text-decoration: none;
+            font-family: 'Cinzel', serif;
+            font-size: 1.4rem;
+            font-weight: 600;
+            border-radius: 50px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            letter-spacing: 0.05em;
+        }
+
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s ease, height 0.6s ease;
+        }
+
+        .cta-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 40px rgba(212, 175, 55, 0.5);
+        }
+
+        .cta-button:hover::before {
+            width: 400px;
+            height: 400px;
+        }
+
+        .cta-button span {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Specs */
+        .specs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin: 4rem 0;
+        }
+
+        .spec-item {
+            background: rgba(26, 26, 62, 0.3);
+            border-left: 3px solid var(--brass);
+            padding: 2rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .spec-item:hover {
+            background: rgba(26, 26, 62, 0.5);
+            border-left-width: 5px;
+            transform: translateX(5px);
+        }
+
+        .spec-label {
+            font-family: 'Cinzel', serif;
+            font-size: 0.85rem;
+            color: var(--brass);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-bottom: 0.8rem;
+            font-weight: 600;
+        }
+
+        .spec-value {
+            font-size: 1.2rem;
+            color: var(--brass-light);
+            line-height: 1.7;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 5rem 2rem;
+            margin-top: 8rem;
+            border-top: 1px solid rgba(212, 175, 55, 0.2);
+        }
+
+        .footer-text {
+            font-size: 1rem;
+            color: var(--brass);
+            opacity: 0.7;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 0.05em;
+        }
+
+        /* Hidden SVG for animations */
+        .hidden-svg {
+            position: absolute;
+            width: 0;
+            height: 0;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Ripple effect */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid var(--brass);
+            animation: ripple-expand 1s ease-out forwards;
+            pointer-events: none;
+        }
+
+        @keyframes ripple-expand {
+            from {
+                width: 0;
+                height: 0;
+                opacity: 1;
+            }
+            to {
+                width: 200px;
+                height: 200px;
+                opacity: 0;
+            }
+        }
+
+        /* Alignment animation */
+        .aligning .planet {
+            animation: align-planets 2s ease-in-out forwards !important;
+        }
+
+        @keyframes align-planets {
+            0% { transform: rotate(var(--current-angle)) translateX(var(--orbit-radius)) rotate(calc(-1 * var(--current-angle))); }
+            100% { transform: rotate(0deg) translateX(var(--orbit-radius)) rotate(0deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Custom Cursor -->
+    <div id="custom-cursor"></div>
+
+    <!-- Background Layers -->
+    <div class="background-layers">
+        <div class="bg-layer"></div>
+        <div class="bg-layer"></div>
+        <div class="bg-layer"></div>
+    </div>
+
+    <!-- Particles -->
+    <div id="particles-container"></div>
+
+    <!-- Hidden SVG -->
+    <svg class="hidden-svg" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <filter id="glow">
+                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+            </filter>
+        </defs>
+    </svg>
+
+    <!-- Content -->
+    <div class="container">
+        <header>
+            <div class="recipient">For Kristi</div>
+            <h1>The Orrery</h1>
+            <p class="subtitle">A solar system for your home</p>
+        </header>
+
+        <!-- Hero Orrery Animation -->
+        <div class="hero-orrery">
+            <div class="orrery-container" id="main-orrery">
+                <div class="sun"></div>
+                <!-- Orbits and planets will be generated by JS -->
+            </div>
+        </div>
+
+        <!-- Handwritten Note -->
+        <div class="note-card" data-gift="orrery" data-year="2025">
+            <div class="note-content">
+                Kristi—<br><br>
+                This felt like you: precise, elegant, always in motion. Something to live with, not just look at—a reminder that beauty can be mechanical, that learning can be tactile, that time itself can be made visible.<br><br>
+                For your new home and all the careful thought you put into making spaces yours. You've always had an eye for things that are both beautiful and true.<br><br>
+                May it sit somewhere sunlit and catch the light just right.
+            </div>
+            <div class="note-signature">Love, Tim 🎄</div>
+        </div>
+
+        <!-- Celestial Mechanics Section -->
+        <section id="mechanics">
+            <h2 class="section-title">Celestial Mechanics</h2>
+            <div class="grid">
+                <div class="card" data-mechanism="hand-crank">
+                    <div class="card-content">
+                        <h3 class="card-title">Brass Gearworks</h3>
+                        <p class="card-text">Precision-machined brass gears orchestrate the dance of nine worlds. Each rotation mathematically true to orbital mechanics. Hand-crank or battery-powered—you control the passage of time.</p>
+                    </div>
+                </div>
+                <div class="card" data-mechanism="semi-precious">
+                    <div class="card-content">
+                        <h3 class="card-title">Stone Planets</h3>
+                        <p class="card-text">Each planet carved from semi-precious stone: jasper, quartz, lapis lazuli. Not representations—physical presences with weight and texture. Geology meeting astronomy.</p>
+                    </div>
+                </div>
+                <div class="card" data-mechanism="calendar">
+                    <div class="card-content">
+                        <h3 class="card-title">Calendar Ring</h3>
+                        <p class="card-text">Brass calendar ring encircles the system. Track the seasons as Earth completes its journey. A year made visible, time made tangible.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Planet Info Cards -->
+            <div class="planet-info-grid">
+                <div class="planet-info-card" data-planet="mercury">
+                    <div class="planet-icon" style="background: var(--mercury); box-shadow: 0 0 10px var(--mercury);"></div>
+                    <div class="planet-name">Mercury</div>
+                    <div class="planet-detail">88 day orbit</div>
+                </div>
+                <div class="planet-info-card" data-planet="venus">
+                    <div class="planet-icon" style="background: var(--venus); box-shadow: 0 0 12px var(--venus);"></div>
+                    <div class="planet-name">Venus</div>
+                    <div class="planet-detail">225 day orbit</div>
+                </div>
+                <div class="planet-info-card" data-planet="earth">
+                    <div class="planet-icon" style="background: var(--earth); box-shadow: 0 0 14px var(--earth);"></div>
+                    <div class="planet-name">Earth</div>
+                    <div class="planet-detail">365 day orbit</div>
+                </div>
+                <div class="planet-info-card" data-planet="mars">
+                    <div class="planet-icon" style="background: var(--mars); box-shadow: 0 0 10px var(--mars);"></div>
+                    <div class="planet-name">Mars</div>
+                    <div class="planet-detail">687 day orbit</div>
+                </div>
+                <div class="planet-info-card" data-planet="jupiter">
+                    <div class="planet-icon" style="background: var(--jupiter); box-shadow: 0 0 20px var(--jupiter);"></div>
+                    <div class="planet-name">Jupiter</div>
+                    <div class="planet-detail">12 year orbit</div>
+                </div>
+                <div class="planet-info-card" data-planet="saturn">
+                    <div class="planet-icon" style="background: var(--saturn); box-shadow: 0 0 18px var(--saturn);"></div>
+                    <div class="planet-name">Saturn</div>
+                    <div class="planet-detail">29 year orbit</div>
+                </div>
+                <div class="planet-info-card" data-planet="uranus">
+                    <div class="planet-icon" style="background: var(--uranus); box-shadow: 0 0 15px var(--uranus);"></div>
+                    <div class="planet-name">Uranus</div>
+                    <div class="planet-detail">84 year orbit</div>
+                </div>
+                <div class="planet-info-card" data-planet="neptune">
+                    <div class="planet-icon" style="background: var(--neptune); box-shadow: 0 0 14px var(--neptune);"></div>
+                    <div class="planet-name">Neptune</div>
+                    <div class="planet-detail">165 year orbit</div>
+                </div>
+                <div class="planet-info-card" data-planet="pluto">
+                    <div class="planet-icon" style="background: var(--pluto); box-shadow: 0 0 8px var(--pluto);"></div>
+                    <div class="planet-name">Pluto</div>
+                    <div class="planet-detail">248 year orbit</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- In Your Home Section -->
+        <section id="placement">
+            <h2 class="section-title">In Your Home</h2>
+            <div class="grid">
+                <div class="card">
+                    <div class="card-content">
+                        <h3 class="card-title">Living Centerpiece</h3>
+                        <p class="card-text">Not wall art—a living presence. Coffee table, console, bookshelf. Wherever it rests becomes a contemplation point. Guests will orbit around it, drawn by its quiet motion.</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-content">
+                        <h3 class="card-title">Design Language</h3>
+                        <p class="card-text">Brass and walnut speak the language of heirloom furniture. Mid-century modern, classical, contemporary—it adapts. The orrery doesn't follow trends; it anchors them.</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-content">
+                        <h3 class="card-title">Light & Shadow</h3>
+                        <p class="card-text">Place near a window. Morning light catches the brass. Evening shadows trace orbital paths on the wall. The room's light becomes part of the mechanism.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Room Placement Suggestions -->
+            <div class="room-suggestions">
+                <div class="room-card">
+                    <div class="room-icon">🪟</div>
+                    <div class="room-title">Console Table</div>
+                    <div class="room-description">By a window where natural light animates the brass. Morning sun creates a private planetarium on your wall.</div>
+                </div>
+                <div class="room-card">
+                    <div class="room-icon">📚</div>
+                    <div class="room-title">Library Shelf</div>
+                    <div class="room-description">Among books and curiosities, a three-dimensional text. The mechanism speaks the language of discovery.</div>
+                </div>
+                <div class="room-card">
+                    <div class="room-icon">🛋️</div>
+                    <div class="room-title">Living Room</div>
+                    <div class="room-description">Coffee table centerpiece that invites contemplation. Turn the crank during conversations—time flows at your command.</div>
+                </div>
+                <div class="room-card">
+                    <div class="room-icon">🎨</div>
+                    <div class="room-title">Studio Space</div>
+                    <div class="room-description">Where you create, let celestial mechanics inspire. A reminder that systems can be both beautiful and precise.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- The Dance of Planets -->
+        <section id="dance">
+            <h2 class="section-title">The Dance of Planets</h2>
+            <div class="specs-grid">
+                <div class="spec-item">
+                    <div class="spec-label">Craftsman</div>
+                    <div class="spec-value">Science Art, Boulder, CO — Family-owned since 1985</div>
+                </div>
+                <div class="spec-item">
+                    <div class="spec-label">Materials</div>
+                    <div class="spec-value">Brass gears, semi-precious stones, walnut/oak/mahogany base</div>
+                </div>
+                <div class="spec-item">
+                    <div class="spec-label">Mechanism</div>
+                    <div class="spec-value">Hand-crank or battery operated, all 9 planets in correct relative motion</div>
+                </div>
+                <div class="spec-item">
+                    <div class="spec-label">Dimensions</div>
+                    <div class="spec-value">~24" diameter base, 18" height when fully extended</div>
+                </div>
+                <div class="spec-item">
+                    <div class="spec-label">Function</div>
+                    <div class="spec-value">Functional solar system model with calendar ring, educational & decorative</div>
+                </div>
+                <div class="spec-item">
+                    <div class="spec-label">Character</div>
+                    <div class="spec-value">Museum-quality heirloom piece, handcrafted to order</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA -->
+        <div class="cta-container">
+            <a href="https://www.etsy.com/listing/1535707943/baby-grand-armillary-orrery-solar-system" target="_blank" class="cta-button" id="cta-link">
+                <span>Bring the cosmos home</span>
+            </a>
+        </div>
+    </div>
+
+    <footer>
+        <p class="footer-text">🎄 Christmas 2025 · Winter Solstice · For Kristi</p>
+        <p class="footer-text" style="margin-top: 0.8rem; font-size: 0.85rem; opacity: 0.5;">The longest night, the longest orbits, the longest love — from your brother Tim</p>
+    </footer>
+
+    <script>
+        /*
+         * Orrery Mechanics — JavaScript
+         * For Kristi — Christmas 2025
+         *
+         * The planets orbit. The cursor follows. The page breathes.
+         * Type "cosmos" to align the planets.
+         * Click all 9 planets in order (Mercury → Pluto) to unlock a secret.
+         * Open the console for hidden messages.
+         *
+         * window.鏡 contains orbital mechanics.
+         *
+         * May this bring you joy, sister.
+         * — Tim
+         */
+
+        // ========================================
+        // Web Audio API — Celestial Soundscape
+        // ========================================
+
+        const AudioEngine = (() => {
+            let audioCtx = null;
+            let isInitialized = false;
+
+            function initAudio() {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                return audioCtx;
+            }
+
+            // Celestial ambient tone (ethereal)
+            function playCelestial() {
+                if (!isInitialized) return;
+                const ctx = initAudio();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = 'sine';
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                const baseFreq = 220 + Math.random() * 220;
+                osc.frequency.setValueAtTime(baseFreq, ctx.currentTime);
+
+                gain.gain.setValueAtTime(0.05, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 2);
+
+                osc.start();
+                osc.stop(ctx.currentTime + 2);
+            }
+
+            // Planet-specific tones
+            function playPlanetTone(planetIndex) {
+                if (!isInitialized) return;
+                const ctx = initAudio();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                const frequencies = [
+                    523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66
+                ];
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(frequencies[planetIndex], ctx.currentTime);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                gain.gain.setValueAtTime(0.08, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+
+                osc.start();
+                osc.stop(ctx.currentTime + 0.5);
+            }
+
+            // Alignment harmony
+            function playAlignment() {
+                if (!isInitialized) return;
+                const ctx = initAudio();
+
+                const frequencies = [261.63, 329.63, 392.00, 493.88];
+
+                frequencies.forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    gain.gain.setValueAtTime(0.04, ctx.currentTime + i * 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 3);
+
+                    osc.start(ctx.currentTime + i * 0.1);
+                    osc.stop(ctx.currentTime + 3);
+                });
+            }
+
+            function init() {
+                isInitialized = true;
+                initAudio();
+            }
+
+            return {
+                init,
+                playCelestial,
+                playPlanetTone,
+                playAlignment
+            };
+        })();
+
+        // Initialize audio on first user interaction
+        let audioInitialized = false;
+        function initAudioOnInteraction() {
+            if (!audioInitialized) {
+                AudioEngine.init();
+                audioInitialized = true;
+            }
+        }
+
+        // ========================================
+        // Custom Cursor
+        // ========================================
+
+        const cursor = document.getElementById('custom-cursor');
+        let mouseX = 0, mouseY = 0;
+        let cursorX = 0, cursorY = 0;
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        function updateCursor() {
+            const dx = mouseX - cursorX;
+            const dy = mouseY - cursorY;
+            cursorX += dx * 0.1;
+            cursorY += dy * 0.1;
+
+            cursor.style.left = cursorX + 'px';
+            cursor.style.top = cursorY + 'px';
+            cursor.style.opacity = '1';
+
+            requestAnimationFrame(updateCursor);
+        }
+
+        updateCursor();
+
+        // Hover detection
+        document.querySelectorAll('a, button, .planet, .card, .planet-info-card').forEach(el => {
+            el.addEventListener('mouseenter', () => {
+                document.body.classList.add('cursor-hover');
+            });
+            el.addEventListener('mouseleave', () => {
+                document.body.classList.remove('cursor-hover');
+            });
+        });
+
+        // ========================================
+        // Particles (Stars)
+        // ========================================
+
+        const particlesContainer = document.getElementById('particles-container');
+        const particleCount = 80;
+
+        for (let i = 0; i < particleCount; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle star-dust';
+            particle.style.left = Math.random() * 100 + 'vw';
+            particle.style.top = Math.random() * 100 + 'vh';
+            particle.style.animationDelay = Math.random() * 3 + 's';
+            particlesContainer.appendChild(particle);
+        }
+
+        // ========================================
+        // Orrery Generator
+        // ========================================
+
+        const orrery = document.getElementById('main-orrery');
+
+        const planetsData = [
+            { name: 'Mercury', orbit: 80, size: 8, period: 8, color: '#9ca0a3' },
+            { name: 'Venus', orbit: 110, size: 12, period: 20, color: '#e8cda2' },
+            { name: 'Earth', orbit: 145, size: 14, period: 33, color: '#4a9eff' },
+            { name: 'Mars', orbit: 180, size: 10, period: 62, color: '#c1440e' },
+            { name: 'Jupiter', orbit: 220, size: 28, period: 394, color: '#c88b3a' },
+            { name: 'Saturn', orbit: 265, size: 24, period: 977, color: '#fad5a5' },
+            { name: 'Uranus', orbit: 310, size: 18, period: 2788, color: '#4fd0e7' },
+            { name: 'Neptune', orbit: 350, size: 16, period: 5469, color: '#4166f5' },
+            { name: 'Pluto', orbit: 385, size: 6, period: 8232, color: '#a47c6d' }
+        ];
+
+        const planets = [];
+        let planetClickSequence = [];
+        let secretUnlocked = false;
+
+        planetsData.forEach((data, index) => {
+            // Create orbit
+            const orbit = document.createElement('div');
+            orbit.className = 'orbit';
+            orbit.style.width = data.orbit * 2 + 'px';
+            orbit.style.height = data.orbit * 2 + 'px';
+            orrery.appendChild(orbit);
+
+            // Create planet
+            const planet = document.createElement('div');
+            planet.className = `planet ${data.name.toLowerCase()}`;
+            planet.dataset.name = data.name;
+            planet.dataset.index = index;
+            orrery.appendChild(planet);
+
+            planets.push({
+                element: planet,
+                orbit: data.orbit,
+                period: data.period,
+                angle: Math.random() * Math.PI * 2,
+                index: index
+            });
+
+            // Planet click handler
+            planet.addEventListener('click', () => {
+                initAudioOnInteraction();
+                AudioEngine.playPlanetTone(index);
+
+                planetClickSequence.push(index);
+                if (planetClickSequence.length > 9) {
+                    planetClickSequence.shift();
+                }
+
+                // Check if sequence is correct
+                const correctSequence = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+                if (planetClickSequence.length === 9 &&
+                    planetClickSequence.every((v, i) => v === correctSequence[i]) &&
+                    !secretUnlocked) {
+                    unlockSecret();
+                }
+            });
+        });
+
+        // Animation loop
+        function animateOrrery() {
+            planets.forEach(planet => {
+                planet.angle += (2 * Math.PI) / (planet.period * 100);
+
+                const x = Math.cos(planet.angle) * planet.orbit;
+                const y = Math.sin(planet.angle) * planet.orbit;
+
+                planet.element.style.left = `calc(50% + ${x}px)`;
+                planet.element.style.top = `calc(50% + ${y}px)`;
+                planet.element.style.transform = 'translate(-50%, -50%)';
+            });
+
+            requestAnimationFrame(animateOrrery);
+        }
+
+        animateOrrery();
+
+        // ========================================
+        // Secret Easter Egg
+        // ========================================
+
+        function unlockSecret() {
+            secretUnlocked = true;
+            console.log('%c🎄 Merry Christmas, Kristi! 🎄', 'font-size: 24px; color: #d4af37; font-weight: bold;');
+            console.log('%cYou found the secret! Click all 9 planets in order from Mercury to Pluto.', 'font-size: 14px; color: #f4d58d;');
+            console.log('%cThis orrery will sit in your home, a reminder of the cosmos and the careful beauty of mechanical systems.', 'font-size: 12px; color: #f4d58d; font-style: italic;');
+            console.log('%cMay it bring you wonder every time you turn the crank. — Tim', 'font-size: 12px; color: #d4af37;');
+
+            AudioEngine.playAlignment();
+
+            // Align all planets
+            orrery.classList.add('aligning');
+            setTimeout(() => orrery.classList.remove('aligning'), 2000);
+        }
+
+        // ========================================
+        // Keyboard Easter Egg ("cosmos")
+        // ========================================
+
+        let typedSequence = '';
+        const secretWord = 'cosmos';
+
+        document.addEventListener('keypress', (e) => {
+            typedSequence += e.key.toLowerCase();
+
+            if (typedSequence.length > secretWord.length) {
+                typedSequence = typedSequence.slice(-secretWord.length);
+            }
+
+            if (typedSequence === secretWord) {
+                initAudioOnInteraction();
+                AudioEngine.playAlignment();
+                orrery.classList.add('aligning');
+                setTimeout(() => orrery.classList.remove('aligning'), 2000);
+
+                console.log('%c✨ Cosmic alignment achieved ✨', 'font-size: 18px; color: #d4af37; font-weight: bold;');
+                typedSequence = '';
+            }
+        });
+
+        // ========================================
+        // Scroll Reveal
+        // ========================================
+
+        const sections = document.querySelectorAll('section');
+
+        const revealSection = (entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        };
+
+        const sectionObserver = new IntersectionObserver(revealSection, {
+            threshold: 0.15
+        });
+
+        sections.forEach(section => {
+            sectionObserver.observe(section);
+        });
+
+        // ========================================
+        // CTA Ripple
+        // ========================================
+
+        const ctaLink = document.getElementById('cta-link');
+        if (ctaLink) {
+            ctaLink.addEventListener('click', (e) => {
+                initAudioOnInteraction();
+                AudioEngine.playCelestial();
+
+                const ripple = document.createElement('div');
+                ripple.className = 'ripple';
+                ripple.style.left = (e.clientX - 100) + 'px';
+                ripple.style.top = (e.clientY - 100) + 'px';
+                ripple.style.borderColor = '#0a0a1a';
+                document.body.appendChild(ripple);
+                setTimeout(() => ripple.remove(), 1000);
+            });
+        }
+
+        // ========================================
+        // Console Art
+        // ========================================
+
+        console.log('%c        ', 'font-size: 1px;');
+        console.log('%c🪐 THE ORRERY 🪐', 'font-size: 20px; color: #d4af37; font-weight: bold; text-shadow: 0 0 10px #d4af37;');
+        console.log('%cFor Kristi — Christmas 2025', 'font-size: 14px; color: #f4d58d; font-style: italic;');
+        console.log('%c        ', 'font-size: 1px;');
+        console.log('%cThe planets orbit in silence.', 'color: #d4af37;');
+        console.log('%cType "cosmos" to align them.', 'color: #d4af37;');
+        console.log('%cClick all 9 planets in order (Mercury → Pluto) for a secret.', 'color: #d4af37;');
+        console.log('%c        ', 'font-size: 1px;');
+        console.log('%cwindow.鏡 = orbital mechanics', 'color: #4a9eff; font-family: monospace;');
+
+        // Expose to console
+        window.鏡 = {
+            planets: planetsData,
+            align: () => {
+                AudioEngine.playAlignment();
+                orrery.classList.add('aligning');
+                setTimeout(() => orrery.classList.remove('aligning'), 2000);
+            },
+            message: () => {
+                console.log('%cFor Kristi:', 'font-size: 16px; color: #d4af37; font-weight: bold;');
+                console.log('%cMay this orrery remind you that the cosmos is both beautiful and knowable,', 'color: #f4d58d; font-style: italic;');
+                console.log('%cthat time flows at the turn of your hand,', 'color: #f4d58d; font-style: italic;');
+                console.log('%cand that the dance of planets is yours to observe.', 'color: #f4d58d; font-style: italic;');
+                console.log('%c— Tim 🎄', 'color: #d4af37;');
+            }
+        };
+
+        // ========================================
+        // Page Load
+        // ========================================
+
+        window.addEventListener('load', () => {
+            console.log('%cOrrery initialized. All systems nominal.', 'color: #d4af37; font-style: italic;');
+            console.log('%cCelestial soundscape ready. Interact to activate.', 'color: #d4af37; font-style: italic;');
+        });
+
+        // First interaction enables audio
+        ['click', 'touchstart', 'keydown'].forEach(event => {
+            document.addEventListener(event, initAudioOnInteraction, { once: true });
+        });
+    </script>
+</body>
+</html>

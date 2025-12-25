@@ -1,0 +1,1955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>For Robert — The Builder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r135/three.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --void: #0a0a0f;
+            --obsidian: #151520;
+            --carbon: #1f1f2e;
+            --cyan: #00f0ff;
+            --cyan-dim: #00a8b8;
+            --orange: #ff6b35;
+            --circuit-green: #00ff88;
+            --silver: #c0c0d0;
+            --gold: #ffd700;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--void);
+            color: var(--silver);
+            cursor: none;
+            overflow-x: hidden;
+            line-height: 1.7;
+        }
+
+        /* Custom Cursor */
+        #custom-cursor {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--cyan);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 10000;
+            mix-blend-mode: screen;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        #custom-cursor.active {
+            opacity: 1;
+        }
+
+        #cursor-glow {
+            position: fixed;
+            width: 60px;
+            height: 60px;
+            background: radial-gradient(circle, rgba(0, 240, 255, 0.4) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        #cursor-glow.active {
+            opacity: 1;
+        }
+
+        #custom-cursor.clicking {
+            transform: scale(0.8);
+            transition: transform 0.1s ease;
+        }
+
+        #cursor-glow.clicking {
+            transform: scale(1.3);
+            transition: transform 0.1s ease;
+        }
+
+        @media (max-width: 768px) {
+            #custom-cursor, #cursor-glow {
+                display: none;
+            }
+            body {
+                cursor: auto;
+            }
+        }
+
+        /* Breathing Background */
+        .background-layers {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .bg-layer {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            top: -50%;
+            left: -50%;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.15;
+        }
+
+        .bg-layer-1 {
+            background: radial-gradient(circle, var(--cyan) 0%, transparent 60%);
+            animation: breathe-1 12s ease-in-out infinite;
+        }
+
+        .bg-layer-2 {
+            background: radial-gradient(circle, var(--orange) 0%, transparent 50%);
+            animation: breathe-2 15s ease-in-out infinite 2s;
+        }
+
+        .bg-layer-3 {
+            background: radial-gradient(circle, var(--circuit-green) 0%, transparent 55%);
+            animation: breathe-3 18s ease-in-out infinite 4s;
+        }
+
+        @keyframes breathe-1 {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.1; }
+            50% { transform: translate(20px, -30px) scale(1.1); opacity: 0.15; }
+        }
+
+        @keyframes breathe-2 {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.12; }
+            50% { transform: translate(-30px, 20px) scale(1.15); opacity: 0.18; }
+        }
+
+        @keyframes breathe-3 {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.08; }
+            50% { transform: translate(15px, 25px) scale(1.08); opacity: 0.14; }
+        }
+
+        /* Particles */
+        #particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--cyan);
+            border-radius: 50%;
+            animation: float-particle linear infinite;
+            will-change: transform, opacity;
+        }
+
+        @keyframes float-particle {
+            0% {
+                transform: translateY(0) translateX(0) rotate(0deg) scale(0.8);
+                opacity: 0;
+            }
+            5% {
+                opacity: var(--particle-opacity, 0.6);
+                transform: translateY(-5vh) translateX(calc(var(--drift) * 0.05)) rotate(18deg) scale(1);
+            }
+            95% {
+                opacity: var(--particle-opacity, 0.6);
+                transform: translateY(-95vh) translateX(calc(var(--drift) * 0.95)) rotate(342deg) scale(1);
+            }
+            100% {
+                transform: translateY(-100vh) translateX(var(--drift)) rotate(360deg) scale(0.8);
+                opacity: 0;
+            }
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            opacity: 0;
+            animation: fadeInUp 1.5s ease forwards 0.3s;
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+        }
+
+        .hero-robot {
+            font-size: 10rem;
+            margin-bottom: 2rem;
+            animation: robot-wave 3s ease-in-out infinite;
+            filter: drop-shadow(0 0 40px rgba(0, 240, 255, 0.5));
+            position: relative;
+        }
+
+        @keyframes robot-wave {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-5deg); }
+            75% { transform: rotate(5deg); }
+        }
+
+        .hero-title {
+            font-size: 4.5rem;
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--cyan) 0%, var(--circuit-green) 50%, var(--orange) 100%);
+            background-size: 200% 200%;
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shimmer 4s ease-in-out infinite;
+            letter-spacing: -2px;
+            line-height: 1.1;
+        }
+
+        @keyframes shimmer {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .hero-subtitle {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2rem;
+            color: var(--silver);
+            font-style: italic;
+            margin-bottom: 3rem;
+            opacity: 0.95;
+            font-weight: 400;
+            letter-spacing: 0.5px;
+        }
+
+        .recipient-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            color: var(--cyan);
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+            opacity: 0;
+            animation: fadeIn 1.5s ease forwards 1s;
+            font-weight: 600;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9rem;
+            color: var(--cyan);
+            opacity: 0.7;
+            animation: bounce 2s ease-in-out infinite;
+            font-weight: 400;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(10px); }
+        }
+
+        /* Sections */
+        section {
+            min-height: 100vh;
+            padding: 6rem 0;
+            position: relative;
+            opacity: 0;
+            transform: translateY(50px);
+            transition: opacity 1s ease, transform 1s ease;
+        }
+
+        section.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .section-title {
+            font-size: 3.5rem;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 4.5rem;
+            color: var(--cyan);
+            letter-spacing: -2px;
+            position: relative;
+            line-height: 1.2;
+        }
+
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -1.2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, var(--orange), transparent);
+            border-radius: 2px;
+        }
+
+        /* Gift Card */
+        .gift-card {
+            background: linear-gradient(135deg, rgba(31, 31, 46, 0.9), rgba(21, 21, 32, 0.7));
+            border: 1px solid rgba(0, 240, 255, 0.25);
+            border-radius: 24px;
+            padding: 3.5rem;
+            backdrop-filter: blur(12px);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+            margin-bottom: 4rem;
+        }
+
+        .gift-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0, 240, 255, 0.15), transparent 50%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            pointer-events: none;
+        }
+
+        .gift-card:hover {
+            transform: translateY(-12px) scale(1.02);
+            border-color: var(--cyan);
+            box-shadow: 0 24px 72px rgba(0, 240, 255, 0.35);
+        }
+
+        .gift-card:hover::before {
+            opacity: 1;
+        }
+
+        .gift-name {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: var(--orange);
+            margin-bottom: 2rem;
+            letter-spacing: -1.5px;
+            line-height: 1.2;
+        }
+
+        .gift-description {
+            font-size: 1.15rem;
+            line-height: 1.9;
+            color: rgba(192, 192, 208, 0.95);
+            margin-bottom: 2.5rem;
+            font-weight: 400;
+        }
+
+        .gift-features {
+            list-style: none;
+            margin: 2.5rem 0;
+        }
+
+        .gift-features li {
+            padding: 1rem 0;
+            padding-left: 2.5rem;
+            position: relative;
+            font-size: 1.05rem;
+            color: rgba(192, 192, 208, 0.9);
+            transition: color 0.3s ease, transform 0.3s ease;
+            line-height: 1.7;
+        }
+
+        .gift-features li::before {
+            content: '⚙';
+            position: absolute;
+            left: 0;
+            color: var(--cyan);
+            font-size: 1.3rem;
+            animation: spin 4s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .gift-features li:hover {
+            color: var(--cyan);
+            transform: translateX(12px);
+        }
+
+        .gift-link {
+            display: inline-block;
+            padding: 1.2rem 3rem;
+            background: linear-gradient(135deg, var(--cyan), var(--circuit-green));
+            color: var(--void);
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 1.15rem;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            letter-spacing: 0.5px;
+        }
+
+        .gift-link::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s ease, height 0.6s ease;
+        }
+
+        .gift-link:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .gift-link:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 36px rgba(0, 240, 255, 0.6);
+        }
+
+        .gift-link span {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Robot Configurations Grid */
+        .robot-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 2.5rem;
+            margin: 3rem 0 4rem 0;
+        }
+
+        @media (max-width: 1024px) {
+            .robot-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .robot-config {
+            background: rgba(31, 31, 46, 0.7);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            border-radius: 18px;
+            padding: 2.5rem;
+            text-align: center;
+            transition: transform 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .robot-config::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(0, 240, 255, 0.1), transparent 70%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .robot-config:hover {
+            transform: translateY(-12px) rotateZ(2deg);
+            border-color: var(--orange);
+            box-shadow: 0 16px 48px rgba(255, 107, 53, 0.35);
+        }
+
+        .robot-config:hover::before {
+            opacity: 1;
+            animation: rotate-glow 3s linear infinite;
+        }
+
+        @keyframes rotate-glow {
+            to { transform: rotate(360deg); }
+        }
+
+        .robot-config-icon {
+            font-size: 4.5rem;
+            margin-bottom: 1.5rem;
+            filter: drop-shadow(0 0 20px currentColor);
+            position: relative;
+            z-index: 1;
+        }
+
+        .robot-config-name {
+            font-size: 1.4rem;
+            color: var(--cyan);
+            font-weight: 700;
+            margin-bottom: 1rem;
+            position: relative;
+            z-index: 1;
+            letter-spacing: -0.5px;
+        }
+
+        .robot-config-desc {
+            font-size: 0.95rem;
+            color: rgba(192, 192, 208, 0.85);
+            position: relative;
+            z-index: 1;
+            line-height: 1.7;
+        }
+
+        /* 3D Robot Preview */
+        .robot-3d-preview {
+            width: 320px;
+            height: 320px;
+            margin: 3rem auto;
+            background: rgba(31, 31, 46, 0.7);
+            border: 2px solid var(--cyan);
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 240, 255, 0.25);
+        }
+
+        #robot-preview-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Assembly Mode Toggle */
+        .assembly-toggle {
+            text-align: center;
+            margin: 5rem 0 3rem 0;
+        }
+
+        .toggle-button {
+            display: inline-block;
+            padding: 1.2rem 2.5rem;
+            background: linear-gradient(135deg, rgba(31, 31, 46, 0.9), rgba(21, 21, 32, 0.9));
+            border: 2px solid var(--circuit-green);
+            border-radius: 50px;
+            color: var(--circuit-green);
+            font-weight: 700;
+            font-size: 1.05rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            letter-spacing: 0.5px;
+        }
+
+        .toggle-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.3), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .toggle-button:hover::before {
+            left: 100%;
+        }
+
+        .toggle-button:hover {
+            background: linear-gradient(135deg, var(--circuit-green), var(--cyan));
+            color: var(--void);
+            border-color: var(--cyan);
+            transform: scale(1.05);
+            box-shadow: 0 12px 36px rgba(0, 255, 136, 0.45);
+        }
+
+        .toggle-button.active {
+            background: var(--orange);
+            color: var(--void);
+            border-color: var(--orange);
+        }
+
+        /* Exploded View */
+        .exploded-view {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.8s ease, opacity 0.8s ease;
+            opacity: 0;
+        }
+
+        .exploded-view.active {
+            max-height: 1000px;
+            opacity: 1;
+        }
+
+        .servo-diagram {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+            padding: 2.5rem;
+            background: rgba(31, 31, 46, 0.5);
+            border-radius: 18px;
+            border: 1px solid rgba(0, 240, 255, 0.25);
+        }
+
+        .servo-part {
+            text-align: center;
+            padding: 2rem 1.5rem;
+            background: rgba(21, 21, 32, 0.7);
+            border-radius: 14px;
+            border: 1px solid rgba(255, 107, 53, 0.35);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+        }
+
+        .servo-part:hover {
+            transform: translateY(-8px) rotateX(10deg);
+            box-shadow: 0 12px 32px rgba(255, 107, 53, 0.45);
+        }
+
+        .servo-icon {
+            font-size: 2.8rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .servo-label {
+            font-size: 0.95rem;
+            color: var(--silver);
+            font-weight: 600;
+        }
+
+        /* Servo Dance Section */
+        .servo-dance {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 2.5rem;
+            margin: 3rem 0;
+            padding: 3.5rem;
+            background: rgba(31, 31, 46, 0.5);
+            border-radius: 24px;
+            border: 1px solid rgba(0, 240, 255, 0.25);
+        }
+
+        .servo-motor {
+            font-size: 3.5rem;
+            animation: servo-wiggle 2s ease-in-out infinite;
+            filter: drop-shadow(0 0 16px var(--orange));
+        }
+
+        .servo-motor:nth-child(1) { animation-delay: 0s; }
+        .servo-motor:nth-child(2) { animation-delay: 0.2s; }
+        .servo-motor:nth-child(3) { animation-delay: 0.4s; }
+        .servo-motor:nth-child(4) { animation-delay: 0.6s; }
+        .servo-motor:nth-child(5) { animation-delay: 0.8s; }
+
+        @keyframes servo-wiggle {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            25% { transform: rotate(-15deg) scale(1.1); }
+            75% { transform: rotate(15deg) scale(1.1); }
+        }
+
+        /* Curiosity Section */
+        .curiosity-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2.5rem;
+            margin: 3rem 0;
+        }
+
+        .curiosity-card {
+            background: rgba(31, 31, 46, 0.7);
+            border: 1px solid rgba(0, 255, 136, 0.25);
+            border-radius: 18px;
+            padding: 3rem;
+            transition: transform 0.4s ease, box-shadow 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .curiosity-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, transparent, rgba(0, 255, 136, 0.1), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.6s ease;
+        }
+
+        .curiosity-card:hover::after {
+            transform: translateX(100%);
+        }
+
+        .curiosity-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 16px 48px rgba(0, 255, 136, 0.35);
+        }
+
+        .curiosity-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .curiosity-title {
+            font-size: 1.6rem;
+            color: var(--circuit-green);
+            font-weight: 700;
+            margin-bottom: 1.2rem;
+            letter-spacing: -0.5px;
+        }
+
+        .curiosity-text {
+            font-size: 1.05rem;
+            color: rgba(192, 192, 208, 0.9);
+            line-height: 1.8;
+        }
+
+        /* Handwritten Note */
+        .note {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.09), rgba(255, 107, 53, 0.07));
+            border-left: 5px solid var(--gold);
+            border-radius: 16px;
+            padding: 3.5rem 4rem;
+            margin: 5rem 0;
+            position: relative;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.45rem;
+            line-height: 2.2;
+            color: rgba(255, 255, 255, 0.96);
+            font-style: italic;
+            box-shadow: 0 12px 48px rgba(255, 215, 0, 0.18);
+            border-top: 1px solid rgba(255, 215, 0, 0.2);
+            border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+        }
+
+        .note::before {
+            content: '"';
+            position: absolute;
+            top: 1.5rem;
+            left: 2rem;
+            font-size: 5rem;
+            color: var(--gold);
+            opacity: 0.4;
+            font-family: 'Cormorant Garamond', serif;
+            line-height: 1;
+        }
+
+        .note::after {
+            content: '❄️';
+            position: absolute;
+            bottom: 1.5rem;
+            right: 2.5rem;
+            font-size: 1.5rem;
+            opacity: 0.5;
+        }
+
+        .note-signature {
+            text-align: right;
+            margin-top: 2.5rem;
+            font-size: 1.25rem;
+            color: var(--gold);
+            font-weight: 600;
+            font-style: normal;
+            letter-spacing: 0.5px;
+        }
+
+        /* Circuit Traces */
+        .circuit-trace {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.12;
+            z-index: -1;
+        }
+
+        .circuit-line {
+            stroke: var(--cyan);
+            stroke-width: 1;
+            fill: none;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: draw-circuit 3s ease forwards;
+        }
+
+        @keyframes draw-circuit {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        .circuit-node {
+            fill: var(--circuit-green);
+            opacity: 0;
+            animation: pulse-node 2s ease infinite;
+        }
+
+        @keyframes pulse-node {
+            0%, 100% { opacity: 0.3; r: 3; }
+            50% { opacity: 0.8; r: 5; }
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 5rem 0;
+            border-top: 1px solid rgba(0, 240, 255, 0.25);
+            margin-top: 6rem;
+        }
+
+        .footer-text {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.3rem;
+            color: var(--silver);
+            font-style: italic;
+            opacity: 0.85;
+            font-weight: 400;
+        }
+
+        .footer-emoji {
+            font-size: 2.5rem;
+            margin: 1.5rem 0;
+            animation: gentle-pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes gentle-pulse {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+        }
+
+        /* Ripple Effect */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(0, 240, 255, 0.5);
+            transform: scale(0);
+            animation: ripple-animation 0.6s ease-out;
+            pointer-events: none;
+        }
+
+        @keyframes ripple-animation {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+
+        /* Secret Unlock Animation */
+        .secret-unlock {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 6rem;
+            z-index: 10001;
+            opacity: 0;
+            pointer-events: none;
+            filter: drop-shadow(0 0 30px var(--cyan));
+        }
+
+        .secret-unlock.active {
+            animation: secret-reveal 2s ease forwards;
+        }
+
+        @keyframes secret-reveal {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0) rotate(0deg); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.5) rotate(180deg); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1) rotate(360deg); }
+        }
+
+        /* Data Attributes (hidden layer) */
+        [data-kanji] {
+            position: relative;
+        }
+
+        /* ============================================ */
+        /* WEBXR STYLES */
+        /* ============================================ */
+
+        .xr-button {
+            display: none;
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1.3rem 2.8rem;
+            background: linear-gradient(135deg, var(--cyan), var(--circuit-green));
+            color: var(--void);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 1.15rem;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            z-index: 9998;
+            transition: all 0.3s ease;
+            box-shadow: 0 12px 48px rgba(0, 240, 255, 0.55);
+            animation: xr-pulse 2s ease-in-out infinite;
+            letter-spacing: 0.5px;
+        }
+
+        @keyframes xr-pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 12px 48px rgba(0, 240, 255, 0.55); }
+            50% { transform: scale(1.05); box-shadow: 0 16px 56px rgba(0, 240, 255, 0.75); }
+        }
+
+        .xr-button:hover {
+            background: linear-gradient(135deg, var(--circuit-green), var(--cyan));
+            transform: translateY(-4px) scale(1.05);
+            box-shadow: 0 20px 64px rgba(0, 240, 255, 0.85);
+        }
+
+        .xr-button:active {
+            transform: translateY(-2px) scale(1.02);
+        }
+
+        .xr-button.in-session {
+            background: linear-gradient(135deg, var(--orange), #ff3535);
+            animation: none;
+        }
+
+        .xr-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -10;
+            pointer-events: none;
+        }
+
+        #xr-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .xr-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 9997;
+            display: none;
+            pointer-events: none;
+        }
+
+        .xr-overlay.active {
+            display: block;
+        }
+
+        .xr-instructions {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: var(--cyan);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.2rem;
+            z-index: 9998;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        .xr-instructions.active {
+            opacity: 1;
+        }
+
+        .xr-not-supported {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(31, 31, 46, 0.98);
+            border: 2px solid var(--orange);
+            border-radius: 20px;
+            padding: 3rem;
+            max-width: 500px;
+            text-align: center;
+            z-index: 10000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .xr-not-supported.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .xr-not-supported button {
+            margin-top: 1.5rem;
+            padding: 0.8rem 2rem;
+            background: var(--cyan);
+            color: var(--void);
+            border: none;
+            border-radius: 30px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .xr-not-supported button:hover {
+            background: var(--circuit-green);
+            transform: translateY(-2px);
+        }
+
+        /* Accessibility - Reduced Motion */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+
+            .particle {
+                display: none;
+            }
+
+            .bg-layer {
+                animation: none !important;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero-title { font-size: 2.8rem; letter-spacing: -1px; }
+            .hero-subtitle { font-size: 1.4rem; }
+            .hero-robot { font-size: 6rem; }
+            .section-title { font-size: 2.2rem; margin-bottom: 3rem; }
+            .gift-name { font-size: 2rem; }
+            .gift-card { padding: 2.5rem; }
+            .note { padding: 2.5rem; font-size: 1.25rem; }
+            .robot-grid { grid-template-columns: 1fr !important; gap: 1.5rem; }
+            .servo-dance { flex-wrap: wrap; padding: 2rem; }
+            .robot-3d-preview { width: 280px; height: 280px; }
+            .curiosity-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 480px) {
+            .container { padding: 0 1.5rem; }
+            .hero-title { font-size: 2rem; }
+            .hero-subtitle { font-size: 1.2rem; }
+            .section-title { font-size: 1.8rem; }
+            .gift-name { font-size: 1.6rem; }
+            .note { font-size: 1.15rem; padding: 2rem; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background Layers -->
+    <div class="background-layers">
+        <div class="bg-layer bg-layer-1"></div>
+        <div class="bg-layer bg-layer-2"></div>
+        <div class="bg-layer bg-layer-3"></div>
+    </div>
+
+    <!-- Particles -->
+    <div id="particles"></div>
+
+    <!-- Custom Cursor -->
+    <div id="custom-cursor"></div>
+    <div id="cursor-glow"></div>
+
+    <!-- Secret Unlock Animation -->
+    <div class="secret-unlock" id="secret-unlock">🔓</div>
+
+    <!-- XR Container -->
+    <div class="xr-container">
+        <canvas id="xr-canvas"></canvas>
+    </div>
+
+    <!-- XR Overlay -->
+    <div class="xr-overlay" id="xr-overlay"></div>
+
+    <!-- XR Instructions -->
+    <div class="xr-instructions" id="xr-instructions">
+        <h2>Point your device at a flat surface</h2>
+        <p>Tap to place the robot</p>
+    </div>
+
+    <!-- AR Button -->
+    <button id="ar-button" class="xr-button">View in AR</button>
+
+    <!-- XR Not Supported Message -->
+    <div class="xr-not-supported" id="xr-not-supported">
+        <h3 style="color: var(--orange); margin-bottom: 1rem;">AR Not Supported</h3>
+        <p>WebXR Augmented Reality is not supported on this device.</p>
+        <p>Try opening this page on:</p>
+        <ul style="list-style: none; padding: 0; margin: 1rem 0;">
+            <li>📱 Android Chrome</li>
+            <li>📱 iOS Safari (iOS 14.5+)</li>
+            <li>🥽 Meta Quest Browser</li>
+        </ul>
+        <button onclick="document.getElementById('xr-not-supported').classList.remove('active')">Got it</button>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero" data-kanji="創造">
+        <div class="recipient-name">FOR ROBERT</div>
+        <div class="hero-robot" id="hero-robot">🤖</div>
+        <h1 class="hero-title">The Builder's Playground</h1>
+        <p class="hero-subtitle">Where Curiosity Meets Engineering</p>
+        <div class="scroll-indicator">↓ Scroll to explore ↓</div>
+
+        <!-- Circuit Trace SVG -->
+        <svg class="circuit-trace" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <path class="circuit-line" d="M 100 100 L 200 100 L 200 200 L 400 200" />
+            <path class="circuit-line" d="M 600 150 L 800 150 L 800 300 L 1000 300" style="animation-delay: 0.5s" />
+            <path class="circuit-line" d="M 300 400 L 500 400 L 500 250 L 700 250" style="animation-delay: 1s" />
+            <circle class="circuit-node" cx="200" cy="100" r="3" style="animation-delay: 1.5s" />
+            <circle class="circuit-node" cx="400" cy="200" r="3" style="animation-delay: 2s" />
+            <circle class="circuit-node" cx="800" cy="150" r="3" style="animation-delay: 2.5s" />
+        </svg>
+    </section>
+
+    <!-- Gift Section -->
+    <section id="gift-section" data-kanji="贈物">
+        <div class="container">
+            <h2 class="section-title">Your Gift Awaits</h2>
+
+            <div class="gift-card" id="gift-card" data-kanji="機械">
+                <h3 class="gift-name">ROBOTIS BIOLOID Premium Robot Kit</h3>
+
+                <p class="gift-description">
+                    This isn't just a kit—it's a canvas for mechanical imagination. With 18+ Dynamixel servo motors and endless configurations, you can build humanoids that walk, dinosaurs that stomp, spiders that crawl, and puppies that bound. Each servo is a joint with its own intelligence, waiting for you to orchestrate the dance.
+                </p>
+
+                <ul class="gift-features">
+                    <li>18+ high-torque Dynamixel AX-12 servo motors with individual control</li>
+                    <li>Build humanoids, dinosaurs, spiders, puppies, or invent your own</li>
+                    <li>RoboPlus software for programming complex behaviors and motion sequences</li>
+                    <li>Modular frame system—disassemble, rebuild, rethink endlessly</li>
+                    <li>Perfect for tinkerers who see potential in every moving part</li>
+                    <li>No instruction manual required—just your engineering instincts</li>
+                </ul>
+
+                <a href="https://robotis.us/robotis-premium/" target="_blank" class="gift-link" id="gift-link">
+                    <span>Explore the Kit →</span>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- What You Can Build Section -->
+    <section id="build-section" data-kanji="構築">
+        <div class="container">
+            <h2 class="section-title">What You Can Build</h2>
+
+            <div class="robot-grid">
+                <div class="robot-config" data-config="humanoid">
+                    <div class="robot-config-icon">🚶</div>
+                    <div class="robot-config-name">Humanoid Walker</div>
+                    <div class="robot-config-desc">Bipedal robots with dynamic balance, programmable gaits, and gesture control. Make it wave, dance, or navigate obstacles.</div>
+                </div>
+
+                <div class="robot-config" data-config="dinosaur">
+                    <div class="robot-config-icon">🦖</div>
+                    <div class="robot-config-name">Mechanical Dinosaur</div>
+                    <div class="robot-config-desc">Quadruped beasts with articulated spines and tails. Program hunting behaviors, roars, or synchronized pack movements.</div>
+                </div>
+
+                <div class="robot-config" data-config="spider">
+                    <div class="robot-config-icon">🕷️</div>
+                    <div class="robot-config-name">Spider Walker</div>
+                    <div class="robot-config-desc">Eight-legged crawlers with independent leg control. Master complex terrain with wave gaits and adaptive stepping.</div>
+                </div>
+
+                <div class="robot-config" data-config="puppy">
+                    <div class="robot-config-icon">🐕</div>
+                    <div class="robot-config-name">Robotic Puppy</div>
+                    <div class="robot-config-desc">Four-legged companions that trot, sit, shake, and respond to commands. Add personality through motion programming.</div>
+                </div>
+            </div>
+
+            <!-- 3D Robot Preview -->
+            <div class="robot-3d-preview">
+                <canvas id="robot-preview-canvas"></canvas>
+            </div>
+            <p style="text-align: center; color: var(--silver); opacity: 0.85; margin-top: 1.5rem; font-size: 0.95rem;">
+                ↑ Interactive 3D preview - drag to rotate
+            </p>
+
+            <!-- Assembly Mode Toggle -->
+            <div class="assembly-toggle">
+                <button class="toggle-button" id="assembly-toggle">
+                    ⚙ Enter Assembly Mode
+                </button>
+            </div>
+
+            <!-- Exploded View -->
+            <div class="exploded-view" id="exploded-view">
+                <h3 style="text-align: center; color: var(--orange); font-size: 2.2rem; margin: 3rem 0 2rem 0; font-weight: 700;">Component Breakdown</h3>
+                <div class="servo-diagram">
+                    <div class="servo-part">
+                        <span class="servo-icon">⚙️</span>
+                        <div class="servo-label">AX-12A Servos</div>
+                    </div>
+                    <div class="servo-part">
+                        <span class="servo-icon">🔩</span>
+                        <div class="servo-label">Frame Brackets</div>
+                    </div>
+                    <div class="servo-part">
+                        <span class="servo-icon">🔌</span>
+                        <div class="servo-label">Power Hub</div>
+                    </div>
+                    <div class="servo-part">
+                        <span class="servo-icon">💾</span>
+                        <div class="servo-label">CM-530 Controller</div>
+                    </div>
+                    <div class="servo-part">
+                        <span class="servo-icon">📡</span>
+                        <div class="servo-label">Sensor Ports</div>
+                    </div>
+                    <div class="servo-part">
+                        <span class="servo-icon">🔋</span>
+                        <div class="servo-label">Battery Pack</div>
+                    </div>
+                    <div class="servo-part">
+                        <span class="servo-icon">🔗</span>
+                        <div class="servo-label">Joint Connectors</div>
+                    </div>
+                    <div class="servo-part">
+                        <span class="servo-icon">📐</span>
+                        <div class="servo-label">Structural Beams</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Servo Dance Section -->
+    <section id="servo-section" data-kanji="踊り">
+        <div class="container">
+            <h2 class="section-title">The Servo Dance</h2>
+
+            <p style="text-align: center; font-size: 1.15rem; color: rgba(192, 192, 208, 0.9); max-width: 700px; margin: 0 auto 3rem auto; line-height: 1.9;">
+                Each servo motor is a precision joint—0.29° resolution, 300° rotation, 1.5 Nm torque. Together, they move like a symphony.
+            </p>
+
+            <div class="servo-dance">
+                <div class="servo-motor">⚙️</div>
+                <div class="servo-motor">⚙️</div>
+                <div class="servo-motor">⚙️</div>
+                <div class="servo-motor">⚙️</div>
+                <div class="servo-motor">⚙️</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Curiosity Section -->
+    <section id="curiosity-section" data-kanji="探求">
+        <div class="container">
+            <h2 class="section-title">For the Curious Mind</h2>
+
+            <div class="curiosity-grid">
+                <div class="curiosity-card">
+                    <div class="curiosity-icon">🔬</div>
+                    <div class="curiosity-title">Reverse Engineer</div>
+                    <div class="curiosity-text">
+                        Take apart the pre-built examples, study the joint angles, measure the servo timing. Understand how walking becomes running becomes dancing.
+                    </div>
+                </div>
+
+                <div class="curiosity-card">
+                    <div class="curiosity-icon">🧪</div>
+                    <div class="curiosity-title">Experiment Wildly</div>
+                    <div class="curiosity-text">
+                        What if a spider had twelve legs? What if the dinosaur's tail was a counterweight? What if servos could sense resistance and adapt? Test your theories.
+                    </div>
+                </div>
+
+                <div class="curiosity-card">
+                    <div class="curiosity-icon">🛠️</div>
+                    <div class="curiosity-title">Build Beyond</div>
+                    <div class="curiosity-text">
+                        The kit is a starting point, not a limit. Add sensors, custom parts, new behaviors. Make it do something the designers never imagined.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Handwritten Note Section -->
+    <section id="note-section" data-kanji="手紙">
+        <div class="container">
+            <div class="note">
+                Dad—This felt like the right kind of fun for you. Something you can take apart, rebuild, rethink, and push further than it was meant to go. No instructions required—just your curiosity and tinkering instincts. I can't wait to see what you build with it. Thank you for teaching me to see potential in every moving part.
+                <div class="note-signature">Love, Tim 🎄<br><span style="font-size: 0.95rem; opacity: 0.85; margin-top: 0.6rem; display: inline-block;">Christmas 2025</span></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer data-kanji="鏡">
+        <div class="footer-emoji">🤖⚙️🔧</div>
+        <div class="footer-text">Built with precision. Given with love.</div>
+        <div style="margin-top: 2.5rem; font-size: 3.5rem; opacity: 0.35; font-family: serif;">鏡</div>
+        <div style="margin-top: 0.6rem; font-size: 0.9rem; color: rgba(192, 192, 208, 0.6); font-style: italic;">The Mirror Reflects</div>
+    </footer>
+
+    <script>
+        // Custom Cursor with smooth momentum
+        const cursor = document.getElementById('custom-cursor');
+        const cursorGlow = document.getElementById('cursor-glow');
+
+        let mouseX = 0, mouseY = 0;
+        let cursorX = 0, cursorY = 0;
+        let glowX = 0, glowY = 0;
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+
+            cursor.classList.add('active');
+            cursorGlow.classList.add('active');
+        });
+
+        document.addEventListener('mouseleave', () => {
+            cursor.classList.remove('active');
+            cursorGlow.classList.remove('active');
+        });
+
+        function animateCursor() {
+            // Cursor follows fast with momentum
+            cursorX += (mouseX - cursorX) * 0.25;
+            cursorY += (mouseY - cursorY) * 0.25;
+
+            // Glow follows slower for depth
+            glowX += (mouseX - glowX) * 0.15;
+            glowY += (mouseY - glowY) * 0.15;
+
+            cursor.style.transform = `translate(${cursorX - 10}px, ${cursorY - 10}px)`;
+            cursorGlow.style.transform = `translate(${glowX - 30}px, ${glowY - 30}px)`;
+
+            requestAnimationFrame(animateCursor);
+        }
+        animateCursor();
+
+        document.addEventListener('mousedown', () => {
+            cursor.classList.add('clicking');
+            cursorGlow.classList.add('clicking');
+        });
+
+        document.addEventListener('mouseup', () => {
+            cursor.classList.remove('clicking');
+            cursorGlow.classList.remove('clicking');
+        });
+
+        // Particles with varied sizes and opacities
+        const particlesContainer = document.getElementById('particles');
+        const particleColors = ['#00f0ff', '#ff6b35', '#00ff88'];
+        const particleShapes = ['⚙', '⚡', '◆', '●'];
+
+        function createParticle() {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+
+            // Random properties
+            const left = Math.random() * 100;
+            const duration = 15 + Math.random() * 20;
+            const delay = Math.random() * 10;
+            const drift = (Math.random() - 0.5) * 200;
+            const opacity = 0.3 + Math.random() * 0.5;
+            const color = particleColors[Math.floor(Math.random() * particleColors.length)];
+
+            particle.style.left = `${left}%`;
+            particle.style.animationDuration = `${duration}s`;
+            particle.style.animationDelay = `${delay}s`;
+            particle.style.setProperty('--drift', `${drift}px`);
+            particle.style.setProperty('--particle-opacity', opacity);
+            particle.style.background = color;
+
+            // Random shape
+            if (Math.random() > 0.7) {
+                const shape = particleShapes[Math.floor(Math.random() * particleShapes.length)];
+                particle.textContent = shape;
+                particle.style.background = 'none';
+                particle.style.color = color;
+                particle.style.fontSize = '12px';
+                particle.style.display = 'flex';
+                particle.style.alignItems = 'center';
+                particle.style.justifyContent = 'center';
+            }
+
+            particlesContainer.appendChild(particle);
+
+            // Remove after animation
+            setTimeout(() => {
+                particle.remove();
+            }, (duration + delay) * 1000);
+        }
+
+        // Create particles periodically
+        for (let i = 0; i < 30; i++) {
+            setTimeout(createParticle, i * 500);
+        }
+        setInterval(createParticle, 1500);
+
+        // Scroll reveal for sections
+        const sections = document.querySelectorAll('section');
+
+        const revealSection = () => {
+            const triggerBottom = window.innerHeight * 0.85;
+
+            sections.forEach(section => {
+                const sectionTop = section.getBoundingClientRect().top;
+
+                if (sectionTop < triggerBottom) {
+                    section.classList.add('visible');
+                }
+            });
+        };
+
+        window.addEventListener('scroll', revealSection);
+        revealSection();
+
+        // Gift card radial glow on mouse move
+        const giftCard = document.getElementById('gift-card');
+
+        if (giftCard) {
+            giftCard.addEventListener('mousemove', (e) => {
+                const rect = giftCard.getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width) * 100;
+                const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+                giftCard.style.setProperty('--mouse-x', `${x}%`);
+                giftCard.style.setProperty('--mouse-y', `${y}%`);
+            });
+        }
+
+        // Assembly mode toggle
+        const assemblyToggle = document.getElementById('assembly-toggle');
+        const explodedView = document.getElementById('exploded-view');
+
+        if (assemblyToggle && explodedView) {
+            assemblyToggle.addEventListener('click', () => {
+                explodedView.classList.toggle('active');
+                assemblyToggle.classList.toggle('active');
+
+                if (explodedView.classList.contains('active')) {
+                    assemblyToggle.textContent = '⚙ Exit Assembly Mode';
+                } else {
+                    assemblyToggle.textContent = '⚙ Enter Assembly Mode';
+                }
+            });
+        }
+
+        // Click ripple effect
+        document.addEventListener('click', (e) => {
+            const ripple = document.createElement('div');
+            ripple.className = 'ripple';
+            ripple.style.left = `${e.clientX - 25}px`;
+            ripple.style.top = `${e.clientY - 25}px`;
+            ripple.style.width = '50px';
+            ripple.style.height = '50px';
+
+            document.body.appendChild(ripple);
+
+            setTimeout(() => ripple.remove(), 600);
+        });
+
+        // Secret unlock: Type "build" to unlock secret
+        let secretBuffer = '';
+        const secretCode = 'build';
+
+        document.addEventListener('keypress', (e) => {
+            secretBuffer += e.key.toLowerCase();
+
+            if (secretBuffer.length > secretCode.length) {
+                secretBuffer = secretBuffer.slice(-secretCode.length);
+            }
+
+            if (secretBuffer === secretCode) {
+                const secretUnlock = document.getElementById('secret-unlock');
+                secretUnlock.classList.add('active');
+                setTimeout(() => secretUnlock.classList.remove('active'), 2000);
+
+                // Trigger extra particle burst
+                for (let i = 0; i < 20; i++) {
+                    setTimeout(createParticle, i * 50);
+                }
+            }
+        });
+
+        // Console easter egg
+        console.log('%c🤖 ROBOTIS BIOLOID Premium', 'color: #00f0ff; font-size: 24px; font-weight: bold;');
+        console.log('%cThe Builder\'s Playground', 'color: #00ff88; font-size: 16px; font-style: italic;');
+        console.log('%c\nSecret: Type "build" to unlock something special...', 'color: #ff6b35; font-size: 12px;');
+        console.log('%c\n鏡 — The Mirror Reflects', 'color: #ffd700; font-size: 14px;');
+
+        // Expose window object for inspection
+        window.鏡 = {
+            gift: 'ROBOTIS BIOLOID Premium',
+            recipient: 'Robert',
+            year: 2025,
+            servos: 18,
+            configurations: ['humanoid', 'dinosaur', 'spider', 'puppy', 'custom'],
+            unlock: () => {
+                const secretUnlock = document.getElementById('secret-unlock');
+                secretUnlock.classList.add('active');
+                setTimeout(() => secretUnlock.classList.remove('active'), 2000);
+            }
+        };
+
+        // ============================================
+        // THREE.JS ROBOT (for 3D preview and XR)
+        // ============================================
+
+        let renderer = null;
+        let xrSession = null;
+        let reticle = null;
+        let hitTestSource = null;
+        let robot = null;
+
+        // Create robot geometry
+        function createRobot(scale = 1) {
+            const robotGroup = new THREE.Group();
+
+            // Body (torso)
+            const bodyGeometry = new THREE.BoxGeometry(0.4 * scale, 0.6 * scale, 0.2 * scale);
+            const bodyMaterial = new THREE.MeshStandardMaterial({
+                color: 0x00f0ff,
+                metalness: 0.7,
+                roughness: 0.3
+            });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.7 * scale;
+            robotGroup.add(body);
+
+            // Head
+            const headGeometry = new THREE.SphereGeometry(0.2 * scale, 16, 16);
+            const headMaterial = new THREE.MeshStandardMaterial({
+                color: 0xff6b35,
+                metalness: 0.6,
+                roughness: 0.4
+            });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 1.2 * scale;
+            robotGroup.add(head);
+
+            // Eyes
+            const eyeGeometry = new THREE.SphereGeometry(0.05 * scale, 8, 8);
+            const eyeMaterial = new THREE.MeshStandardMaterial({
+                color: 0x00ff88,
+                emissive: 0x00ff88,
+                emissiveIntensity: 0.8
+            });
+
+            const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            leftEye.position.set(-0.08 * scale, 1.25 * scale, 0.15 * scale);
+            robotGroup.add(leftEye);
+
+            const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            rightEye.position.set(0.08 * scale, 1.25 * scale, 0.15 * scale);
+            robotGroup.add(rightEye);
+
+            // Arms (servos)
+            const armGeometry = new THREE.CylinderGeometry(0.08 * scale, 0.08 * scale, 0.5 * scale, 8);
+            const armMaterial = new THREE.MeshStandardMaterial({
+                color: 0x00a8b8,
+                metalness: 0.8,
+                roughness: 0.2
+            });
+
+            const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+            leftArm.position.set(-0.3 * scale, 0.7 * scale, 0);
+            leftArm.rotation.z = 0.3;
+            robotGroup.add(leftArm);
+
+            const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+            rightArm.position.set(0.3 * scale, 0.7 * scale, 0);
+            rightArm.rotation.z = -0.3;
+            robotGroup.add(rightArm);
+
+            // Legs
+            const legGeometry = new THREE.CylinderGeometry(0.08 * scale, 0.08 * scale, 0.6 * scale, 8);
+            const legMaterial = new THREE.MeshStandardMaterial({
+                color: 0x00a8b8,
+                metalness: 0.8,
+                roughness: 0.2
+            });
+
+            const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+            leftLeg.position.set(-0.12 * scale, 0.1 * scale, 0);
+            robotGroup.add(leftLeg);
+
+            const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+            rightLeg.position.set(0.12 * scale, 0.1 * scale, 0);
+            robotGroup.add(rightLeg);
+
+            // Feet
+            const footGeometry = new THREE.BoxGeometry(0.12 * scale, 0.05 * scale, 0.18 * scale);
+            const footMaterial = new THREE.MeshStandardMaterial({
+                color: 0xff6b35,
+                metalness: 0.5,
+                roughness: 0.5
+            });
+
+            const leftFoot = new THREE.Mesh(footGeometry, footMaterial);
+            leftFoot.position.set(-0.12 * scale, -0.2 * scale, 0.05 * scale);
+            robotGroup.add(leftFoot);
+
+            const rightFoot = new THREE.Mesh(footGeometry, footMaterial);
+            rightFoot.position.set(0.12 * scale, -0.2 * scale, 0.05 * scale);
+            robotGroup.add(rightFoot);
+
+            // Store parts for animation
+            robotGroup.userData = {
+                head,
+                leftArm,
+                rightArm,
+                leftLeg,
+                rightLeg,
+                leftEye,
+                rightEye
+            };
+
+            return robotGroup;
+        }
+
+        // Animate robot
+        function animateRobot(robot, time) {
+            const { head, leftArm, rightArm, leftLeg, rightLeg, leftEye, rightEye } = robot.userData;
+
+            // Head bob
+            head.position.y = 1.2 + Math.sin(time * 2) * 0.02;
+            head.rotation.y = Math.sin(time * 1.5) * 0.2;
+
+            // Arm swing
+            leftArm.rotation.z = 0.3 + Math.sin(time * 2) * 0.3;
+            rightArm.rotation.z = -0.3 - Math.sin(time * 2) * 0.3;
+
+            // Leg movement
+            leftLeg.rotation.x = Math.sin(time * 2.5) * 0.2;
+            rightLeg.rotation.x = -Math.sin(time * 2.5) * 0.2;
+
+            // Eye glow pulse
+            leftEye.material.emissiveIntensity = 0.5 + Math.sin(time * 4) * 0.3;
+            rightEye.material.emissiveIntensity = 0.5 + Math.sin(time * 4) * 0.3;
+
+            // Whole robot hover
+            robot.position.y += Math.sin(time * 3) * 0.003;
+        }
+
+        // Initialize 3D preview (non-XR)
+        function init3DPreview() {
+            const canvas = document.getElementById('robot-preview-canvas');
+            if (!canvas) {
+                console.warn('⚠️ 3D preview canvas not found');
+                return;
+            }
+
+            // Check if THREE.js is loaded
+            if (typeof THREE === 'undefined') {
+                console.error('❌ THREE.js not loaded - 3D preview disabled');
+                return;
+            }
+
+            try {
+                const previewScene = new THREE.Scene();
+                const previewCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+                previewCamera.position.set(0, 1.5, 3);
+                previewCamera.lookAt(0, 0.5, 0);
+
+                const previewRenderer = new THREE.WebGLRenderer({
+                    canvas,
+                    antialias: true,
+                    alpha: true
+                });
+                previewRenderer.setSize(320, 320);
+                previewRenderer.setPixelRatio(window.devicePixelRatio);
+
+                // Lighting
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+                previewScene.add(ambientLight);
+
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(2, 3, 2);
+                previewScene.add(directionalLight);
+
+                const cyanLight = new THREE.PointLight(0x00f0ff, 1, 10);
+                cyanLight.position.set(-2, 1, 2);
+                previewScene.add(cyanLight);
+
+                // Create robot
+                const previewRobot = createRobot(0.8);
+                previewRobot.position.y = 0;
+                previewScene.add(previewRobot);
+
+            // Mouse interaction
+            let isDragging = false;
+            let previousMousePosition = { x: 0, y: 0 };
+            let targetRotation = { x: 0, y: 0 };
+            let currentRotation = { x: 0, y: 0 };
+
+            canvas.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const deltaX = e.clientX - previousMousePosition.x;
+                    const deltaY = e.clientY - previousMousePosition.y;
+                    targetRotation.y += deltaX * 0.01;
+                    targetRotation.x += deltaY * 0.01;
+                    previousMousePosition = { x: e.clientX, y: e.clientY };
+                }
+            });
+
+            canvas.addEventListener('mouseup', () => isDragging = false);
+            canvas.addEventListener('mouseleave', () => isDragging = false);
+
+            // Touch support
+            canvas.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                const touch = e.touches[0];
+                previousMousePosition = { x: touch.clientX, y: touch.clientY };
+            });
+
+            canvas.addEventListener('touchmove', (e) => {
+                if (isDragging) {
+                    const touch = e.touches[0];
+                    const deltaX = touch.clientX - previousMousePosition.x;
+                    const deltaY = touch.clientY - previousMousePosition.y;
+                    targetRotation.y += deltaX * 0.01;
+                    targetRotation.x += deltaY * 0.01;
+                    previousMousePosition = { x: touch.clientX, y: touch.clientY };
+                }
+            });
+
+            canvas.addEventListener('touchend', () => isDragging = false);
+
+            // Animation loop
+            function animatePreview() {
+                requestAnimationFrame(animatePreview);
+
+                const time = Date.now() * 0.001;
+                animateRobot(previewRobot, time);
+
+                // Smooth rotation interpolation
+                currentRotation.x += (targetRotation.x - currentRotation.x) * 0.1;
+                currentRotation.y += (targetRotation.y - currentRotation.y) * 0.1;
+
+                previewRobot.rotation.x = currentRotation.x;
+                previewRobot.rotation.y = currentRotation.y;
+
+                previewRenderer.render(previewScene, previewCamera);
+            }
+
+            animatePreview();
+                console.log('🤖 3D preview initialized');
+            } catch (error) {
+                console.error('❌ Failed to initialize 3D preview:', error);
+            }
+        }
+
+        // Check WebXR support
+        async function checkXRSupport() {
+            if (!navigator.xr) {
+                console.log('❌ WebXR not available');
+                return false;
+            }
+
+            try {
+                const supported = await navigator.xr.isSessionSupported('immersive-ar');
+                if (supported) {
+                    console.log('✅ WebXR AR supported!');
+                    document.getElementById('ar-button').style.display = 'block';
+                } else {
+                    console.log('❌ WebXR AR not supported on this device');
+                }
+                return supported;
+            } catch (err) {
+                console.error('Error checking XR support:', err);
+                return false;
+            }
+        }
+
+        // Initialize XR scene
+        function initXRScene() {
+            const canvas = document.getElementById('xr-canvas');
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({
+                canvas,
+                antialias: true,
+                alpha: true
+            });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.xr.enabled = true;
+
+            // Scene
+            const scene = new THREE.Scene();
+
+            // Camera
+            const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+            // Lighting
+            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+            light.position.set(0.5, 1, 0.25);
+            scene.add(light);
+
+            // Reticle (placement indicator)
+            const reticleGeometry = new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2);
+            const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+            reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
+            reticle.matrixAutoUpdate = false;
+            reticle.visible = false;
+            scene.add(reticle);
+
+            // AR Button
+            const arButton = document.getElementById('ar-button');
+
+            arButton.addEventListener('click', async () => {
+                if (xrSession === null) {
+                    // Start AR session
+                    try {
+                        xrSession = await navigator.xr.requestSession('immersive-ar', {
+                            requiredFeatures: ['hit-test'],
+                            optionalFeatures: ['dom-overlay'],
+                            domOverlay: { root: document.body }
+                        });
+
+                        await renderer.xr.setSession(xrSession);
+
+                        // Setup hit test
+                        const referenceSpace = await xrSession.requestReferenceSpace('viewer');
+                        hitTestSource = await xrSession.requestHitTestSource({ space: referenceSpace });
+
+                        arButton.textContent = 'Exit AR';
+                        arButton.classList.add('in-session');
+                        document.getElementById('xr-overlay').classList.add('active');
+                        document.getElementById('xr-instructions').classList.add('active');
+
+                        xrSession.addEventListener('end', () => {
+                            xrSession = null;
+                            hitTestSource = null;
+                            arButton.textContent = 'View in AR';
+                            arButton.classList.remove('in-session');
+                            document.getElementById('xr-overlay').classList.remove('active');
+                            document.getElementById('xr-instructions').classList.remove('active');
+                            reticle.visible = false;
+                            if (robot) {
+                                robot.visible = false;
+                            }
+                        });
+                    } catch (err) {
+                        console.error('Failed to start AR session:', err);
+                        document.getElementById('xr-not-supported').classList.add('active');
+                    }
+                } else {
+                    // End AR session
+                    xrSession.end();
+                }
+            });
+
+            // Handle tap to place robot
+            const controller = renderer.xr.getController(0);
+            controller.addEventListener('select', () => {
+                if (reticle.visible) {
+                    if (!robot) {
+                        // Create robot on first tap
+                        robot = createRobot(0.3);
+                        scene.add(robot);
+                        document.getElementById('xr-instructions').classList.remove('active');
+                    }
+
+                    // Place robot at reticle position
+                    robot.position.setFromMatrixPosition(reticle.matrix);
+                    robot.visible = true;
+                }
+            });
+            scene.add(controller);
+
+            // Animation loop
+            renderer.setAnimationLoop((timestamp, frame) => {
+                if (frame) {
+                    // Hit test for placement
+                    if (hitTestSource) {
+                        const referenceSpace = renderer.xr.getReferenceSpace();
+                        const hitTestResults = frame.getHitTestResults(hitTestSource);
+
+                        if (hitTestResults.length > 0) {
+                            const hit = hitTestResults[0];
+                            const pose = hit.getPose(referenceSpace);
+
+                            reticle.visible = true;
+                            reticle.matrix.fromArray(pose.transform.matrix);
+                        } else {
+                            reticle.visible = false;
+                        }
+                    }
+
+                    // Animate robot
+                    if (robot && robot.visible) {
+                        const time = timestamp * 0.001;
+                        animateRobot(robot, time);
+                    }
+                }
+
+                renderer.render(scene, camera);
+            });
+        }
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            checkXRSupport();
+            init3DPreview();
+            initXRScene();
+            console.log('🥽 WebXR system initialized');
+        });
+    </script>
+</body>
+</html>
