@@ -760,12 +760,12 @@
                 <h2 class="card-name">Robert</h2>
                 <p class="card-relationship">Dad</p>
                 <div class="qr-container">
-                    <a href="https://awktavian.github.io/gifts/robert.html" target="_blank">
+                    <a href="https://awktavian.github.io/art/gifts/robert" target="_blank">
                         <img src="qr/robert-qr.png" alt="Robert's Gift QR Code" class="qr-code" onclick="openModal(this.src)">
                     </a>
-                    <p class="qr-label">Scan to reveal your gift</p>
+                    <p class="qr-label">Scan or click to reveal your gift</p>
                 </div>
-                <a href="robert.html" class="open-gift-btn">
+                <a href="https://awktavian.github.io/art/gifts/robert" class="open-gift-btn">
                     <span>OPEN GIFT</span>
                 </a>
             </div>
@@ -776,12 +776,12 @@
                 <h2 class="card-name">Katie</h2>
                 <p class="card-relationship">Mom</p>
                 <div class="qr-container">
-                    <a href="https://awktavian.github.io/gifts/katie.html" target="_blank">
+                    <a href="https://awktavian.github.io/art/gifts/katie" target="_blank">
                         <img src="qr/katie-qr.png" alt="Katie's Gift QR Code" class="qr-code" onclick="openModal(this.src)">
                     </a>
-                    <p class="qr-label">Scan to reveal your gift</p>
+                    <p class="qr-label">Scan or click to reveal your gift</p>
                 </div>
-                <a href="katie.html" class="open-gift-btn">
+                <a href="https://awktavian.github.io/art/gifts/katie" class="open-gift-btn">
                     <span>OPEN GIFT</span>
                 </a>
             </div>
@@ -792,12 +792,12 @@
                 <h2 class="card-name">Kristi</h2>
                 <p class="card-relationship">Sister</p>
                 <div class="qr-container">
-                    <a href="https://awktavian.github.io/gifts/kristi.html" target="_blank">
+                    <a href="https://awktavian.github.io/art/gifts/kristi" target="_blank">
                         <img src="qr/kristi-qr.png" alt="Kristi's Gift QR Code" class="qr-code" onclick="openModal(this.src)">
                     </a>
-                    <p class="qr-label">Scan to reveal your gift</p>
+                    <p class="qr-label">Scan or click to reveal your gift</p>
                 </div>
-                <a href="kristi.html" class="open-gift-btn">
+                <a href="https://awktavian.github.io/art/gifts/kristi" class="open-gift-btn">
                     <span>OPEN GIFT</span>
                 </a>
             </div>
@@ -808,12 +808,12 @@
                 <h2 class="card-name">Becky</h2>
                 <p class="card-relationship">Sister</p>
                 <div class="qr-container">
-                    <a href="https://awktavian.github.io/gifts/becky.html" target="_blank">
+                    <a href="https://awktavian.github.io/art/gifts/becky" target="_blank">
                         <img src="qr/becky-qr.png" alt="Becky's Gift QR Code" class="qr-code" onclick="openModal(this.src)">
                     </a>
-                    <p class="qr-label">Scan to reveal your gift</p>
+                    <p class="qr-label">Scan or click to reveal your gift</p>
                 </div>
-                <a href="becky.html" class="open-gift-btn">
+                <a href="https://awktavian.github.io/art/gifts/becky" class="open-gift-btn">
                     <span>OPEN GIFT</span>
                 </a>
             </div>
@@ -900,10 +900,10 @@
         <h2 class="footer-title">Jacoby Family Christmas 2025</h2>
         <p class="footer-signature">Made with love by Tim</p>
         <div class="footer-links">
-            <a href="robert.html" class="footer-link">Robert's Gift</a>
-            <a href="katie.html" class="footer-link">Katie's Gift</a>
-            <a href="kristi.html" class="footer-link">Kristi's Gift</a>
-            <a href="becky.html" class="footer-link">Becky's Gift</a>
+            <a href="https://awktavian.github.io/art/gifts/robert" class="footer-link">Robert's Gift</a>
+            <a href="https://awktavian.github.io/art/gifts/katie" class="footer-link">Katie's Gift</a>
+            <a href="https://awktavian.github.io/art/gifts/kristi" class="footer-link">Kristi's Gift</a>
+            <a href="https://awktavian.github.io/art/gifts/becky" class="footer-link">Becky's Gift</a>
         </div>
     </footer>
 
@@ -1277,19 +1277,51 @@
         createStars();
 
         // ============================================================================
-        // AUDIO SYSTEM
+        // AUDIO SYSTEM (Mobile-Compatible)
         // ============================================================================
         let audioContext;
         let masterGain;
         let isPlaying = false;
         let oscillators = [];
+        let audioInitialized = false;
 
-        function initAudio() {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            masterGain = audioContext.createGain();
-            masterGain.gain.value = 0.5;
-            masterGain.connect(audioContext.destination);
+        async function initAudio() {
+            if (audioInitialized && audioContext) {
+                // Resume suspended context (mobile requirement)
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+                return;
+            }
+
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                masterGain = audioContext.createGain();
+                masterGain.gain.value = 0.5;
+                masterGain.connect(audioContext.destination);
+
+                // Resume if suspended (mobile Safari/Chrome requirement)
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+
+                audioInitialized = true;
+                console.log('🎵 Audio initialized successfully');
+            } catch (e) {
+                console.warn('Audio initialization failed:', e);
+            }
         }
+
+        // Initialize audio on any user gesture (critical for mobile)
+        ['click', 'touchstart', 'keydown'].forEach(event => {
+            document.addEventListener(event, () => {
+                if (!audioInitialized) {
+                    initAudio();
+                } else if (audioContext && audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+            }, { once: false, passive: true });
+        });
 
         function playNote(frequency, duration, startTime, type = 'sine', gain = 0.3) {
             const oscillator = audioContext.createOscillator();
@@ -1398,19 +1430,32 @@
             playNoise();
         }
 
-        function toggleMusic() {
+        async function toggleMusic() {
             const btn = document.getElementById('play-pause-btn');
 
             if (!isPlaying) {
-                if (!audioContext) initAudio();
+                await initAudio();
+
+                // Ensure context is running (mobile fix)
+                if (audioContext && audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+
+                if (!audioContext) {
+                    console.warn('Audio not available');
+                    return;
+                }
+
                 isPlaying = true;
                 btn.textContent = '⏸️';
+                btn.setAttribute('aria-label', 'Pause music');
                 playSilentNight();
                 playBells();
                 playFireplace();
             } else {
                 isPlaying = false;
                 btn.textContent = '▶️';
+                btn.setAttribute('aria-label', 'Play music');
                 oscillators.forEach(osc => {
                     try { osc.stop(); } catch(e) {}
                 });
