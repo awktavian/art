@@ -116,7 +116,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: auto;
+            pointer-events: none;
             z-index: 50;
         }
 
@@ -134,7 +134,7 @@
         /* Main Content */
         .container {
             position: relative;
-            z-index: 10;
+            z-index: 200;
             max-width: 1400px;
             margin: 0 auto;
             padding: 80px 40px;
@@ -486,7 +486,7 @@
             text-align: center;
             padding: 60px 20px;
             position: relative;
-            z-index: 10;
+            z-index: 200;
             border-top: 1px solid rgba(255, 215, 0, 0.2);
         }
 
@@ -1277,197 +1277,320 @@
         createStars();
 
         // ============================================================================
-        // AUDIO SYSTEM (Mobile-Compatible)
+        // PREMIUM AUDIO SYSTEM - Auto-play with Rich Sound
         // ============================================================================
         let audioContext;
         let masterGain;
+        let reverbNode;
         let isPlaying = false;
-        let oscillators = [];
         let audioInitialized = false;
+        let melodyTimeout = null;
+        let padOscillators = [];
+        let bellInterval = null;
 
         async function initAudio() {
             if (audioInitialized && audioContext) {
-                // Resume suspended context (mobile requirement)
                 if (audioContext.state === 'suspended') {
                     await audioContext.resume();
                 }
-                return;
+                return true;
             }
 
             try {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+                // Master gain
                 masterGain = audioContext.createGain();
-                masterGain.gain.value = 0.5;
+                masterGain.gain.value = 0.4;
+
+                // Create reverb for warmth
+                reverbNode = await createReverb();
+                reverbNode.connect(masterGain);
                 masterGain.connect(audioContext.destination);
 
-                // Resume if suspended (mobile Safari/Chrome requirement)
                 if (audioContext.state === 'suspended') {
                     await audioContext.resume();
                 }
 
                 audioInitialized = true;
-                console.log('🎵 Audio initialized successfully');
+                console.log('%c🎵 Christmas Audio Ready', 'color: #FFD700; font-size: 14px;');
+                return true;
             } catch (e) {
                 console.warn('Audio initialization failed:', e);
+                return false;
             }
         }
 
-        // Initialize audio on any user gesture (critical for mobile)
-        ['click', 'touchstart', 'keydown'].forEach(event => {
-            document.addEventListener(event, () => {
-                if (!audioInitialized) {
-                    initAudio();
-                } else if (audioContext && audioContext.state === 'suspended') {
-                    audioContext.resume();
-                }
-            }, { once: false, passive: true });
-        });
+        // Create convolution reverb for rich sound
+        async function createReverb() {
+            const convolver = audioContext.createConvolver();
+            const rate = audioContext.sampleRate;
+            const length = rate * 2.5;
+            const impulse = audioContext.createBuffer(2, length, rate);
 
-        function playNote(frequency, duration, startTime, type = 'sine', gain = 0.3) {
-            const oscillator = audioContext.createOscillator();
+            for (let channel = 0; channel < 2; channel++) {
+                const data = impulse.getChannelData(channel);
+                for (let i = 0; i < length; i++) {
+                    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2.5);
+                }
+            }
+            convolver.buffer = impulse;
+            return convolver;
+        }
+
+        // Rich bell sound with harmonics
+        function playBell(frequency, time, volume = 0.15) {
+            const fundamental = audioContext.createOscillator();
+            const harmonic2 = audioContext.createOscillator();
+            const harmonic3 = audioContext.createOscillator();
+
+            const gainNode = audioContext.createGain();
+            const filterNode = audioContext.createBiquadFilter();
+
+            filterNode.type = 'lowpass';
+            filterNode.frequency.value = 4000;
+            filterNode.Q.value = 1;
+
+            fundamental.type = 'sine';
+            fundamental.frequency.value = frequency;
+            harmonic2.type = 'sine';
+            harmonic2.frequency.value = frequency * 2.4;
+            harmonic3.type = 'sine';
+            harmonic3.frequency.value = frequency * 5.95;
+
+            const fundamentalGain = audioContext.createGain();
+            const harmonic2Gain = audioContext.createGain();
+            const harmonic3Gain = audioContext.createGain();
+
+            fundamentalGain.gain.value = volume;
+            harmonic2Gain.gain.value = volume * 0.5;
+            harmonic3Gain.gain.value = volume * 0.25;
+
+            fundamental.connect(fundamentalGain);
+            harmonic2.connect(harmonic2Gain);
+            harmonic3.connect(harmonic3Gain);
+
+            fundamentalGain.connect(gainNode);
+            harmonic2Gain.connect(gainNode);
+            harmonic3Gain.connect(gainNode);
+
+            gainNode.connect(filterNode);
+            filterNode.connect(reverbNode);
+
+            // Bell envelope
+            gainNode.gain.setValueAtTime(0, time);
+            gainNode.gain.linearRampToValueAtTime(1, time + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.3, time + 0.3);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, time + 3);
+
+            fundamental.start(time);
+            harmonic2.start(time);
+            harmonic3.start(time);
+            fundamental.stop(time + 3);
+            harmonic2.stop(time + 3);
+            harmonic3.stop(time + 3);
+        }
+
+        // Warm pad for atmosphere
+        function playPad(notes, duration = 8) {
+            padOscillators.forEach(o => { try { o.stop(); } catch(e) {} });
+            padOscillators = [];
+
+            const now = audioContext.currentTime;
+            const padGain = audioContext.createGain();
+            padGain.gain.setValueAtTime(0, now);
+            padGain.gain.linearRampToValueAtTime(0.08, now + 2);
+            padGain.gain.linearRampToValueAtTime(0.08, now + duration - 2);
+            padGain.gain.linearRampToValueAtTime(0, now + duration);
+
+            const filter = audioContext.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 800;
+
+            padGain.connect(filter);
+            filter.connect(reverbNode);
+
+            notes.forEach(freq => {
+                const osc = audioContext.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+
+                const osc2 = audioContext.createOscillator();
+                osc2.type = 'sine';
+                osc2.frequency.value = freq * 1.002; // Slight detune for richness
+
+                osc.connect(padGain);
+                osc2.connect(padGain);
+                osc.start(now);
+                osc2.start(now);
+                osc.stop(now + duration);
+                osc2.stop(now + duration);
+
+                padOscillators.push(osc, osc2);
+            });
+        }
+
+        // Play melody note with vibrato
+        function playMelodyNote(frequency, startTime, duration, volume = 0.2) {
+            const osc = audioContext.createOscillator();
+            const vibrato = audioContext.createOscillator();
+            const vibratoGain = audioContext.createGain();
             const gainNode = audioContext.createGain();
 
-            oscillator.type = type;
-            oscillator.frequency.value = frequency;
+            osc.type = 'sine';
+            osc.frequency.value = frequency;
 
+            vibrato.type = 'sine';
+            vibrato.frequency.value = 5;
+            vibratoGain.gain.value = 3;
+
+            vibrato.connect(vibratoGain);
+            vibratoGain.connect(osc.frequency);
+
+            // Soft attack and release
             gainNode.gain.setValueAtTime(0, startTime);
-            gainNode.gain.linearRampToValueAtTime(gain, startTime + 0.1);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+            gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.15);
+            gainNode.gain.setValueAtTime(volume, startTime + duration - 0.2);
+            gainNode.gain.linearRampToValueAtTime(0, startTime + duration);
 
-            oscillator.connect(gainNode);
-            gainNode.connect(masterGain);
+            osc.connect(gainNode);
+            gainNode.connect(reverbNode);
 
-            oscillator.start(startTime);
-            oscillator.stop(startTime + duration);
-
-            oscillators.push(oscillator);
+            osc.start(startTime);
+            vibrato.start(startTime);
+            osc.stop(startTime + duration + 0.1);
+            vibrato.stop(startTime + duration + 0.1);
         }
 
-        // Silent Night melody (simplified)
-        const silentNightMelody = [
-            { note: 293.66, duration: 1.5 },  // D
-            { note: 329.63, duration: 0.5 },  // E
-            { note: 293.66, duration: 1 },    // D
-            { note: 246.94, duration: 2 },    // B
-            { note: 293.66, duration: 1.5 },  // D
-            { note: 329.63, duration: 0.5 },  // E
-            { note: 293.66, duration: 1 },    // D
-            { note: 246.94, duration: 2 },    // B
-            { note: 440.00, duration: 1 },    // A
-            { note: 440.00, duration: 1 },    // A
-            { note: 349.23, duration: 2 },    // F#
-            { note: 392.00, duration: 1 },    // G
-            { note: 392.00, duration: 1 },    // G
-            { note: 293.66, duration: 2 }     // D
+        // Silent Night - Full arrangement in G major
+        const silentNight = [
+            // Phrase 1: "Silent night, holy night"
+            { note: 392.00, dur: 1.2 }, { note: 440.00, dur: 0.4 }, { note: 392.00, dur: 0.8 }, // Si-lent night
+            { note: 329.63, dur: 2.0 }, // (hold)
+            { note: 392.00, dur: 1.2 }, { note: 440.00, dur: 0.4 }, { note: 392.00, dur: 0.8 }, // Ho-ly night
+            { note: 329.63, dur: 2.0 }, // (hold)
+
+            // Phrase 2: "All is calm, all is bright"
+            { note: 587.33, dur: 1.6 }, { note: 587.33, dur: 0.8 }, // All is
+            { note: 493.88, dur: 2.0 }, // calm
+            { note: 523.25, dur: 1.6 }, { note: 523.25, dur: 0.8 }, // All is
+            { note: 392.00, dur: 2.0 }, // bright
+
+            // Phrase 3: "Round yon virgin, mother and child"
+            { note: 440.00, dur: 1.6 }, { note: 440.00, dur: 0.8 }, // Round yon
+            { note: 523.25, dur: 1.2 }, { note: 493.88, dur: 0.4 }, { note: 440.00, dur: 0.8 }, // vir-gin
+            { note: 392.00, dur: 1.2 }, { note: 440.00, dur: 0.4 }, { note: 392.00, dur: 0.8 }, // mo-ther and
+            { note: 329.63, dur: 2.0 }, // child
+
+            // Phrase 4: "Holy infant so tender and mild"
+            { note: 440.00, dur: 1.6 }, { note: 440.00, dur: 0.8 }, // Ho-ly
+            { note: 523.25, dur: 1.2 }, { note: 493.88, dur: 0.4 }, { note: 440.00, dur: 0.8 }, // in-fant so
+            { note: 392.00, dur: 1.2 }, { note: 440.00, dur: 0.4 }, { note: 392.00, dur: 0.8 }, // ten-der and
+            { note: 329.63, dur: 2.0 }, // mild
+
+            // Phrase 5: "Sleep in heavenly peace"
+            { note: 587.33, dur: 1.6 }, { note: 587.33, dur: 0.8 }, // Sleep in
+            { note: 698.46, dur: 1.2 }, { note: 587.33, dur: 0.8 }, // hea-ven-ly
+            { note: 493.88, dur: 2.4 }, // peace
+
+            // Phrase 6: "Sleep in heavenly peace"
+            { note: 523.25, dur: 1.2 }, { note: 392.00, dur: 0.4 }, { note: 329.63, dur: 0.8 }, // Sleep in
+            { note: 293.66, dur: 1.2 }, { note: 392.00, dur: 0.8 }, // hea-ven-ly
+            { note: 261.63, dur: 3.0 }, // peace (G3 - low ending)
         ];
 
-        function playSilentNight() {
-            if (!audioContext) initAudio();
+        function playSilentNightMelody() {
+            if (!isPlaying || !audioContext) return;
 
-            let currentTime = audioContext.currentTime;
-            silentNightMelody.forEach(note => {
-                playNote(note.note, note.duration, currentTime, 'sine', 0.15);
-                // Add harmony
-                playNote(note.note * 0.75, note.duration, currentTime, 'sine', 0.08);
-                currentTime += note.duration;
+            let time = audioContext.currentTime + 0.5;
+            const tempo = 0.9; // Slower, more peaceful
+
+            silentNight.forEach(note => {
+                playMelodyNote(note.note, time, note.dur * tempo * 0.95, 0.18);
+                time += note.dur * tempo;
             });
 
-            // Schedule next loop
+            // Background pad changes with harmony
+            playPad([130.81, 164.81, 196.00], 12); // C major
             setTimeout(() => {
-                if (isPlaying) playSilentNight();
-            }, currentTime * 1000 - audioContext.currentTime * 1000 + 2000);
+                if (isPlaying) playPad([146.83, 174.61, 220.00], 12); // D minor
+            }, 12000);
+            setTimeout(() => {
+                if (isPlaying) playPad([130.81, 164.81, 196.00], 12); // C major
+            }, 24000);
+
+            // Schedule next loop
+            const totalDuration = silentNight.reduce((sum, n) => sum + n.dur * tempo, 0);
+            melodyTimeout = setTimeout(() => {
+                if (isPlaying) playSilentNightMelody();
+            }, (totalDuration + 4) * 1000);
         }
 
-        function playBells() {
-            if (!audioContext) return;
+        function playRandomBells() {
+            if (!isPlaying || !audioContext) return;
 
-            setInterval(() => {
-                if (isPlaying) {
-                    const bellNotes = [523.25, 659.25, 783.99]; // C, E, G
-                    const note = bellNotes[Math.floor(Math.random() * bellNotes.length)];
-                    playNote(note, 0.3, audioContext.currentTime, 'triangle', 0.1);
-                }
-            }, 4000);
+            const bellNotes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+            const note = bellNotes[Math.floor(Math.random() * bellNotes.length)];
+            playBell(note, audioContext.currentTime, 0.1);
         }
 
-        function playFireplace() {
-            if (!audioContext) return;
+        async function startMusic() {
+            const success = await initAudio();
+            if (!success) return;
 
-            // Pink noise for crackling
-            const bufferSize = 2 * audioContext.sampleRate;
-            const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-            const output = noiseBuffer.getChannelData(0);
-
-            let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-            for (let i = 0; i < bufferSize; i++) {
-                const white = Math.random() * 2 - 1;
-                b0 = 0.99886 * b0 + white * 0.0555179;
-                b1 = 0.99332 * b1 + white * 0.0750759;
-                b2 = 0.96900 * b2 + white * 0.1538520;
-                b3 = 0.86650 * b3 + white * 0.3104856;
-                b4 = 0.55000 * b4 + white * 0.5329522;
-                b5 = -0.7616 * b5 - white * 0.0168980;
-                output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
-                output[i] *= 0.11;
-                b6 = white * 0.115926;
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
             }
 
-            function playNoise() {
-                if (!isPlaying) return;
+            isPlaying = true;
+            const btn = document.getElementById('play-pause-btn');
+            btn.textContent = '⏸️';
 
-                const whiteNoise = audioContext.createBufferSource();
-                whiteNoise.buffer = noiseBuffer;
-                const noiseGain = audioContext.createGain();
-                noiseGain.gain.value = 0.03;
-                whiteNoise.connect(noiseGain);
-                noiseGain.connect(masterGain);
-                whiteNoise.start();
-                whiteNoise.stop(audioContext.currentTime + 2);
+            playSilentNightMelody();
+            bellInterval = setInterval(playRandomBells, 6000);
 
-                setTimeout(playNoise, 1800);
-            }
+            console.log('%c🎄 Music playing...', 'color: #228B22;');
+        }
 
-            playNoise();
+        function stopMusic() {
+            isPlaying = false;
+            const btn = document.getElementById('play-pause-btn');
+            btn.textContent = '▶️';
+
+            if (melodyTimeout) clearTimeout(melodyTimeout);
+            if (bellInterval) clearInterval(bellInterval);
+            padOscillators.forEach(o => { try { o.stop(); } catch(e) {} });
+            padOscillators = [];
         }
 
         async function toggleMusic() {
-            const btn = document.getElementById('play-pause-btn');
-
             if (!isPlaying) {
-                await initAudio();
-
-                // Ensure context is running (mobile fix)
-                if (audioContext && audioContext.state === 'suspended') {
-                    await audioContext.resume();
-                }
-
-                if (!audioContext) {
-                    console.warn('Audio not available');
-                    return;
-                }
-
-                isPlaying = true;
-                btn.textContent = '⏸️';
-                btn.setAttribute('aria-label', 'Pause music');
-                playSilentNight();
-                playBells();
-                playFireplace();
+                await startMusic();
             } else {
-                isPlaying = false;
-                btn.textContent = '▶️';
-                btn.setAttribute('aria-label', 'Play music');
-                oscillators.forEach(osc => {
-                    try { osc.stop(); } catch(e) {}
-                });
-                oscillators = [];
+                stopMusic();
             }
         }
 
         function changeVolume(value) {
             if (masterGain) {
-                masterGain.gain.value = value / 100;
+                masterGain.gain.value = (value / 100) * 0.6;
             }
         }
+
+        // AUTO-PLAY: Start music on first user interaction
+        let autoPlayTriggered = false;
+        function tryAutoPlay() {
+            if (autoPlayTriggered) return;
+            autoPlayTriggered = true;
+
+            setTimeout(async () => {
+                await startMusic();
+            }, 500);
+        }
+
+        ['click', 'touchstart', 'keydown', 'scroll'].forEach(event => {
+            document.addEventListener(event, tryAutoPlay, { once: true, passive: true });
+        });
 
         // ============================================================================
         // TREE INTERACTION
