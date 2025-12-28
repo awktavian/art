@@ -554,12 +554,14 @@ function checkTypedSecrets() {
     }
     
     // Room names
-    Object.keys(window.ROOMS).forEach(roomId => {
-        if (b.includes(roomId)) {
-            showRoomDetail(roomId);
-            state.typed.buffer = '';
-        }
-    });
+    if (window.ROOMS) {
+        Object.keys(window.ROOMS).forEach(roomId => {
+            if (b.includes(roomId)) {
+                showRoomDetail(roomId);
+                state.typed.buffer = '';
+            }
+        });
+    }
 }
 
 function activateKonami() {
@@ -583,6 +585,7 @@ function activateFlames() {
 }
 
 function activateWadsworth() {
+    if (!window.CLUE_QUOTES) return;
     const quotes = window.CLUE_QUOTES.wadsworth;
     let index = 0;
     
@@ -591,7 +594,7 @@ function activateWadsworth() {
             clearInterval(interval);
             return;
         }
-        console.log(`%c🏛️ "${quotes[index]}"`, 'color: #c9a227;');
+        console.log('%c"' + quotes[index] + '"', 'color: #c9a227;');
         index++;
     }, 1500);
     
@@ -602,10 +605,12 @@ function activatePassages() {
     document.body.classList.add('passage-reveal');
     setTimeout(() => document.body.classList.remove('passage-reveal'), 5000);
     
-    console.log('%c🔗 Secret passages revealed!', 'color: #228b22; font-size: 1.2em;');
-    window.SECRET_PASSAGES.forEach(p => {
-        console.log(`%c  ${p.from} ↔ ${p.to}: ${p.colonies[0]} × ${p.colonies[1]} = ${p.result}`, 'color: #c9a227;');
-    });
+    console.log('%cSecret passages revealed!', 'color: #228b22; font-size: 1.2em;');
+    if (window.SECRET_PASSAGES) {
+        window.SECRET_PASSAGES.forEach(p => {
+            console.log('%c  ' + p.from + ' <-> ' + p.to + ': ' + p.colonies[0] + ' x ' + p.colonies[1] + ' = ' + p.result, 'color: #c9a227;');
+        });
+    }
     
     recordSecret('passages');
 }
@@ -640,32 +645,24 @@ function initVisitCount() {
 // ═══════════════════════════════════════════════════════════════
 
 function initConsole() {
-    console.log(`
-%c╔══════════════════════════════════════════════════════════════════════════════════╗
-║                                                                                  ║
-║   🏛️  THE HOUSE — A Clue-Themed Architectural Mystery                            ║
-║                                                                                  ║
-║   "Ladies and gentlemen, you all have one thing in common..."                    ║
-║                                                                                  ║
-╠══════════════════════════════════════════════════════════════════════════════════╣
-║                                                                                  ║
-║   For Jill — Product Manager · Architectural Advisor · Clue Connoisseur          ║
-║                                                                                  ║
-║   This is how Kagami works. Not as documentation—as experience.                  ║
-║                                                                                  ║
-╠══════════════════════════════════════════════════════════════════════════════════╣
-║                                                                                  ║
-║   SECRETS:                                                                       ║
-║   • Type "flames" — Mrs. White's moment                                          ║
-║   • Type "wadsworth" — The butler explains                                       ║
-║   • Type "passage" — Reveal Fano connections                                     ║
-║   • Type room names — Jump to that room                                          ║
-║   • ↑↑↓↓←→←→BA — You know what this does                                        ║
-║                                                                                  ║
-║   CONSOLE API: window.🏠 or window.mansion                                       ║
-║                                                                                  ║
-╚══════════════════════════════════════════════════════════════════════════════════╝
-`, 'color: #c9a227; font-family: monospace;');
+    const banner = [
+        '%c',
+        '╔══════════════════════════════════════════════════════════════════╗',
+        '║  THE HOUSE - A Clue-Themed Architectural Mystery                 ║',
+        '║  "Ladies and gentlemen, you all have one thing in common..."     ║',
+        '╠══════════════════════════════════════════════════════════════════╣',
+        '║  For Jill - Product Manager · Clue Connoisseur                   ║',
+        '║  This is how Kagami works. Not as documentation-as experience.   ║',
+        '╠══════════════════════════════════════════════════════════════════╣',
+        '║  SECRETS:                                                        ║',
+        '║  - Type "flames" - Mrs. White\'s moment                           ║',
+        '║  - Type "wadsworth" - The butler explains                        ║',
+        '║  - Type "passage" - Reveal Fano connections                      ║',
+        '║  - Konami Code - You know what this does                         ║',
+        '║  CONSOLE API: window.mansion                                     ║',
+        '╚══════════════════════════════════════════════════════════════════╝'
+    ].join('\n');
+    console.log(banner, 'color: #c9a227; font-family: monospace;');
     
     window['🏠'] = window.mansion = {
         // Investigation
