@@ -637,7 +637,7 @@ function initVisitCount() {
         return n + (s[(v - 20) % 10] || s[v] || s[0]);
     };
     
-    elements.visitCount.textContent = `Visit #${state.visits}`;
+    elements.visitCount.textContent = state.visits;
     
     if (state.secretsFound.length > 0) {
         elements.visitCount.textContent += ` · ${state.secretsFound.length} secrets found`;
