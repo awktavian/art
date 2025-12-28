@@ -184,7 +184,7 @@ const CHARACTERS = {
             "Let me explain... No, there is too much. Let me sum up.",
             "One plus one plus two plus one...",
             "Ladies and gentlemen, you all have one thing in common.",
-            "To make a long story short—" "Too late."
+            "To make a long story short— Too late."
         ],
         essence: 'The butler who knows everything. Routes, coordinates, observes all.',
         code: 'CLAUDE.md',
