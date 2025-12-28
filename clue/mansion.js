@@ -320,8 +320,12 @@ function initRoomInteractions() {
     });
     
     // Modal close
-    $('.modal-close').addEventListener('click', closeModal);
-    $('.modal-backdrop').addEventListener('click', closeModal);
+    const modalClose = $('.modal-close');
+    const modal = $('.modal');
+    if (modalClose) modalClose.addEventListener('click', closeModal);
+    if (modal) modal.addEventListener('click', e => {
+        if (e.target === modal) closeModal();
+    });
     
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') closeModal();
