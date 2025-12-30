@@ -1,6 +1,6 @@
 # Home — Complete Integrated Environment
 
-**7331 W Green Lake Dr N, Seattle, WA 98103**
+**Green Lake, Seattle**
 
 An artisanal showcase of a completely integrated smart home environment with 600+ capabilities, 100+ devices, and seamless digital-physical orchestration.
 
