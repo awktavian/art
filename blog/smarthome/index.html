@@ -858,25 +858,79 @@
             </div>
 
             <div class="mind-content">
-                <h3>Pattern Learning</h3>
+                <h3>Pattern Learning with Exponential Moving Average</h3>
                 <p>
-                    The presence engine maintains a probability distribution over room occupancy 
-                    for each 30-minute time slot. After a few weeks, it knows that at 7:30am on 
-                    a weekday, there's a 94% chance you're in the kitchen.
+                    The <code>PatternLearner</code> divides each day into 30-minute slots, 
+                    separately tracking weekdays and weekends. Every observation updates 
+                    probabilities using an exponential moving average—recent behavior 
+                    matters more than old habits, but stable patterns persist.
                 </p>
 
                 <figure class="code-figure">
-                    <figcaption>presence.py</figcaption>
-                    <pre><code><span class="code-keyword">def</span> <span class="code-function">predict_next_room</span>(self) -> tuple[str, float]:
+                    <figcaption>presence.py — observe_room</figcaption>
+                    <pre><code><span class="code-keyword">def</span> <span class="code-function">observe_room</span>(self, room_name: str, timestamp: float):
+    slot = TimeSlot.from_timestamp(timestamp)
+    pattern = self._patterns[slot]
+    
+    <span class="code-comment"># EMA: decay old observations, boost current</span>
+    alpha = self.learning_rate  <span class="code-comment"># 0.1</span>
+    <span class="code-keyword">for</span> room <span class="code-keyword">in</span> pattern.room_probabilities:
+        pattern.room_probabilities[room] *= (1 - alpha)
+    
+    current = pattern.room_probabilities.get(room_name, 0.0)
+    pattern.room_probabilities[room_name] = current + alpha * (1 - current)</code></pre>
+                </figure>
+
+                <h3>Transition Learning</h3>
+                <p>
+                    Beyond "where are you now," the system learns "where do you go next." 
+                    When you walk from the kitchen to the office every weekday at 9am, 
+                    that transition gets reinforced. After a few weeks, it knows the 
+                    morning sequence: bedroom → bathroom → kitchen → office.
+                </p>
+
+                <figure class="code-figure">
+                    <figcaption>presence.py — predict_next_room</figcaption>
+                    <pre><code><span class="code-keyword">def</span> <span class="code-function">predict_next_room</span>(self, current_room: str) -> tuple[str, float]:
     slot = TimeSlot.current()
-    pattern = self.patterns[slot]
+    transitions = self._patterns[slot].transitions[current_room]
     
-    <span class="code-comment"># Most likely room given current time</span>
-    probs = pattern.room_probabilities
-    best = max(probs, key=probs.get)
-    confidence = probs[best] / pattern.samples
+    <span class="code-keyword">if not</span> transitions:
+        <span class="code-keyword">return</span> None
     
-    <span class="code-keyword">return</span> best, confidence</code></pre>
+    best_room = max(transitions.keys(), key=<span class="code-keyword">lambda</span> r: transitions[r])
+    <span class="code-keyword">return</span> (best_room, transitions[best_room])</code></pre>
+                </figure>
+
+                <h3>Intent Prediction: Multi-Signal Fusion</h3>
+                <p>
+                    The <code>IntentPredictor</code> combines four weighted signals—time of day, 
+                    current location, historical patterns, and device states—to predict 
+                    what you're about to do. Eight Sleep says you just woke up. Denon is on. 
+                    Your car just arrived. Each signal adds evidence.
+                </p>
+
+                <figure class="signal-fusion">
+                    <div class="signal-row">
+                        <span class="signal-name">Time</span>
+                        <span class="signal-weight">30%</span>
+                        <span class="signal-desc">Morning routine vs evening wind-down</span>
+                    </div>
+                    <div class="signal-row">
+                        <span class="signal-name">Location</span>
+                        <span class="signal-weight">25%</span>
+                        <span class="signal-desc">Which room you're in right now</span>
+                    </div>
+                    <div class="signal-row">
+                        <span class="signal-name">Pattern</span>
+                        <span class="signal-weight">25%</span>
+                        <span class="signal-desc">What you usually do at this time slot</span>
+                    </div>
+                    <div class="signal-row">
+                        <span class="signal-name">Device</span>
+                        <span class="signal-weight">20%</span>
+                        <span class="signal-desc">Eight Sleep awake, Denon on, car home</span>
+                    </div>
                 </figure>
 
                 <h3>Activity Context</h3>
@@ -916,6 +970,25 @@
                         <span>&gt; 15min</span>
                         <span class="context-activity">SLEEPING</span>
                     </div>
+                </figure>
+
+                <h3>Preference Learning</h3>
+                <p>
+                    When you manually adjust the lights after the system sets them, 
+                    the adjustment gets recorded against your current room and activity.
+                    Over time, "Office + WORKING" learns your preferred brightness. 
+                    The system stops guessing and starts knowing.
+                </p>
+
+                <figure class="code-figure">
+                    <figcaption>presence.py — learn_preference</figcaption>
+                    <pre><code><span class="code-keyword">def</span> <span class="code-function">learn_preference</span>(self, room: str, activity: ActivityContext, 
+                        setting: str, value: float):
+    prefs = self._preferences[room][activity.value]
+    current = prefs.get(setting, value)
+    
+    <span class="code-comment"># Blend toward new preference</span>
+    prefs[setting] = current * (1 - alpha) + value * alpha</code></pre>
                 </figure>
             </div>
 
