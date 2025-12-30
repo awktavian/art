@@ -1032,20 +1032,82 @@
             </div>
 
             <div class="awareness-content">
-                <h3>Phase Detection</h3>
+                <h3>The Wakefulness Manager</h3>
                 <p>
-                    The day divides into phases: MORNING, WORKING, AFTERNOON, EVENING, NIGHT.
-                    Each phase has different polling rates, notification thresholds, and automation
-                    aggressiveness. During WORKING, email checks increase; during NIGHT, 
-                    everything quiets except critical alerts.
+                    The system has its own wakefulness—a single state that propagates to every 
+                    subsystem: polling rates, autonomy decisions, and alert thresholds.
                 </p>
 
-                <h3>Wakefulness States</h3>
+                <figure class="wakefulness-table">
+                    <div class="wake-row wake-header">
+                        <span>Level</span>
+                        <span>Poll Rate</span>
+                        <span>Autonomy</span>
+                        <span>Alert Threshold</span>
+                    </div>
+                    <div class="wake-row">
+                        <span class="wake-level">DORMANT</span>
+                        <span>10× slower</span>
+                        <span>Off</span>
+                        <span>Critical only</span>
+                    </div>
+                    <div class="wake-row">
+                        <span class="wake-level">DROWSY</span>
+                        <span>3× slower</span>
+                        <span>Off</span>
+                        <span>High+</span>
+                    </div>
+                    <div class="wake-row">
+                        <span class="wake-level">ALERT</span>
+                        <span>Normal</span>
+                        <span>Full</span>
+                        <span>Normal+</span>
+                    </div>
+                    <div class="wake-row">
+                        <span class="wake-level">FOCUSED</span>
+                        <span>2× slower</span>
+                        <span>Full</span>
+                        <span>High+ only</span>
+                    </div>
+                    <div class="wake-row">
+                        <span class="wake-level">HYPER</span>
+                        <span>2× faster</span>
+                        <span>Full</span>
+                        <span>All alerts</span>
+                    </div>
+                </figure>
+
+                <h3>Per-Sense Overrides</h3>
                 <p>
-                    The system itself has wakefulness levels: DORMANT, DROWSY, ALERT, FOCUSED, HYPER.
-                    During FOCUSED mode, Gmail polls 5x slower, Discord 10x slower. During HYPER
-                    (active scene change), everything runs at 2x speed.
+                    Not all senses slow down equally. During FOCUSED mode, Gmail polls 5× slower 
+                    and Discord 10× slower—but calendar stays fast. Security and locks 
+                    always poll at normal speed, regardless of wakefulness.
                 </p>
+
+                <figure class="code-figure">
+                    <figcaption>wakefulness.py — FOCUSED mode</figcaption>
+                    <pre><code>WakefulnessLevel.FOCUSED: WakefulnessConfig(
+    poll_multiplier=<span class="code-number">2.0</span>,     <span class="code-comment"># Slower polling</span>
+    autonomy_enabled=<span class="code-keyword">True</span>,   <span class="code-comment"># But autonomy continues</span>
+    alert_min_priority=<span class="code-number">2</span>,    <span class="code-comment"># Only high priority</span>
+    sense_overrides={
+        <span class="code-string">"gmail"</span>: <span class="code-number">5.0</span>,       <span class="code-comment"># Much slower</span>
+        <span class="code-string">"discord"</span>: <span class="code-number">10.0</span>,    <span class="code-comment"># Almost no polling</span>
+        <span class="code-string">"calendar"</span>: <span class="code-number">1.0</span>,    <span class="code-comment"># Watch calendar</span>
+    },
+)</code></pre>
+                </figure>
+
+                <h3>Adaptive Polling Formula</h3>
+                <p>
+                    The final poll interval stacks five multipliers. At 2am when you're sleeping 
+                    and away, email might poll once every 30 minutes instead of every minute.
+                </p>
+
+                <figure class="formula-figure">
+                    <code>interval = base × wake × activity × presence × time</code>
+                    <span class="formula-constraint">Clamped to 0.25× – 10× of base</span>
+                </figure>
             </div>
 
         </div>
@@ -1094,14 +1156,25 @@
             </div>
 
             <div class="bridge-content">
-                <h3>Composio Integration</h3>
+                <h3>Trigger Architecture</h3>
                 <p>
-                    Ten digital services connected through Composio: Gmail, Slack, Calendar, Linear,
-                    Todoist, Notion, Drive, Sheets, Discord, Twitter. That's 500 API actions unified
-                    under one interface.
+                    Each <code>CrossDomainTrigger</code> binds a condition function to an action.
+                    When a sense polls new data, the bridge evaluates all triggers. Those that 
+                    match and haven't fired within their cooldown window execute their action.
                 </p>
 
-                <h3>Example Triggers</h3>
+                <figure class="code-figure">
+                    <figcaption>cross_domain_bridge.py — Trigger definition</figcaption>
+                    <pre><code>CrossDomainTrigger(
+    name=<span class="code-string">"urgent_email"</span>,
+    source=<span class="code-string">"gmail"</span>,
+    condition=<span class="code-keyword">lambda</span> d: d.get(<span class="code-string">"is_urgent"</span>),
+    action=announce_to_occupied_room,
+    cooldown=<span class="code-number">300.0</span>,  <span class="code-comment"># 5 minutes</span>
+)</code></pre>
+                </figure>
+
+                <h3>Ten Active Triggers</h3>
                 <figure class="triggers-list">
                     <div class="trigger-row">
                         <span class="trigger-event">Urgent email arrives</span>
@@ -1109,21 +1182,58 @@
                         <span class="trigger-action">Announce via occupied room speaker</span>
                     </div>
                     <div class="trigger-row">
-                        <span class="trigger-event">Meeting in 5 minutes</span>
+                        <span class="trigger-event">Meeting in 15 minutes</span>
                         <span class="trigger-arrow">→</span>
                         <span class="trigger-action">Office lights optimize, shades adjust</span>
                     </div>
                     <div class="trigger-row">
-                        <span class="trigger-event">PR merged</span>
+                        <span class="trigger-event">Sleep detected</span>
                         <span class="trigger-arrow">→</span>
-                        <span class="trigger-action">Celebration chime (quiet hours aware)</span>
+                        <span class="trigger-action">Trigger goodnight scene</span>
                     </div>
                     <div class="trigger-row">
-                        <span class="trigger-event">Focus mode enabled</span>
+                        <span class="trigger-event">Vehicle arriving (ETA &lt;5min)</span>
                         <span class="trigger-arrow">→</span>
-                        <span class="trigger-action">Notifications pause, lights warm</span>
+                        <span class="trigger-action">Trigger welcome_home</span>
+                    </div>
+                    <div class="trigger-row">
+                        <span class="trigger-event">Hot/sunny weather</span>
+                        <span class="trigger-arrow">→</span>
+                        <span class="trigger-action">Close south-facing shades</span>
+                    </div>
+                    <div class="trigger-row">
+                        <span class="trigger-event">PR merged on GitHub</span>
+                        <span class="trigger-arrow">→</span>
+                        <span class="trigger-action">Celebration announcement</span>
+                    </div>
+                    <div class="trigger-row">
+                        <span class="trigger-event">Rain starting</span>
+                        <span class="trigger-arrow">→</span>
+                        <span class="trigger-action">Close shades, announce</span>
+                    </div>
+                    <div class="trigger-row">
+                        <span class="trigger-event">Cold weather alert</span>
+                        <span class="trigger-arrow">→</span>
+                        <span class="trigger-action">HVAC comfort suggestion</span>
+                    </div>
+                    <div class="trigger-row">
+                        <span class="trigger-event">Sunset approaching</span>
+                        <span class="trigger-arrow">→</span>
+                        <span class="trigger-action">Prepare evening lighting</span>
+                    </div>
+                    <div class="trigger-row">
+                        <span class="trigger-event">Snow detected</span>
+                        <span class="trigger-arrow">→</span>
+                        <span class="trigger-action">Safety announcement</span>
                     </div>
                 </figure>
+
+                <h3>Cooldown and Dedup</h3>
+                <p>
+                    Each trigger tracks <code>last_triggered</code> and won't fire again until its 
+                    cooldown expires. Email announcements also track message IDs to prevent
+                    duplicate reads of the same urgent message.
+                </p>
             </div>
 
         </div>
@@ -1140,21 +1250,16 @@
             <div class="scene-intro">
                 <span class="scene-number">XII</span>
                 <h2 class="scene-title">Performance</h2>
-            </div>
-
-            <div class="perf-hero">
-                <div class="perf-number">
-                    <span class="perf-value">Parallel</span>
-                </div>
-                <p class="perf-context">Independent operations run concurrently, not sequentially.</p>
+                <p class="scene-subtitle">Speed through parallelism and resilience</p>
             </div>
 
             <div class="perf-content">
                 <h3>Parallel Execution</h3>
                 <p>
                     Scene activation doesn't wait for each device sequentially. 
-                    Independent operations run in parallel via <code>asyncio.gather()</code>,
-                    with dependencies executed in topological order.
+                    Independent operations run in parallel via <code>asyncio.gather()</code>.
+                    A scene touching four integrations completes in the time of the slowest, 
+                    not the sum of all.
                 </p>
 
                 <figure class="timeline-figure">
@@ -1185,18 +1290,62 @@
                     </div>
                 </figure>
 
-                <h3>Circuit Breakers</h3>
+                <h3>Circuit Breakers by Tier</h3>
                 <p>
-                    Each integration has a circuit breaker that trips after 3 consecutive failures. 
-                    The breaker stays open for 60 seconds before allowing a retry. 
-                    One failing integration can't block the entire system.
+                    Each integration has a circuit breaker configured by criticality tier. 
+                    Critical systems (locks, security) get more retries before tripping. 
+                    Once tripped, the breaker stays open—one failing integration 
+                    can't block the entire system.
                 </p>
 
-                <h3>Adaptive Polling</h3>
+                <figure class="circuit-table">
+                    <div class="circuit-row circuit-header">
+                        <span>Integration</span>
+                        <span>Tier</span>
+                        <span>Threshold</span>
+                        <span>Check Interval</span>
+                    </div>
+                    <div class="circuit-row">
+                        <span>Control4</span>
+                        <span class="tier-critical">CRITICAL</span>
+                        <span>5 failures</span>
+                        <span>30s</span>
+                    </div>
+                    <div class="circuit-row">
+                        <span>UniFi</span>
+                        <span class="tier-critical">CRITICAL</span>
+                        <span>5 failures</span>
+                        <span>60s</span>
+                    </div>
+                    <div class="circuit-row">
+                        <span>Denon</span>
+                        <span class="tier-important">IMPORTANT</span>
+                        <span>3 failures</span>
+                        <span>120s</span>
+                    </div>
+                    <div class="circuit-row">
+                        <span>Eight Sleep</span>
+                        <span class="tier-essential">ESSENTIAL</span>
+                        <span>3 failures</span>
+                        <span>300s</span>
+                    </div>
+                </figure>
+
+                <h3>Failover Routes</h3>
                 <p>
-                    Polling rates adapt to context. Four factors multiply: wakefulness level,
-                    activity type, presence confidence, and time of day. Range: 0.25x to 10x baseline.
+                    If Control4 goes down, lighting degrades to direct Lutron LEAP. 
+                    If UniFi fails, presence falls back to Tesla geofencing, then August door sensors. 
+                    There's always another path.
                 </p>
+
+                <figure class="code-figure">
+                    <figcaption>failover_manager.py</figcaption>
+                    <pre><code>FAILOVER_ROUTES = {
+    <span class="code-string">"presence"</span>: [<span class="code-string">"unifi"</span>, <span class="code-string">"tesla"</span>, <span class="code-string">"august"</span>],
+    <span class="code-string">"lighting"</span>: [<span class="code-string">"control4"</span>, <span class="code-string">"lutron_leap"</span>],
+    <span class="code-string">"climate"</span>:  [<span class="code-string">"mitsubishi"</span>, <span class="code-string">"control4"</span>],
+}</code></pre>
+                </figure>
             </div>
 
         </div>
@@ -1321,19 +1470,66 @@
             </div>
 
             <div class="realtime-content">
-                <h3>Event Flow</h3>
+                <h3>Event-Driven Architecture</h3>
                 <p>
-                    Real-time events from four sources converge into a unified event bus.
-                    Each event is typed, timestamped, and routed to interested handlers.
-                    Motion detection triggers lighting. Doorbell triggers camera snapshot.
-                    Car arrival triggers welcome sequence.
+                    Four sources push events as they happen. Motion detection arrives in 50ms.
+                    The system can react before you've finished walking through a room.
                 </p>
+
+                <figure class="event-flow">
+                    <div class="event-sources">
+                        <span>UniFi</span>
+                        <span>Control4</span>
+                        <span>Denon</span>
+                        <span>Tesla</span>
+                    </div>
+                    <div class="event-arrow">↓</div>
+                    <div class="event-bus">
+                        <span class="bus-label">PresenceEngine.process_event()</span>
+                    </div>
+                    <div class="event-arrow">↓</div>
+                    <div class="event-handlers">
+                        <span>Pattern Learning</span>
+                        <span>Activity Inference</span>
+                        <span>Room Occupancy</span>
+                        <span>Cross-Domain Triggers</span>
+                    </div>
+                </figure>
+
+                <h3>What Triggers What</h3>
+                <figure class="event-table">
+                    <div class="event-row event-header">
+                        <span>Event Type</span>
+                        <span>Source</span>
+                        <span>Reaction</span>
+                    </div>
+                    <div class="event-row">
+                        <span><code>motion</code> / <code>person</code></span>
+                        <span>UniFi cameras</span>
+                        <span>Update room occupancy, trigger lights</span>
+                    </div>
+                    <div class="event-row">
+                        <span><code>ring</code></span>
+                        <span>Doorbell</span>
+                        <span>Camera snapshot, announcement</span>
+                    </div>
+                    <div class="event-row">
+                        <span><code>connect</code> / <code>disconnect</code></span>
+                        <span>UniFi WiFi</span>
+                        <span>Device presence, owner location</span>
+                    </div>
+                    <div class="event-row">
+                        <span><code>zone_open</code></span>
+                        <span>DSC security</span>
+                        <span>Room entered, presence confirmed</span>
+                    </div>
+                </figure>
 
                 <h3>Polling Fallbacks</h3>
                 <p>
-                    When WebSocket isn't available, adaptive polling fills the gap. Base intervals
-                    range from 15 seconds (presence) to 600 seconds (sleep data), multiplied by
-                    the 4-factor adaptive system based on current context.
+                    When WebSocket isn't available, adaptive polling fills the gap. Base intervals 
+                    range from 15 seconds (presence) to 600 seconds (sleep data), multiplied by 
+                    wakefulness and activity factors.
                 </p>
             </div>
 
@@ -1350,72 +1546,64 @@
             
             <div class="scene-intro">
                 <span class="scene-number">XV</span>
-                <h2 class="scene-title">The Yak Shaves</h2>
-                <p class="scene-subtitle">Every project has moments where you find yourself<br>three levels deep in something unrelated.</p>
+                <h2 class="scene-title">The Lessons</h2>
+                <p class="scene-subtitle">What I learned building this</p>
             </div>
 
-            <div class="yak-list">
+            <div class="lessons-grid">
                 
-                <article class="yak">
-                    <h3>The Control4 Token Dance</h3>
+                <article class="lesson">
+                    <span class="lesson-number">01</span>
+                    <h3>Token management is its own microservice</h3>
                     <p>
-                        To control my own lights, I need a bearer token. To get the token, 
-                        I authenticate with Control4's cloud. The cloud returns an account token. 
-                        I exchange that for a controller token. Then I get a director token. 
-                        The director token expires in 24 hours. The refresh flow requires 
-                        the entire dance again.
-                    </p>
-                    <p class="yak-lesson">
-                        <strong>Lesson:</strong> Token management is its own microservice.
+                        Control4's 3-step authentication, 24-hour expiry, and refresh dance taught me: 
+                        treat auth as infrastructure, not afterthought. Build it robust from day one.
                     </p>
                 </article>
 
-                <article class="yak">
-                    <h3>UniFi Local Admin Discovery</h3>
+                <article class="lesson">
+                    <span class="lesson-number">02</span>
+                    <h3>Enterprise features have escape hatches</h3>
                     <p>
-                        UniFi's 2FA flow makes automation painful. After days of frustration, 
-                        I discovered you can create a local-only admin account on the UDM Pro 
-                        that bypasses 2FA entirely. This isn't documented anywhere obvious.
-                    </p>
-                    <p class="yak-lesson">
-                        <strong>Lesson:</strong> Enterprise features often have escape hatches.
+                        UniFi's 2FA blocked automation until I found the undocumented local admin account.
+                        When an API seems impossible, there's usually a path—keep digging.
                     </p>
                 </article>
 
-                <article class="yak">
-                    <h3>Tesla Fleet API Migration</h3>
+                <article class="lesson">
+                    <span class="lesson-number">03</span>
+                    <h3>APIs you don't control will break</h3>
                     <p>
-                        My working Tesla integration suddenly stopped. Tesla had deprecated 
-                        the Vehicle API. The new Fleet API requires registering as a "partner," 
-                        which means hosting a public key at a specific URL path on a verified domain. 
-                        For a personal project.
-                    </p>
-                    <p class="yak-lesson">
-                        <strong>Lesson:</strong> APIs you don't control can change overnight.
+                        Tesla deprecated their Vehicle API overnight. Eight Sleep changed their auth flow.
+                        Every integration needs circuit breakers and fallback paths. No exceptions.
                     </p>
                 </article>
 
-                <article class="yak">
-                    <h3>Denon Input Source Archaeology</h3>
+                <article class="lesson">
+                    <span class="lesson-number">04</span>
+                    <h3>Experimentation is documentation</h3>
                     <p>
-                        The Denon API accepts input names like "MPLAY" and "SAT/CBL". 
-                        The UI shows "Apple TV" and "Cable". There's no mapping documentation. 
-                        I literally tried every combination of input names and recorded which ones worked.
-                    </p>
-                    <p class="yak-lesson">
-                        <strong>Lesson:</strong> Sometimes the only documentation is experimentation.
+                        Denon's input names ("MPLAY", "SAT/CBL") don't match their UI labels.
+                        I tried every combination. Now my code IS the documentation.
                     </p>
                 </article>
 
-                <article class="yak">
-                    <h3>The Denon Connection Race</h3>
+                <article class="lesson">
+                    <span class="lesson-number">05</span>
+                    <h3>Initialization order matters</h3>
                     <p>
-                        When too many integrations initialize simultaneously, the Denon AVR's telnet
-                        port becomes overloaded. Connection timeouts cascaded. The fix: exponential
-                        backoff with jitter, plus a 20-second timeout instead of 10.
+                        Nine integrations connecting simultaneously overwhelmed Denon's telnet port.
+                        The fix: exponential backoff, jitter, and generous timeouts.
                     </p>
-                    <p class="yak-lesson">
-                        <strong>Lesson:</strong> Initialization order matters more than you think.
+                </article>
+
+                <article class="lesson">
+                    <span class="lesson-number">06</span>
+                    <h3>Rate limits are friends, not enemies</h3>
+                    <p>
+                        Eight Sleep's rate limiting taught me: respect the API's limits, 
+                        read the <code>Retry-After</code> header, back off gracefully. Aggressive 
+                        clients get blocked; patient ones stay connected.
                     </p>
                 </article>
 
@@ -1477,18 +1665,17 @@
                     The house thinks now.
                 </p>
                 <p class="closing-text">
-                    It knows when I'm home, what I'm doing, and what I might need next. 
-                    Nine physical integrations and ten digital services, unified under one command.
-                    Forty-one lights, eleven shades, five HVAC zones, four cameras—all responding
-                    in parallel, in under a second.
+                    Nine physical integrations. Ten digital services. One command. 
+                    Parallel execution. Real-time events. Adaptive polling. 
+                    Pattern learning that improves over time.
                 </p>
                 <p class="closing-text">
-                    And when something fails — and it will — the system routes around it.
-                    Circuit breakers trip. Failover paths activate. Degraded operation beats
-                    total failure every time.
+                    When Control4 goes down, lights fall back to direct Lutron.
+                    When UniFi fails, presence routes through Tesla geofencing.
+                    Every integration has a circuit breaker. Every failure has a fallback.
                 </p>
                 <p class="closing-coda">
-                    That's not magic. That's just good engineering.
+                    Not magic. Just engineering.
                 </p>
             </div>
 
