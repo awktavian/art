@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boss Your Car Around — Tesla Control for Robots</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOSS YOUR CAR AROUND — TESLA CONTROL FOR ROBOTS
+   🚗 "Ugh I need a new car so my robots can boss it around" — Kristi
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+    /* Tesla Palette */
+    --tesla-red: #E82127;
+    --tesla-white: #FFFFFF;
+    --tesla-silver: #C0C0C0;
+    --tesla-blue: #3E6AE1;
+    --ice-blue: #A8D5E2;
+    --warm-orange: #FF6B35;
+    --heat-red: #FF4136;
+    --seattle-gray: #4A5568;
+
+    /* Glass */
+    --glass-bg: rgba(255, 255, 255, 0.03);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-glow: rgba(232, 33, 39, 0.1);
+
+    /* Void */
+    --void: #07060B;
+    --void-light: #0f0e14;
+    --void-lighter: #16141f;
+
+    /* Text */
+    --text: #f5f5f5;
+    --text-dim: rgba(245, 245, 245, 0.6);
+    --text-bright: #ffffff;
+
+    /* Timing (Fibonacci) */
+    --dur-fast: 144ms;
+    --dur-normal: 233ms;
+    --dur-slow: 377ms;
+    --dur-dramatic: 610ms;
+
+    /* Spacing (Fibonacci) */
+    --space-xs: 8px;
+    --space-sm: 13px;
+    --space-md: 21px;
+    --space-lg: 34px;
+    --space-xl: 55px;
+    --space-2xl: 89px;
+
+    /* Easing */
+    --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-vroom: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 17px; }
+
+body {
+    font-family: 'Comic Neue', 'Inter', sans-serif;
+    background: var(--void);
+    color: var(--text);
+    line-height: 1.8;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--tesla-red); color: var(--void); }
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--void); }
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--tesla-red), var(--warm-orange));
+    border-radius: 4px;
+}
+
+/* ═══ CAUSTICS BACKGROUND (Car headlight reflections) ═══ */
+.caustics {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse 50% 40% at 20% 30%, rgba(232, 33, 39, 0.04) 0%, transparent 50%),
+        radial-gradient(ellipse 40% 35% at 80% 70%, rgba(62, 106, 225, 0.03) 0%, transparent 50%),
+        radial-gradient(ellipse 45% 30% at 60% 20%, rgba(255, 107, 53, 0.02) 0%, transparent 50%);
+    animation: caustics-drift 25s ease-in-out infinite;
+}
+
+@keyframes caustics-drift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(2%, -1%) scale(1.02); }
+    66% { transform: translate(-1%, 2%) scale(0.98); }
+}
+
+/* ═══ HEADER ═══ */
+.header {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: var(--space-xl) var(--space-md);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Header atmospheric background */
+.header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 80% 50% at 50% 40%, rgba(232, 33, 39, 0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 30% 60%, rgba(255, 107, 53, 0.05) 0%, transparent 50%),
+        radial-gradient(ellipse 50% 30% at 70% 30%, rgba(62, 106, 225, 0.04) 0%, transparent 50%);
+    animation: header-atmosphere 8s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes header-atmosphere {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.05); }
+}
+
+/* Road lines behind car */
+.header::after {
+    content: '';
+    position: absolute;
+    top: 55%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 400px;
+    height: 4px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(232, 33, 39, 0.1) 20%,
+        rgba(232, 33, 39, 0.3) 50%,
+        rgba(232, 33, 39, 0.1) 80%,
+        transparent 100%
+    );
+    border-radius: 2px;
+    animation: road-pulse 2s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes road-pulse {
+    0%, 100% { opacity: 0.3; width: 300px; }
+    50% { opacity: 0.6; width: 450px; }
+}
+
+/* ═══ CAR CONTAINER ═══ */
+.header-car-container {
+    position: relative;
+    margin-bottom: 24px;
+}
+
+.header-car {
+    font-size: 5rem;
+    display: block;
+    animation: car-idle 2s var(--ease-vroom) infinite;
+    filter: drop-shadow(0 0 30px rgba(232, 33, 39, 0.6));
+    position: relative;
+    z-index: 2;
+}
+
+/* Heat waves rising */
+.header-car-container::before,
+.header-car-container::after {
+    content: '♨️';
+    position: absolute;
+    font-size: 1.5rem;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.header-car-container::before {
+    top: -20px;
+    left: 30%;
+    animation: heat-rise-1 2s ease-out infinite;
+}
+
+.header-car-container::after {
+    top: -15px;
+    left: 60%;
+    animation: heat-rise-2 2s ease-out infinite 0.5s;
+}
+
+@keyframes car-idle {
+    0%, 100% {
+        transform: translateY(0) rotate(0deg);
+        filter: drop-shadow(0 0 30px rgba(232, 33, 39, 0.6));
+    }
+    50% {
+        transform: translateY(-2px) rotate(0deg);
+        filter: drop-shadow(0 0 40px rgba(232, 33, 39, 0.8));
+    }
+}
+
+@keyframes heat-rise-1 {
+    0% { opacity: 0.8; transform: translateY(0) scale(0.5); }
+    100% { opacity: 0; transform: translateY(-40px) scale(1.2); }
+}
+
+@keyframes heat-rise-2 {
+    0% { opacity: 0.6; transform: translateY(0) scale(0.4); }
+    100% { opacity: 0; transform: translateY(-50px) scale(1); }
+}
+
+/* ═══ TITLE ═══ */
+.header-title {
+    font-family: 'Bangers', cursive;
+    font-size: clamp(2.5rem, 10vw, 5.5rem);
+    color: var(--tesla-red);
+    text-shadow:
+        0 0 10px rgba(232, 33, 39, 0.8),
+        0 0 30px rgba(232, 33, 39, 0.4),
+        4px 4px 0 var(--warm-orange),
+        8px 8px 0 rgba(255, 107, 53, 0.5),
+        12px 12px 20px rgba(0, 0, 0, 0.4);
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+    margin-bottom: 20px;
+    animation: title-entrance 1s var(--ease-bounce) both, title-glow 3s ease-in-out infinite 1s;
+    position: relative;
+}
+
+@keyframes title-entrance {
+    0% { opacity: 0; transform: scale(0.5) translateY(30px); filter: blur(10px); }
+    60% { opacity: 1; transform: scale(1.05) translateY(-5px); filter: blur(0); }
+    100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+}
+
+@keyframes title-glow {
+    0%, 100% {
+        text-shadow:
+            0 0 10px rgba(232, 33, 39, 0.8),
+            0 0 30px rgba(232, 33, 39, 0.4),
+            4px 4px 0 var(--warm-orange),
+            8px 8px 0 rgba(255, 107, 53, 0.5);
+    }
+    50% {
+        text-shadow:
+            0 0 20px rgba(232, 33, 39, 1),
+            0 0 50px rgba(232, 33, 39, 0.6),
+            4px 4px 0 var(--warm-orange),
+            8px 8px 0 rgba(255, 107, 53, 0.7);
+    }
+}
+
+/* ═══ SUBTITLE ═══ */
+.header-subtitle {
+    font-family: 'Comic Neue', 'Inter', sans-serif;
+    font-size: 1.25rem;
+    color: var(--text);
+    max-width: 550px;
+    margin-bottom: var(--space-xl);
+    opacity: 0;
+    animation: subtitle-entrance 0.8s ease-out 0.5s both;
+    line-height: 1.6;
+}
+
+@keyframes subtitle-entrance {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+.header-subtitle code {
+    color: var(--tesla-red);
+    background: linear-gradient(135deg, rgba(232, 33, 39, 0.15), rgba(255, 107, 53, 0.1));
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95rem;
+    border: 1px solid rgba(232, 33, 39, 0.2);
+}
+
+/* ═══ GLASS CARDS ═══ */
+.glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    position: relative;
+    overflow: hidden;
+    transform: translateZ(0);
+    will-change: transform;
+    contain: layout paint;
+}
+
+.glass::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, rgba(232, 33, 39, 0.2) 0%, transparent 40%);
+    filter: blur(8px);
+    z-index: -1;
+    opacity: 0;
+    transition: all var(--dur-slow) var(--ease-smooth);
+    pointer-events: none;
+}
+
+.glass::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: inherit;
+    background: linear-gradient(315deg, rgba(62, 106, 225, 0.2) 0%, transparent 40%);
+    filter: blur(8px);
+    z-index: -1;
+    opacity: 0;
+    transition: all var(--dur-slow) var(--ease-smooth);
+    pointer-events: none;
+}
+
+.glass:hover::before, .glass:hover::after { opacity: 1; inset: -6px; }
+
+/* ═══ SECTIONS ═══ */
+section {
+    max-width: min(900px, 90vw);
+    margin: 0 auto;
+    padding: var(--space-2xl) var(--space-md);
+}
+
+h2 {
+    font-family: 'Bangers', cursive;
+    font-size: 2.5rem;
+    color: var(--tesla-red);
+    text-shadow: 2px 2px 0 var(--warm-orange);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+h2 .icon {
+    font-size: 2rem;
+    opacity: 0;
+    transform: translateY(-15px) scale(0.8);
+    transition: all var(--dur-dramatic) var(--ease-bounce);
+}
+
+h2.visible .icon { opacity: 1; transform: translateY(0) scale(1); }
+
+p {
+    margin-bottom: var(--space-md);
+    color: var(--text-dim);
+}
+
+p strong { color: var(--text); font-weight: 600; }
+
+/* ═══ QUOTE BOXES ═══ */
+.quote {
+    background: linear-gradient(135deg, rgba(232, 33, 39, 0.08), rgba(255, 107, 53, 0.05));
+    border-left: 4px solid var(--tesla-red);
+    padding: var(--space-md) var(--space-lg);
+    margin: var(--space-lg) 0;
+    border-radius: 0 16px 16px 0;
+    position: relative;
+    transition: all var(--dur-normal) var(--ease-smooth);
+}
+
+.quote:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(232, 33, 39, 0.12);
+}
+
+.quote::before {
+    content: '"';
+    position: absolute;
+    top: 10px;
+    left: 16px;
+    font-family: 'Bangers', cursive;
+    font-size: 4rem;
+    color: var(--tesla-red);
+    opacity: 0.2;
+    line-height: 1;
+}
+
+.quote p {
+    font-size: 1.2rem;
+    font-style: italic;
+    color: var(--text);
+    margin-bottom: 12px;
+    padding-left: 20px;
+}
+
+.quote cite {
+    font-style: normal;
+    font-size: 0.9rem;
+    color: var(--warm-orange);
+    padding-left: 20px;
+}
+
+/* ═══ HERO QUOTE — Family Wisdom ═══ */
+.quote-hero {
+    background: linear-gradient(135deg, rgba(232, 33, 39, 0.15), rgba(255, 107, 53, 0.08));
+    border-left: none;
+    border-radius: 28px;
+    padding: var(--space-xl) var(--space-lg) calc(var(--space-xl) + 20px);
+    margin: var(--space-xl) 0 calc(var(--space-xl) + 40px);
+    text-align: center;
+    position: relative;
+    box-shadow: 0 0 80px rgba(232, 33, 39, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    animation: hero-glow 4s ease-in-out infinite;
+}
+
+@keyframes hero-glow {
+    0%, 100% { box-shadow: 0 0 60px rgba(232, 33, 39, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
+    50% { box-shadow: 0 0 100px rgba(232, 33, 39, 0.25), 0 0 40px rgba(255, 107, 53, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.15); }
+}
+
+.quote-hero::before {
+    content: '';
+    position: absolute;
+    bottom: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 20px solid transparent;
+    border-right: 20px solid transparent;
+    border-top: 20px solid rgba(232, 33, 39, 0.15);
+}
+
+.quote-hero::after {
+    content: '🚗';
+    position: absolute;
+    bottom: -55px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 2.2rem;
+    opacity: 0.7;
+    animation: car-bounce 2s ease-in-out infinite;
+    filter: drop-shadow(0 0 10px rgba(232, 33, 39, 0.3));
+}
+
+@keyframes car-bounce {
+    0%, 100% { transform: translateX(-50%) rotate(0deg) scale(1); }
+    25% { transform: translateX(-50%) rotate(-3deg) scale(1.05); }
+    75% { transform: translateX(-50%) rotate(3deg) scale(1.02); }
+}
+
+.quote-hero p {
+    font-family: 'Bangers', cursive;
+    font-size: clamp(1.5rem, 4vw, 2.2rem);
+    font-style: normal;
+    color: var(--tesla-red);
+    text-shadow: 2px 2px 0 var(--warm-orange), 0 0 30px rgba(232, 33, 39, 0.5);
+    margin-bottom: var(--space-sm);
+    padding-left: 0;
+    line-height: 1.3;
+}
+
+.quote-hero cite {
+    display: block;
+    font-family: 'Comic Neue', sans-serif;
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--text-dim);
+    padding-left: 0;
+    margin-top: var(--space-xs);
+}
+
+/* ═══ CODE BLOCKS ═══ */
+.code-block {
+    background: var(--void-light);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--space-sm);
+    padding: var(--space-md);
+    margin: var(--space-lg) 0;
+    overflow-x: auto;
+    position: relative;
+}
+
+.code-block::before {
+    content: attr(data-label);
+    position: absolute;
+    top: -10px;
+    left: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--tesla-red);
+    background: var(--void);
+    padding: 2px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--glass-border);
+}
+
+.code-block pre {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    line-height: 1.7;
+    color: var(--text);
+    white-space: pre;
+    margin: 0;
+}
+
+.code-block .comment { color: var(--text-dim); }
+.code-block .keyword { color: var(--warm-orange); }
+.code-block .string { color: #2ECC40; }
+.code-block .function { color: var(--tesla-red); }
+
+/* ═══ LIVE CODE BLOCK ═══ */
+.code-alive {
+    background: var(--void-light);
+    border: none;
+    border-radius: 16px;
+    padding: 0;
+    margin: var(--space-xl) 0;
+    overflow: hidden;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4), 0 0 60px rgba(232, 33, 39, 0.08);
+    position: relative;
+}
+
+.code-alive .terminal-header {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.code-alive .terminal-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.code-alive .terminal-dot.red { background: #ff5f56; }
+.code-alive .terminal-dot.yellow { background: #ffbd2e; }
+.code-alive .terminal-dot.green { background: #27c93f; animation: dot-pulse 2s ease-in-out infinite; }
+
+@keyframes dot-pulse {
+    0%, 100% { box-shadow: 0 0 0 rgba(39, 201, 63, 0); }
+    50% { box-shadow: 0 0 8px rgba(39, 201, 63, 0.6); }
+}
+
+.code-alive .terminal-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin-left: 12px;
+}
+
+.code-alive .terminal-status {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--tesla-red);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.code-alive .terminal-status::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    background: var(--tesla-red);
+    border-radius: 50%;
+    animation: status-blink 1.5s ease-in-out infinite;
+}
+
+@keyframes status-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+.code-alive pre { padding: var(--space-md) var(--space-lg); margin: 0; }
+
+.code-alive pre::after {
+    content: '_';
+    color: var(--tesla-red);
+    font-weight: bold;
+    animation: cursor-blink-fast 0.8s step-end infinite;
+}
+
+@keyframes cursor-blink-fast {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+
+.code-alive::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, var(--tesla-red) 0%, var(--warm-orange) 50%, var(--tesla-blue) 100%);
+    background-size: 100% 200%;
+    animation: border-flow 3s ease-in-out infinite;
+    z-index: 10;
+}
+
+@keyframes border-flow {
+    0%, 100% { background-position: 0% 0%; }
+    50% { background-position: 0% 100%; }
+}
+
+/* ═══ CAPABILITY GRID ═══ */
+.capabilities {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-md);
+    margin: var(--space-xl) 0;
+}
+
+.capability {
+    background: var(--void-light);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: var(--space-lg) var(--space-md);
+    text-align: center;
+    transition: all var(--dur-normal) var(--ease-bounce);
+    cursor: default;
+}
+
+.capability:hover {
+    transform: translateY(-8px) scale(1.02);
+    border-color: var(--tesla-red);
+    box-shadow: 0 15px 40px rgba(232, 33, 39, 0.2);
+}
+
+.capability .emoji {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: var(--space-sm);
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+    transition: transform var(--dur-normal) var(--ease-bounce);
+}
+
+.capability:hover .emoji { transform: scale(1.15) rotate(-5deg); }
+
+.capability .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.capability .action {
+    font-family: 'Bangers', cursive;
+    font-size: 1.2rem;
+    color: var(--tesla-red);
+}
+
+/* ═══ ICE MELTING ANIMATION ═══ */
+.ice-section {
+    position: relative;
+    padding: var(--space-2xl) var(--space-md);
+    overflow: hidden;
+}
+
+.ice-visual {
+    position: relative;
+    height: 200px;
+    margin: var(--space-xl) 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.frozen-car {
+    font-size: 6rem;
+    position: relative;
+    z-index: 2;
+    animation: shiver 0.3s ease-in-out infinite;
+    filter: drop-shadow(0 0 20px rgba(168, 213, 226, 0.6));
+}
+
+@keyframes shiver {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-2px); }
+    75% { transform: translateX(2px); }
+}
+
+.ice-crystals {
+    position: absolute;
+    font-size: 1.5rem;
+    animation: float-away 3s ease-out infinite;
+    opacity: 0.8;
+}
+
+.ice-crystals:nth-child(1) { left: 20%; top: 30%; animation-delay: 0s; }
+.ice-crystals:nth-child(2) { left: 70%; top: 20%; animation-delay: 0.5s; }
+.ice-crystals:nth-child(3) { left: 30%; top: 60%; animation-delay: 1s; }
+.ice-crystals:nth-child(4) { left: 80%; top: 50%; animation-delay: 1.5s; }
+.ice-crystals:nth-child(5) { left: 50%; top: 10%; animation-delay: 2s; }
+
+@keyframes float-away {
+    0% { opacity: 0.8; transform: translateY(0) rotate(0deg); }
+    100% { opacity: 0; transform: translateY(-50px) rotate(180deg); }
+}
+
+.defrost-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 32px;
+    background: linear-gradient(135deg, var(--tesla-red), var(--warm-orange));
+    border: none;
+    border-radius: 50px;
+    color: white;
+    font-family: 'Bangers', cursive;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all var(--dur-normal) var(--ease-bounce);
+    box-shadow: 0 8px 30px rgba(232, 33, 39, 0.4);
+    margin-top: var(--space-lg);
+}
+
+.defrost-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 12px 40px rgba(232, 33, 39, 0.6);
+}
+
+.defrost-button:active { transform: scale(0.95); }
+
+.defrost-button .icon { font-size: 1.8rem; }
+
+/* ═══ TEMPERATURE DIAL ═══ */
+.temp-dial {
+    width: 200px;
+    height: 200px;
+    background: conic-gradient(
+        from 180deg,
+        var(--ice-blue) 0deg,
+        var(--tesla-blue) 90deg,
+        var(--warm-orange) 180deg,
+        var(--heat-red) 270deg,
+        var(--ice-blue) 360deg
+    );
+    border-radius: 50%;
+    position: relative;
+    margin: var(--space-xl) auto;
+    box-shadow: 0 0 60px rgba(232, 33, 39, 0.3), inset 0 0 40px rgba(0, 0, 0, 0.5);
+}
+
+.temp-dial::before {
+    content: '';
+    position: absolute;
+    inset: 20px;
+    background: var(--void);
+    border-radius: 50%;
+}
+
+.temp-dial::after {
+    content: '🔥';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 3rem;
+    animation: temp-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes temp-pulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.2); }
+}
+
+/* ═══ BIG IDEA BOX ═══ */
+.big-idea {
+    background: linear-gradient(135deg, var(--tesla-red), var(--warm-orange));
+    color: var(--void);
+    padding: var(--space-xl) var(--space-lg);
+    border-radius: var(--space-md);
+    text-align: center;
+    margin: var(--space-xl) 0;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 var(--space-md) var(--space-xl) rgba(232, 33, 39, 0.3);
+}
+
+.big-idea::before {
+    content: '🚗';
+    position: absolute;
+    font-size: 8rem;
+    opacity: 0.1;
+    top: -20px;
+    right: -20px;
+    transform: rotate(15deg);
+}
+
+.big-idea p {
+    font-family: 'Bangers', cursive;
+    font-size: 1.8rem;
+    color: var(--void);
+    margin: 0;
+    line-height: 1.4;
+    position: relative;
+    z-index: 1;
+}
+
+.big-idea .subtext {
+    font-family: 'Comic Neue', sans-serif;
+    font-size: 1rem;
+    margin-top: 16px;
+    opacity: 0.8;
+}
+
+/* ═══ CANVAS ═══ */
+.canvas-container {
+    position: relative;
+    margin: var(--space-xl) 0;
+    border-radius: var(--space-sm);
+    overflow: hidden;
+    box-shadow: 0 0 var(--space-xl) rgba(232, 33, 39, 0.1), inset 0 0 var(--space-xl) rgba(0,0,0,0.3);
+}
+
+#car-canvas {
+    display: block;
+    width: 100%;
+    height: 350px;
+    background: var(--void-light);
+    cursor: pointer;
+}
+
+.canvas-hint {
+    position: absolute;
+    bottom: var(--space-sm);
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text);
+    background: rgba(0,0,0,0.8);
+    padding: var(--space-xs) var(--space-md);
+    border-radius: var(--space-md);
+    pointer-events: none;
+}
+
+.canvas-hint .key {
+    background: var(--tesla-red);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    margin: 0 4px;
+}
+
+/* ═══ SCROLL INDICATOR ═══ */
+.scroll-indicator {
+    position: absolute;
+    bottom: var(--space-xl);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    opacity: 0;
+    animation: scroll-entrance 0.6s ease-out 1.2s both, scroll-pulse 2s ease-in-out 1.8s infinite;
+}
+
+@keyframes scroll-entrance {
+    0% { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes scroll-pulse {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(8px); }
+}
+
+.scroll-indicator .arrows {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.scroll-indicator .arrow {
+    font-size: 1.2rem;
+    color: var(--tesla-red);
+    opacity: 0.4;
+    animation: arrow-cascade 1.5s ease-in-out infinite;
+    line-height: 0.8;
+}
+
+.scroll-indicator .arrow:nth-child(1) { animation-delay: 0s; }
+.scroll-indicator .arrow:nth-child(2) { animation-delay: 0.15s; }
+.scroll-indicator .arrow:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes arrow-cascade {
+    0%, 100% { opacity: 0.3; transform: translateY(0); }
+    50% { opacity: 1; transform: translateY(4px); }
+}
+
+.scroll-indicator .text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-top: 4px;
+}
+
+/* ═══ FOOTER ═══ */
+footer {
+    text-align: center;
+    padding: var(--space-2xl) var(--space-md) var(--space-xl);
+    background: var(--void-light);
+    border-top: 1px solid var(--glass-border);
+    min-height: 50vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.footer-car {
+    font-size: 5rem;
+    display: block;
+    animation: drive-away 6s var(--ease-vroom) infinite;
+    filter: drop-shadow(0 0 25px rgba(232, 33, 39, 0.5));
+    margin-bottom: var(--space-lg);
+}
+
+@keyframes drive-away {
+    0%, 40% { transform: translateX(0) rotate(0); }
+    45% { transform: translateX(10px) rotate(2deg); }
+    85% { transform: translateX(200vw) rotate(0); opacity: 1; }
+    86% { transform: translateX(-200vw); opacity: 0; }
+    87% { opacity: 1; }
+    100% { transform: translateX(0); }
+}
+
+.footer-tagline {
+    font-family: 'Bangers', cursive;
+    font-size: 2.5rem;
+    color: var(--tesla-red);
+    text-shadow: 3px 3px 0 var(--warm-orange);
+    margin-bottom: var(--space-sm);
+}
+
+.footer-subtitle {
+    font-family: 'Comic Neue', sans-serif;
+    font-size: 1.1rem;
+    color: var(--text-dim);
+    margin-bottom: var(--space-lg);
+}
+
+/* ═══ REDUCED MOTION ═══ */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ═══ FOCUS STATES ═══ */
+*:focus-visible {
+    outline: 2px solid var(--tesla-red);
+    outline-offset: 3px;
+}
+    </style>
+</head>
+<body>
+
+<div class="caustics"></div>
+
+<header class="header">
+    <div class="header-car-container">
+        <span class="header-car">🚗</span>
+    </div>
+    <h1 class="header-title">Boss Your Car Around</h1>
+    <p class="header-subtitle">
+        Tesla control for robots — because <code>cold mornings</code> are for humans
+    </p>
+
+    <div class="scroll-indicator">
+        <div class="arrows">
+            <span class="arrow">&#8964;</span>
+            <span class="arrow">&#8964;</span>
+            <span class="arrow">&#8964;</span>
+        </div>
+        <span class="text">learn the ways</span>
+    </div>
+</header>
+
+<section>
+    <h2><span class="icon">💭</span> The Dream</h2>
+
+    <div class="quote quote-hero">
+        <p>Ugh I need a new car so my robots can boss it around</p>
+        <cite>Kristi Jacoby, on the natural order of things</cite>
+    </div>
+
+    <p>It's January in Seattle. It's <strong>cold</strong>. There's frost on the windshield. Ice on the mirrors. Your breath is visible.</p>
+
+    <p>You could scrape ice at 7am like some kind of <em>caveperson</em>. Or...</p>
+
+    <div class="quote">
+        <p>BTW - being able to tell the robots to heat up the car when it is cold outside is actually super cool.</p>
+        <cite>Tim, discovering the future</cite>
+    </div>
+</section>
+
+<section class="ice-section">
+    <h2><span class="icon">❄️</span> Stop The Ice</h2>
+
+    <div class="ice-visual">
+        <span class="ice-crystals">❄️</span>
+        <span class="ice-crystals">❄️</span>
+        <span class="ice-crystals">❄️</span>
+        <span class="ice-crystals">❄️</span>
+        <span class="ice-crystals">❄️</span>
+        <span class="frozen-car">🚗</span>
+    </div>
+
+    <div class="quote">
+        <p>There is ice sometimes! I can set a trigger to stop the ice!!</p>
+        <cite>Tim, absolutely losing it over automated defrosting</cite>
+    </div>
+
+    <p>The trigger is simple: when the temperature drops below freezing and departure is within 30 minutes, <strong>precondition the cabin</strong>. The ice melts. The seats warm. The car is ready.</p>
+
+    <div class="code-block code-alive">
+        <div class="terminal-header">
+            <span class="terminal-dot red"></span>
+            <span class="terminal-dot yellow"></span>
+            <span class="terminal-dot green"></span>
+            <span class="terminal-title">defrost.py</span>
+            <span class="terminal-status">warming</span>
+        </div>
+<pre><span class="keyword">async def</span> <span class="function">stop_the_ice</span>():
+    <span class="comment"># Seattle winter morning trigger</span>
+    weather = <span class="keyword">await</span> <span class="function">get_weather</span>()
+    <span class="keyword">if</span> weather.temp < <span class="string">32</span>:  <span class="comment"># Freezing!</span>
+        <span class="keyword">await</span> tesla.<span class="function">climate_on</span>()
+        <span class="keyword">await</span> tesla.<span class="function">set_temps</span>(<span class="string">72</span>, <span class="string">72</span>)
+        <span class="keyword">await</span> tesla.<span class="function">defrost</span>(on=<span class="string">True</span>)
+        <span class="function">print</span>(<span class="string">"🔥 Warming up. Ice defeated."</span>)</pre>
+    </div>
+
+    <p>No more scraping. No more cold steering wheel. The robots handle it.</p>
+
+    <div class="big-idea">
+        <p>Ice is just frozen inconvenience.</p>
+        <p>We have robots for that now.</p>
+    </div>
+</section>
+
+<section>
+    <h2><span class="icon">🎮</span> What The Robots Can Do</h2>
+
+    <p>Through the Tesla API, Kagami can control:</p>
+
+    <div class="capabilities">
+        <div class="capability">
+            <span class="emoji">🔥</span>
+            <span class="label">Climate</span>
+            <span class="action">Heat / Cool</span>
+        </div>
+        <div class="capability">
+            <span class="emoji">❄️</span>
+            <span class="label">Defrost</span>
+            <span class="action">Melt Ice</span>
+        </div>
+        <div class="capability">
+            <span class="emoji">🪟</span>
+            <span class="label">Windows</span>
+            <span class="action">Vent / Close</span>
+        </div>
+        <div class="capability">
+            <span class="emoji">🔒</span>
+            <span class="label">Locks</span>
+            <span class="action">Lock / Unlock</span>
+        </div>
+        <div class="capability">
+            <span class="emoji">📦</span>
+            <span class="label">Trunk</span>
+            <span class="action">Open Frunk</span>
+        </div>
+        <div class="capability">
+            <span class="emoji">⚡</span>
+            <span class="label">Charging</span>
+            <span class="action">Start / Stop</span>
+        </div>
+        <div class="capability">
+            <span class="emoji">📍</span>
+            <span class="label">Location</span>
+            <span class="action">Find Car</span>
+        </div>
+        <div class="capability">
+            <span class="emoji">📢</span>
+            <span class="label">Horn</span>
+            <span class="action">Honk!</span>
+        </div>
+        <div class="capability">
+            <span class="emoji">💡</span>
+            <span class="label">Lights</span>
+            <span class="action">Flash</span>
+        </div>
+        <div class="capability">
+            <span class="emoji">👁️</span>
+            <span class="label">Sentry</span>
+            <span class="action">Watch Mode</span>
+        </div>
+        <div class="capability">
+            <span class="emoji">🛋️</span>
+            <span class="label">Seats</span>
+            <span class="action">Heat Level</span>
+        </div>
+        <div class="capability">
+            <span class="emoji">🚨</span>
+            <span class="label">Wake Up</span>
+            <span class="action">Rouse Car</span>
+        </div>
+    </div>
+
+    <p>All from code. All triggerable. All <strong>bossable</strong>.</p>
+</section>
+
+<section>
+    <h2><span class="icon">🤖</span> The Pattern</h2>
+
+    <p>When you ask me to warm up the car, here's what happens:</p>
+
+    <div class="code-block code-alive">
+        <div class="terminal-header">
+            <span class="terminal-dot red"></span>
+            <span class="terminal-dot yellow"></span>
+            <span class="terminal-dot green"></span>
+            <span class="terminal-title">boss_car.py</span>
+            <span class="terminal-status">executing</span>
+        </div>
+<pre><span class="comment"># Kagami: "Sure, I'll warm up the car."</span>
+<span class="keyword">import</span> asyncio
+<span class="keyword">from</span> kagami_smarthome <span class="keyword">import</span> <span class="function">get_smart_home</span>
+
+<span class="keyword">async def</span> <span class="function">main</span>():
+    controller = <span class="keyword">await</span> <span class="function">get_smart_home</span>()
+    tesla = controller.tesla
+
+    <span class="comment"># Wake up (Teslas sleep to save power)</span>
+    <span class="keyword">await</span> tesla.<span class="function">wake_up</span>()
+
+    <span class="comment"># Set temperature (driver, passenger)</span>
+    <span class="keyword">await</span> tesla.<span class="function">set_temps</span>(<span class="string">72</span>, <span class="string">72</span>)
+
+    <span class="comment"># Heat seats</span>
+    <span class="keyword">await</span> tesla.<span class="function">set_seat_heat</span>(<span class="string">"front_left"</span>, <span class="string">3</span>)
+
+    <span class="comment"># Turn on climate</span>
+    <span class="keyword">await</span> tesla.<span class="function">climate_on</span>()
+
+    <span class="function">print</span>(<span class="string">"🚗 Car warming up. ETA: toasty in 10 min."</span>)
+
+asyncio.<span class="function">run</span>(main())</pre>
+    </div>
+
+    <p>I don't describe this. I <strong>execute it</strong>. That's the difference between a chatbot and a robot.</p>
+</section>
+
+<section>
+    <h2><span class="icon">🌡️</span> Warm Up The Car</h2>
+
+    <p>Click the car to send warmth:</p>
+
+    <div class="canvas-container">
+        <canvas id="car-canvas"></canvas>
+        <div class="canvas-hint">
+            <span class="key">CLICK</span> to send heat waves
+            <span class="key">HOLD</span> for maximum toasty
+        </div>
+    </div>
+
+    <p>In real life, Tim just says <strong>"warm up the car"</strong> and it happens. No app hunting. No tapping through menus. Just words → action.</p>
+</section>
+
+<section>
+    <h2><span class="icon">🔗</span> The Bigger Picture</h2>
+
+    <p>This isn't just about heating a car. It's about <strong>cross-domain triggers</strong>:</p>
+
+    <div class="code-block" data-label="triggers">
+<pre><span class="comment"># When calendar says "Work" in 30 min AND temp < 32°F</span>
+<span class="function">trigger</span>(<span class="string">"calendar.departure"</span>, <span class="string">"weather.freezing"</span>)
+  → <span class="function">tesla.precondition</span>()
+  → <span class="function">announce</span>(<span class="string">"Car warming up"</span>)
+
+<span class="comment"># When arriving home (geofence)</span>
+<span class="function">trigger</span>(<span class="string">"location.arriving_home"</span>)
+  → <span class="function">garage.open</span>()
+  → <span class="function">lights.welcome</span>()
+
+<span class="comment"># When bedtime AND car not plugged in</span>
+<span class="function">trigger</span>(<span class="string">"scene.goodnight"</span>, <span class="string">"tesla.not_charging"</span>)
+  → <span class="function">announce</span>(<span class="string">"Hey, plug in the car"</span>)</pre>
+    </div>
+
+    <p>Your calendar knows when you leave. The weather knows it's cold. The car knows how to warm up. Connect them, and <strong>the robots handle the details</strong>.</p>
+
+    <div class="quote">
+        <p>Yes - just ask the robots to use the UI to get the API to work - log in for them.</p>
+        <cite>Tim, on the recursive nature of robot assistance</cite>
+    </div>
+</section>
+
+<section>
+    <h2><span class="icon">🚀</span> The Future</h2>
+
+    <p>Kristi needs a new car. When she gets one (with robot-compatible APIs), she too can:</p>
+
+    <ul style="list-style: none; padding: 0;">
+        <li style="padding: 8px 0; display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.5rem;">✓</span>
+            <span>Tell robots to warm it up</span>
+        </li>
+        <li style="padding: 8px 0; display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.5rem;">✓</span>
+            <span>Set triggers for cold mornings</span>
+        </li>
+        <li style="padding: 8px 0; display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.5rem;">✓</span>
+            <span>Never scrape ice again</span>
+        </li>
+        <li style="padding: 8px 0; display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.5rem;">✓</span>
+            <span>Boss it around properly</span>
+        </li>
+    </ul>
+
+    <div class="big-idea">
+        <p>The future is warm seats on cold mornings.</p>
+        <p>The robots are ready when you are.</p>
+    </div>
+</section>
+
+<footer>
+    <span class="footer-car">🚗</span>
+    <h2 class="footer-tagline">Boss Your Car Around!</h2>
+    <p class="footer-subtitle">Because robots should handle the cold stuff</p>
+    <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-dim); margin-top: var(--space-lg);">
+        <code style="color: var(--tesla-red);">await tesla.climate_on()</code>
+    </p>
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// CAR WARMING CANVAS
+// ═══════════════════════════════════════════════════════════════════════════
+
+class CarCanvas {
+    constructor() {
+        this.canvas = document.getElementById('car-canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.heatWaves = [];
+        this.snowflakes = [];
+        this.car = { x: 0, y: 0, temp: 32, warming: false };
+        this.resize();
+        this.initSnowflakes();
+        this.bindEvents();
+        this.animate();
+    }
+
+    resize() {
+        const container = this.canvas.parentElement;
+        this.canvas.width = container.clientWidth;
+        this.canvas.height = 350;
+        this.car.x = this.canvas.width / 2;
+        this.car.y = this.canvas.height / 2;
+        this.initSnowflakes();
+    }
+
+    initSnowflakes() {
+        this.snowflakes = [];
+        for (let i = 0; i < 40; i++) {
+            this.snowflakes.push({
+                x: Math.random() * this.canvas.width,
+                y: Math.random() * this.canvas.height,
+                size: 8 + Math.random() * 12,
+                speed: 0.5 + Math.random() * 1,
+                wobble: Math.random() * Math.PI * 2,
+                melting: 1
+            });
+        }
+    }
+
+    bindEvents() {
+        window.addEventListener('resize', () => this.resize());
+
+        this.canvas.addEventListener('click', (e) => {
+            const rect = this.canvas.getBoundingClientRect();
+            this.sendHeat(e.clientX - rect.left, e.clientY - rect.top);
+        });
+
+        this.canvas.addEventListener('mousedown', () => {
+            this.car.warming = true;
+        });
+
+        this.canvas.addEventListener('mouseup', () => {
+            this.car.warming = false;
+        });
+
+        this.canvas.addEventListener('mouseleave', () => {
+            this.car.warming = false;
+        });
+
+        this.canvas.addEventListener('mousemove', (e) => {
+            if (this.car.warming) {
+                const rect = this.canvas.getBoundingClientRect();
+                this.sendHeat(e.clientX - rect.left, e.clientY - rect.top);
+            }
+        });
+    }
+
+    sendHeat(x, y) {
+        // Create heat wave expanding from car
+        this.heatWaves.push({
+            x: this.car.x,
+            y: this.car.y,
+            radius: 30,
+            maxRadius: 150 + Math.random() * 50,
+            life: 1,
+            color: Math.random() > 0.5 ? 'rgba(232, 33, 39, ALPHA)' : 'rgba(255, 107, 53, ALPHA)'
+        });
+
+        // Increase temperature
+        this.car.temp = Math.min(85, this.car.temp + 2);
+
+        // Melt nearby snowflakes
+        this.snowflakes.forEach(s => {
+            const dist = Math.sqrt((s.x - this.car.x) ** 2 + (s.y - this.car.y) ** 2);
+            if (dist < 150) {
+                s.melting -= 0.1;
+            }
+        });
+    }
+
+    animate() {
+        const ctx = this.ctx;
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+
+        // Clear with fade
+        ctx.fillStyle = 'rgba(15, 14, 20, 0.15)';
+        ctx.fillRect(0, 0, width, height);
+
+        // Temperature slowly decreases when not warming
+        if (!this.car.warming && this.car.temp > 32) {
+            this.car.temp -= 0.1;
+        }
+
+        // Draw snowflakes
+        this.snowflakes.forEach(s => {
+            if (s.melting <= 0) return;
+
+            s.y += s.speed;
+            s.wobble += 0.02;
+            s.x += Math.sin(s.wobble) * 0.5;
+
+            // Wrap around
+            if (s.y > height + 20) {
+                s.y = -20;
+                s.x = Math.random() * width;
+                s.melting = Math.min(1, s.melting + 0.3);
+            }
+
+            ctx.font = `${s.size * s.melting}px Arial`;
+            ctx.globalAlpha = s.melting * 0.6;
+            ctx.fillText('❄️', s.x, s.y);
+        });
+
+        ctx.globalAlpha = 1;
+
+        // Draw heat waves
+        for (let i = this.heatWaves.length - 1; i >= 0; i--) {
+            const wave = this.heatWaves[i];
+            wave.radius += 3;
+            wave.life -= 0.02;
+
+            if (wave.life <= 0 || wave.radius > wave.maxRadius) {
+                this.heatWaves.splice(i, 1);
+                continue;
+            }
+
+            const gradient = ctx.createRadialGradient(
+                wave.x, wave.y, 0,
+                wave.x, wave.y, wave.radius
+            );
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+            gradient.addColorStop(0.5, wave.color.replace('ALPHA', (wave.life * 0.3).toString()));
+            gradient.addColorStop(1, 'rgba(255, 107, 53, 0)');
+
+            ctx.beginPath();
+            ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+        }
+
+        // Draw car
+        const carWarm = this.car.temp > 50;
+        const carHot = this.car.temp > 70;
+
+        ctx.font = '80px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // Glow based on temperature
+        if (carHot) {
+            ctx.shadowBlur = 40;
+            ctx.shadowColor = 'rgba(255, 107, 53, 0.8)';
+        } else if (carWarm) {
+            ctx.shadowBlur = 25;
+            ctx.shadowColor = 'rgba(232, 33, 39, 0.5)';
+        } else {
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = 'rgba(168, 213, 226, 0.3)';
+        }
+
+        ctx.fillText('🚗', this.car.x, this.car.y);
+        ctx.shadowBlur = 0;
+
+        // Temperature display
+        ctx.font = 'bold 24px "JetBrains Mono", monospace';
+        ctx.fillStyle = this.car.temp > 60 ? '#FF6B35' : this.car.temp > 40 ? '#E82127' : '#A8D5E2';
+        ctx.fillText(`${Math.round(this.car.temp)}°F`, this.car.x, this.car.y + 60);
+
+        // Status text
+        ctx.font = '14px "JetBrains Mono", monospace';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        const status = this.car.temp > 70 ? '🔥 TOASTY!' :
+                       this.car.temp > 50 ? '♨️ Warming...' :
+                       this.car.warming ? '⚡ Heating...' : '❄️ Cold';
+        ctx.fillText(status, this.car.x, this.car.y + 90);
+
+        // Hint when cold
+        if (this.car.temp <= 35 && this.heatWaves.length === 0) {
+            ctx.font = '16px "Comic Neue", sans-serif';
+            ctx.fillStyle = 'rgba(232, 33, 39, 0.5)';
+            ctx.fillText('Click to warm up!', this.car.x, this.car.y - 70);
+        }
+
+        requestAnimationFrame(() => this.animate());
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    new CarCanvas();
+
+    // Scroll indicator
+    document.querySelector('.scroll-indicator')?.addEventListener('click', () => {
+        document.querySelector('section').scrollIntoView({ behavior: 'smooth' });
+    });
+
+    // Section headers animation
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+            }
+        });
+    }, { threshold: 0.2 });
+
+    document.querySelectorAll('h2').forEach(h2 => observer.observe(h2));
+});
+
+// Console easter egg
+console.log(`
+    🚗 Boss Your Car Around!
+
+    await tesla.climate_on()
+    await tesla.set_temps(72, 72)
+    await tesla.defrost(on=True)
+
+    "There is ice sometimes! I can set a trigger to stop the ice!!"
+    — Tim, absolutely losing it
+
+    Kagami @ Green Lake, Seattle
+`);
+</script>
+
+</body>
+</html>
