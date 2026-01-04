@@ -6,24 +6,43 @@
     <title>DCC: Making the Team</title>
     <meta name="description" content="An interactive documentary featuring the voices and faces of the Dallas Cowboys Cheerleaders">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         :root {
-            --gold: #d4af37;
-            --gold-dim: rgba(212, 175, 55, 0.6);
-            --bg: #0a0908;
-            --text: #f5f5f5;
-            --text-dim: rgba(245, 245, 245, 0.6);
+            /* DCC Official Colors */
+            --navy: #002244;
+            --navy-deep: #001a33;
+            --silver: #869397;
+            --silver-light: #b0b7bc;
+            --white: #ffffff;
+            --star-gold: #c5b358;
+            
+            /* Semantic */
+            --bg: #0a0d12;
+            --bg-panel: rgba(0, 34, 68, 0.3);
+            --text: #f8f9fa;
+            --text-dim: rgba(248, 249, 250, 0.6);
+            --accent: var(--silver-light);
+            --accent-glow: rgba(176, 183, 188, 0.4);
         }
         
         body {
             background: var(--bg);
             color: var(--text);
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', system-ui, sans-serif;
             min-height: 100vh;
             overflow: hidden;
+        }
+        
+        /* ============ STAR PARTICLE CANVAS ============ */
+        #starfield {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.6;
         }
         
         /* ============ LOADING STATE ============ */
@@ -36,42 +55,56 @@
             align-items: center;
             justify-content: center;
             z-index: 2000;
-            transition: opacity 0.5s ease;
+            transition: opacity 0.8s ease;
         }
         
         .loading.hidden { opacity: 0; pointer-events: none; }
         
-        .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid var(--text-dim);
-            border-top-color: var(--gold);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+        .loading-star {
+            width: 60px;
+            height: 60px;
+            position: relative;
+        }
+        
+        .loading-star::before {
+            content: '★';
+            font-size: 48px;
+            color: var(--silver-light);
+            animation: starPulse 1.5s ease-in-out infinite, starSpin 3s linear infinite;
+            display: block;
+            text-align: center;
+        }
+        
+        @keyframes starPulse {
+            0%, 100% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        @keyframes starSpin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
         
         .loading-text {
-            margin-top: 1rem;
+            margin-top: 1.5rem;
             color: var(--text-dim);
-            font-size: 0.9rem;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+            font-size: 0.85rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
         }
         
         /* ============ START OVERLAY ============ */
         #start-overlay {
             position: fixed;
             inset: 0;
-            background: var(--bg);
+            background: linear-gradient(135deg, var(--bg) 0%, var(--navy-deep) 50%, var(--bg) 100%);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             z-index: 1000;
             cursor: pointer;
-            transition: opacity 0.8s ease, visibility 0.8s;
+            transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1), visibility 1.2s;
         }
         
         #start-overlay.hidden {
@@ -80,21 +113,66 @@
             pointer-events: none;
         }
         
-        #start-overlay h1 {
-            font-family: 'Playfair Display', serif;
-            font-size: clamp(2.5rem, 8vw, 5rem);
-            letter-spacing: 0.3em;
-            margin-bottom: 1rem;
-            background: linear-gradient(135deg, var(--gold) 0%, var(--text) 50%, var(--gold) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        .intro-stars {
+            position: absolute;
+            font-size: 1.5rem;
+            color: var(--silver);
+            letter-spacing: 0.5em;
+            opacity: 0;
+            animation: fadeSlideUp 1s ease forwards 0.3s;
         }
         
-        #start-overlay p {
-            font-size: clamp(0.9rem, 2vw, 1.2rem);
-            letter-spacing: 0.2em;
+        .intro-stars.top { top: 25%; }
+        .intro-stars.bottom { bottom: 25%; animation-delay: 0.5s; }
+        
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 0.6; transform: translateY(0); }
+        }
+        
+        #start-overlay h1 {
+            font-family: 'Cinzel', serif;
+            font-size: clamp(3rem, 12vw, 8rem);
+            font-weight: 600;
+            letter-spacing: 0.4em;
+            margin-left: 0.4em;
+            background: linear-gradient(
+                180deg,
+                var(--white) 0%,
+                var(--silver-light) 40%,
+                var(--silver) 60%,
+                var(--white) 100%
+            );
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 60px rgba(134, 147, 151, 0.3);
+            opacity: 0;
+            animation: titleReveal 1.5s ease forwards 0.2s;
+        }
+        
+        @keyframes titleReveal {
+            0% { opacity: 0; transform: scale(0.9) translateY(20px); letter-spacing: 0.6em; }
+            100% { opacity: 1; transform: scale(1) translateY(0); letter-spacing: 0.4em; }
+        }
+        
+        .subtitle {
+            font-family: 'Cinzel', serif;
+            font-size: clamp(0.7rem, 2vw, 1rem);
+            letter-spacing: 0.35em;
+            color: var(--silver);
+            margin-top: 1rem;
+            opacity: 0;
+            animation: fadeSlideUp 1s ease forwards 0.8s;
+        }
+        
+        .start-prompt {
+            position: absolute;
+            bottom: 15%;
+            font-size: clamp(0.7rem, 1.5vw, 0.9rem);
+            letter-spacing: 0.25em;
             color: var(--text-dim);
-            animation: pulse 2s ease-in-out infinite;
+            opacity: 0;
+            animation: fadeSlideUp 1s ease forwards 1.2s, pulse 2.5s ease-in-out infinite 2.2s;
         }
         
         @keyframes pulse {
@@ -110,39 +188,49 @@
             z-index: 500;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.75rem;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.5s ease;
+        }
+        
+        .language-picker.visible {
+            opacity: 1;
+            transform: translateY(0);
         }
         
         .language-picker label {
-            font-size: 0.75rem;
+            font-size: 0.65rem;
             color: var(--text-dim);
             text-transform: uppercase;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.15em;
         }
         
         .language-picker select {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 34, 68, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(176, 183, 188, 0.2);
             color: var(--text);
-            padding: 0.5rem 2rem 0.5rem 0.75rem;
-            border-radius: 4px;
-            font-size: 0.85rem;
+            padding: 0.6rem 2.2rem 0.6rem 1rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
             cursor: pointer;
             appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23f5f5f5' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23b0b7bc' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
-            background-position: right 0.5rem center;
-            transition: all 0.2s ease;
+            background-position: right 0.7rem center;
+            transition: all 0.3s ease;
         }
         
         .language-picker select:hover {
-            border-color: var(--gold);
+            border-color: var(--silver);
+            box-shadow: 0 0 20px rgba(176, 183, 188, 0.15);
         }
         
         .language-picker select:focus {
             outline: none;
-            border-color: var(--gold);
-            box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
+            border-color: var(--silver-light);
+            box-shadow: 0 0 0 3px rgba(176, 183, 188, 0.1);
         }
         
         /* ============ MAIN CONTAINER ============ */
@@ -150,21 +238,27 @@
             display: flex;
             height: 100vh;
             opacity: 0;
-            transition: opacity 1s ease;
+            transform: scale(0.98);
+            transition: opacity 1s ease 0.3s, transform 1s ease 0.3s;
+            position: relative;
+            z-index: 1;
         }
         
-        .main-container.active { opacity: 1; }
+        .main-container.active {
+            opacity: 1;
+            transform: scale(1);
+        }
         
         @media (min-width: 768px) {
             .main-container { flex-direction: row; }
-            .video-panel { flex: 1.2; }
-            .content-panel { flex: 0.8; }
+            .video-panel { flex: 1.3; }
+            .content-panel { flex: 0.7; }
         }
         
         @media (max-width: 767px) {
             .main-container { flex-direction: column; }
-            .video-panel { height: 50vh; }
-            .content-panel { height: 50vh; overflow-y: auto; }
+            .video-panel { height: 55vh; }
+            .content-panel { height: 45vh; overflow-y: auto; }
         }
         
         /* ============ VIDEO PANEL ============ */
@@ -174,17 +268,28 @@
             background: #000;
         }
         
+        .video-panel::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at center, transparent 50%, var(--bg) 100%);
+            pointer-events: none;
+            z-index: 2;
+            opacity: 0.4;
+        }
+        
         .video-panel::after {
             content: '';
             position: absolute;
             inset: 0;
-            background: linear-gradient(to right, transparent 70%, var(--bg) 100%);
+            background: linear-gradient(to right, transparent 60%, var(--bg) 100%);
             pointer-events: none;
+            z-index: 3;
         }
         
         @media (max-width: 767px) {
             .video-panel::after {
-                background: linear-gradient(to bottom, transparent 70%, var(--bg) 100%);
+                background: linear-gradient(to bottom, transparent 60%, var(--bg) 100%);
             }
         }
         
@@ -194,7 +299,8 @@
             object-fit: cover;
             object-position: center 20%;
             opacity: 0;
-            transition: opacity 0.4s ease;
+            transform: scale(1.02);
+            transition: opacity 0.6s ease, transform 0.8s ease;
             position: absolute;
             top: 0;
             left: 0;
@@ -202,41 +308,48 @@
         
         .character-video.active {
             opacity: 1;
+            transform: scale(1);
             z-index: 1;
         }
         
         .speaker-badge {
             position: absolute;
-            bottom: 2rem;
-            left: 2rem;
+            bottom: 2.5rem;
+            left: 2.5rem;
             z-index: 10;
         }
         
         .speaker-badge h2 {
-            font-family: 'Playfair Display', serif;
-            font-size: clamp(1.5rem, 4vw, 2.5rem);
-            letter-spacing: 0.15em;
-            margin-bottom: 0.5rem;
+            font-family: 'Cinzel', serif;
+            font-size: clamp(1.5rem, 4vw, 2.8rem);
+            font-weight: 500;
+            letter-spacing: 0.12em;
+            margin-bottom: 0.6rem;
             opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.6s ease;
+            transform: translateX(-30px);
+            transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+            text-shadow: 0 2px 20px rgba(0,0,0,0.5);
         }
         
         .speaker-badge h2.visible {
             opacity: 1;
-            transform: translateY(0);
+            transform: translateX(0);
         }
         
         .speaker-badge .role {
-            font-size: clamp(0.7rem, 1.5vw, 0.9rem);
+            font-size: clamp(0.65rem, 1.3vw, 0.85rem);
             letter-spacing: 0.2em;
-            color: var(--gold);
+            color: var(--silver-light);
             text-transform: uppercase;
             opacity: 0;
-            transition: opacity 0.6s ease 0.3s;
+            transform: translateX(-20px);
+            transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.15s;
         }
         
-        .speaker-badge .role.visible { opacity: 1; }
+        .speaker-badge .role.visible {
+            opacity: 1;
+            transform: translateX(0);
+        }
         
         /* ============ CONTENT PANEL ============ */
         .content-panel {
@@ -245,37 +358,49 @@
             justify-content: center;
             padding: clamp(2rem, 5vw, 5rem);
             position: relative;
+            background: linear-gradient(135deg, transparent 0%, var(--bg-panel) 100%);
         }
         
         .quote-container {
-            font-size: clamp(1.1rem, 2.5vw, 1.7rem);
-            line-height: 1.9;
+            font-size: clamp(1.1rem, 2.2vw, 1.6rem);
+            line-height: 2;
             font-weight: 300;
             color: var(--text-dim);
-            max-width: 600px;
+            max-width: 550px;
         }
         
         .word {
             display: inline-block;
             opacity: 0;
-            transform: translateY(12px);
-            transition: opacity 0.2s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.3s ease;
-            margin-right: 0.2em;
+            transform: translateY(15px) rotateX(-20deg);
+            transition: 
+                opacity 0.25s ease,
+                transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+                color 0.3s ease,
+                text-shadow 0.3s ease;
+            margin-right: 0.25em;
+            transform-origin: center bottom;
         }
         
         .word.visible {
             opacity: 1;
-            transform: translateY(0);
+            transform: translateY(0) rotateX(0);
         }
         
         .word.current {
-            color: var(--text);
+            color: var(--white);
             font-weight: 400;
+            text-shadow: 0 0 30px rgba(176, 183, 188, 0.4);
         }
         
         .word.emphasis {
-            color: var(--gold);
+            color: var(--silver-light);
             font-style: italic;
+            font-weight: 500;
+        }
+        
+        .word.emphasis.current {
+            text-shadow: 0 0 40px rgba(176, 183, 188, 0.6);
         }
         
         /* ============ PLAYBACK CONTROLS ============ */
@@ -287,75 +412,134 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 1rem;
-            padding: 1.5rem;
-            background: linear-gradient(to top, var(--bg), transparent);
+            gap: 0.8rem;
+            padding: 1.5rem 2rem;
+            background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
             opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.3s ease;
+            transform: translateY(30px);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 100;
         }
         
-        body:hover .controls,
-        .controls:hover,
         .controls.visible {
             opacity: 1;
             transform: translateY(0);
         }
         
         @media (max-width: 767px) {
-            .controls { opacity: 1; transform: translateY(0); gap: 0.5rem; }
+            .controls { gap: 0.5rem; padding: 1rem; }
         }
         
         .control-btn {
             width: 44px;
             height: 44px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 34, 68, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(176, 183, 188, 0.15);
             color: var(--text);
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s ease;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .control-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, var(--accent-glow) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
         
         .control-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            border-color: var(--gold);
+            background: rgba(0, 34, 68, 0.8);
+            border-color: var(--silver);
+            transform: scale(1.08);
+            box-shadow: 0 0 25px rgba(176, 183, 188, 0.2);
+        }
+        
+        .control-btn:hover::before { opacity: 1; }
+        
+        .control-btn:active {
+            transform: scale(0.95);
         }
         
         .control-btn.play-pause {
-            width: 56px;
-            height: 56px;
-            background: var(--gold);
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--silver) 0%, var(--silver-light) 100%);
             border: none;
+            box-shadow: 0 4px 20px rgba(176, 183, 188, 0.3);
         }
         
         .control-btn.play-pause:hover {
-            transform: scale(1.05);
-            background: #e5c349;
+            transform: scale(1.1);
+            box-shadow: 0 6px 30px rgba(176, 183, 188, 0.4);
+        }
+        
+        .control-btn.play-pause:active {
+            transform: scale(0.98);
         }
         
         .control-btn svg {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             fill: currentColor;
+            position: relative;
+            z-index: 1;
         }
         
         .control-btn.play-pause svg {
-            fill: var(--bg);
+            fill: var(--navy-deep);
             width: 24px;
             height: 24px;
         }
         
-        .progress-container {
+        /* ============ PROGRESS BAR ============ */
+        .progress-wrapper {
             flex: 1;
-            max-width: 300px;
-            height: 6px;
-            background: rgba(255, 255, 255, 0.1);
+            max-width: 350px;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .segment-indicators {
+            display: flex;
+            gap: 4px;
+            height: 3px;
+        }
+        
+        .segment-indicator {
+            flex: 1;
+            background: rgba(176, 183, 188, 0.15);
+            border-radius: 2px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .segment-indicator:hover {
+            background: rgba(176, 183, 188, 0.3);
+        }
+        
+        .segment-indicator.active {
+            background: var(--silver-light);
+            box-shadow: 0 0 10px rgba(176, 183, 188, 0.4);
+        }
+        
+        .segment-indicator.completed {
+            background: var(--silver);
+        }
+        
+        .progress-container {
+            height: 5px;
+            background: rgba(176, 183, 188, 0.1);
             border-radius: 3px;
             cursor: pointer;
             position: relative;
@@ -364,18 +548,20 @@
         
         .progress-bar {
             height: 100%;
-            background: var(--gold);
+            background: linear-gradient(90deg, var(--silver) 0%, var(--silver-light) 100%);
             border-radius: 3px;
             width: 0%;
             transition: width 0.05s linear;
+            box-shadow: 0 0 10px rgba(176, 183, 188, 0.3);
         }
         
         .time-display {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--text-dim);
-            min-width: 70px;
+            min-width: 75px;
             text-align: center;
             font-variant-numeric: tabular-nums;
+            letter-spacing: 0.05em;
         }
         
         /* ============ NAV DOTS ============ */
@@ -386,16 +572,20 @@
             transform: translateY(-50%);
             display: flex;
             flex-direction: column;
-            gap: 0.8rem;
+            gap: 1rem;
             z-index: 100;
+            opacity: 0;
+            transition: opacity 0.5s ease;
         }
+        
+        .nav-dots.visible { opacity: 1; }
         
         @media (max-width: 767px) {
             .nav-dots {
                 right: auto;
                 left: 50%;
                 top: auto;
-                bottom: 5rem;
+                bottom: 6rem;
                 transform: translateX(-50%);
                 flex-direction: row;
             }
@@ -405,60 +595,160 @@
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(176, 183, 188, 0.2);
+            border: 1px solid transparent;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
         }
         
-        .nav-dot:hover { background: rgba(255, 255, 255, 0.5); }
-        .nav-dot.active { background: var(--gold); transform: scale(1.3); }
+        .nav-dot:hover {
+            background: rgba(176, 183, 188, 0.4);
+            transform: scale(1.2);
+        }
+        
+        .nav-dot.active {
+            background: var(--silver-light);
+            border-color: var(--silver-light);
+            transform: scale(1.4);
+            box-shadow: 0 0 15px rgba(176, 183, 188, 0.5);
+        }
         
         .nav-dot::after {
             content: attr(data-name);
             position: absolute;
-            right: 20px;
+            right: 24px;
             top: 50%;
             transform: translateY(-50%);
             white-space: nowrap;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--text-dim);
             opacity: 0;
-            transition: opacity 0.2s ease;
+            transition: all 0.3s ease;
             pointer-events: none;
+            padding: 0.3rem 0.6rem;
+            background: rgba(0, 34, 68, 0.8);
+            border-radius: 4px;
+            backdrop-filter: blur(5px);
         }
         
-        .nav-dot:hover::after { opacity: 1; }
+        .nav-dot:hover::after { opacity: 1; transform: translateY(-50%) translateX(-5px); }
         
         @media (max-width: 767px) {
             .nav-dot::after { display: none; }
         }
         
+        /* ============ ENDING OVERLAY ============ */
+        #ending-overlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, var(--bg) 0%, var(--navy-deep) 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 900;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.8s ease;
+        }
+        
+        #ending-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .ending-content {
+            text-align: center;
+        }
+        
+        .ending-star {
+            font-size: 3rem;
+            color: var(--silver-light);
+            margin-bottom: 2rem;
+            opacity: 0;
+            animation: endingStarReveal 1s ease forwards 0.3s;
+        }
+        
+        @keyframes endingStarReveal {
+            from { opacity: 0; transform: scale(0) rotate(-180deg); }
+            to { opacity: 1; transform: scale(1) rotate(0deg); }
+        }
+        
+        .ending-title {
+            font-family: 'Cinzel', serif;
+            font-size: clamp(2rem, 6vw, 4rem);
+            letter-spacing: 0.3em;
+            margin-left: 0.3em;
+            color: var(--silver-light);
+            margin-bottom: 1rem;
+            opacity: 0;
+            animation: fadeSlideUp 1s ease forwards 0.6s;
+        }
+        
+        .ending-subtitle {
+            font-size: 0.9rem;
+            letter-spacing: 0.2em;
+            color: var(--text-dim);
+            margin-bottom: 3rem;
+            opacity: 0;
+            animation: fadeSlideUp 1s ease forwards 0.9s;
+        }
+        
+        .replay-btn {
+            padding: 1rem 2.5rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            background: transparent;
+            border: 1px solid var(--silver);
+            color: var(--silver-light);
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            opacity: 0;
+            animation: fadeSlideUp 1s ease forwards 1.2s;
+        }
+        
+        .replay-btn:hover {
+            background: var(--silver);
+            color: var(--navy-deep);
+            box-shadow: 0 0 30px rgba(176, 183, 188, 0.3);
+        }
+        
         .credits {
             position: fixed;
-            bottom: 1rem;
+            bottom: 0.8rem;
             right: 1rem;
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             color: var(--text-dim);
-            opacity: 0.4;
+            opacity: 0.3;
             z-index: 50;
+            letter-spacing: 0.05em;
         }
         
         .credits a {
-            color: var(--gold-dim);
+            color: var(--silver);
             text-decoration: none;
+            transition: color 0.2s ease;
         }
+        
+        .credits a:hover { color: var(--silver-light); }
     </style>
 </head>
 <body>
+    <!-- Star Particle Canvas -->
+    <canvas id="starfield"></canvas>
+    
     <!-- Loading state -->
     <div class="loading" id="loading">
-        <div class="loading-spinner"></div>
-        <div class="loading-text">Loading videos...</div>
+        <div class="loading-star"></div>
+        <div class="loading-text">Preparing Experience</div>
     </div>
     
     <!-- Language Picker -->
-    <div class="language-picker">
+    <div class="language-picker" id="langPicker">
         <label for="langSelect">Language</label>
         <select id="langSelect">
             <option value="en">English</option>
@@ -467,10 +757,13 @@
         </select>
     </div>
     
-    <!-- Click to start -->
+    <!-- Cinematic Intro -->
     <div id="start-overlay">
+        <div class="intro-stars top">★ ★ ★ ★ ★</div>
         <h1>DCC</h1>
-        <p>CLICK TO BEGIN</p>
+        <div class="subtitle">MAKING THE TEAM</div>
+        <div class="intro-stars bottom">★ ★ ★ ★ ★</div>
+        <div class="start-prompt">CLICK ANYWHERE TO BEGIN</div>
     </div>
     
     <div class="main-container" id="main">
@@ -486,39 +779,97 @@
     </div>
     
     <div class="controls" id="controls">
-        <button class="control-btn" id="prevBtn" title="Previous (↑)">
+        <button class="control-btn" id="prevBtn" title="Previous (↑)" aria-label="Previous speaker">
             <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
         </button>
-        <button class="control-btn" id="rewindBtn" title="Rewind 5s (←)">
+        <button class="control-btn" id="rewindBtn" title="Rewind 5s (←)" aria-label="Rewind 5 seconds">
             <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
         </button>
-        <button class="control-btn play-pause" id="playPauseBtn" title="Play/Pause (Space)">
+        <button class="control-btn play-pause" id="playPauseBtn" title="Play/Pause (Space)" aria-label="Play or pause">
             <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
             <svg id="pauseIcon" viewBox="0 0 24 24" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
         </button>
-        <button class="control-btn" id="forwardBtn" title="Forward 5s (→)">
+        <button class="control-btn" id="forwardBtn" title="Forward 5s (→)" aria-label="Forward 5 seconds">
             <svg viewBox="0 0 24 24"><path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/></svg>
         </button>
-        <button class="control-btn" id="nextBtn" title="Next (↓)">
+        <button class="control-btn" id="nextBtn" title="Next (↓)" aria-label="Next speaker">
             <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
         </button>
-        <div class="progress-container" id="progressContainer">
-            <div class="progress-bar" id="progressBar"></div>
+        <div class="progress-wrapper">
+            <div class="segment-indicators" id="segmentIndicators"></div>
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
         </div>
         <div class="time-display" id="timeDisplay">0:00 / 0:00</div>
     </div>
     
     <div class="nav-dots" id="navDots"></div>
     
+    <!-- Ending overlay -->
+    <div id="ending-overlay">
+        <div class="ending-content">
+            <div class="ending-star">★</div>
+            <h2 class="ending-title">DCC</h2>
+            <p class="ending-subtitle">MAKING THE TEAM</p>
+            <button class="replay-btn" id="replayBtn">Watch Again</button>
+        </div>
+    </div>
+    
     <div class="credits">
-        Voice: <a href="https://elevenlabs.io">ElevenLabs</a> · 
-        Video: <a href="https://heygen.com">HeyGen</a>
+        Voice <a href="https://elevenlabs.io">ElevenLabs</a> · 
+        Video <a href="https://heygen.com">HeyGen</a>
     </div>
     
     <script>
-    /**
-     * VideoDocumentary - Robust multi-segment video playback with language support
-     */
+    // ============ STAR PARTICLE SYSTEM ============
+    class Starfield {
+        constructor(canvas) {
+            this.canvas = canvas;
+            this.ctx = canvas.getContext('2d');
+            this.stars = [];
+            this.resize();
+            window.addEventListener('resize', () => this.resize());
+        }
+        
+        resize() {
+            this.canvas.width = window.innerWidth;
+            this.canvas.height = window.innerHeight;
+            this.initStars();
+        }
+        
+        initStars() {
+            this.stars = [];
+            const count = Math.floor((this.canvas.width * this.canvas.height) / 15000);
+            for (let i = 0; i < count; i++) {
+                this.stars.push({
+                    x: Math.random() * this.canvas.width,
+                    y: Math.random() * this.canvas.height,
+                    size: Math.random() * 1.5 + 0.5,
+                    twinkle: Math.random() * Math.PI * 2,
+                    speed: Math.random() * 0.02 + 0.01,
+                });
+            }
+        }
+        
+        animate() {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            this.stars.forEach(star => {
+                star.twinkle += star.speed;
+                const alpha = 0.3 + Math.sin(star.twinkle) * 0.3;
+                
+                this.ctx.beginPath();
+                this.ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                this.ctx.fillStyle = `rgba(176, 183, 188, ${alpha})`;
+                this.ctx.fill();
+            });
+            
+            requestAnimationFrame(() => this.animate());
+        }
+    }
+    
+    // ============ VIDEO DOCUMENTARY CLASS ============
     class VideoDocumentary {
         constructor(config, containerEl) {
             this.config = config;
@@ -559,15 +910,13 @@
         }
         
         async _loadLanguage(lang) {
-            // Clear existing videos
             Object.values(this.videos).forEach(v => v.remove());
             this.videos = {};
             
             const segments = this.config.languages[lang].segments;
-            const loadPromises = segments.map((seg, i) => this._createVideo(seg, lang));
+            const loadPromises = segments.map(seg => this._createVideo(seg, lang));
             await Promise.all(loadPromises);
             
-            // Set up ended handlers
             Object.values(this.videos).forEach(video => {
                 video.addEventListener('ended', () => this._onVideoEnded());
             });
@@ -588,7 +937,7 @@
                 
                 video.addEventListener('canplaythrough', onCanPlay);
                 video.addEventListener('error', () => resolve());
-                setTimeout(() => resolve(), 8000);
+                setTimeout(() => resolve(), 10000);
                 
                 video.load();
                 this.videos[segment.key] = video;
@@ -660,7 +1009,7 @@
                 if (autoplay || this.isPlaying) {
                     this.play();
                 }
-            }, 100);
+            }, 150);
         }
         
         play() {
@@ -702,7 +1051,7 @@
                         setTimeout(() => {
                             const video = this.videos[segments[i].key];
                             if (video) video.currentTime = Math.max(0, localTime);
-                        }, 150);
+                        }, 200);
                     } else {
                         const video = this._currentVideo();
                         if (video) video.currentTime = Math.max(0, localTime);
@@ -754,6 +1103,15 @@
             };
             requestAnimationFrame(update);
         }
+        
+        reset() {
+            this.pause();
+            this.currentIndex = -1;
+            Object.values(this.videos).forEach(v => {
+                v.classList.remove('active');
+                v.currentTime = 0;
+            });
+        }
     }
     
     // ============ CONFIGURATION ============
@@ -762,7 +1120,7 @@
         languages: {
             en: {
                 segments: [
-                    { key: "kelli", name: "Kelli Finglass", role: "Director, Dallas Cowboys Cheerleaders", duration: 11.12,
+                    { key: "kelli", name: "Kelli Finglass", role: "Director", duration: 11.12,
                       quote: "Being a Dallas Cowboys Cheerleader isn't about the uniform. It's about the *woman* inside it. When I look at these women, I see *daughters*. I see *sisters*. I see the *best* of what we can be." },
                     { key: "judy", name: "Judy Trammell", role: "Head Choreographer", duration: 9.68,
                       quote: "Five, six, seven, eight. You know what I tell them? *Feel* the *music*. Don't count it. When you're out there on that *field*, the crowd can tell if you're just going through the *motions*." },
@@ -774,19 +1132,19 @@
             },
             es: {
                 segments: [
-                    { key: "kelli", name: "Kelli Finglass", role: "Directora, Dallas Cowboys Cheerleaders", duration: 12.529,
+                    { key: "kelli", name: "Kelli Finglass", role: "Directora", duration: 12.529,
                       quote: "Ser porrista de los Dallas Cowboys no se trata del uniforme. Se trata de la *mujer* que lo lleva. Cuando miro a estas mujeres, veo *hijas*. Veo *hermanas*. Veo lo *mejor* de lo que podemos ser." },
                     { key: "judy", name: "Judy Trammell", role: "Coreógrafa Principal", duration: 12.241,
                       quote: "Cinco, seis, siete, ocho. ¿Saben qué les digo? *Sientan* la *música*. No la cuenten. Cuando están en ese *campo*, el público puede notar si solo están pasando por los *movimientos*." },
-                    { key: "victoria", name: "Victoria Kalina", role: "Veterana de 4 Años", duration: 13.801,
+                    { key: "victoria", name: "Victoria Kalina", role: "Veterana · 4 Años", duration: 13.801,
                       quote: "Mi *mamá* fue *DCC*. Ella me contaba historias sobre lo que significaba para ella. La *hermandad*, el *sacrificio*. Ahora yo puedo vivir ese mismo *sueño*. Es como llevar una *antorcha* hacia adelante." },
-                    { key: "chandi", name: "Chandi Dayle", role: "Veterana de 6 Años", duration: 9.8,
+                    { key: "chandi", name: "Chandi Dayle", role: "Veterana · 6 Años", duration: 9.8,
                       quote: "Seis *años*. Seis *temporadas* en este equipo. Cada una de ellas me enseñó algo diferente sobre quién soy. Los *altos*, los *bajos*... eso es lo que te hace *veterana*." },
                 ]
             },
             ja: {
                 segments: [
-                    { key: "kelli", name: "ケリー・フィングラス", role: "ダラス・カウボーイズ・チアリーダーズ ディレクター", duration: 16.76,
+                    { key: "kelli", name: "ケリー・フィングラス", role: "ディレクター", duration: 16.76,
                       quote: "ダラス・カウボーイズ・チアリーダーであることは、ユニフォームのことではありません。それを着る*女性*のことです。この女性たちを見ると、*娘*たちが見えます。*姉妹*が見えます。私たちの*最高*の姿が見えます。" },
                     { key: "judy", name: "ジュディ・トラメル", role: "ヘッドコレオグラファー", duration: 12.481,
                       quote: "5、6、7、8。私が彼女たちに言うことを知っていますか？*音楽*を*感じ*なさい。数えないで。*フィールド*に出たとき、観客にはただ*動き*をなぞっているだけかどうかがわかります。" },
@@ -799,7 +1157,10 @@
         }
     };
     
-    // ============ UI SETUP ============
+    // ============ INITIALIZE ============
+    const starfield = new Starfield(document.getElementById('starfield'));
+    starfield.animate();
+    
     const loadingEl = document.getElementById('loading');
     const overlayEl = document.getElementById('start-overlay');
     const mainEl = document.getElementById('main');
@@ -814,18 +1175,28 @@
     const timeDisplay = document.getElementById('timeDisplay');
     const navDotsContainer = document.getElementById('navDots');
     const langSelect = document.getElementById('langSelect');
+    const langPicker = document.getElementById('langPicker');
+    const controlsEl = document.getElementById('controls');
+    const endingEl = document.getElementById('ending-overlay');
+    const segmentIndicatorsEl = document.getElementById('segmentIndicators');
     
-    // Create nav dots
+    // Create nav dots and segment indicators
     CONFIG.languages.en.segments.forEach((seg, i) => {
         const dot = document.createElement('div');
         dot.className = 'nav-dot';
         dot.dataset.idx = i;
         dot.dataset.name = seg.name;
         navDotsContainer.appendChild(dot);
+        
+        const indicator = document.createElement('div');
+        indicator.className = 'segment-indicator';
+        indicator.dataset.idx = i;
+        segmentIndicatorsEl.appendChild(indicator);
     });
-    const navDots = navDotsContainer.querySelectorAll('.nav-dot');
     
-    // ============ DOCUMENTARY INSTANCE ============
+    const navDots = navDotsContainer.querySelectorAll('.nav-dot');
+    const segmentIndicators = segmentIndicatorsEl.querySelectorAll('.segment-indicator');
+    
     const doc = new VideoDocumentary(CONFIG, videoPanelEl);
     
     function formatTime(s) {
@@ -876,12 +1247,10 @@
         pauseIcon.style.display = doc.isPlaying ? '' : 'none';
     }
     
-    function updateNavDots() {
-        const segments = doc._getSegments();
-        navDots.forEach((dot, i) => {
-            if (segments[i]) {
-                dot.dataset.name = segments[i].name;
-            }
+    function updateSegmentIndicators(currentIdx) {
+        segmentIndicators.forEach((ind, i) => {
+            ind.classList.toggle('active', i === currentIdx);
+            ind.classList.toggle('completed', i < currentIdx);
         });
     }
     
@@ -892,6 +1261,7 @@
     
     doc.onSegmentChange = (index, segment) => {
         navDots.forEach((dot, i) => dot.classList.toggle('active', i === index));
+        updateSegmentIndicators(index);
         
         speakerNameEl.classList.remove('visible');
         speakerRoleEl.classList.remove('visible');
@@ -914,17 +1284,43 @@
     
     doc.onEnd = () => {
         updatePlayPauseIcon();
+        showEnding();
     };
     
-    // ============ LANGUAGE CHANGE ============
+    function showEnding() {
+        endingEl.classList.add('visible');
+        controlsEl.classList.remove('visible');
+        navDotsContainer.classList.remove('visible');
+    }
+    
+    function hideEnding() {
+        endingEl.classList.remove('visible');
+        controlsEl.classList.add('visible');
+        navDotsContainer.classList.add('visible');
+    }
+    
+    document.getElementById('replayBtn').addEventListener('click', () => {
+        hideEnding();
+        doc.reset();
+        quoteEl.innerHTML = '';
+        speakerNameEl.classList.remove('visible');
+        speakerRoleEl.classList.remove('visible');
+        updateSegmentIndicators(-1);
+        
+        setTimeout(() => {
+            doc.goToSegment(0, true);
+            updatePlayPauseIcon();
+        }, 300);
+    });
+    
+    // Language change
     langSelect.addEventListener('change', async (e) => {
         loadingEl.classList.remove('hidden');
         await doc.setLanguage(e.target.value);
-        updateNavDots();
         loadingEl.classList.add('hidden');
     });
     
-    // ============ CONTROLS ============
+    // Controls
     document.getElementById('playPauseBtn').addEventListener('click', () => {
         doc.toggle();
         updatePlayPauseIcon();
@@ -941,6 +1337,17 @@
         doc.seek(percent * doc._getTotalDuration());
     });
     
+    segmentIndicators.forEach(ind => {
+        ind.addEventListener('click', () => {
+            const idx = parseInt(ind.dataset.idx);
+            doc.goToSegment(idx, true);
+            if (!doc.isPlaying) {
+                doc.play();
+                updatePlayPauseIcon();
+            }
+        });
+    });
+    
     navDots.forEach(dot => {
         dot.addEventListener('click', () => {
             const idx = parseInt(dot.dataset.idx);
@@ -955,6 +1362,16 @@
     document.addEventListener('keydown', (e) => {
         if (!overlayEl.classList.contains('hidden')) {
             startExperience();
+            return;
+        }
+        
+        if (endingEl.classList.contains('visible')) {
+            hideEnding();
+            doc.reset();
+            setTimeout(() => {
+                doc.goToSegment(0, true);
+                updatePlayPauseIcon();
+            }, 300);
             return;
         }
         
@@ -985,11 +1402,14 @@
     function startExperience() {
         overlayEl.classList.add('hidden');
         mainEl.classList.add('active');
+        controlsEl.classList.add('visible');
+        navDotsContainer.classList.add('visible');
+        langPicker.classList.add('visible');
         
         setTimeout(() => {
             doc.goToSegment(0, true);
             updatePlayPauseIcon();
-        }, 300);
+        }, 500);
     }
     
     overlayEl.addEventListener('click', startExperience);
