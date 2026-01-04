@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DCC: Making the Team</title>
+    <meta name="description" content="An interactive documentary featuring the voices and faces of the Dallas Cowboys Cheerleaders">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --gold: #d4af37;
+            --gold-dim: rgba(212, 175, 55, 0.6);
+            --bg: #0a0908;
+            --text: #f5f5f5;
+            --text-dim: rgba(245, 245, 245, 0.6);
+        }
+        
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* ============ START OVERLAY ============ */
+        #start-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            cursor: pointer;
+            transition: opacity 0.8s ease, visibility 0.8s;
+        }
+        
+        #start-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        #start-overlay h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2.5rem, 8vw, 5rem);
+            letter-spacing: 0.3em;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--gold) 0%, var(--text) 50%, var(--gold) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        #start-overlay p {
+            font-size: clamp(0.9rem, 2vw, 1.2rem);
+            letter-spacing: 0.2em;
+            color: var(--text-dim);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.8; }
+        }
+        
+        /* ============ MAIN CONTAINER ============ */
+        .main-container {
+            display: flex;
+            height: 100vh;
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+        
+        .main-container.active { opacity: 1; }
+        
+        /* Desktop: side-by-side */
+        @media (min-width: 768px) {
+            .main-container { flex-direction: row; }
+            .video-panel { flex: 1.2; }
+            .content-panel { flex: 0.8; }
+        }
+        
+        /* Mobile: stacked */
+        @media (max-width: 767px) {
+            .main-container { flex-direction: column; }
+            .video-panel { height: 50vh; }
+            .content-panel { height: 50vh; overflow-y: auto; }
+        }
+        
+        /* ============ VIDEO PANEL ============ */
+        .video-panel {
+            position: relative;
+            overflow: hidden;
+            background: #000;
+        }
+        
+        .video-panel::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to right, transparent 70%, var(--bg) 100%);
+            pointer-events: none;
+        }
+        
+        @media (max-width: 767px) {
+            .video-panel::after {
+                background: linear-gradient(to bottom, transparent 70%, var(--bg) 100%);
+            }
+        }
+        
+        .character-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center 20%;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        
+        .character-video.active {
+            opacity: 1;
+        }
+        
+        /* Speaker name badge */
+        .speaker-badge {
+            position: absolute;
+            bottom: 2rem;
+            left: 2rem;
+            z-index: 10;
+        }
+        
+        .speaker-badge h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            letter-spacing: 0.15em;
+            margin-bottom: 0.5rem;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.6s ease;
+        }
+        
+        .speaker-badge h2.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .speaker-badge .role {
+            font-size: clamp(0.7rem, 1.5vw, 0.9rem);
+            letter-spacing: 0.2em;
+            color: var(--gold);
+            text-transform: uppercase;
+            opacity: 0;
+            transition: opacity 0.6s ease 0.3s;
+        }
+        
+        .speaker-badge .role.visible { opacity: 1; }
+        
+        /* ============ CONTENT PANEL ============ */
+        .content-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: clamp(2rem, 5vw, 5rem);
+            position: relative;
+        }
+        
+        /* Quote container with kinetic words */
+        .quote-container {
+            font-size: clamp(1.1rem, 2.5vw, 1.7rem);
+            line-height: 1.9;
+            font-weight: 300;
+            color: var(--text-dim);
+            max-width: 600px;
+        }
+        
+        .word {
+            display: inline-block;
+            opacity: 0;
+            transform: translateY(12px);
+            transition: opacity 0.2s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.3s ease;
+            margin-right: 0.2em;
+        }
+        
+        .word.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .word.current {
+            color: var(--text);
+            font-weight: 400;
+        }
+        
+        .word.emphasis {
+            color: var(--gold);
+            font-style: italic;
+        }
+        
+        /* ============ PLAYBACK CONTROLS ============ */
+        .controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            background: linear-gradient(to top, var(--bg), transparent);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+        
+        body:hover .controls,
+        .controls:hover,
+        .controls.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        @media (max-width: 767px) {
+            .controls { opacity: 1; transform: translateY(0); }
+        }
+        
+        .control-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--text);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: var(--gold);
+        }
+        
+        .control-btn.play-pause {
+            width: 64px;
+            height: 64px;
+            background: var(--gold);
+            border: none;
+        }
+        
+        .control-btn.play-pause:hover {
+            transform: scale(1.05);
+            background: #e5c349;
+        }
+        
+        .control-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+        }
+        
+        .control-btn.play-pause svg {
+            fill: var(--bg);
+        }
+        
+        /* Progress bar */
+        .progress-container {
+            flex: 1;
+            max-width: 400px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: var(--gold);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        
+        .time-display {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            min-width: 80px;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+        
+        /* ============ NAV DOTS ============ */
+        .nav-dots {
+            position: fixed;
+            right: 1.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            z-index: 100;
+        }
+        
+        @media (max-width: 767px) {
+            .nav-dots {
+                right: auto;
+                left: 50%;
+                top: auto;
+                bottom: 5rem;
+                transform: translateX(-50%);
+                flex-direction: row;
+            }
+        }
+        
+        .nav-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .nav-dot:hover { background: rgba(255, 255, 255, 0.5); }
+        .nav-dot.active { background: var(--gold); transform: scale(1.3); }
+        
+        .nav-dot::after {
+            content: attr(data-name);
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            white-space: nowrap;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+        }
+        
+        .nav-dot:hover::after { opacity: 1; }
+        
+        @media (max-width: 767px) {
+            .nav-dot::after { display: none; }
+        }
+        
+        /* ============ CREDITS ============ */
+        .credits {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            opacity: 0.5;
+            z-index: 50;
+        }
+        
+        .credits a {
+            color: var(--gold-dim);
+            text-decoration: none;
+        }
+        
+        .credits a:hover {
+            color: var(--gold);
+        }
+    </style>
+</head>
+<body>
+    <!-- Click to start -->
+    <div id="start-overlay">
+        <h1>DCC</h1>
+        <p>CLICK TO BEGIN</p>
+    </div>
+    
+    <div class="main-container" id="main">
+        <div class="video-panel">
+            <!-- Video elements for each character - each has its own audio track synced by HeyGen -->
+            <video class="character-video" id="video-kelli" playsinline>
+                <source src="videos/kelli_talking.mp4" type="video/mp4">
+            </video>
+            <video class="character-video" id="video-judy" playsinline>
+                <source src="videos/judy_talking.mp4" type="video/mp4">
+            </video>
+            <video class="character-video" id="video-victoria" playsinline>
+                <source src="videos/victoria_talking.mp4" type="video/mp4">
+            </video>
+            <video class="character-video" id="video-chandi" playsinline>
+                <source src="videos/chandi_talking.mp4" type="video/mp4">
+            </video>
+            
+            <div class="speaker-badge">
+                <h2 id="speakerName"></h2>
+                <div class="role" id="speakerRole"></div>
+            </div>
+        </div>
+        <div class="content-panel">
+            <div class="quote-container" id="quote"></div>
+        </div>
+    </div>
+    
+    <!-- Playback Controls -->
+    <div class="controls" id="controls">
+        <button class="control-btn" id="prevBtn" title="Previous">
+            <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+        </button>
+        <button class="control-btn" id="rewindBtn" title="Rewind 5s">
+            <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+        </button>
+        <button class="control-btn play-pause" id="playPauseBtn" title="Play/Pause">
+            <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="pauseIcon" viewBox="0 0 24 24" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        </button>
+        <button class="control-btn" id="forwardBtn" title="Forward 5s">
+            <svg viewBox="0 0 24 24"><path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/></svg>
+        </button>
+        <button class="control-btn" id="nextBtn" title="Next">
+            <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+        </button>
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="time-display" id="timeDisplay">0:00 / 0:00</div>
+    </div>
+    
+    <!-- Nav Dots -->
+    <div class="nav-dots">
+        <div class="nav-dot" data-idx="0" data-name="Kelli Finglass"></div>
+        <div class="nav-dot" data-idx="1" data-name="Judy Trammell"></div>
+        <div class="nav-dot" data-idx="2" data-name="Victoria Kalina"></div>
+        <div class="nav-dot" data-idx="3" data-name="Chandi Dayle"></div>
+    </div>
+    
+    <div class="credits">
+        Voice cloning by <a href="https://elevenlabs.io">ElevenLabs</a> · 
+        Lip sync by <a href="https://heygen.com">HeyGen</a> · 
+        Built with <a href="https://github.com/awktavian/kagami">Kagami</a>
+    </div>
+    
+    <script>
+        // Segment data - each video has its own synced audio from HeyGen
+        const segments = [
+            {
+                key: "kelli",
+                name: "Kelli Finglass",
+                role: "Director, Dallas Cowboys Cheerleaders",
+                duration: 10.4,
+                quote: "Being a Dallas Cowboys Cheerleader isn't about the uniform. It's about the *woman* inside it. When I look at these women, I see *daughters*. I see *sisters*. I see the *best* of what we can be."
+            },
+            {
+                key: "judy",
+                name: "Judy Trammell",
+                role: "Head Choreographer",
+                duration: 8.8,
+                quote: "Five, six, seven, eight. You know what I tell them? *Feel* the *music*. Don't count it. When you're out there on that *field*, the crowd can tell if you're just going through the *motions*."
+            },
+            {
+                key: "victoria",
+                name: "Victoria Kalina",
+                role: "4th Year Veteran",
+                duration: 8.7,
+                quote: "My *mom* was a *DCC*. She used to tell me stories about what it meant to her. The *sisterhood*, the *sacrifice*. Now I get to live that same *dream*. It's like carrying a *torch* forward."
+            },
+            {
+                key: "chandi",
+                name: "Chandi Dayle",
+                role: "6th Year Veteran",
+                duration: 8.8,
+                quote: "Six *years*. Six *seasons* on this team. Every single one of them taught me something different about who I am. The *highs*, the *lows*... that's what makes you a *veteran*."
+            },
+        ];
+        
+        // Calculate cumulative times for global progress
+        let cumulativeStarts = [0];
+        let totalDuration = 0;
+        segments.forEach((s, i) => {
+            totalDuration += s.duration;
+            if (i < segments.length - 1) {
+                cumulativeStarts.push(totalDuration);
+            }
+        });
+        cumulativeStarts.push(totalDuration);
+        
+        // DOM elements
+        const overlay = document.getElementById('start-overlay');
+        const mainContainer = document.getElementById('main');
+        const speakerName = document.getElementById('speakerName');
+        const speakerRole = document.getElementById('speakerRole');
+        const quoteEl = document.getElementById('quote');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const playIcon = document.getElementById('playIcon');
+        const pauseIcon = document.getElementById('pauseIcon');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const rewindBtn = document.getElementById('rewindBtn');
+        const forwardBtn = document.getElementById('forwardBtn');
+        const progressBar = document.getElementById('progressBar');
+        const progressContainer = document.getElementById('progressContainer');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const navDots = document.querySelectorAll('.nav-dot');
+        
+        // Video elements
+        const videos = {
+            kelli: document.getElementById('video-kelli'),
+            judy: document.getElementById('video-judy'),
+            victoria: document.getElementById('video-victoria'),
+            chandi: document.getElementById('video-chandi'),
+        };
+        
+        let currentSegmentIndex = -1;
+        let isPlaying = false;
+        let globalTime = 0;
+        let animationFrame = null;
+        
+        // Format time as M:SS
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        }
+        
+        // Parse quote with emphasis markers
+        function parseQuote(quote) {
+            const words = quote.split(' ');
+            return words.map(word => {
+                const isEmphasis = word.startsWith('*') && word.endsWith('*');
+                const cleanWord = word.replace(/\*/g, '');
+                return { word: cleanWord, emphasis: isEmphasis };
+            });
+        }
+        
+        // Build word elements for a segment
+        function buildWords(segment) {
+            quoteEl.innerHTML = '';
+            const words = parseQuote(segment.quote);
+            const wordDuration = segment.duration / words.length;
+            
+            words.forEach((w, i) => {
+                const span = document.createElement('span');
+                span.className = 'word';
+                if (w.emphasis) span.classList.add('emphasis');
+                span.textContent = w.word;
+                span.dataset.start = (i * wordDuration).toFixed(3);
+                quoteEl.appendChild(span);
+            });
+        }
+        
+        // Update word visibility based on video time
+        function updateWords(videoTime) {
+            const wordEls = quoteEl.querySelectorAll('.word');
+            wordEls.forEach((el, i) => {
+                const start = parseFloat(el.dataset.start);
+                const nextStart = wordEls[i + 1] ? parseFloat(wordEls[i + 1].dataset.start) : Infinity;
+                
+                if (videoTime >= start) {
+                    el.classList.add('visible');
+                    if (videoTime >= start && videoTime < nextStart) {
+                        el.classList.add('current');
+                    } else {
+                        el.classList.remove('current');
+                    }
+                } else {
+                    el.classList.remove('visible', 'current');
+                }
+            });
+        }
+        
+        // Show segment
+        function showSegment(index, autoplay = true) {
+            if (index < 0 || index >= segments.length) return;
+            
+            const segment = segments[index];
+            const prevIndex = currentSegmentIndex;
+            currentSegmentIndex = index;
+            
+            // Pause previous video
+            if (prevIndex >= 0) {
+                const prevVideo = videos[segments[prevIndex].key];
+                prevVideo.pause();
+                prevVideo.classList.remove('active');
+            }
+            
+            // Update nav dots
+            navDots.forEach((dot, i) => {
+                dot.classList.toggle('active', i === index);
+            });
+            
+            // Activate new video
+            const activeVideo = videos[segment.key];
+            Object.values(videos).forEach(v => v.classList.remove('active'));
+            activeVideo.classList.add('active');
+            activeVideo.currentTime = 0;
+            
+            // Update badge
+            speakerName.classList.remove('visible');
+            speakerRole.classList.remove('visible');
+            
+            setTimeout(() => {
+                speakerName.textContent = segment.name;
+                speakerRole.textContent = segment.role;
+                speakerName.classList.add('visible');
+                speakerRole.classList.add('visible');
+            }, 100);
+            
+            // Build words
+            buildWords(segment);
+            
+            // Play if autoplay
+            if (autoplay && isPlaying) {
+                activeVideo.play();
+            }
+        }
+        
+        // Animation loop for global progress
+        function updateLoop() {
+            if (!isPlaying) return;
+            
+            const segment = segments[currentSegmentIndex];
+            const activeVideo = videos[segment.key];
+            
+            // Calculate global time
+            globalTime = cumulativeStarts[currentSegmentIndex] + activeVideo.currentTime;
+            
+            // Update progress
+            progressBar.style.width = `${(globalTime / totalDuration) * 100}%`;
+            timeDisplay.textContent = `${formatTime(globalTime)} / ${formatTime(totalDuration)}`;
+            
+            // Update word highlighting
+            updateWords(activeVideo.currentTime);
+            
+            animationFrame = requestAnimationFrame(updateLoop);
+        }
+        
+        // Play/pause toggle
+        function togglePlayPause() {
+            const segment = segments[currentSegmentIndex];
+            const activeVideo = videos[segment.key];
+            
+            if (isPlaying) {
+                activeVideo.pause();
+                playIcon.style.display = '';
+                pauseIcon.style.display = 'none';
+                cancelAnimationFrame(animationFrame);
+            } else {
+                activeVideo.play();
+                playIcon.style.display = 'none';
+                pauseIcon.style.display = '';
+                updateLoop();
+            }
+            isPlaying = !isPlaying;
+        }
+        
+        // Handle video end - auto-advance
+        function onVideoEnded() {
+            if (currentSegmentIndex < segments.length - 1) {
+                showSegment(currentSegmentIndex + 1, true);
+            } else {
+                // End of all segments
+                isPlaying = false;
+                playIcon.style.display = '';
+                pauseIcon.style.display = 'none';
+                cancelAnimationFrame(animationFrame);
+            }
+        }
+        
+        // Attach end handlers to all videos
+        Object.values(videos).forEach(video => {
+            video.addEventListener('ended', onVideoEnded);
+        });
+        
+        // Start experience
+        function startExperience() {
+            overlay.classList.add('hidden');
+            mainContainer.classList.add('active');
+            
+            setTimeout(() => {
+                showSegment(0, false);
+                setTimeout(() => {
+                    const firstVideo = videos.kelli;
+                    firstVideo.play();
+                    isPlaying = true;
+                    playIcon.style.display = 'none';
+                    pauseIcon.style.display = '';
+                    updateLoop();
+                }, 500);
+            }, 300);
+        }
+        
+        // Event listeners
+        overlay.addEventListener('click', startExperience);
+        
+        playPauseBtn.addEventListener('click', togglePlayPause);
+        
+        prevBtn.addEventListener('click', () => {
+            const newIdx = Math.max(0, currentSegmentIndex - 1);
+            showSegment(newIdx, isPlaying);
+        });
+        
+        nextBtn.addEventListener('click', () => {
+            const newIdx = Math.min(segments.length - 1, currentSegmentIndex + 1);
+            showSegment(newIdx, isPlaying);
+        });
+        
+        rewindBtn.addEventListener('click', () => {
+            const segment = segments[currentSegmentIndex];
+            const activeVideo = videos[segment.key];
+            activeVideo.currentTime = Math.max(0, activeVideo.currentTime - 5);
+        });
+        
+        forwardBtn.addEventListener('click', () => {
+            const segment = segments[currentSegmentIndex];
+            const activeVideo = videos[segment.key];
+            const newTime = activeVideo.currentTime + 5;
+            if (newTime >= segment.duration && currentSegmentIndex < segments.length - 1) {
+                showSegment(currentSegmentIndex + 1, isPlaying);
+            } else {
+                activeVideo.currentTime = Math.min(segment.duration, newTime);
+            }
+        });
+        
+        progressContainer.addEventListener('click', (e) => {
+            const rect = progressContainer.getBoundingClientRect();
+            const percent = (e.clientX - rect.left) / rect.width;
+            const targetTime = percent * totalDuration;
+            
+            // Find which segment this falls into
+            for (let i = 0; i < segments.length; i++) {
+                if (targetTime < cumulativeStarts[i + 1]) {
+                    const localTime = targetTime - cumulativeStarts[i];
+                    if (i !== currentSegmentIndex) {
+                        showSegment(i, isPlaying);
+                    }
+                    videos[segments[i].key].currentTime = localTime;
+                    break;
+                }
+            }
+        });
+        
+        navDots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                const idx = parseInt(dot.dataset.idx);
+                showSegment(idx, isPlaying);
+                if (!isPlaying) togglePlayPause();
+            });
+        });
+        
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (overlay.classList.contains('hidden')) {
+                switch(e.key) {
+                    case ' ':
+                        e.preventDefault();
+                        togglePlayPause();
+                        break;
+                    case 'ArrowRight':
+                        forwardBtn.click();
+                        break;
+                    case 'ArrowLeft':
+                        rewindBtn.click();
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        prevBtn.click();
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        nextBtn.click();
+                        break;
+                }
+            } else {
+                startExperience();
+            }
+        });
+    </script>
+</body>
+</html>
