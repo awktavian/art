@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Jail Speech — Memory Restored</title>
+    <meta name="description" content="A childhood memory naturally restored from VHS — preserving the texture of time">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg: #000;
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --glass-glow: rgba(255, 255, 255, 0.05);
+            --text: #ffffff;
+            --text-dim: rgba(255, 255, 255, 0.6);
+            --accent: #a78bfa;
+            --accent-glow: rgba(167, 139, 250, 0.4);
+            --gold: #fbbf24;
+            --red: #f87171;
+            --green: #4ade80;
+            --blue: #60a5fa;
+        }
+        
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', system-ui, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* Film Grain */
+        .grain {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9998;
+            opacity: 0.025;
+            mix-blend-mode: overlay;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            animation: grain 0.2s steps(8) infinite;
+        }
+        @keyframes grain {
+            0%, 100% { transform: translate(0); }
+            25% { transform: translate(-1%, 1%); }
+            50% { transform: translate(1%, -1%); }
+            75% { transform: translate(-1%, -1%); }
+        }
+        
+        /* Loading */
+        .loading {
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            transition: opacity 1s ease;
+        }
+        .loading.hidden { opacity: 0; pointer-events: none; }
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 2px solid rgba(167, 139, 250, 0.2);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text {
+            margin-top: 1.2rem;
+            font-size: 0.7rem;
+            letter-spacing: 0.3em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+        
+        /* Start Overlay */
+        #start-overlay {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at center, rgba(20, 10, 30, 0.95) 0%, var(--bg) 70%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            cursor: pointer;
+            transition: all 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #start-overlay.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+        
+        .intro-badge {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            opacity: 0;
+            animation: fadeUp 1s ease forwards 0.2s;
+        }
+        .badge {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 0.05em;
+        }
+        .badge.vhs {
+            background: rgba(248, 113, 113, 0.1);
+            border: 1px solid var(--red);
+            color: var(--red);
+        }
+        .badge.enhanced {
+            background: rgba(74, 222, 128, 0.1);
+            border: 1px solid var(--green);
+            color: var(--green);
+        }
+        .badge-arrow {
+            color: var(--accent);
+            font-size: 1.5rem;
+            opacity: 0;
+            animation: fadeUp 0.5s ease forwards 0.4s, arrowPulse 2s ease-in-out infinite 1.4s;
+        }
+        @keyframes arrowPulse {
+            0%, 100% { transform: translateX(0); opacity: 0.6; }
+            50% { transform: translateX(5px); opacity: 1; }
+        }
+        
+        .intro-year {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            letter-spacing: 0.4em;
+            color: var(--accent);
+            margin-bottom: 1rem;
+            opacity: 0;
+            animation: fadeUp 1s ease forwards 0.5s;
+        }
+        
+        #start-overlay h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2.5rem, 9vw, 5rem);
+            font-weight: 400;
+            font-style: italic;
+            color: var(--text);
+            opacity: 0;
+            animation: titleReveal 1.5s ease forwards 0.7s;
+            text-align: center;
+            line-height: 1.1;
+        }
+        
+        .subtitle {
+            font-size: 0.85rem;
+            letter-spacing: 0.25em;
+            color: var(--text-dim);
+            margin-top: 1rem;
+            text-transform: uppercase;
+            opacity: 0;
+            animation: fadeUp 1s ease forwards 1.2s;
+        }
+        
+        .start-prompt {
+            position: absolute;
+            bottom: 8%;
+            font-size: 0.65rem;
+            letter-spacing: 0.25em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            opacity: 0;
+            animation: fadeUp 1s ease forwards 1.8s, pulse 3s ease-in-out infinite 2.8s;
+        }
+        
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes titleReveal {
+            0% { opacity: 0; transform: scale(0.9) translateY(15px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.7; }
+        }
+        
+        /* Main Video Container */
+        .video-container {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg);
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+        .video-container.active { opacity: 1; }
+        
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-width: calc(100vh * 4 / 3);
+            cursor: ew-resize;
+        }
+        
+        .video-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        #video-original { z-index: 1; }
+        #video-enhanced { z-index: 2; clip-path: inset(0 50% 0 0); }
+        
+        /* Blend Slider */
+        .blend-slider {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 2px;
+            background: var(--text);
+            z-index: 10;
+            transform: translateX(-50%);
+            box-shadow: 0 0 20px rgba(255,255,255,0.3);
+            pointer-events: none;
+        }
+        
+        .blend-slider::before {
+            content: '';
+            position: absolute;
+            width: 48px;
+            height: 48px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+        
+        .blend-slider::after {
+            content: '⟷';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.1rem;
+            color: var(--text);
+            z-index: 1;
+        }
+        
+        /* Video Labels */
+        .video-labels {
+            position: absolute;
+            top: 1.5rem;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 2rem;
+            z-index: 15;
+            pointer-events: none;
+        }
+        
+        .video-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+        }
+        .video-label.original { color: var(--red); }
+        .video-label.enhanced { color: var(--green); }
+        
+        /* GLASSMORPHISM SUBTITLES */
+        .subtitle-container {
+            position: absolute;
+            bottom: 12%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            width: 90%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+        }
+        
+        .subtitle-glass {
+            background: linear-gradient(135deg, 
+                rgba(255, 255, 255, 0.12) 0%, 
+                rgba(255, 255, 255, 0.05) 50%,
+                rgba(167, 139, 250, 0.08) 100%
+            );
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 20px;
+            padding: 1.2rem 2rem;
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+            transform: translateY(20px);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .subtitle-glass.visible {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .subtitle-text {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(1.2rem, 3vw, 1.8rem);
+            font-weight: 400;
+            line-height: 1.6;
+            text-align: center;
+            color: var(--text);
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        
+        /* Word animations */
+        .word {
+            display: inline-block;
+            opacity: 0;
+            transform: translateY(8px);
+            transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            margin: 0 0.12em;
+        }
+        .word.visible { opacity: 1; transform: translateY(0); }
+        .word.current { 
+            color: var(--accent);
+            text-shadow: 0 0 20px var(--accent-glow);
+        }
+        
+        /* Emotion: Authority */
+        .word.emotion-authority.current {
+            color: var(--blue);
+            text-shadow: 0 0 25px rgba(96, 165, 250, 0.6);
+            animation: wordPop 0.3s ease;
+        }
+        
+        /* Emotion: Warning */
+        .word.emotion-warning.current {
+            color: var(--gold);
+            text-shadow: 0 0 25px rgba(251, 191, 36, 0.6);
+            animation: wordShake 0.3s ease;
+        }
+        
+        /* Emotion: Dramatic */
+        .word.emotion-dramatic.current {
+            color: var(--accent);
+            font-style: italic;
+            text-shadow: 0 0 30px var(--accent-glow);
+            animation: wordGlow 0.5s ease;
+        }
+        
+        @keyframes wordPop {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-4px) scale(1.05); }
+        }
+        @keyframes wordShake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-3px); }
+            75% { transform: translateX(3px); }
+        }
+        @keyframes wordGlow {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.3); }
+        }
+        
+        /* Language indicator */
+        .lang-indicator {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            letter-spacing: 0.1em;
+            margin-top: 0.8rem;
+            padding: 0.3rem 0.8rem;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .lang-indicator.visible { opacity: 1; }
+        
+        /* Controls */
+        .controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.8rem;
+            padding: 1.5rem 2rem;
+            background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%);
+            z-index: 100;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.5s ease;
+        }
+        .controls.visible { opacity: 1; transform: translateY(0); }
+        
+        .control-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            color: var(--text);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.25s ease;
+        }
+        .control-btn:hover {
+            background: rgba(255,255,255,0.15);
+            transform: scale(1.08);
+        }
+        .control-btn.play-pause {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
+            border: none;
+        }
+        .control-btn svg { width: 18px; height: 18px; fill: currentColor; }
+        .control-btn.play-pause svg { width: 22px; height: 22px; }
+        
+        .progress-wrapper {
+            flex: 1;
+            max-width: 400px;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .progress-bar-container {
+            flex: 1;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            cursor: pointer;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent) 0%, #8b5cf6 100%);
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        .time-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            min-width: 80px;
+        }
+        
+        /* Language Selector */
+        .lang-selector {
+            position: fixed;
+            top: 1.2rem;
+            right: 1.2rem;
+            z-index: 200;
+            display: flex;
+            gap: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        .lang-selector.visible { opacity: 1; }
+        
+        .lang-btn {
+            padding: 0.5rem 0.8rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+        .lang-btn:hover { color: var(--text); border-color: var(--text-dim); }
+        .lang-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: var(--bg);
+        }
+        
+        /* Ending */
+        #ending-overlay {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at center, rgba(20, 10, 30, 0.98) 0%, var(--bg) 70%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 900;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.8s ease;
+        }
+        #ending-overlay.visible { opacity: 1; visibility: visible; }
+        
+        .ending-icon {
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
+            opacity: 0;
+            animation: endReveal 1s ease forwards 0.3s;
+        }
+        @keyframes endReveal {
+            from { opacity: 0; transform: scale(0); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .ending-title {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            font-style: italic;
+            margin-bottom: 0.5rem;
+            opacity: 0;
+            animation: fadeUp 1s ease forwards 0.6s;
+        }
+        .ending-subtitle {
+            font-size: 0.75rem;
+            letter-spacing: 0.2em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            margin-bottom: 2rem;
+            opacity: 0;
+            animation: fadeUp 1s ease forwards 0.9s;
+        }
+        .replay-btn {
+            padding: 1rem 2rem;
+            font-family: inherit;
+            font-size: 0.8rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            opacity: 0;
+            animation: fadeUp 1s ease forwards 1.2s;
+        }
+        .replay-btn:hover { background: var(--accent); color: var(--bg); }
+        
+        /* Tech badge */
+        .tech-badge {
+            position: fixed;
+            bottom: 0.8rem;
+            left: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.55rem;
+            color: var(--text-dim);
+            opacity: 0.3;
+            z-index: 50;
+        }
+        .tech-badge span { color: var(--accent); }
+    </style>
+</head>
+<body>
+    <div class="grain"></div>
+    
+    <div class="loading" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Preserving Time</div>
+    </div>
+    
+    <div id="start-overlay">
+        <div class="intro-badge">
+            <span class="badge vhs">VHS 640×480</span>
+            <span class="badge-arrow">→</span>
+            <span class="badge enhanced">2K 2560×1920</span>
+        </div>
+        <div class="intro-year">≈ 1998</div>
+        <h1>"The Jail Speech"</h1>
+        <div class="subtitle">Natural Restoration · Texture Preserved</div>
+        <div class="start-prompt">Click to begin</div>
+        
+        <!-- 
+        Philosophy: Natural restoration, not artificial enhancement.
+        The grain is part of the memory. The softness is truth.
+        We don't make it sharper. We make it clearer.
+        
+        Settings:
+        - Model: Iris-3 (soft, natural upscaling)
+        - Scale: 4× (640×480 → 2560×1920)
+        - Blur: -0.2 (preserve softness)
+        - Details: -0.15 (reduce AI hallucination)
+        - Grain: 0.35 (restore film texture)
+        
+        There is beauty in truth. There is truth in self.
+        -->
+    </div>
+    
+    <div class="video-container" id="videoContainer">
+        <div class="video-wrapper" id="videoWrapper">
+            <video id="video-original" class="video-layer" playsinline muted>
+                <source src="videos/original.mp4" type="video/mp4">
+            </video>
+            <video id="video-enhanced" class="video-layer" playsinline>
+                <source src="videos/enhanced.mp4" type="video/mp4">
+            </video>
+            <div class="blend-slider" id="blendSlider"></div>
+            
+            <div class="video-labels">
+                <span class="video-label original">VHS · 1998</span>
+                <span class="video-label enhanced">RESTORED · 4×</span>
+            </div>
+            
+            <div class="subtitle-container">
+                <div class="subtitle-glass" id="subtitleGlass">
+                    <div class="subtitle-text" id="subtitleText"></div>
+                </div>
+                <div class="lang-indicator" id="langIndicator">EN</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="lang-selector" id="langSelector">
+        <button class="lang-btn active" data-lang="en">EN</button>
+        <button class="lang-btn" data-lang="es">ES</button>
+        <button class="lang-btn" data-lang="ja">日本語</button>
+    </div>
+    
+    <div class="controls" id="controls">
+        <button class="control-btn" id="rewindBtn">
+            <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+        </button>
+        <button class="control-btn play-pause" id="playPauseBtn">
+            <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="pauseIcon" viewBox="0 0 24 24" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        </button>
+        <button class="control-btn" id="forwardBtn">
+            <svg viewBox="0 0 24 24"><path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/></svg>
+        </button>
+        <div class="progress-wrapper">
+            <div class="progress-bar-container" id="progressContainer">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="time-display" id="timeDisplay">0:00 / 0:00</div>
+        </div>
+    </div>
+    
+    <div id="ending-overlay">
+        <div class="ending-icon">📼</div>
+        <h2 class="ending-title">"The Jail Speech"</h2>
+        <p class="ending-subtitle">The texture of time, preserved</p>
+        <button class="replay-btn" id="replayBtn">Watch Again</button>
+    </div>
+    
+    <div class="tech-badge">
+        <span>Topaz Video AI</span> · Iris-3 (natural) · 4× · grain restored
+    </div>
+    
+    <script>
+    // Emotion mapping
+    const EMOTIONS = {
+        'police': 'authority', 'Police': 'authority', 'policía': 'authority', '警察': 'authority',
+        'court': 'authority', 'tribunal': 'authority', '法廷': 'authority',
+        'law': 'authority', 'ley': 'authority', '法': 'authority',
+        'hands': 'warning', 'Hands': 'warning', 'manos': 'warning', 'Manos': 'warning', '手': 'warning',
+        'Stand': 'warning', 'Levántate': 'warning', '立て': 'warning',
+        'Stop': 'warning', 'Alto': 'warning', '止まれ': 'warning',
+        'right': 'dramatic', 'derecho': 'dramatic', '権利': 'dramatic',
+        'silent': 'dramatic', 'silencio': 'dramatic', '黙秘': 'dramatic',
+        'remain': 'dramatic', 'permanecer': 'dramatic',
+        'against': 'dramatic', 'contra': 'dramatic', '不利': 'dramatic',
+    };
+    
+    // Word timings with translations
+    const WORDS = {
+        en: [
+            { text: "This", t: 1.00 },
+            { text: "is", t: 1.50 },
+            { text: "the", t: 1.90 },
+            { text: "police.", t: 2.06 },
+            { text: "Stand", t: 2.92 },
+            { text: "up", t: 3.28 },
+            { text: "and", t: 3.54 },
+            { text: "put", t: 3.70 },
+            { text: "your", t: 3.80 },
+            { text: "hands", t: 3.94 },
+            { text: "in", t: 4.20 },
+            { text: "the", t: 4.38 },
+            { text: "air.", t: 4.60 },
+            { text: "Hands", t: 5.34 },
+            { text: "in", t: 5.58 },
+            { text: "the", t: 5.78 },
+            { text: "air,", t: 5.90 },
+            { text: "you", t: 7.00 },
+            { text: "have", t: 7.08 },
+            { text: "the", t: 7.22 },
+            { text: "right", t: 7.38 },
+            { text: "to", t: 7.62 },
+            { text: "remain", t: 7.80 },
+            { text: "silent.", t: 8.22 },
+            { text: "Anything", t: 9.24 },
+            { text: "you", t: 9.50 },
+            { text: "say", t: 9.60 },
+            { text: "or", t: 9.96 },
+            { text: "do,", t: 10.38 },
+            { text: "can", t: 11.20 },
+            { text: "and", t: 11.54 },
+            { text: "will", t: 12.04 },
+            { text: "be", t: 12.60 },
+            { text: "used", t: 12.96 },
+            { text: "against", t: 13.16 },
+            { text: "you", t: 13.56 },
+            { text: "in", t: 14.08 },
+            { text: "a", t: 14.20 },
+            { text: "court", t: 14.38 },
+            { text: "of", t: 14.52 },
+            { text: "law.", t: 14.78 },
+        ],
+        es: [
+            { text: "Esta", t: 1.00 },
+            { text: "es", t: 1.50 },
+            { text: "la", t: 1.90 },
+            { text: "policía.", t: 2.06 },
+            { text: "Levántate", t: 2.92 },
+            { text: "y", t: 3.54 },
+            { text: "pon", t: 3.70 },
+            { text: "tus", t: 3.80 },
+            { text: "manos", t: 3.94 },
+            { text: "en", t: 4.20 },
+            { text: "el", t: 4.38 },
+            { text: "aire.", t: 4.60 },
+            { text: "Manos", t: 5.34 },
+            { text: "en", t: 5.58 },
+            { text: "el", t: 5.78 },
+            { text: "aire,", t: 5.90 },
+            { text: "tienes", t: 7.00 },
+            { text: "el", t: 7.22 },
+            { text: "derecho", t: 7.38 },
+            { text: "a", t: 7.62 },
+            { text: "permanecer", t: 7.80 },
+            { text: "en", t: 8.10 },
+            { text: "silencio.", t: 8.22 },
+            { text: "Todo", t: 9.24 },
+            { text: "lo", t: 9.50 },
+            { text: "que", t: 9.60 },
+            { text: "digas", t: 9.96 },
+            { text: "o", t: 10.20 },
+            { text: "hagas,", t: 10.38 },
+            { text: "puede", t: 11.20 },
+            { text: "y", t: 11.54 },
+            { text: "será", t: 12.04 },
+            { text: "usado", t: 12.60 },
+            { text: "en", t: 12.96 },
+            { text: "tu", t: 13.16 },
+            { text: "contra", t: 13.40 },
+            { text: "en", t: 14.08 },
+            { text: "un", t: 14.20 },
+            { text: "tribunal.", t: 14.38 },
+        ],
+        ja: [
+            { text: "こちら", t: 1.00 },
+            { text: "警察です。", t: 1.90 },
+            { text: "立って", t: 2.92 },
+            { text: "手を", t: 3.54 },
+            { text: "上げ", t: 3.94 },
+            { text: "なさい。", t: 4.38 },
+            { text: "手を", t: 5.34 },
+            { text: "上げろ、", t: 5.78 },
+            { text: "あなたには", t: 7.00 },
+            { text: "黙秘する", t: 7.38 },
+            { text: "権利が", t: 7.80 },
+            { text: "あります。", t: 8.22 },
+            { text: "あなたが", t: 9.24 },
+            { text: "言う", t: 9.60 },
+            { text: "ことは", t: 9.96 },
+            { text: "すべて", t: 10.38 },
+            { text: "法廷で", t: 11.20 },
+            { text: "あなたに", t: 12.30 },
+            { text: "不利な", t: 12.96 },
+            { text: "証拠として", t: 13.56 },
+            { text: "使用されます。", t: 14.38 },
+        ]
+    };
+    
+    // State
+    let currentLang = 'en';
+    let isPlaying = false;
+    let blendPercent = 50;
+    
+    // Elements
+    const loading = document.getElementById('loading');
+    const startOverlay = document.getElementById('start-overlay');
+    const videoContainer = document.getElementById('videoContainer');
+    const videoWrapper = document.getElementById('videoWrapper');
+    const videoOriginal = document.getElementById('video-original');
+    const videoEnhanced = document.getElementById('video-enhanced');
+    const blendSlider = document.getElementById('blendSlider');
+    const subtitleGlass = document.getElementById('subtitleGlass');
+    const subtitleText = document.getElementById('subtitleText');
+    const langIndicator = document.getElementById('langIndicator');
+    const langSelector = document.getElementById('langSelector');
+    const controls = document.getElementById('controls');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const playIcon = document.getElementById('playIcon');
+    const pauseIcon = document.getElementById('pauseIcon');
+    const rewindBtn = document.getElementById('rewindBtn');
+    const forwardBtn = document.getElementById('forwardBtn');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const timeDisplay = document.getElementById('timeDisplay');
+    const endingOverlay = document.getElementById('ending-overlay');
+    const replayBtn = document.getElementById('replayBtn');
+    
+    // Loading
+    window.addEventListener('load', () => {
+        setTimeout(() => loading.classList.add('hidden'), 1000);
+    });
+    
+    // Start
+    startOverlay.addEventListener('click', () => {
+        startOverlay.classList.add('hidden');
+        videoContainer.classList.add('active');
+        controls.classList.add('visible');
+        langSelector.classList.add('visible');
+        initSubtitles();
+    });
+    
+    // Initialize subtitles
+    function initSubtitles() {
+        const words = WORDS[currentLang];
+        subtitleText.innerHTML = words.map((w, i) => {
+            const cleanWord = w.text.replace(/[.,!?。、]/g, '');
+            const emotion = EMOTIONS[cleanWord] || '';
+            const emotionClass = emotion ? ` emotion-${emotion}` : '';
+            return `<span class="word${emotionClass}" data-index="${i}">${w.text}</span>`;
+        }).join('');
+        langIndicator.textContent = currentLang.toUpperCase();
+    }
+    
+    // Update subtitles
+    function updateSubtitles(currentTime) {
+        const words = WORDS[currentLang];
+        const wordEls = subtitleText.querySelectorAll('.word');
+        
+        let hasVisible = false;
+        
+        words.forEach((w, i) => {
+            const el = wordEls[i];
+            if (!el) return;
+            
+            const nextWord = words[i + 1];
+            const endTime = nextWord ? nextWord.t : w.t + 0.8;
+            
+            if (currentTime >= w.t - 0.15 && currentTime < endTime + 0.5) {
+                el.classList.add('visible');
+                hasVisible = true;
+            } else if (currentTime < w.t - 0.15) {
+                el.classList.remove('visible', 'current');
+            }
+            
+            if (currentTime >= w.t && currentTime < endTime) {
+                el.classList.add('current');
+            } else {
+                el.classList.remove('current');
+            }
+        });
+        
+        // Show/hide glass container
+        if (hasVisible && currentTime > 0.5 && currentTime < 16) {
+            subtitleGlass.classList.add('visible');
+            langIndicator.classList.add('visible');
+        } else {
+            subtitleGlass.classList.remove('visible');
+            langIndicator.classList.remove('visible');
+        }
+    }
+    
+    // Language switch
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentLang = btn.dataset.lang;
+            initSubtitles();
+            updateSubtitles(videoEnhanced.currentTime);
+        });
+    });
+    
+    // Video sync
+    function syncVideos() {
+        if (Math.abs(videoOriginal.currentTime - videoEnhanced.currentTime) > 0.1) {
+            videoOriginal.currentTime = videoEnhanced.currentTime;
+        }
+    }
+    
+    videoEnhanced.addEventListener('timeupdate', () => {
+        syncVideos();
+        updateSubtitles(videoEnhanced.currentTime);
+        
+        const percent = (videoEnhanced.currentTime / videoEnhanced.duration) * 100;
+        progressBar.style.width = percent + '%';
+        
+        const fmt = t => {
+            const m = Math.floor(t / 60);
+            const s = Math.floor(t % 60);
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        };
+        timeDisplay.textContent = `${fmt(videoEnhanced.currentTime)} / ${fmt(videoEnhanced.duration || 0)}`;
+    });
+    
+    videoEnhanced.addEventListener('ended', () => {
+        isPlaying = false;
+        playIcon.style.display = 'block';
+        pauseIcon.style.display = 'none';
+        endingOverlay.classList.add('visible');
+    });
+    
+    // Play/Pause
+    function togglePlay() {
+        if (isPlaying) {
+            videoOriginal.pause();
+            videoEnhanced.pause();
+            playIcon.style.display = 'block';
+            pauseIcon.style.display = 'none';
+        } else {
+            videoOriginal.play();
+            videoEnhanced.play();
+            playIcon.style.display = 'none';
+            pauseIcon.style.display = 'block';
+        }
+        isPlaying = !isPlaying;
+    }
+    
+    playPauseBtn.addEventListener('click', togglePlay);
+    
+    rewindBtn.addEventListener('click', () => {
+        videoEnhanced.currentTime = Math.max(0, videoEnhanced.currentTime - 5);
+        videoOriginal.currentTime = videoEnhanced.currentTime;
+    });
+    
+    forwardBtn.addEventListener('click', () => {
+        videoEnhanced.currentTime = Math.min(videoEnhanced.duration, videoEnhanced.currentTime + 5);
+        videoOriginal.currentTime = videoEnhanced.currentTime;
+    });
+    
+    progressContainer.addEventListener('click', e => {
+        const rect = progressContainer.getBoundingClientRect();
+        const percent = (e.clientX - rect.left) / rect.width;
+        videoEnhanced.currentTime = percent * videoEnhanced.duration;
+        videoOriginal.currentTime = videoEnhanced.currentTime;
+    });
+    
+    // Blend slider
+    let isDragging = false;
+    
+    function updateBlend(percent) {
+        blendPercent = Math.max(0, Math.min(100, percent));
+        videoEnhanced.style.clipPath = `inset(0 ${100 - blendPercent}% 0 0)`;
+        blendSlider.style.left = blendPercent + '%';
+    }
+    
+    videoWrapper.addEventListener('mousedown', e => {
+        isDragging = true;
+        const rect = videoWrapper.getBoundingClientRect();
+        updateBlend(((e.clientX - rect.left) / rect.width) * 100);
+    });
+    
+    document.addEventListener('mousemove', e => {
+        if (isDragging) {
+            const rect = videoWrapper.getBoundingClientRect();
+            updateBlend(((e.clientX - rect.left) / rect.width) * 100);
+        }
+    });
+    
+    document.addEventListener('mouseup', () => isDragging = false);
+    
+    // Touch
+    videoWrapper.addEventListener('touchstart', e => {
+        isDragging = true;
+        const rect = videoWrapper.getBoundingClientRect();
+        updateBlend(((e.touches[0].clientX - rect.left) / rect.width) * 100);
+    }, { passive: true });
+    
+    videoWrapper.addEventListener('touchmove', e => {
+        if (isDragging) {
+            const rect = videoWrapper.getBoundingClientRect();
+            updateBlend(((e.touches[0].clientX - rect.left) / rect.width) * 100);
+        }
+    }, { passive: true });
+    
+    videoWrapper.addEventListener('touchend', () => isDragging = false);
+    
+    // Replay
+    replayBtn.addEventListener('click', () => {
+        endingOverlay.classList.remove('visible');
+        videoEnhanced.currentTime = 0;
+        videoOriginal.currentTime = 0;
+        subtitleText.querySelectorAll('.word').forEach(w => w.classList.remove('visible', 'current'));
+        subtitleGlass.classList.remove('visible');
+        togglePlay();
+    });
+    
+    // Keyboard
+    document.addEventListener('keydown', e => {
+        if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+        else if (e.code === 'ArrowLeft') rewindBtn.click();
+        else if (e.code === 'ArrowRight') forwardBtn.click();
+    });
+    </script>
+</body>
+</html>
