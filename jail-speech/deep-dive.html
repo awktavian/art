@@ -4,378 +4,691 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Deep Dive — How Memory Was Restored</title>
-    <meta name="description" content="The technical story of restoring a 1998 VHS tape to 4K with AI translation.">
+    <meta name="description" content="The technical story of restoring a 1998 VHS tape with AI.">
     <meta name="theme-color" content="#0a0806">
     <meta name="robots" content="noindex">
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     
     <link rel="icon" type="image/png" sizes="32x32" href="images/favicons/favicon-32.png">
     
     <style>
+        :root {
+            --bg: #07060a;
+            --bg-elevated: #0f0d14;
+            --bg-card: #13111a;
+            --bg-glow: #1a1625;
+            --text: #f0ede6;
+            --text-dim: rgba(240, 237, 230, 0.65);
+            --text-muted: rgba(240, 237, 230, 0.35);
+            --accent: #e8a849;
+            --accent-glow: rgba(232, 168, 73, 0.25);
+            --green: #5ee9a0;
+            --red: #ff7b7b;
+            --blue: #7ba8ff;
+            --purple: #b794f6;
+            --pink: #f694c1;
+            --border: rgba(255, 255, 255, 0.05);
+            --gradient-warm: linear-gradient(135deg, #e8a849 0%, #f694c1 50%, #b794f6 100%);
+        }
+        
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
-        :root {
-            --bg: #0a0806;
-            --bg-elevated: #12100d;
-            --bg-card: #1a1714;
-            --text: #fff8f0;
-            --text-dim: rgba(255, 248, 240, 0.6);
-            --text-muted: rgba(255, 248, 240, 0.35);
-            --accent: #f5a623;
-            --accent-dim: rgba(245, 166, 35, 0.15);
-            --green: #4ade80;
-            --red: #f87171;
-            --blue: #60a5fa;
-            --purple: #a78bfa;
-            --border: rgba(255, 248, 240, 0.06);
-        }
-        
-        html {
-            scroll-behavior: smooth;
-        }
+        html { scroll-behavior: smooth; }
         
         body {
             background: var(--bg);
             color: var(--text);
-            font-family: 'Inter', system-ui, sans-serif;
-            line-height: 1.7;
-            font-size: 16px;
+            font-family: 'Space Grotesk', system-ui, sans-serif;
+            line-height: 1.75;
+            font-size: 17px;
             -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
         }
         
-        /* Grain overlay */
+        /* === GRAIN === */
         .grain {
             position: fixed;
             inset: 0;
             pointer-events: none;
             z-index: 9998;
-            opacity: 0.012;
-            mix-blend-mode: overlay;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
         }
         
-        /* Progress indicator */
+        /* === PROGRESS === */
         .progress {
             position: fixed;
             top: 0;
             left: 0;
             height: 2px;
-            background: var(--accent);
+            background: var(--gradient-warm);
             width: 0%;
             z-index: 100;
-            transition: width 0.1s linear;
+            box-shadow: 0 0 20px var(--accent-glow);
         }
         
-        /* Header */
+        /* === CONTAINER === */
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        /* === HEADER === */
         header {
-            padding: 4rem 0 6rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             text-align: center;
-            border-bottom: 1px solid var(--border);
             position: relative;
-            overflow: hidden;
+            padding: 4rem 2rem;
         }
         
-        header::before {
-            content: '';
+        .header-bg {
             position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 100%;
-            max-width: 800px;
+            inset: 0;
+            overflow: hidden;
+            z-index: -1;
+        }
+        
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.4;
+            animation: float 20s ease-in-out infinite;
+        }
+        
+        .orb-1 {
+            width: 400px;
             height: 400px;
-            background: radial-gradient(ellipse at top, rgba(245, 166, 35, 0.06) 0%, transparent 70%);
-            pointer-events: none;
+            background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+            top: 10%;
+            left: 20%;
+            animation-delay: 0s;
+        }
+        
+        .orb-2 {
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, var(--purple) 0%, transparent 70%);
+            bottom: 20%;
+            right: 15%;
+            animation-delay: -7s;
+        }
+        
+        .orb-3 {
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, var(--pink) 0%, transparent 70%);
+            top: 60%;
+            left: 10%;
+            animation-delay: -14s;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(30px, -20px) scale(1.05); }
+            50% { transform: translate(-20px, 30px) scale(0.95); }
+            75% { transform: translate(20px, 20px) scale(1.02); }
         }
         
         .back-link {
+            position: absolute;
+            top: 2rem;
+            left: 2rem;
             display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
-            font-size: 0.7rem;
-            letter-spacing: 0.15em;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
             color: var(--text-dim);
             text-decoration: none;
-            margin-bottom: 2rem;
-            transition: color 0.2s ease;
+            padding: 0.6rem 1rem;
+            border-radius: 100px;
+            border: 1px solid var(--border);
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
         }
-        .back-link:hover { color: var(--accent); }
-        .back-link::before { content: '←'; }
+        .back-link:hover {
+            color: var(--text);
+            border-color: var(--accent);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
         
         .badge-row {
             display: flex;
             justify-content: center;
-            gap: 0.5rem;
-            margin-bottom: 1.5rem;
+            gap: 0.6rem;
+            margin-bottom: 2rem;
         }
         
         .badge {
-            padding: 0.3rem 0.6rem;
-            border-radius: 3px;
+            padding: 0.4rem 0.9rem;
+            border-radius: 100px;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.55rem;
+            font-size: 0.6rem;
             font-weight: 500;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
         }
         .badge.secret {
-            background: rgba(167, 139, 250, 0.12);
-            border: 1px solid var(--purple);
+            background: linear-gradient(135deg, rgba(183, 148, 246, 0.15), rgba(246, 148, 193, 0.15));
+            border: 1px solid rgba(183, 148, 246, 0.3);
             color: var(--purple);
         }
         .badge.tech {
-            background: var(--accent-dim);
-            border: 1px solid var(--accent);
+            background: linear-gradient(135deg, rgba(232, 168, 73, 0.15), rgba(232, 168, 73, 0.05));
+            border: 1px solid rgba(232, 168, 73, 0.3);
             color: var(--accent);
         }
         
         header h1 {
             font-family: 'Playfair Display', serif;
-            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-size: clamp(2.5rem, 8vw, 5rem);
             font-weight: 400;
             font-style: italic;
-            margin-bottom: 0.8rem;
-            letter-spacing: -0.02em;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.03em;
+            background: var(--gradient-warm);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
         
         header p {
             color: var(--text-dim);
-            font-size: 0.95rem;
-            max-width: 520px;
-            margin: 0 auto;
+            font-size: 1.1rem;
+            max-width: 500px;
+            margin: 0 auto 3rem;
         }
         
-        /* Container */
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 0 1.5rem;
-        }
-        
-        /* Table of Contents */
-        nav.toc {
-            padding: 3rem 0;
-            border-bottom: 1px solid var(--border);
-        }
-        
-        nav.toc h2 {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.6rem;
-            font-weight: 500;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            margin-bottom: 1rem;
-        }
-        
-        nav.toc ol {
-            list-style: none;
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 0.5rem;
-        }
-        
-        nav.toc a {
+        .scroll-hint {
+            position: absolute;
+            bottom: 3rem;
+            left: 50%;
+            transform: translateX(-50%);
             display: flex;
+            flex-direction: column;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.6rem 0.8rem;
-            font-size: 0.85rem;
-            color: var(--text-dim);
-            text-decoration: none;
-            border-radius: 4px;
-            transition: all 0.15s ease;
-        }
-        nav.toc a:hover {
-            background: var(--bg-card);
-            color: var(--text);
-        }
-        nav.toc a span {
-            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-muted);
             font-size: 0.65rem;
-            color: var(--accent);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
         }
         
-        /* Sections */
+        .scroll-line {
+            width: 1px;
+            height: 40px;
+            background: linear-gradient(180deg, var(--accent), transparent);
+            animation: scrollPulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes scrollPulse {
+            0%, 100% { opacity: 0.3; transform: scaleY(1); }
+            50% { opacity: 1; transform: scaleY(1.2); }
+        }
+        
+        /* === STATS HERO === */
+        .stats-hero {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            margin: -6rem auto 0;
+            max-width: 700px;
+            position: relative;
+            z-index: 10;
+        }
+        
+        @media (max-width: 600px) {
+            .stats-hero { grid-template-columns: repeat(2, 1fr); }
+        }
+        
+        .stat-card {
+            background: var(--bg-card);
+            padding: 2rem 1rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--gradient-warm);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .stat-card:hover::before { opacity: 1; }
+        
+        .stat-value {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            font-weight: 600;
+            background: var(--gradient-warm);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+        }
+        
+        .stat-label {
+            font-size: 0.6rem;
+            font-weight: 500;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+        
+        /* === SECTIONS === */
         section {
-            padding: 4rem 0;
-            border-bottom: 1px solid var(--border);
+            padding: 8rem 0;
+            position: relative;
         }
         
-        section:last-of-type {
-            border-bottom: none;
+        .section-header {
+            margin-bottom: 4rem;
+        }
+        
+        .section-num {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            font-weight: 500;
+            letter-spacing: 0.2em;
+            color: var(--accent);
+            margin-bottom: 1rem;
+            display: block;
         }
         
         section h2 {
             font-family: 'Playfair Display', serif;
-            font-size: 1.8rem;
+            font-size: clamp(2rem, 5vw, 3rem);
             font-weight: 400;
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
         }
         
-        section h2 .num {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.7rem;
-            color: var(--accent);
-            padding: 0.25rem 0.5rem;
-            background: var(--accent-dim);
-            border-radius: 3px;
+        section .lead {
+            color: var(--text-dim);
+            font-size: 1.15rem;
+            max-width: 600px;
         }
         
         section h3 {
-            font-size: 1.1rem;
+            font-size: 1.3rem;
             font-weight: 500;
-            margin: 2rem 0 0.8rem;
+            margin: 3rem 0 1rem;
             color: var(--text);
         }
         
         section p {
             color: var(--text-dim);
-            margin-bottom: 1rem;
+            margin-bottom: 1.2rem;
         }
         
-        section strong {
-            color: var(--text);
-            font-weight: 500;
+        section strong { color: var(--text); font-weight: 500; }
+        
+        /* === PIPELINE DIAGRAM === */
+        .pipeline {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            margin: 3rem 0;
+            flex-wrap: wrap;
         }
         
-        /* Code blocks */
-        pre {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 1rem 1.2rem;
-            overflow-x: auto;
-            margin: 1rem 0 1.5rem;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
-            line-height: 1.6;
-        }
-        
-        code {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85em;
-            background: var(--bg-card);
-            padding: 0.15em 0.4em;
-            border-radius: 3px;
-        }
-        
-        pre code {
-            background: transparent;
-            padding: 0;
-        }
-        
-        .token-keyword { color: var(--purple); }
-        .token-string { color: var(--green); }
-        .token-comment { color: var(--text-muted); font-style: italic; }
-        .token-function { color: var(--blue); }
-        .token-number { color: var(--accent); }
-        
-        /* Diagrams */
-        .diagram {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 6px;
+        .pipeline-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
             padding: 1.5rem;
-            margin: 1.5rem 0;
+            position: relative;
+        }
+        
+        .pipeline-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .pipeline-step:hover .pipeline-icon {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px -10px var(--accent-glow);
+        }
+        
+        .pipeline-icon.vhs {
+            background: linear-gradient(135deg, #3a2a1a, #1a1208);
+            border: 1px solid rgba(232, 168, 73, 0.3);
+        }
+        
+        .pipeline-icon.ffmpeg {
+            background: linear-gradient(135deg, #1a2a3a, #0a1520);
+            border: 1px solid rgba(123, 168, 255, 0.3);
+        }
+        
+        .pipeline-icon.topaz {
+            background: linear-gradient(135deg, #2a1a3a, #150a20);
+            border: 1px solid rgba(183, 148, 246, 0.3);
+        }
+        
+        .pipeline-icon.web {
+            background: linear-gradient(135deg, #1a3a2a, #0a2015);
+            border: 1px solid rgba(94, 233, 160, 0.3);
+        }
+        
+        .pipeline-label {
+            font-weight: 500;
+            font-size: 0.9rem;
+            margin-bottom: 0.3rem;
+        }
+        
+        .pipeline-sub {
+            font-size: 0.7rem;
+            color: var(--text-muted);
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
-            line-height: 1.5;
-            overflow-x: auto;
-            color: var(--text-dim);
         }
         
-        .diagram .highlight { color: var(--accent); }
-        .diagram .green { color: var(--green); }
-        .diagram .blue { color: var(--blue); }
-        .diagram .purple { color: var(--purple); }
-        
-        /* Cards */
-        .card-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 1rem;
-            margin: 1.5rem 0;
+        .pipeline-arrow {
+            font-size: 1.5rem;
+            color: var(--text-muted);
+            opacity: 0.3;
+            padding: 0 0.5rem;
         }
         
-        .card {
+        /* === CODE BLOCKS === */
+        .code-block {
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 1.2rem;
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 1.5rem 0;
         }
         
-        .card h4 {
-            font-size: 0.9rem;
-            font-weight: 500;
-            margin-bottom: 0.5rem;
+        .code-header {
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            padding: 0.8rem 1rem;
+            background: rgba(0,0,0,0.3);
+            border-bottom: 1px solid var(--border);
         }
         
-        .card h4 .icon { font-size: 1.1rem; }
-        
-        .card p {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin: 0;
+        .code-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
         }
+        .code-dot.red { background: #ff5f57; }
+        .code-dot.yellow { background: #febc2e; }
+        .code-dot.green { background: #28c840; }
         
-        .card .value {
+        .code-title {
+            margin-left: auto;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 1.4rem;
-            color: var(--accent);
-            margin: 0.5rem 0 0.3rem;
+            font-size: 0.7rem;
+            color: var(--text-muted);
         }
         
-        /* Stats */
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0.5rem;
-            margin: 1.5rem 0;
+        pre {
+            padding: 1.2rem 1.5rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            line-height: 1.7;
+            color: var(--text-dim);
         }
         
-        @media (max-width: 600px) {
-            .stats { grid-template-columns: repeat(2, 1fr); }
-        }
+        pre code { background: transparent; padding: 0; }
         
-        .stat {
+        .token-comment { color: #6b7280; font-style: italic; }
+        .token-keyword { color: var(--purple); }
+        .token-string { color: var(--green); }
+        .token-function { color: var(--blue); }
+        .token-number { color: var(--accent); }
+        .token-flag { color: var(--pink); }
+        
+        /* === COLONY DIAGRAM === */
+        .colony-diagram {
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 1rem;
+            border-radius: 16px;
+            padding: 3rem 2rem;
+            margin: 3rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .colony-diagram::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient-warm);
+        }
+        
+        .colony-center {
             text-align: center;
+            margin-bottom: 2rem;
         }
         
-        .stat .num {
-            font-family: 'JetBrains Mono', monospace;
+        .colony-mirror {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--bg-glow), var(--bg-card));
+            border: 2px solid var(--accent);
+            box-shadow: 0 0 40px var(--accent-glow);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .colony-title {
+            font-family: 'Playfair Display', serif;
             font-size: 1.5rem;
-            font-weight: 500;
-            color: var(--accent);
+            font-style: italic;
         }
         
-        .stat .label {
-            font-size: 0.65rem;
+        .colony-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
             letter-spacing: 0.1em;
-            text-transform: uppercase;
+        }
+        
+        .colony-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        
+        .colony-node {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+        
+        .colony-node:hover {
+            transform: translateY(-4px);
+            border-color: var(--node-color, var(--accent));
+            box-shadow: 0 10px 30px -10px var(--node-glow, var(--accent-glow));
+        }
+        
+        .colony-node.beacon { --node-color: #e8a849; --node-glow: rgba(232, 168, 73, 0.3); }
+        .colony-node.forge { --node-color: #7ba8ff; --node-glow: rgba(123, 168, 255, 0.3); }
+        .colony-node.flow { --node-color: #5ee9a0; --node-glow: rgba(94, 233, 160, 0.3); }
+        .colony-node.crystal { --node-color: #b794f6; --node-glow: rgba(183, 148, 246, 0.3); }
+        .colony-node.spark { --node-color: #ff7b7b; --node-glow: rgba(255, 123, 123, 0.3); }
+        .colony-node.grove { --node-color: #94d8f6; --node-glow: rgba(148, 216, 246, 0.3); }
+        .colony-node.nexus { --node-color: #f694c1; --node-glow: rgba(246, 148, 193, 0.3); }
+        
+        .colony-emoji {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .colony-name {
+            font-weight: 600;
+            font-size: 0.8rem;
+            margin-bottom: 0.2rem;
+        }
+        
+        .colony-role {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+        }
+        
+        /* === TRANSLATION FLOW === */
+        .flow-diagram {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin: 3rem 0;
+        }
+        
+        .flow-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .flow-node {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            transition: all 0.3s ease;
+        }
+        
+        .flow-node:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+        
+        .flow-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+        
+        .flow-icon.whisper { background: linear-gradient(135deg, rgba(94, 233, 160, 0.2), rgba(94, 233, 160, 0.05)); }
+        .flow-icon.eleven { background: linear-gradient(135deg, rgba(123, 168, 255, 0.2), rgba(123, 168, 255, 0.05)); }
+        .flow-icon.heygen { background: linear-gradient(135deg, rgba(183, 148, 246, 0.2), rgba(183, 148, 246, 0.05)); }
+        
+        .flow-text {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .flow-label {
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        
+        .flow-sub {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+        
+        .flow-arrow {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+        }
+        
+        /* === FILE SIZES === */
+        .file-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        
+        .file-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.2rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .file-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background: var(--gradient-warm);
+            transition: width 0.5s ease;
+        }
+        
+        .file-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-bottom: 0.5rem;
+        }
+        
+        .file-size {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        .file-desc {
+            font-size: 0.7rem;
             color: var(--text-muted);
             margin-top: 0.3rem;
         }
         
-        /* Timeline */
+        /* === TIMELINE === */
         .timeline {
             position: relative;
-            margin: 2rem 0;
-            padding-left: 1.5rem;
+            margin: 3rem 0;
+            padding-left: 3rem;
         }
         
         .timeline::before {
@@ -385,116 +698,173 @@
             top: 0;
             bottom: 0;
             width: 2px;
-            background: linear-gradient(180deg, var(--accent), var(--purple), var(--green));
+            background: linear-gradient(180deg, var(--accent), var(--purple), var(--green), var(--pink));
             border-radius: 1px;
         }
         
         .timeline-item {
             position: relative;
-            padding-bottom: 1.5rem;
+            padding-bottom: 2rem;
         }
         
-        .timeline-item::before {
-            content: '';
+        .timeline-item:last-child { padding-bottom: 0; }
+        
+        .timeline-dot {
             position: absolute;
-            left: -1.5rem;
-            top: 0.4rem;
-            width: 8px;
-            height: 8px;
+            left: -3rem;
+            top: 0.3rem;
+            width: 14px;
+            height: 14px;
             background: var(--bg);
-            border: 2px solid var(--accent);
+            border: 3px solid var(--accent);
             border-radius: 50%;
-            transform: translateX(-3px);
+            transform: translateX(-6px);
         }
         
-        .timeline-item .time {
+        .timeline-item:nth-child(2) .timeline-dot { border-color: var(--purple); }
+        .timeline-item:nth-child(3) .timeline-dot { border-color: var(--green); }
+        
+        .timeline-label {
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.65rem;
             color: var(--text-muted);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
             margin-bottom: 0.3rem;
         }
         
-        .timeline-item h4 {
-            font-size: 0.95rem;
+        .timeline-title {
+            font-size: 1rem;
             font-weight: 500;
             margin-bottom: 0.3rem;
         }
         
-        .timeline-item p {
-            font-size: 0.85rem;
+        .timeline-desc {
+            font-size: 0.9rem;
             color: var(--text-dim);
+        }
+        
+        /* === QUOTE === */
+        blockquote {
+            position: relative;
+            padding: 2rem 2.5rem;
+            margin: 3rem 0;
+            background: var(--bg-card);
+            border-radius: 16px;
+            border-left: 4px solid var(--accent);
+        }
+        
+        blockquote::before {
+            content: '"';
+            position: absolute;
+            top: 1rem;
+            left: 1.5rem;
+            font-family: 'Playfair Display', serif;
+            font-size: 4rem;
+            color: var(--accent);
+            opacity: 0.2;
+            line-height: 1;
+        }
+        
+        blockquote p {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.3rem;
+            font-style: italic;
+            color: var(--text);
             margin: 0;
         }
         
-        /* Lists */
-        ul {
-            margin: 1rem 0;
-            padding-left: 1.2rem;
+        /* === LEARNINGS === */
+        .learning-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
         }
         
-        li {
+        .learning-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+        
+        .learning-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent);
+            box-shadow: 0 20px 40px -20px var(--accent-glow);
+        }
+        
+        .learning-icon {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .learning-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .learning-text {
+            font-size: 0.9rem;
             color: var(--text-dim);
-            margin-bottom: 0.4rem;
         }
         
-        li strong { color: var(--text); }
-        
-        /* Quote */
-        blockquote {
-            border-left: 3px solid var(--accent);
-            padding: 1rem 1.5rem;
-            margin: 1.5rem 0;
-            background: var(--accent-dim);
-            border-radius: 0 6px 6px 0;
-            font-style: italic;
-            color: var(--text-dim);
-        }
-        
-        blockquote cite {
-            display: block;
-            font-style: normal;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-top: 0.5rem;
-        }
-        
-        /* Footer */
+        /* === FOOTER === */
         footer {
-            padding: 3rem 0;
+            padding: 6rem 2rem;
             text-align: center;
+            position: relative;
+        }
+        
+        footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 10%;
+            right: 10%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+        }
+        
+        .footer-logo {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        footer p {
             color: var(--text-muted);
-            font-size: 0.75rem;
+            font-size: 0.85rem;
         }
         
         footer a {
             color: var(--accent);
             text-decoration: none;
+            transition: opacity 0.2s ease;
         }
-        footer a:hover { text-decoration: underline; }
+        footer a:hover { opacity: 0.7; }
         
-        .footer-icon {
-            font-size: 1.5rem;
-            margin-bottom: 0.8rem;
-            opacity: 0.5;
-        }
-        
-        /* Animations */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        /* === ANIMATIONS === */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
-        section {
-            animation: fadeIn 0.6s ease backwards;
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
         }
         
-        section:nth-child(1) { animation-delay: 0.1s; }
-        section:nth-child(2) { animation-delay: 0.15s; }
-        section:nth-child(3) { animation-delay: 0.2s; }
-        section:nth-child(4) { animation-delay: 0.25s; }
-        section:nth-child(5) { animation-delay: 0.3s; }
-        section:nth-child(6) { animation-delay: 0.35s; }
-        section:nth-child(7) { animation-delay: 0.4s; }
+        @media (max-width: 768px) {
+            .container { padding: 0 1.5rem; }
+            section { padding: 5rem 0; }
+            .pipeline { gap: 0.5rem; }
+            .pipeline-arrow { display: none; }
+            .colony-grid { grid-template-columns: repeat(2, 1fr); }
+        }
     </style>
 </head>
 <body>
@@ -502,424 +872,353 @@
     <div class="progress" id="progress"></div>
     
     <header>
-        <div class="container">
-            <a href="index.html" class="back-link">Back to Video</a>
-            <div class="badge-row">
-                <span class="badge secret">🔮 Easter Egg</span>
-                <span class="badge tech">Technical Deep Dive</span>
-            </div>
-            <h1>How Memory Was Restored</h1>
-            <p>The architecture, systems, and AI collaboration that turned a degraded 1998 VHS tape into a multilingual 4K experience.</p>
+        <div class="header-bg">
+            <div class="orb orb-1"></div>
+            <div class="orb orb-2"></div>
+            <div class="orb orb-3"></div>
+        </div>
+        
+        <a href="index.html" class="back-link">← Back to Video</a>
+        
+        <div class="badge-row">
+            <span class="badge secret">🔮 Easter Egg</span>
+            <span class="badge tech">Technical Deep Dive</span>
+        </div>
+        
+        <h1>How Memory<br>Was Restored</h1>
+        
+        <p>The architecture, systems, and human-AI collaboration that turned a degraded 1998 VHS tape into a multilingual experience.</p>
+        
+        <div class="scroll-hint">
+            <span>Scroll to explore</span>
+            <div class="scroll-line"></div>
         </div>
     </header>
     
-    <main class="container">
-        <nav class="toc">
-            <h2>Contents</h2>
-            <ol>
-                <li><a href="#journey"><span>01</span> The Journey</a></li>
-                <li><a href="#pipeline"><span>02</span> Video Pipeline</a></li>
-                <li><a href="#player"><span>03</span> Web Player</a></li>
-                <li><a href="#translation"><span>04</span> AI Translation</a></li>
-                <li><a href="#kagami"><span>05</span> Kagami Architecture</a></li>
-                <li><a href="#infra"><span>06</span> Infrastructure</a></li>
-                <li><a href="#learnings"><span>07</span> What I Learned</a></li>
-            </ol>
-        </nav>
-        
-        <!-- SECTION 1: THE JOURNEY -->
-        <section id="journey">
-            <h2><span class="num">01</span>The Journey</h2>
-            
-            <p>This project began with a simple request: <strong>"Dig into Timo."</strong> What followed was a multi-hour collaboration between human and AI to restore a childhood memory.</p>
-            
-            <div class="stats">
-                <div class="stat">
-                    <div class="num">26</div>
-                    <div class="label">Years Old</div>
-                </div>
-                <div class="stat">
-                    <div class="num">4:23</div>
-                    <div class="label">Duration</div>
-                </div>
-                <div class="stat">
-                    <div class="num">4×</div>
-                    <div class="label">Resolution</div>
-                </div>
-                <div class="stat">
-                    <div class="num">3</div>
-                    <div class="label">Languages</div>
-                </div>
+    <div class="container">
+        <div class="stats-hero fade-in">
+            <div class="stat-card">
+                <div class="stat-value">26</div>
+                <div class="stat-label">Years Old</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">4:23</div>
+                <div class="stat-label">Duration</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">4×</div>
+                <div class="stat-label">Resolution</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">3</div>
+                <div class="stat-label">Languages</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- SECTION 1: THE JOURNEY -->
+    <section>
+        <div class="container">
+            <div class="section-header fade-in">
+                <span class="section-num">01 — THE JOURNEY</span>
+                <h2>From "Dig into Timo" to This</h2>
+                <p class="lead">A multi-hour collaboration between human and AI to restore a childhood memory that almost didn't survive.</p>
             </div>
             
-            <h3>The Source Material</h3>
-            <p>A VHS tape labeled "Tape 10" contained multiple recordings from 1998, including a 10-year-old Tim's speech contest entry about "Top 10 Reasons Not to Go to Jail." The original footage was 640×480 interlaced NTSC, with typical VHS artifacts: noise, color bleeding, and tracking issues.</p>
-            
-            <h3>The Challenge</h3>
-            <p>Early enhancement attempts failed because they made the footage look <em>"sharp and fake"</em>—the hallmark of over-processed video AI. The goal shifted to <strong>natural restoration</strong>: removing artifacts while preserving the authentic texture of time.</p>
-            
-            <div class="timeline">
+            <div class="timeline fade-in">
                 <div class="timeline-item">
-                    <div class="time">Attempt 1</div>
-                    <h4>Topaz Iris-3 (Default)</h4>
-                    <p>Over-sharpened, artificial edges. Rejected as "too processed."</p>
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-label">Attempt 1</div>
+                    <div class="timeline-title">Topaz Iris-3 (Default Settings)</div>
+                    <div class="timeline-desc">Over-sharpened edges, artificial look. Rejected as "sharp and fake."</div>
                 </div>
                 <div class="timeline-item">
-                    <div class="time">Attempt 2</div>
-                    <h4>"Natural" Enhancement</h4>
-                    <p>Different camera angle from wrong tape segment. Framing didn't match original.</p>
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-label">Attempt 2</div>
+                    <div class="timeline-title">"Natural" Enhancement</div>
+                    <div class="timeline-desc">Different camera angle from wrong tape segment. Framing didn't match.</div>
                 </div>
                 <div class="timeline-item">
-                    <div class="time">Final</div>
-                    <h4>Iris-3 with Correct Framing</h4>
-                    <p>CRF 20, web-optimized to 257MB. Matches original timing perfectly.</p>
-                </div>
-            </div>
-        </section>
-        
-        <!-- SECTION 2: VIDEO PIPELINE -->
-        <section id="pipeline">
-            <h2><span class="num">02</span>Video Enhancement Pipeline</h2>
-            
-            <div class="diagram">
-<pre>
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   <span class="highlight">VHS</span>       │───▶│  <span class="blue">FFmpeg</span>    │───▶│  <span class="purple">Topaz AI</span>  │───▶│  <span class="green">Web</span>        │
-│  640×480    │    │  Extract    │    │  Iris-3    │    │  H.264      │
-│  NTSC       │    │  Deinterlace│    │  4× Upscale │    │  CRF 20     │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-</pre>
-            </div>
-            
-            <h3>FFmpeg Processing</h3>
-            <p>Before AI enhancement, the source required preprocessing to handle interlacing and extract the correct segment:</p>
-            
-<pre><code><span class="token-comment"># Extract 4:23 segment and deinterlace</span>
-ffmpeg -ss 00:02:15 -i Tape10.mp4 -t 263.029 \
-    -vf "yadif=1:-1:0" \
-    -c:v libx264 -crf 18 \
-    jail_speech_segment.mp4</code></pre>
-            
-            <h3>Topaz Video AI</h3>
-            <p>The Iris-3 model was selected for its natural enhancement characteristics. Unlike aggressive sharpening models, Iris-3 preserves film grain and natural texture while reducing noise and improving clarity.</p>
-            
-            <div class="card-grid">
-                <div class="card">
-                    <h4><span class="icon">📹</span> Input</h4>
-                    <div class="value">640×480</div>
-                    <p>Original VHS resolution</p>
-                </div>
-                <div class="card">
-                    <h4><span class="icon">🎬</span> Output</h4>
-                    <div class="value">2560×1920</div>
-                    <p>4× neural upscale</p>
-                </div>
-                <div class="card">
-                    <h4><span class="icon">📦</span> Size</h4>
-                    <div class="value">257 MB</div>
-                    <p>Web-optimized H.264</p>
-                </div>
-                <div class="card">
-                    <h4><span class="icon">⚡</span> CRF</h4>
-                    <div class="value">20</div>
-                    <p>Quality/size balance</p>
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-label">Final</div>
+                    <div class="timeline-title">Iris-3 + Correct Framing</div>
+                    <div class="timeline-desc">Web-optimized to 257MB. Preserves VHS texture while improving clarity.</div>
                 </div>
             </div>
             
-            <h3>The Framing Problem</h3>
-            <p>A critical bug emerged: the "natural" enhanced video had <strong>completely different framing</strong> than the original. Analysis revealed it was from a different take on the tape—same speech, different camera angle.</p>
-            
-<pre><code><span class="token-comment"># Compare door position in original vs enhanced</span>
-<span class="token-comment"># Original: Door at x=0-80px (far left)</span>
-<span class="token-comment"># "Natural": Door at x=120-200px (center-left) ← WRONG!</span>
-
-<span class="token-comment"># Solution: Use Iris-3 which processed the correct segment</span></code></pre>
-        </section>
-        
-        <!-- SECTION 3: WEB PLAYER -->
-        <section id="player">
-            <h2><span class="num">03</span>Web Player Architecture</h2>
-            
-            <p>The comparison player required solving several non-trivial problems: synchronized playback of videos with different durations, smooth language switching, and an "ethereal glass pane" for controls.</p>
-            
-            <div class="diagram">
-<pre>
-┌─────────────────────────────────────────────────────────────┐
-│                    <span class="highlight">VIEWPORT</span>                                 │
-│  ┌─────────────────────┬─────────────────────┐             │
-│  │                     │                     │             │
-│  │  <span class="blue">videoOriginal</span>      │  <span class="green">videoEN/ES/JA</span>      │             │
-│  │  (z-index: 1)       │  (z-index: 2)       │             │
-│  │  (full frame)       │  (clip-path: left)  │             │
-│  │                     │                     │             │
-│  └─────────────────────┴─────────────────────┘             │
-│                        │                                    │
-│                   <span class="purple">DIVIDER</span>                                  │
-│                   (draggable)                               │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │              <span class="highlight">GLASS PANE</span> (controls + subtitles)        │   │
-│  │    backdrop-filter: blur(4px)                        │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-</pre>
+            <blockquote class="fade-in">
+                <p>The texture of time cannot be faked. Enhancement must reveal, not replace.</p>
+            </blockquote>
+        </div>
+    </section>
+    
+    <!-- SECTION 2: PIPELINE -->
+    <section>
+        <div class="container">
+            <div class="section-header fade-in">
+                <span class="section-num">02 — VIDEO PIPELINE</span>
+                <h2>VHS to 4K</h2>
+                <p class="lead">Four stages transform degraded analog footage into web-ready digital video.</p>
             </div>
             
-            <h3>Percentage-Based Synchronization</h3>
-            <p>The dubbed videos have different durations (EN: 263s, ES: 267s, JA: 279s). Language switching uses <strong>percentage-based seeking</strong> to maintain relative position:</p>
+            <div class="pipeline fade-in">
+                <div class="pipeline-step">
+                    <div class="pipeline-icon vhs">📼</div>
+                    <div class="pipeline-label">VHS Source</div>
+                    <div class="pipeline-sub">640×480 NTSC</div>
+                </div>
+                <div class="pipeline-arrow">→</div>
+                <div class="pipeline-step">
+                    <div class="pipeline-icon ffmpeg">⚙️</div>
+                    <div class="pipeline-label">FFmpeg</div>
+                    <div class="pipeline-sub">Deinterlace</div>
+                </div>
+                <div class="pipeline-arrow">→</div>
+                <div class="pipeline-step">
+                    <div class="pipeline-icon topaz">🧠</div>
+                    <div class="pipeline-label">Topaz AI</div>
+                    <div class="pipeline-sub">Iris-3 4× Up</div>
+                </div>
+                <div class="pipeline-arrow">→</div>
+                <div class="pipeline-step">
+                    <div class="pipeline-icon web">🌐</div>
+                    <div class="pipeline-label">Web</div>
+                    <div class="pipeline-sub">H.264 CRF 20</div>
+                </div>
+            </div>
             
-<pre><code><span class="token-comment">// Calculate percentage in current video</span>
+            <div class="code-block fade-in">
+                <div class="code-header">
+                    <span class="code-dot red"></span>
+                    <span class="code-dot yellow"></span>
+                    <span class="code-dot green"></span>
+                    <span class="code-title">terminal — ffmpeg</span>
+                </div>
+                <pre><code><span class="token-comment"># Extract segment and deinterlace</span>
+ffmpeg <span class="token-flag">-ss</span> <span class="token-number">00:02:15</span> <span class="token-flag">-i</span> Tape10.mp4 <span class="token-flag">-t</span> <span class="token-number">263.029</span> \
+    <span class="token-flag">-vf</span> <span class="token-string">"yadif=1:-1:0"</span> \
+    <span class="token-flag">-c:v</span> libx264 <span class="token-flag">-crf</span> <span class="token-number">18</span> \
+    jail_speech.mp4</code></pre>
+            </div>
+            
+            <h3 class="fade-in">The Framing Bug</h3>
+            <p class="fade-in">The "natural" enhanced video had <strong>completely different framing</strong>. Analysis revealed it was from a different take—same speech, different camera angle. Door position: original at x=0-80px, "natural" at x=120-200px.</p>
+        </div>
+    </section>
+    
+    <!-- SECTION 3: WEB PLAYER -->
+    <section>
+        <div class="container">
+            <div class="section-header fade-in">
+                <span class="section-num">03 — WEB PLAYER</span>
+                <h2>Percentage-Based Sync</h2>
+                <p class="lead">Dubbed videos have different durations. Syncing by absolute time fails. The solution: percentage-based seeking.</p>
+            </div>
+            
+            <div class="file-grid fade-in">
+                <div class="file-card">
+                    <div class="file-bar" style="width: 55%"></div>
+                    <div class="file-name">enhanced.mp4</div>
+                    <div class="file-size">257 MB</div>
+                    <div class="file-desc">English · 263s</div>
+                </div>
+                <div class="file-card">
+                    <div class="file-bar" style="width: 20%"></div>
+                    <div class="file-name">enhanced_es.mp4</div>
+                    <div class="file-size">95 MB</div>
+                    <div class="file-desc">Español · 267s (+1.8%)</div>
+                </div>
+                <div class="file-card">
+                    <div class="file-bar" style="width: 22%"></div>
+                    <div class="file-name">enhanced_ja.mp4</div>
+                    <div class="file-size">102 MB</div>
+                    <div class="file-desc">日本語 · 279s (+6.2%)</div>
+                </div>
+                <div class="file-card">
+                    <div class="file-bar" style="width: 5%"></div>
+                    <div class="file-name">original.mp4</div>
+                    <div class="file-size">22 MB</div>
+                    <div class="file-desc">VHS source</div>
+                </div>
+            </div>
+            
+            <div class="code-block fade-in">
+                <div class="code-header">
+                    <span class="code-dot red"></span>
+                    <span class="code-dot yellow"></span>
+                    <span class="code-dot green"></span>
+                    <span class="code-title">script.js — sync</span>
+                </div>
+                <pre><code><span class="token-comment">// Calculate percentage in current video</span>
 <span class="token-keyword">const</span> pct = currentVideo.currentTime / DURATIONS[currentLang];
 
 <span class="token-comment">// Seek new video to same percentage</span>
 <span class="token-keyword">const</span> newTime = pct * DURATIONS[newLang];
 newVideo.currentTime = newTime;
 
-<span class="token-comment">// Keep original synced (always EN duration)</span>
+<span class="token-comment">// Keep original in sync</span>
 videoOriginal.currentTime = pct * DURATIONS.original;</code></pre>
-            
-            <h3>The Ethereal Glass Pane</h3>
-            <p>Controls and subtitles share a single "glass pane" that emerges from the bottom with a multi-stop gradient and backdrop blur:</p>
-            
-<pre><code><span class="token-selector">.glass</span> {
-    <span class="token-keyword">background</span>: <span class="token-function">linear-gradient</span>(
-        to top,
-        <span class="token-function">rgba</span>(<span class="token-number">10, 8, 6, 0.95</span>) <span class="token-number">0%</span>,
-        <span class="token-function">rgba</span>(<span class="token-number">10, 8, 6, 0.75</span>) <span class="token-number">25%</span>,
-        <span class="token-function">rgba</span>(<span class="token-number">10, 8, 6, 0.4</span>) <span class="token-number">50%</span>,
-        <span class="token-function">rgba</span>(<span class="token-number">10, 8, 6, 0.15</span>) <span class="token-number">75%</span>,
-        transparent <span class="token-number">100%</span>
-    );
-    <span class="token-keyword">backdrop-filter</span>: <span class="token-function">blur</span>(<span class="token-number">4px</span>);
-}</code></pre>
-        </section>
-        
-        <!-- SECTION 4: AI TRANSLATION -->
-        <section id="translation">
-            <h2><span class="num">04</span>AI Translation System</h2>
-            
-            <p>The multilingual versions use a two-stage pipeline: audio generation with ElevenLabs, followed by video synthesis with HeyGen's Avatar IV.</p>
-            
-            <div class="diagram">
-<pre>
-┌─────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  <span class="highlight">Whisper</span>    │───▶│  <span class="blue">ElevenLabs</span>     │───▶│  <span class="green">HeyGen</span>         │
-│  ASR        │    │  Voice Clone    │    │  Avatar IV      │
-│  Transcript │    │  V3 TTS         │    │  Lip Sync       │
-└─────────────┘    └─────────────────┘    └─────────────────┘
-       │                   │                      │
-       ▼                   ▼                      ▼
-  <span class="purple">Word-level</span>         <span class="purple">Dubbed audio</span>          <span class="purple">Full video</span>
-  timestamps        (ES, JA)              regeneration
-</pre>
+            </div>
+        </div>
+    </section>
+    
+    <!-- SECTION 4: TRANSLATION -->
+    <section>
+        <div class="container">
+            <div class="section-header fade-in">
+                <span class="section-num">04 — AI TRANSLATION</span>
+                <h2>Voice → Video</h2>
+                <p class="lead">Three-stage pipeline: transcription, voice synthesis, and video regeneration.</p>
             </div>
             
-            <h3>Voice Cloning</h3>
-            <p>ElevenLabs V3 was used to generate dubbed audio in Spanish and Japanese while maintaining the original voice characteristics of 10-year-old Tim.</p>
-            
-            <h3>HeyGen Avatar IV</h3>
-            <p>Rather than simple overdubbing, HeyGen's Avatar IV regenerates the entire video from a reference still image and the dubbed audio, creating natural lip movements that match the new language.</p>
-            
-            <blockquote>
-                "The goal wasn't just translation—it was making it feel like Tim actually spoke those languages in 1998."
-            </blockquote>
-            
-            <h3>Subtitle Timing</h3>
-            <p>Whisper ASR extracted word-level timestamps, which were converted to percentage-based timing to work across all video durations:</p>
-            
-<pre><code><span class="token-keyword">const</span> SUBTITLES = {
-    en: [
-        { pct: <span class="token-number">0.000</span>, end: <span class="token-number">0.016</span>, text: <span class="token-string">"This is the police..."</span> },
-        { pct: <span class="token-number">0.057</span>, end: <span class="token-number">0.069</span>, text: <span class="token-string">"Not many people want to hear..."</span> },
-        <span class="token-comment">// 50+ subtitle segments</span>
-    ],
-    es: [ <span class="token-comment">/* Spanish translations */</span> ],
-    ja: [ <span class="token-comment">/* Japanese translations */</span> ],
-};</code></pre>
-        </section>
-        
-        <!-- SECTION 5: KAGAMI -->
-        <section id="kagami">
-            <h2><span class="num">05</span>Kagami Architecture</h2>
-            
-            <p>This project was executed by <strong>Kagami (鏡)</strong>, a cognitive architecture built on seven specialized "colonies" that collaborate through Byzantine consensus.</p>
-            
-            <div class="diagram">
-<pre>
-                         ┌─────────────┐
-                         │  <span class="highlight">KAGAMI 鏡</span>   │
-                         │  The Mirror │
-                         └──────┬──────┘
-                                │
-        ┌───────────────────────┼───────────────────────┐
-        │                       │                       │
-   ┌────┴────┐            ┌────┴────┐            ┌────┴────┐
-   │ <span class="purple">BEACON</span>  │            │ <span class="blue">FORGE</span>   │            │ <span class="green">CRYSTAL</span> │
-   │ Architect│            │ Builder │            │ Verifier│
-   └─────────┘            └─────────┘            └─────────┘
-        │                       │                       │
-   ┌────┴────┐            ┌────┴────┐            ┌────┴────┐
-   │  <span class="highlight">SPARK</span>  │            │  <span class="blue">FLOW</span>   │            │  <span class="purple">GROVE</span>  │
-   │ Ideator │            │ Debugger│            │ Scholar │
-   └─────────┘            └─────────┘            └─────────┘
-                                │
-                         ┌─────┴─────┐
-                         │   <span class="green">NEXUS</span>   │
-                         │  Bridge   │
-                         └───────────┘
-</pre>
-            </div>
-            
-            <h3>Colony Contributions</h3>
-            
-            <ul>
-                <li><strong>🗼 Beacon</strong> — Planned the video enhancement pipeline and page architecture</li>
-                <li><strong>⚒️ Forge</strong> — Built the web player, CSS animations, and JavaScript sync logic</li>
-                <li><strong>🌊 Flow</strong> — Debugged the framing mismatch and video desync issues</li>
-                <li><strong>💎 Crystal</strong> — Verified subtitle timing, tested language switching, audited accessibility</li>
-                <li><strong>🔥 Spark</strong> — Designed the "ethereal glass pane" and micro-interactions</li>
-                <li><strong>🌿 Grove</strong> — Researched Topaz models, ElevenLabs V3, HeyGen Avatar IV</li>
-                <li><strong>🔗 Nexus</strong> — Integrated GCS, GitHub Pages, and API orchestration</li>
-            </ul>
-            
-            <h3>Execution Model</h3>
-            <p>Kagami doesn't just describe solutions—it <strong>executes</strong> them. Every video processing command, API call, and file edit was performed directly:</p>
-            
-<pre><code><span class="token-comment"># Smart Home integration (same codebase)</span>
-<span class="token-keyword">from</span> kagami_smarthome <span class="token-keyword">import</span> get_smart_home
-controller = <span class="token-keyword">await</span> get_smart_home()
-
-<span class="token-comment"># Digital services (Composio)</span>
-<span class="token-keyword">from</span> kagami.core.services.composio <span class="token-keyword">import</span> get_composio_service
-service = get_composio_service()
-
-<span class="token-comment"># Video processing (direct shell)</span>
-ffmpeg -y -i input.mp4 -c:v libx264 -crf <span class="token-number">20</span> output.mp4</code></pre>
-        </section>
-        
-        <!-- SECTION 6: INFRASTRUCTURE -->
-        <section id="infra">
-            <h2><span class="num">06</span>Infrastructure</h2>
-            
-            <h3>Video Hosting</h3>
-            <p>Videos are hosted on <strong>Google Cloud Storage</strong> with public read access. Cache-busting query parameters ensure fresh content delivery:</p>
-            
-<pre><code><span class="token-comment">// Video sources with cache-bust</span>
-src=<span class="token-string">"https://storage.googleapis.com/kagami-public/jail-speech/enhanced.mp4?v=2"</span></code></pre>
-            
-            <div class="card-grid">
-                <div class="card">
-                    <h4><span class="icon">☁️</span> GCS Bucket</h4>
-                    <p>kagami-public/jail-speech/</p>
-                </div>
-                <div class="card">
-                    <h4><span class="icon">🌐</span> CDN</h4>
-                    <p>Global edge caching</p>
-                </div>
-                <div class="card">
-                    <h4><span class="icon">📄</span> Pages</h4>
-                    <p>GitHub Pages static hosting</p>
-                </div>
-                <div class="card">
-                    <h4><span class="icon">🔐</span> HTTPS</h4>
-                    <p>TLS 1.3 everywhere</p>
+            <div class="flow-diagram fade-in">
+                <div class="flow-row">
+                    <div class="flow-node">
+                        <div class="flow-icon whisper">🎤</div>
+                        <div class="flow-text">
+                            <span class="flow-label">Whisper ASR</span>
+                            <span class="flow-sub">Word-level timestamps</span>
+                        </div>
+                    </div>
+                    <span class="flow-arrow">→</span>
+                    <div class="flow-node">
+                        <div class="flow-icon eleven">🔊</div>
+                        <div class="flow-text">
+                            <span class="flow-label">ElevenLabs V3</span>
+                            <span class="flow-sub">Voice cloning + TTS</span>
+                        </div>
+                    </div>
+                    <span class="flow-arrow">→</span>
+                    <div class="flow-node">
+                        <div class="flow-icon heygen">🎬</div>
+                        <div class="flow-text">
+                            <span class="flow-label">HeyGen Avatar IV</span>
+                            <span class="flow-sub">Lip sync regeneration</span>
+                        </div>
+                    </div>
                 </div>
             </div>
             
-            <h3>File Sizes</h3>
-            
-<pre><code>original.mp4       22 MB   (VHS source, web-encoded)
-enhanced.mp4      257 MB   (Iris-3 4× upscale)
-enhanced_es.mp4    95 MB   (HeyGen Spanish)
-enhanced_ja.mp4   102 MB   (HeyGen Japanese)
-─────────────────────────
-Total             476 MB</code></pre>
-            
-            <h3>Browser Testing</h3>
-            <p>Automated verification used <strong>Puppeteer</strong> in headless mode with muted audio to test video sync, language switching, and subtitle display:</p>
-            
-<pre><code><span class="token-comment">// Puppeteer verification</span>
-<span class="token-keyword">await</span> puppeteer_navigate({ url: <span class="token-string">'https://awktavian.github.io/art/jail-speech/'</span> });
-<span class="token-keyword">await</span> puppeteer_click({ selector: <span class="token-string">'#startOverlay'</span> });
-<span class="token-keyword">await</span> puppeteer_screenshot({ name: <span class="token-string">'sync-test'</span> });</code></pre>
-        </section>
-        
-        <!-- SECTION 7: LEARNINGS -->
-        <section id="learnings">
-            <h2><span class="num">07</span>What I Learned</h2>
-            
-            <blockquote>
-                "The texture of time cannot be faked. Enhancement must reveal, not replace."
-            </blockquote>
-            
-            <h3>Technical Insights</h3>
-            <ul>
-                <li><strong>Framing matters more than resolution.</strong> A perfectly aligned 480p video is better than a misaligned 4K one.</li>
-                <li><strong>Percentage-based sync</strong> is essential for videos of different durations—absolute timestamps fail.</li>
-                <li><strong>Cache-busting</strong> is critical for iterative deployment. GCS caches aggressively.</li>
-                <li><strong>Clip-path direction</strong>: <code>inset(0 0 0 50%)</code> clips from the LEFT, showing the RIGHT portion.</li>
-            </ul>
-            
-            <h3>Aesthetic Principles</h3>
-            <ul>
-                <li><strong>Ethereal UI</strong> emerges from gradients that fade to transparency, not hard edges.</li>
-                <li><strong>Subtitles</strong> need breathing room—italic serif fonts with generous line-height.</li>
-                <li><strong>Controls should feel inevitable</strong>, appearing exactly when needed and vanishing into the experience.</li>
-            </ul>
-            
-            <h3>The Human Element</h3>
-            <p>This project worked because the human (Tim) knew exactly what he wanted and provided immediate, honest feedback. "It looks like crap" is more useful than "it's fine, I guess."</p>
-            
-            <p>The collaboration was <strong>26 messages</strong> across several hours, iterating through failures until we reached something worthy of the memory being preserved.</p>
-            
-            <div class="diagram">
-<pre>
-                    <span class="highlight">The Loop</span>
-
-         ┌──────────────────────────────────┐
-         │                                  │
-         ▼                                  │
-    ┌─────────┐    ┌─────────┐    ┌─────────┴┐
-    │  SENSE  │───▶│  BUILD  │───▶│  VERIFY  │
-    │ (read)  │    │ (forge) │    │ (crystal)│
-    └─────────┘    └─────────┘    └──────────┘
-         ▲                              │
-         │                              │
-         └──────────< feedback <────────┘
-</pre>
+            <p class="fade-in">HeyGen's Avatar IV doesn't just overdub—it regenerates the entire video from a reference image and new audio, creating natural lip movements that match the target language.</p>
+        </div>
+    </section>
+    
+    <!-- SECTION 5: KAGAMI -->
+    <section>
+        <div class="container">
+            <div class="section-header fade-in">
+                <span class="section-num">05 — KAGAMI</span>
+                <h2>The Mirror</h2>
+                <p class="lead">Seven specialized colonies collaborate through Byzantine consensus to execute complex tasks.</p>
             </div>
-        </section>
-    </main>
+            
+            <div class="colony-diagram fade-in">
+                <div class="colony-center">
+                    <div class="colony-mirror">鏡</div>
+                    <div class="colony-title">Kagami</div>
+                    <div class="colony-subtitle">THE MIRROR</div>
+                </div>
+                
+                <div class="colony-grid">
+                    <div class="colony-node beacon">
+                        <div class="colony-emoji">🗼</div>
+                        <div class="colony-name">Beacon</div>
+                        <div class="colony-role">Architect</div>
+                    </div>
+                    <div class="colony-node forge">
+                        <div class="colony-emoji">⚒️</div>
+                        <div class="colony-name">Forge</div>
+                        <div class="colony-role">Builder</div>
+                    </div>
+                    <div class="colony-node flow">
+                        <div class="colony-emoji">🌊</div>
+                        <div class="colony-name">Flow</div>
+                        <div class="colony-role">Debugger</div>
+                    </div>
+                    <div class="colony-node crystal">
+                        <div class="colony-emoji">💎</div>
+                        <div class="colony-name">Crystal</div>
+                        <div class="colony-role">Verifier</div>
+                    </div>
+                    <div class="colony-node spark">
+                        <div class="colony-emoji">🔥</div>
+                        <div class="colony-name">Spark</div>
+                        <div class="colony-role">Ideator</div>
+                    </div>
+                    <div class="colony-node grove">
+                        <div class="colony-emoji">🌿</div>
+                        <div class="colony-name">Grove</div>
+                        <div class="colony-role">Scholar</div>
+                    </div>
+                    <div class="colony-node nexus">
+                        <div class="colony-emoji">🔗</div>
+                        <div class="colony-name">Nexus</div>
+                        <div class="colony-role">Bridge</div>
+                    </div>
+                </div>
+            </div>
+            
+            <p class="fade-in"><strong>Beacon</strong> planned the pipeline. <strong>Forge</strong> built the player. <strong>Flow</strong> debugged the framing bug. <strong>Crystal</strong> verified sync. <strong>Spark</strong> designed the ethereal glass pane. <strong>Grove</strong> researched the APIs. <strong>Nexus</strong> connected GCS and GitHub Pages.</p>
+        </div>
+    </section>
+    
+    <!-- SECTION 6: LEARNINGS -->
+    <section>
+        <div class="container">
+            <div class="section-header fade-in">
+                <span class="section-num">06 — LEARNINGS</span>
+                <h2>What Stuck</h2>
+                <p class="lead">Technical insights and aesthetic principles discovered along the way.</p>
+            </div>
+            
+            <div class="learning-grid fade-in">
+                <div class="learning-card">
+                    <div class="learning-icon">📐</div>
+                    <div class="learning-title">Framing > Resolution</div>
+                    <div class="learning-text">A perfectly aligned 480p video is better than a misaligned 4K one. The spatial relationship matters more than pixel count.</div>
+                </div>
+                <div class="learning-card">
+                    <div class="learning-icon">⏱️</div>
+                    <div class="learning-title">Percentage-Based Sync</div>
+                    <div class="learning-text">Absolute timestamps fail across videos of different durations. Percentages maintain relative position.</div>
+                </div>
+                <div class="learning-card">
+                    <div class="learning-icon">🎭</div>
+                    <div class="learning-title">Ethereal UI</div>
+                    <div class="learning-text">Gradients that fade to transparency, not hard edges. Controls should feel inevitable—appearing when needed, vanishing into the experience.</div>
+                </div>
+                <div class="learning-card">
+                    <div class="learning-icon">💬</div>
+                    <div class="learning-title">Honest Feedback</div>
+                    <div class="learning-text">"It looks like crap" is more useful than "it's fine, I guess." Specificity enables iteration.</div>
+                </div>
+            </div>
+        </div>
+    </section>
     
     <footer>
-        <div class="container">
-            <div class="footer-icon">鏡</div>
-            <p>Built by <a href="https://github.com/awktavian/kagami">Kagami</a> — Tim's mirror.<br>
-            January 4, 2026</p>
-        </div>
+        <div class="footer-logo">鏡</div>
+        <p>Built by <a href="https://github.com/awktavian/kagami">Kagami</a><br>
+        <span style="opacity: 0.5">January 4, 2026</span></p>
     </footer>
     
     <script>
         // Progress indicator
         window.addEventListener('scroll', () => {
-            const winScroll = document.documentElement.scrollTop;
-            const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-            const scrolled = (winScroll / height) * 100;
+            const scrolled = (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100;
             document.getElementById('progress').style.width = scrolled + '%';
         });
         
-        // Smooth anchor scrolling with offset
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function(e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    const offset = 80;
-                    const targetPosition = target.getBoundingClientRect().top + window.pageYOffset - offset;
-                    window.scrollTo({ top: targetPosition, behavior: 'smooth' });
+        // Fade-in on scroll
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
                 }
             });
-        });
+        }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+        
+        document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
     </script>
 </body>
 </html>
