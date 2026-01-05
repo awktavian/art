@@ -387,14 +387,18 @@
             
             background: linear-gradient(
                 to top,
-                rgba(0, 0, 0, 0.85) 0%,
-                rgba(0, 0, 0, 0.6) 40%,
-                rgba(0, 0, 0, 0.25) 70%,
+                rgba(10, 8, 6, 0.95) 0%,
+                rgba(10, 8, 6, 0.75) 25%,
+                rgba(10, 8, 6, 0.4) 50%,
+                rgba(10, 8, 6, 0.15) 75%,
                 transparent 100%
             );
             
-            padding: 0 0 1rem 0;
-            min-height: 120px;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            
+            padding: 0 0 1.2rem 0;
+            min-height: 140px;
             
             display: flex;
             flex-direction: column;
@@ -402,15 +406,25 @@
             justify-content: flex-end;
             
             opacity: 0;
-            transform: translateY(100%);
+            transform: translateY(20px);
             pointer-events: none;
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         .glass.visible {
             opacity: 1;
             transform: translateY(0);
             pointer-events: auto;
+        }
+        
+        .glass::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 10%;
+            right: 10%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 248, 240, 0.08), transparent);
         }
         
         /* Subtitle Area */
@@ -424,17 +438,28 @@
         
         .subtitle-line {
             font-family: 'Playfair Display', serif;
-            font-size: clamp(0.95rem, 2.2vw, 1.3rem);
+            font-size: clamp(1.1rem, 2.5vw, 1.5rem);
             font-weight: 400;
-            line-height: 1.55;
+            font-style: italic;
+            line-height: 1.6;
             color: var(--text);
-            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+            text-shadow: 
+                0 0 20px rgba(0, 0, 0, 0.9),
+                0 0 40px rgba(0, 0, 0, 0.6),
+                0 2px 4px rgba(0, 0, 0, 0.8);
+            letter-spacing: 0.02em;
+            animation: subtitleGlow 3s ease-in-out infinite alternate;
+        }
+        
+        @keyframes subtitleGlow {
+            0% { text-shadow: 0 0 20px rgba(0, 0, 0, 0.9), 0 0 40px rgba(0, 0, 0, 0.6), 0 2px 4px rgba(0, 0, 0, 0.8); }
+            100% { text-shadow: 0 0 25px rgba(0, 0, 0, 0.9), 0 0 50px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.7), 0 0 60px rgba(245, 166, 35, 0.1); }
         }
         
         .subtitle-line .word {
             display: inline;
-            opacity: 0.4;
-            transition: opacity 0.12s ease, color 0.12s ease;
+            opacity: 0.5;
+            transition: opacity 0.15s ease, color 0.15s ease, text-shadow 0.15s ease;
         }
         
         .subtitle-line .word.spoken {
@@ -443,6 +468,7 @@
         
         .subtitle-line .word.current {
             color: var(--accent);
+            text-shadow: 0 0 8px var(--accent-glow);
         }
         
         /* Controls */
@@ -1026,6 +1052,15 @@
                     }, { once: true });
                     v.load();
                 }
+            })
+        ));
+        
+        // CRITICAL: Force all videos to time 0 and wait for seek
+        await Promise.all(allVideos.map(v => 
+            new Promise(resolve => {
+                v.currentTime = 0;
+                v.addEventListener('seeked', () => resolve(), { once: true });
+                setTimeout(resolve, 200); // Fallback
             })
         ));
         
