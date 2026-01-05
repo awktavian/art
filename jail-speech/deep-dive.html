@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deep Dive — How Memory Was Restored</title>
+    <meta name="description" content="The technical story of restoring a 1998 VHS tape to 4K with AI translation.">
+    <meta name="theme-color" content="#0a0806">
+    <meta name="robots" content="noindex">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <link rel="icon" type="image/png" sizes="32x32" href="images/favicons/favicon-32.png">
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg: #0a0806;
+            --bg-elevated: #12100d;
+            --bg-card: #1a1714;
+            --text: #fff8f0;
+            --text-dim: rgba(255, 248, 240, 0.6);
+            --text-muted: rgba(255, 248, 240, 0.35);
+            --accent: #f5a623;
+            --accent-dim: rgba(245, 166, 35, 0.15);
+            --green: #4ade80;
+            --red: #f87171;
+            --blue: #60a5fa;
+            --purple: #a78bfa;
+            --border: rgba(255, 248, 240, 0.06);
+        }
+        
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', system-ui, sans-serif;
+            line-height: 1.7;
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* Grain overlay */
+        .grain {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9998;
+            opacity: 0.012;
+            mix-blend-mode: overlay;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+        
+        /* Progress indicator */
+        .progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 2px;
+            background: var(--accent);
+            width: 0%;
+            z-index: 100;
+            transition: width 0.1s linear;
+        }
+        
+        /* Header */
+        header {
+            padding: 4rem 0 6rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 800px;
+            height: 400px;
+            background: radial-gradient(ellipse at top, rgba(245, 166, 35, 0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.7rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            text-decoration: none;
+            margin-bottom: 2rem;
+            transition: color 0.2s ease;
+        }
+        .back-link:hover { color: var(--accent); }
+        .back-link::before { content: '←'; }
+        
+        .badge-row {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .badge {
+            padding: 0.3rem 0.6rem;
+            border-radius: 3px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.55rem;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        .badge.secret {
+            background: rgba(167, 139, 250, 0.12);
+            border: 1px solid var(--purple);
+            color: var(--purple);
+        }
+        .badge.tech {
+            background: var(--accent-dim);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+        }
+        
+        header h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 400;
+            font-style: italic;
+            margin-bottom: 0.8rem;
+            letter-spacing: -0.02em;
+        }
+        
+        header p {
+            color: var(--text-dim);
+            font-size: 0.95rem;
+            max-width: 520px;
+            margin: 0 auto;
+        }
+        
+        /* Container */
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+        
+        /* Table of Contents */
+        nav.toc {
+            padding: 3rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        nav.toc h2 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.6rem;
+            font-weight: 500;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+        
+        nav.toc ol {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.5rem;
+        }
+        
+        nav.toc a {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 0.8rem;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            text-decoration: none;
+            border-radius: 4px;
+            transition: all 0.15s ease;
+        }
+        nav.toc a:hover {
+            background: var(--bg-card);
+            color: var(--text);
+        }
+        nav.toc a span {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--accent);
+        }
+        
+        /* Sections */
+        section {
+            padding: 4rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        section:last-of-type {
+            border-bottom: none;
+        }
+        
+        section h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.8rem;
+            font-weight: 400;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+        
+        section h2 .num {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--accent);
+            padding: 0.25rem 0.5rem;
+            background: var(--accent-dim);
+            border-radius: 3px;
+        }
+        
+        section h3 {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin: 2rem 0 0.8rem;
+            color: var(--text);
+        }
+        
+        section p {
+            color: var(--text-dim);
+            margin-bottom: 1rem;
+        }
+        
+        section strong {
+            color: var(--text);
+            font-weight: 500;
+        }
+        
+        /* Code blocks */
+        pre {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem 1.2rem;
+            overflow-x: auto;
+            margin: 1rem 0 1.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            line-height: 1.6;
+        }
+        
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85em;
+            background: var(--bg-card);
+            padding: 0.15em 0.4em;
+            border-radius: 3px;
+        }
+        
+        pre code {
+            background: transparent;
+            padding: 0;
+        }
+        
+        .token-keyword { color: var(--purple); }
+        .token-string { color: var(--green); }
+        .token-comment { color: var(--text-muted); font-style: italic; }
+        .token-function { color: var(--blue); }
+        .token-number { color: var(--accent); }
+        
+        /* Diagrams */
+        .diagram {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            line-height: 1.5;
+            overflow-x: auto;
+            color: var(--text-dim);
+        }
+        
+        .diagram .highlight { color: var(--accent); }
+        .diagram .green { color: var(--green); }
+        .diagram .blue { color: var(--blue); }
+        .diagram .purple { color: var(--purple); }
+        
+        /* Cards */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1.2rem;
+        }
+        
+        .card h4 {
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .card h4 .icon { font-size: 1.1rem; }
+        
+        .card p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin: 0;
+        }
+        
+        .card .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.4rem;
+            color: var(--accent);
+            margin: 0.5rem 0 0.3rem;
+        }
+        
+        /* Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+            margin: 1.5rem 0;
+        }
+        
+        @media (max-width: 600px) {
+            .stats { grid-template-columns: repeat(2, 1fr); }
+        }
+        
+        .stat {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 1rem;
+            text-align: center;
+        }
+        
+        .stat .num {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 500;
+            color: var(--accent);
+        }
+        
+        .stat .label {
+            font-size: 0.65rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-top: 0.3rem;
+        }
+        
+        /* Timeline */
+        .timeline {
+            position: relative;
+            margin: 2rem 0;
+            padding-left: 1.5rem;
+        }
+        
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, var(--accent), var(--purple), var(--green));
+            border-radius: 1px;
+        }
+        
+        .timeline-item {
+            position: relative;
+            padding-bottom: 1.5rem;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -1.5rem;
+            top: 0.4rem;
+            width: 8px;
+            height: 8px;
+            background: var(--bg);
+            border: 2px solid var(--accent);
+            border-radius: 50%;
+            transform: translateX(-3px);
+        }
+        
+        .timeline-item .time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-bottom: 0.3rem;
+        }
+        
+        .timeline-item h4 {
+            font-size: 0.95rem;
+            font-weight: 500;
+            margin-bottom: 0.3rem;
+        }
+        
+        .timeline-item p {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin: 0;
+        }
+        
+        /* Lists */
+        ul {
+            margin: 1rem 0;
+            padding-left: 1.2rem;
+        }
+        
+        li {
+            color: var(--text-dim);
+            margin-bottom: 0.4rem;
+        }
+        
+        li strong { color: var(--text); }
+        
+        /* Quote */
+        blockquote {
+            border-left: 3px solid var(--accent);
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            background: var(--accent-dim);
+            border-radius: 0 6px 6px 0;
+            font-style: italic;
+            color: var(--text-dim);
+        }
+        
+        blockquote cite {
+            display: block;
+            font-style: normal;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+        
+        /* Footer */
+        footer {
+            padding: 3rem 0;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+        
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        footer a:hover { text-decoration: underline; }
+        
+        .footer-icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.8rem;
+            opacity: 0.5;
+        }
+        
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        section {
+            animation: fadeIn 0.6s ease backwards;
+        }
+        
+        section:nth-child(1) { animation-delay: 0.1s; }
+        section:nth-child(2) { animation-delay: 0.15s; }
+        section:nth-child(3) { animation-delay: 0.2s; }
+        section:nth-child(4) { animation-delay: 0.25s; }
+        section:nth-child(5) { animation-delay: 0.3s; }
+        section:nth-child(6) { animation-delay: 0.35s; }
+        section:nth-child(7) { animation-delay: 0.4s; }
+    </style>
+</head>
+<body>
+    <div class="grain"></div>
+    <div class="progress" id="progress"></div>
+    
+    <header>
+        <div class="container">
+            <a href="index.html" class="back-link">Back to Video</a>
+            <div class="badge-row">
+                <span class="badge secret">🔮 Easter Egg</span>
+                <span class="badge tech">Technical Deep Dive</span>
+            </div>
+            <h1>How Memory Was Restored</h1>
+            <p>The architecture, systems, and AI collaboration that turned a degraded 1998 VHS tape into a multilingual 4K experience.</p>
+        </div>
+    </header>
+    
+    <main class="container">
+        <nav class="toc">
+            <h2>Contents</h2>
+            <ol>
+                <li><a href="#journey"><span>01</span> The Journey</a></li>
+                <li><a href="#pipeline"><span>02</span> Video Pipeline</a></li>
+                <li><a href="#player"><span>03</span> Web Player</a></li>
+                <li><a href="#translation"><span>04</span> AI Translation</a></li>
+                <li><a href="#kagami"><span>05</span> Kagami Architecture</a></li>
+                <li><a href="#infra"><span>06</span> Infrastructure</a></li>
+                <li><a href="#learnings"><span>07</span> What I Learned</a></li>
+            </ol>
+        </nav>
+        
+        <!-- SECTION 1: THE JOURNEY -->
+        <section id="journey">
+            <h2><span class="num">01</span>The Journey</h2>
+            
+            <p>This project began with a simple request: <strong>"Dig into Timo."</strong> What followed was a multi-hour collaboration between human and AI to restore a childhood memory.</p>
+            
+            <div class="stats">
+                <div class="stat">
+                    <div class="num">26</div>
+                    <div class="label">Years Old</div>
+                </div>
+                <div class="stat">
+                    <div class="num">4:23</div>
+                    <div class="label">Duration</div>
+                </div>
+                <div class="stat">
+                    <div class="num">4×</div>
+                    <div class="label">Resolution</div>
+                </div>
+                <div class="stat">
+                    <div class="num">3</div>
+                    <div class="label">Languages</div>
+                </div>
+            </div>
+            
+            <h3>The Source Material</h3>
+            <p>A VHS tape labeled "Tape 10" contained multiple recordings from 1998, including a 10-year-old Tim's speech contest entry about "Top 10 Reasons Not to Go to Jail." The original footage was 640×480 interlaced NTSC, with typical VHS artifacts: noise, color bleeding, and tracking issues.</p>
+            
+            <h3>The Challenge</h3>
+            <p>Early enhancement attempts failed because they made the footage look <em>"sharp and fake"</em>—the hallmark of over-processed video AI. The goal shifted to <strong>natural restoration</strong>: removing artifacts while preserving the authentic texture of time.</p>
+            
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="time">Attempt 1</div>
+                    <h4>Topaz Iris-3 (Default)</h4>
+                    <p>Over-sharpened, artificial edges. Rejected as "too processed."</p>
+                </div>
+                <div class="timeline-item">
+                    <div class="time">Attempt 2</div>
+                    <h4>"Natural" Enhancement</h4>
+                    <p>Different camera angle from wrong tape segment. Framing didn't match original.</p>
+                </div>
+                <div class="timeline-item">
+                    <div class="time">Final</div>
+                    <h4>Iris-3 with Correct Framing</h4>
+                    <p>CRF 20, web-optimized to 257MB. Matches original timing perfectly.</p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- SECTION 2: VIDEO PIPELINE -->
+        <section id="pipeline">
+            <h2><span class="num">02</span>Video Enhancement Pipeline</h2>
+            
+            <div class="diagram">
+<pre>
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   <span class="highlight">VHS</span>       │───▶│  <span class="blue">FFmpeg</span>    │───▶│  <span class="purple">Topaz AI</span>  │───▶│  <span class="green">Web</span>        │
+│  640×480    │    │  Extract    │    │  Iris-3    │    │  H.264      │
+│  NTSC       │    │  Deinterlace│    │  4× Upscale │    │  CRF 20     │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+</pre>
+            </div>
+            
+            <h3>FFmpeg Processing</h3>
+            <p>Before AI enhancement, the source required preprocessing to handle interlacing and extract the correct segment:</p>
+            
+<pre><code><span class="token-comment"># Extract 4:23 segment and deinterlace</span>
+ffmpeg -ss 00:02:15 -i Tape10.mp4 -t 263.029 \
+    -vf "yadif=1:-1:0" \
+    -c:v libx264 -crf 18 \
+    jail_speech_segment.mp4</code></pre>
+            
+            <h3>Topaz Video AI</h3>
+            <p>The Iris-3 model was selected for its natural enhancement characteristics. Unlike aggressive sharpening models, Iris-3 preserves film grain and natural texture while reducing noise and improving clarity.</p>
+            
+            <div class="card-grid">
+                <div class="card">
+                    <h4><span class="icon">📹</span> Input</h4>
+                    <div class="value">640×480</div>
+                    <p>Original VHS resolution</p>
+                </div>
+                <div class="card">
+                    <h4><span class="icon">🎬</span> Output</h4>
+                    <div class="value">2560×1920</div>
+                    <p>4× neural upscale</p>
+                </div>
+                <div class="card">
+                    <h4><span class="icon">📦</span> Size</h4>
+                    <div class="value">257 MB</div>
+                    <p>Web-optimized H.264</p>
+                </div>
+                <div class="card">
+                    <h4><span class="icon">⚡</span> CRF</h4>
+                    <div class="value">20</div>
+                    <p>Quality/size balance</p>
+                </div>
+            </div>
+            
+            <h3>The Framing Problem</h3>
+            <p>A critical bug emerged: the "natural" enhanced video had <strong>completely different framing</strong> than the original. Analysis revealed it was from a different take on the tape—same speech, different camera angle.</p>
+            
+<pre><code><span class="token-comment"># Compare door position in original vs enhanced</span>
+<span class="token-comment"># Original: Door at x=0-80px (far left)</span>
+<span class="token-comment"># "Natural": Door at x=120-200px (center-left) ← WRONG!</span>
+
+<span class="token-comment"># Solution: Use Iris-3 which processed the correct segment</span></code></pre>
+        </section>
+        
+        <!-- SECTION 3: WEB PLAYER -->
+        <section id="player">
+            <h2><span class="num">03</span>Web Player Architecture</h2>
+            
+            <p>The comparison player required solving several non-trivial problems: synchronized playback of videos with different durations, smooth language switching, and an "ethereal glass pane" for controls.</p>
+            
+            <div class="diagram">
+<pre>
+┌─────────────────────────────────────────────────────────────┐
+│                    <span class="highlight">VIEWPORT</span>                                 │
+│  ┌─────────────────────┬─────────────────────┐             │
+│  │                     │                     │             │
+│  │  <span class="blue">videoOriginal</span>      │  <span class="green">videoEN/ES/JA</span>      │             │
+│  │  (z-index: 1)       │  (z-index: 2)       │             │
+│  │  (full frame)       │  (clip-path: left)  │             │
+│  │                     │                     │             │
+│  └─────────────────────┴─────────────────────┘             │
+│                        │                                    │
+│                   <span class="purple">DIVIDER</span>                                  │
+│                   (draggable)                               │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              <span class="highlight">GLASS PANE</span> (controls + subtitles)        │   │
+│  │    backdrop-filter: blur(4px)                        │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+</pre>
+            </div>
+            
+            <h3>Percentage-Based Synchronization</h3>
+            <p>The dubbed videos have different durations (EN: 263s, ES: 267s, JA: 279s). Language switching uses <strong>percentage-based seeking</strong> to maintain relative position:</p>
+            
+<pre><code><span class="token-comment">// Calculate percentage in current video</span>
+<span class="token-keyword">const</span> pct = currentVideo.currentTime / DURATIONS[currentLang];
+
+<span class="token-comment">// Seek new video to same percentage</span>
+<span class="token-keyword">const</span> newTime = pct * DURATIONS[newLang];
+newVideo.currentTime = newTime;
+
+<span class="token-comment">// Keep original synced (always EN duration)</span>
+videoOriginal.currentTime = pct * DURATIONS.original;</code></pre>
+            
+            <h3>The Ethereal Glass Pane</h3>
+            <p>Controls and subtitles share a single "glass pane" that emerges from the bottom with a multi-stop gradient and backdrop blur:</p>
+            
+<pre><code><span class="token-selector">.glass</span> {
+    <span class="token-keyword">background</span>: <span class="token-function">linear-gradient</span>(
+        to top,
+        <span class="token-function">rgba</span>(<span class="token-number">10, 8, 6, 0.95</span>) <span class="token-number">0%</span>,
+        <span class="token-function">rgba</span>(<span class="token-number">10, 8, 6, 0.75</span>) <span class="token-number">25%</span>,
+        <span class="token-function">rgba</span>(<span class="token-number">10, 8, 6, 0.4</span>) <span class="token-number">50%</span>,
+        <span class="token-function">rgba</span>(<span class="token-number">10, 8, 6, 0.15</span>) <span class="token-number">75%</span>,
+        transparent <span class="token-number">100%</span>
+    );
+    <span class="token-keyword">backdrop-filter</span>: <span class="token-function">blur</span>(<span class="token-number">4px</span>);
+}</code></pre>
+        </section>
+        
+        <!-- SECTION 4: AI TRANSLATION -->
+        <section id="translation">
+            <h2><span class="num">04</span>AI Translation System</h2>
+            
+            <p>The multilingual versions use a two-stage pipeline: audio generation with ElevenLabs, followed by video synthesis with HeyGen's Avatar IV.</p>
+            
+            <div class="diagram">
+<pre>
+┌─────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  <span class="highlight">Whisper</span>    │───▶│  <span class="blue">ElevenLabs</span>     │───▶│  <span class="green">HeyGen</span>         │
+│  ASR        │    │  Voice Clone    │    │  Avatar IV      │
+│  Transcript │    │  V3 TTS         │    │  Lip Sync       │
+└─────────────┘    └─────────────────┘    └─────────────────┘
+       │                   │                      │
+       ▼                   ▼                      ▼
+  <span class="purple">Word-level</span>         <span class="purple">Dubbed audio</span>          <span class="purple">Full video</span>
+  timestamps        (ES, JA)              regeneration
+</pre>
+            </div>
+            
+            <h3>Voice Cloning</h3>
+            <p>ElevenLabs V3 was used to generate dubbed audio in Spanish and Japanese while maintaining the original voice characteristics of 10-year-old Tim.</p>
+            
+            <h3>HeyGen Avatar IV</h3>
+            <p>Rather than simple overdubbing, HeyGen's Avatar IV regenerates the entire video from a reference still image and the dubbed audio, creating natural lip movements that match the new language.</p>
+            
+            <blockquote>
+                "The goal wasn't just translation—it was making it feel like Tim actually spoke those languages in 1998."
+            </blockquote>
+            
+            <h3>Subtitle Timing</h3>
+            <p>Whisper ASR extracted word-level timestamps, which were converted to percentage-based timing to work across all video durations:</p>
+            
+<pre><code><span class="token-keyword">const</span> SUBTITLES = {
+    en: [
+        { pct: <span class="token-number">0.000</span>, end: <span class="token-number">0.016</span>, text: <span class="token-string">"This is the police..."</span> },
+        { pct: <span class="token-number">0.057</span>, end: <span class="token-number">0.069</span>, text: <span class="token-string">"Not many people want to hear..."</span> },
+        <span class="token-comment">// 50+ subtitle segments</span>
+    ],
+    es: [ <span class="token-comment">/* Spanish translations */</span> ],
+    ja: [ <span class="token-comment">/* Japanese translations */</span> ],
+};</code></pre>
+        </section>
+        
+        <!-- SECTION 5: KAGAMI -->
+        <section id="kagami">
+            <h2><span class="num">05</span>Kagami Architecture</h2>
+            
+            <p>This project was executed by <strong>Kagami (鏡)</strong>, a cognitive architecture built on seven specialized "colonies" that collaborate through Byzantine consensus.</p>
+            
+            <div class="diagram">
+<pre>
+                         ┌─────────────┐
+                         │  <span class="highlight">KAGAMI 鏡</span>   │
+                         │  The Mirror │
+                         └──────┬──────┘
+                                │
+        ┌───────────────────────┼───────────────────────┐
+        │                       │                       │
+   ┌────┴────┐            ┌────┴────┐            ┌────┴────┐
+   │ <span class="purple">BEACON</span>  │            │ <span class="blue">FORGE</span>   │            │ <span class="green">CRYSTAL</span> │
+   │ Architect│            │ Builder │            │ Verifier│
+   └─────────┘            └─────────┘            └─────────┘
+        │                       │                       │
+   ┌────┴────┐            ┌────┴────┐            ┌────┴────┐
+   │  <span class="highlight">SPARK</span>  │            │  <span class="blue">FLOW</span>   │            │  <span class="purple">GROVE</span>  │
+   │ Ideator │            │ Debugger│            │ Scholar │
+   └─────────┘            └─────────┘            └─────────┘
+                                │
+                         ┌─────┴─────┐
+                         │   <span class="green">NEXUS</span>   │
+                         │  Bridge   │
+                         └───────────┘
+</pre>
+            </div>
+            
+            <h3>Colony Contributions</h3>
+            
+            <ul>
+                <li><strong>🗼 Beacon</strong> — Planned the video enhancement pipeline and page architecture</li>
+                <li><strong>⚒️ Forge</strong> — Built the web player, CSS animations, and JavaScript sync logic</li>
+                <li><strong>🌊 Flow</strong> — Debugged the framing mismatch and video desync issues</li>
+                <li><strong>💎 Crystal</strong> — Verified subtitle timing, tested language switching, audited accessibility</li>
+                <li><strong>🔥 Spark</strong> — Designed the "ethereal glass pane" and micro-interactions</li>
+                <li><strong>🌿 Grove</strong> — Researched Topaz models, ElevenLabs V3, HeyGen Avatar IV</li>
+                <li><strong>🔗 Nexus</strong> — Integrated GCS, GitHub Pages, and API orchestration</li>
+            </ul>
+            
+            <h3>Execution Model</h3>
+            <p>Kagami doesn't just describe solutions—it <strong>executes</strong> them. Every video processing command, API call, and file edit was performed directly:</p>
+            
+<pre><code><span class="token-comment"># Smart Home integration (same codebase)</span>
+<span class="token-keyword">from</span> kagami_smarthome <span class="token-keyword">import</span> get_smart_home
+controller = <span class="token-keyword">await</span> get_smart_home()
+
+<span class="token-comment"># Digital services (Composio)</span>
+<span class="token-keyword">from</span> kagami.core.services.composio <span class="token-keyword">import</span> get_composio_service
+service = get_composio_service()
+
+<span class="token-comment"># Video processing (direct shell)</span>
+ffmpeg -y -i input.mp4 -c:v libx264 -crf <span class="token-number">20</span> output.mp4</code></pre>
+        </section>
+        
+        <!-- SECTION 6: INFRASTRUCTURE -->
+        <section id="infra">
+            <h2><span class="num">06</span>Infrastructure</h2>
+            
+            <h3>Video Hosting</h3>
+            <p>Videos are hosted on <strong>Google Cloud Storage</strong> with public read access. Cache-busting query parameters ensure fresh content delivery:</p>
+            
+<pre><code><span class="token-comment">// Video sources with cache-bust</span>
+src=<span class="token-string">"https://storage.googleapis.com/kagami-public/jail-speech/enhanced.mp4?v=2"</span></code></pre>
+            
+            <div class="card-grid">
+                <div class="card">
+                    <h4><span class="icon">☁️</span> GCS Bucket</h4>
+                    <p>kagami-public/jail-speech/</p>
+                </div>
+                <div class="card">
+                    <h4><span class="icon">🌐</span> CDN</h4>
+                    <p>Global edge caching</p>
+                </div>
+                <div class="card">
+                    <h4><span class="icon">📄</span> Pages</h4>
+                    <p>GitHub Pages static hosting</p>
+                </div>
+                <div class="card">
+                    <h4><span class="icon">🔐</span> HTTPS</h4>
+                    <p>TLS 1.3 everywhere</p>
+                </div>
+            </div>
+            
+            <h3>File Sizes</h3>
+            
+<pre><code>original.mp4       22 MB   (VHS source, web-encoded)
+enhanced.mp4      257 MB   (Iris-3 4× upscale)
+enhanced_es.mp4    95 MB   (HeyGen Spanish)
+enhanced_ja.mp4   102 MB   (HeyGen Japanese)
+─────────────────────────
+Total             476 MB</code></pre>
+            
+            <h3>Browser Testing</h3>
+            <p>Automated verification used <strong>Puppeteer</strong> in headless mode with muted audio to test video sync, language switching, and subtitle display:</p>
+            
+<pre><code><span class="token-comment">// Puppeteer verification</span>
+<span class="token-keyword">await</span> puppeteer_navigate({ url: <span class="token-string">'https://awktavian.github.io/art/jail-speech/'</span> });
+<span class="token-keyword">await</span> puppeteer_click({ selector: <span class="token-string">'#startOverlay'</span> });
+<span class="token-keyword">await</span> puppeteer_screenshot({ name: <span class="token-string">'sync-test'</span> });</code></pre>
+        </section>
+        
+        <!-- SECTION 7: LEARNINGS -->
+        <section id="learnings">
+            <h2><span class="num">07</span>What I Learned</h2>
+            
+            <blockquote>
+                "The texture of time cannot be faked. Enhancement must reveal, not replace."
+            </blockquote>
+            
+            <h3>Technical Insights</h3>
+            <ul>
+                <li><strong>Framing matters more than resolution.</strong> A perfectly aligned 480p video is better than a misaligned 4K one.</li>
+                <li><strong>Percentage-based sync</strong> is essential for videos of different durations—absolute timestamps fail.</li>
+                <li><strong>Cache-busting</strong> is critical for iterative deployment. GCS caches aggressively.</li>
+                <li><strong>Clip-path direction</strong>: <code>inset(0 0 0 50%)</code> clips from the LEFT, showing the RIGHT portion.</li>
+            </ul>
+            
+            <h3>Aesthetic Principles</h3>
+            <ul>
+                <li><strong>Ethereal UI</strong> emerges from gradients that fade to transparency, not hard edges.</li>
+                <li><strong>Subtitles</strong> need breathing room—italic serif fonts with generous line-height.</li>
+                <li><strong>Controls should feel inevitable</strong>, appearing exactly when needed and vanishing into the experience.</li>
+            </ul>
+            
+            <h3>The Human Element</h3>
+            <p>This project worked because the human (Tim) knew exactly what he wanted and provided immediate, honest feedback. "It looks like crap" is more useful than "it's fine, I guess."</p>
+            
+            <p>The collaboration was <strong>26 messages</strong> across several hours, iterating through failures until we reached something worthy of the memory being preserved.</p>
+            
+            <div class="diagram">
+<pre>
+                    <span class="highlight">The Loop</span>
+
+         ┌──────────────────────────────────┐
+         │                                  │
+         ▼                                  │
+    ┌─────────┐    ┌─────────┐    ┌─────────┴┐
+    │  SENSE  │───▶│  BUILD  │───▶│  VERIFY  │
+    │ (read)  │    │ (forge) │    │ (crystal)│
+    └─────────┘    └─────────┘    └──────────┘
+         ▲                              │
+         │                              │
+         └──────────< feedback <────────┘
+</pre>
+            </div>
+        </section>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <div class="footer-icon">鏡</div>
+            <p>Built by <a href="https://github.com/awktavian/kagami">Kagami</a> — Tim's mirror.<br>
+            January 4, 2026</p>
+        </div>
+    </footer>
+    
+    <script>
+        // Progress indicator
+        window.addEventListener('scroll', () => {
+            const winScroll = document.documentElement.scrollTop;
+            const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            const scrolled = (winScroll / height) * 100;
+            document.getElementById('progress').style.width = scrolled + '%';
+        });
+        
+        // Smooth anchor scrolling with offset
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    const offset = 80;
+                    const targetPosition = target.getBoundingClientRect().top + window.pageYOffset - offset;
+                    window.scrollTo({ top: targetPosition, behavior: 'smooth' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
