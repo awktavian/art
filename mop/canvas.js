@@ -237,7 +237,7 @@
     }
 
     // =========================================================================
-    // DRAW CENTER WAVEFORM
+    // DRAW CENTER WAVEFORM (Oscilloscope style)
     // =========================================================================
     
     function drawWaveform(audioData) {
@@ -247,11 +247,18 @@
         analyser.getByteTimeDomainData(timeData);
         
         const hue = MOVEMENT_HUES[currentMovement] || 45;
+        const intensity = audioData.overall;
         
         ctx.save();
-        ctx.globalAlpha = 0.4;
-        ctx.strokeStyle = `hsla(${hue}, 70%, 60%, 0.6)`;
-        ctx.lineWidth = 2;
+        
+        // Glow effect layer
+        ctx.shadowBlur = 20 + intensity * 30;
+        ctx.shadowColor = `hsla(${hue}, 80%, 60%, 0.8)`;
+        ctx.strokeStyle = `hsla(${hue}, 80%, 70%, ${0.6 + intensity * 0.4})`;
+        ctx.lineWidth = 3 + intensity * 4;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
         ctx.beginPath();
         
         const sliceWidth = width / timeData.length;
@@ -259,7 +266,9 @@
         
         for (let i = 0; i < timeData.length; i++) {
             const v = timeData[i] / 128.0;
-            const y = (v * height / 4) + height / 2;
+            // Bigger amplitude - fills more of screen
+            const amplitude = height * 0.35 * (1 + intensity * 0.5);
+            const y = (v - 1) * amplitude + height / 2;
             
             if (i === 0) {
                 ctx.moveTo(x, y);
@@ -270,6 +279,69 @@
         }
         
         ctx.stroke();
+        
+        // Second brighter line on top
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = `hsla(${hue}, 60%, 90%, ${0.4 + intensity * 0.3})`;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+    
+    // =========================================================================
+    // DRAW CIRCULAR VISUALIZER (Center)
+    // =========================================================================
+    
+    function drawCircularVisualizer(audioData) {
+        if (!analyser || !dataArray || !audio || audio.paused) return;
+        
+        analyser.getByteFrequencyData(dataArray);
+        
+        const hue = MOVEMENT_HUES[currentMovement] || 45;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const baseRadius = Math.min(width, height) * 0.15;
+        
+        ctx.save();
+        
+        // Draw circular bars
+        const barCount = 64;
+        for (let i = 0; i < barCount; i++) {
+            const dataIndex = Math.floor(i * dataArray.length / barCount);
+            const value = dataArray[dataIndex] / 255;
+            
+            const angle = (i / barCount) * Math.PI * 2 - Math.PI / 2;
+            const barLength = value * baseRadius * 1.5;
+            
+            const x1 = centerX + Math.cos(angle) * baseRadius;
+            const y1 = centerY + Math.sin(angle) * baseRadius;
+            const x2 = centerX + Math.cos(angle) * (baseRadius + barLength);
+            const y2 = centerY + Math.sin(angle) * (baseRadius + barLength);
+            
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            
+            const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+            gradient.addColorStop(0, `hsla(${hue}, 70%, 50%, 0.3)`);
+            gradient.addColorStop(1, `hsla(${hue + 30}, 80%, 70%, ${0.5 + value * 0.5})`);
+            
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+        
+        // Inner circle glow
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, baseRadius * 0.8, 0, Math.PI * 2);
+        ctx.strokeStyle = `hsla(${hue}, 60%, 60%, ${0.2 + audioData.bass * 0.5})`;
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 20 + audioData.bass * 30;
+        ctx.shadowColor = `hsla(${hue}, 80%, 50%, 0.6)`;
+        ctx.stroke();
+        
         ctx.restore();
     }
 
@@ -287,7 +359,10 @@
         // Draw frequency bars (behind particles)
         drawFrequencyBars(audioData);
         
-        // Draw waveform
+        // Draw circular visualizer in center
+        drawCircularVisualizer(audioData);
+        
+        // Draw waveform (oscilloscope)
         drawWaveform(audioData);
 
         // Update and draw particles
