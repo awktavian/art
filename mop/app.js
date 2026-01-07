@@ -1,747 +1,355 @@
 /**
  * Master of Puppets — Main Application
- *
- * - Easter egg (click on mirror symbol)
- * - WebXR immersive mode
- * - Scroll-based animations
- * - Movement navigation
- * - Hero play button
- *
- * h(x) >= 0
+ * 
+ * Audio player controls, keyboard shortcuts, scroll handling
+ * 
+ * h(x) ≥ 0
  */
 
 (function() {
     'use strict';
 
-    // ═══════════════════════════════════════════════════════════════════════════
+    // =========================================================================
     // DOM ELEMENTS
-    // ═══════════════════════════════════════════════════════════════════════════
+    // =========================================================================
+    
+    const audio = document.getElementById('audio');
+    const playBtn = document.getElementById('play-btn');
+    const heroPlayBtn = document.getElementById('hero-play-btn');
+    const progressBar = document.getElementById('progress-bar');
+    const progressFill = document.getElementById('progress-fill');
+    const timeDisplay = document.getElementById('time-display');
+    const volumeSlider = document.getElementById('volume-slider');
+    const volumeIcon = document.getElementById('volume-icon');
+    const progressBarTop = document.getElementById('progress-bar-top');
+    const movementDots = document.querySelectorAll('.movement-dot');
+    const movements = document.querySelectorAll('.movement, .overture');
+    const easterEggOverlay = document.getElementById('easter-egg-overlay');
+    const mirrorSymbol = document.getElementById('mirror-easter-egg');
 
-    const elements = {
-        audio: document.getElementById('audio'),
-        playBtn: document.getElementById('play-btn'),
-        heroPlayBtn: document.getElementById('hero-play-btn'),
-        progressBar: document.getElementById('progress-bar'),
-        progressFill: document.getElementById('progress-fill'),
-        timeDisplay: document.getElementById('time-display'),
-        progressBarTop: document.getElementById('progress-bar-top'),
-        movementNav: document.getElementById('movement-nav'),
-        movementDots: document.querySelectorAll('.movement-dot'),
-        movements: document.querySelectorAll('[data-movement]'),
-        mirrorEasterEgg: document.getElementById('mirror-easter-egg'),
-        easterEggOverlay: document.getElementById('easter-egg-overlay'),
-        easterEggClose: document.querySelector('.easter-egg-close'),
-        webxrBtn: document.getElementById('webxr-btn'),
-        volumeSlider: document.getElementById('volume-slider'),
-        volumeIcon: document.getElementById('volume-icon')
-    };
+    if (!audio || !playBtn) {
+        console.warn('App: Required elements not found');
+        return;
+    }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CONSTANTS
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    // =========================================================================
+    // STATE
+    // =========================================================================
+    
     const DURATION = 402; // 6:42 in seconds
-    const FIBONACCI = [89, 144, 233, 377, 610, 987, 1597, 2584];
+    let isPlaying = false;
+    let currentMovement = 0;
 
-    // ═══════════════════════════════════════════════════════════════════════════
+    // =========================================================================
     // UTILITIES
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    // =========================================================================
+    
     function formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
-    function lerp(start, end, t) {
-        return start + (end - start) * t;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // EASTER EGG - THE MIRROR
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    function initEasterEgg() {
-        if (!elements.mirrorEasterEgg || !elements.easterEggOverlay) return;
-
-        const showEasterEgg = () => {
-            elements.easterEggOverlay.classList.add('active');
-            elements.easterEggOverlay.setAttribute('aria-hidden', 'false');
-            document.body.style.overflow = 'hidden';
-
-            // Trigger particle burst
-            if (window.ParticleCanvas) {
-                window.ParticleCanvas.spawnBurst('gold', 1);
-            }
-        };
-
-        const hideEasterEgg = () => {
-            elements.easterEggOverlay.classList.remove('active');
-            elements.easterEggOverlay.setAttribute('aria-hidden', 'true');
-            document.body.style.overflow = '';
-        };
-
-        // Click handler
-        elements.mirrorEasterEgg.addEventListener('click', showEasterEgg);
-
-        // Keyboard handler (Enter/Space)
-        elements.mirrorEasterEgg.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                showEasterEgg();
-            }
-        });
-
-        // Close button
-        if (elements.easterEggClose) {
-            elements.easterEggClose.addEventListener('click', hideEasterEgg);
-        }
-
-        // Click outside to close
-        elements.easterEggOverlay.addEventListener('click', (e) => {
-            if (e.target === elements.easterEggOverlay) {
-                hideEasterEgg();
-            }
-        });
-
-        // Escape to close
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && elements.easterEggOverlay.classList.contains('active')) {
-                hideEasterEgg();
-            }
-        });
-
-        console.log('Easter egg initialized');
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // WEBXR IMMERSIVE MODE
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    let xrSession = null;
-
-    async function initWebXR() {
-        if (!elements.webxrBtn) return;
-
-        // Check WebXR support
-        if (!navigator.xr) {
-            console.log('WebXR not supported');
-            return;
-        }
-
-        try {
-            const isSupported = await navigator.xr.isSessionSupported('immersive-vr');
-            if (isSupported) {
-                elements.webxrBtn.style.display = 'flex';
-                elements.webxrBtn.addEventListener('click', toggleXRSession);
-                console.log('WebXR available');
-            }
-        } catch (e) {
-            console.log('WebXR check failed:', e.message);
-        }
-    }
-
-    async function toggleXRSession() {
-        if (xrSession) {
-            await xrSession.end();
-            return;
-        }
-
-        try {
-            xrSession = await navigator.xr.requestSession('immersive-vr', {
-                optionalFeatures: ['local-floor', 'bounded-floor']
+    // =========================================================================
+    // PLAYBACK CONTROL
+    // =========================================================================
+    
+    function togglePlay() {
+        if (isPlaying) {
+            audio.pause();
+            playBtn.classList.remove('playing');
+            playBtn.setAttribute('aria-label', 'Play');
+        } else {
+            audio.play().catch(e => {
+                console.error('Audio play failed:', e);
             });
-
-            xrSession.addEventListener('end', () => {
-                xrSession = null;
-                elements.webxrBtn.querySelector('.webxr-text').textContent = 'Enter VR';
-            });
-
-            elements.webxrBtn.querySelector('.webxr-text').textContent = 'Exit VR';
-
-            // In a full implementation, we'd set up the XR render loop here
-            console.log('XR session started');
-        } catch (e) {
-            console.error('Failed to start XR session:', e);
+            playBtn.classList.add('playing');
+            playBtn.setAttribute('aria-label', 'Pause');
         }
+        isPlaying = !isPlaying;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // SCROLL ANIMATIONS
-    // ═══════════════════════════════════════════════════════════════════════════
+    // Play button
+    playBtn.addEventListener('click', togglePlay);
 
-    function initScrollAnimations() {
-        const observerOptions = {
-            root: null,
-            rootMargin: '-10% 0px -10% 0px',
-            threshold: [0, 0.1, 0.5, 1]
-        };
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('visible');
-
-                    // Update movement navigation
-                    const movement = entry.target.dataset.movement;
-                    if (movement !== undefined) {
-                        updateMovementNav(parseInt(movement));
-                    }
-                }
-            });
-        }, observerOptions);
-
-        // Observe movements
-        elements.movements.forEach(movement => {
-            observer.observe(movement);
-        });
-
-        // Observe other animated elements
-        document.querySelectorAll('.technique-card, .instrument-section, .score-display').forEach(el => {
-            observer.observe(el);
-        });
-
-        // Update scroll progress bar
-        window.addEventListener('scroll', updateScrollProgress, { passive: true });
-    }
-
-    function updateScrollProgress() {
-        const scrollTop = window.scrollY;
-        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-        const progress = (scrollTop / docHeight) * 100;
-
-        if (elements.progressBarTop) {
-            elements.progressBarTop.style.width = `${Math.min(progress, 100)}%`;
-            elements.progressBarTop.setAttribute('aria-valuenow', Math.round(progress));
-        }
-    }
-
-    function updateMovementNav(activeMovement) {
-        elements.movementDots.forEach(dot => {
-            const dotMovement = parseInt(dot.dataset.movement);
-            dot.classList.toggle('active', dotMovement === activeMovement);
-        });
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MOVEMENT NAVIGATION
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    function initMovementNav() {
-        elements.movementDots.forEach(dot => {
-            dot.addEventListener('click', () => {
-                const movement = dot.dataset.movement;
-                const target = document.querySelector(`[data-movement="${movement}"]`);
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth' });
-                }
-            });
-        });
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // HERO PLAY BUTTON
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    function initHeroPlay() {
-        if (!elements.heroPlayBtn || !elements.audio) return;
-
-        elements.heroPlayBtn.addEventListener('click', () => {
+    // Hero play button
+    if (heroPlayBtn) {
+        heroPlayBtn.addEventListener('click', () => {
+            if (!isPlaying) {
+                togglePlay();
+            }
             // Scroll to orchestra section
             const orchestraSection = document.getElementById('movement-3');
             if (orchestraSection) {
                 orchestraSection.scrollIntoView({ behavior: 'smooth' });
             }
-
-            // Start playback after a short delay
-            setTimeout(() => {
-                if (elements.audio.paused) {
-                    elements.audio.play().catch(e => console.log('Play failed:', e));
-                }
-            }, 800);
         });
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // VOLUME CONTROL
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    function initVolumeControl() {
-        if (!elements.volumeSlider || !elements.audio) return;
-
-        elements.volumeSlider.addEventListener('input', (e) => {
-            const vol = e.target.value / 100;
-            elements.audio.volume = vol;
-            updateVolumeIcon(vol);
+    // =========================================================================
+    // PROGRESS BAR
+    // =========================================================================
+    
+    if (progressBar) {
+        progressBar.addEventListener('click', (e) => {
+            const rect = progressBar.getBoundingClientRect();
+            const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            audio.currentTime = pct * DURATION;
         });
 
-        // Initialize
-        elements.audio.volume = elements.volumeSlider.value / 100;
-
-        // Mute toggle
-        if (elements.volumeIcon) {
-            elements.volumeIcon.addEventListener('click', () => {
-                elements.audio.muted = !elements.audio.muted;
-                updateVolumeIcon(elements.audio.muted ? 0 : elements.audio.volume);
-            });
-        }
-    }
-
-    function updateVolumeIcon(vol) {
-        if (!elements.volumeIcon) return;
-        if (vol === 0 || elements.audio.muted) {
-            elements.volumeIcon.textContent = '🔇';
-        } else if (vol < 0.5) {
-            elements.volumeIcon.textContent = '🔉';
-        } else {
-            elements.volumeIcon.textContent = '🔊';
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // TITLE ANIMATION
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    function initTitleAnimation() {
-        const titleWords = document.querySelectorAll('.title-word');
-        if (!titleWords.length) return;
-
-        titleWords.forEach((word, i) => {
-            word.style.opacity = '0';
-            word.style.transform = 'translateY(30px)';
-            word.style.transition = `all ${FIBONACCI[4]}ms cubic-bezier(0.16, 1, 0.3, 1)`;
-            word.style.transitionDelay = `${FIBONACCI[2] + i * FIBONACCI[1]}ms`;
-        });
-
-        // Trigger after a short delay
-        setTimeout(() => {
-            titleWords.forEach(word => {
-                word.style.opacity = '1';
-                word.style.transform = 'translateY(0)';
-            });
-        }, 100);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // OVERTURE META ANIMATION
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    function initOvertureAnimation() {
-        const content = document.querySelector('.overture-content');
-        if (!content) return;
-
-        // Already handled by CSS animations, but we can enhance
-        const metaItems = content.querySelectorAll('.meta-item');
-        metaItems.forEach((item, i) => {
-            item.style.animationDelay = `${2584 + i * 144}ms`;
-        });
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // KEYBOARD NAVIGATION
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    function initKeyboardNav() {
-        document.addEventListener('keydown', (e) => {
-            // Don't intercept if user is typing
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
-            switch (e.code) {
-                case 'Space':
-                    e.preventDefault();
-                    togglePlay();
-                    break;
-                case 'ArrowRight':
-                    e.preventDefault();
-                    if (elements.audio) {
-                        elements.audio.currentTime = Math.min(elements.audio.currentTime + 5, DURATION);
-                    }
-                    break;
-                case 'ArrowLeft':
-                    e.preventDefault();
-                    if (elements.audio) {
-                        elements.audio.currentTime = Math.max(elements.audio.currentTime - 5, 0);
-                    }
-                    break;
-                case 'Home':
-                    e.preventDefault();
-                    if (elements.audio) elements.audio.currentTime = 0;
-                    break;
-                case 'End':
-                    e.preventDefault();
-                    if (elements.audio) elements.audio.currentTime = DURATION - 1;
-                    break;
-                case 'ArrowUp':
-                    e.preventDefault();
-                    if (elements.volumeSlider) {
-                        elements.volumeSlider.value = Math.min(parseInt(elements.volumeSlider.value) + 10, 100);
-                        elements.volumeSlider.dispatchEvent(new Event('input'));
-                    }
-                    break;
-                case 'ArrowDown':
-                    e.preventDefault();
-                    if (elements.volumeSlider) {
-                        elements.volumeSlider.value = Math.max(parseInt(elements.volumeSlider.value) - 10, 0);
-                        elements.volumeSlider.dispatchEvent(new Event('input'));
-                    }
-                    break;
-                case 'KeyM':
-                    if (elements.audio) {
-                        elements.audio.muted = !elements.audio.muted;
-                        updateVolumeIcon(elements.audio.muted ? 0 : elements.audio.volume);
-                    }
-                    break;
-            }
-        });
-    }
-
-    function togglePlay() {
-        if (!elements.audio || !elements.playBtn) return;
-
-        // Don't allow play during loading or error
-        if (currentAudioState === AudioState.LOADING || currentAudioState === AudioState.ERROR) {
-            return;
-        }
-
-        if (elements.audio.paused) {
-            elements.audio.play().catch(e => {
-                console.error('Play failed:', e);
-                // On mobile, user gesture might be required
-                if (e.name === 'NotAllowedError') {
-                    setAudioState(AudioState.READY);
-                }
-            });
-        } else {
-            elements.audio.pause();
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // KONAMI CODE EASTER EGG
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
-    let konamiProgress = 0;
-    let metalModeActive = false;
-
-    function initKonamiCode() {
-        document.addEventListener('keydown', (e) => {
-            if (e.code === KONAMI_CODE[konamiProgress]) {
-                konamiProgress++;
-                if (konamiProgress === KONAMI_CODE.length) {
-                    activateMetalMode();
-                    konamiProgress = 0;
-                }
-            } else {
-                konamiProgress = 0;
-            }
-        });
-    }
-
-    function activateMetalMode() {
-        if (metalModeActive) return;
-        metalModeActive = true;
-
-        console.log('🤘 METAL MODE ACTIVATED 🤘');
-
-        // Flash the screen with Metallica colors
-        const flash = document.createElement('div');
-        flash.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(45deg, #8b0000, #0a0a0a, #c0c0c0);
-            z-index: 10000;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 144ms ease-out;
-        `;
-        document.body.appendChild(flash);
-
-        // Flash sequence
-        setTimeout(() => flash.style.opacity = '0.8', 0);
-        setTimeout(() => flash.style.opacity = '0', 144);
-        setTimeout(() => flash.style.opacity = '0.6', 288);
-        setTimeout(() => flash.style.opacity = '0', 432);
-        setTimeout(() => flash.style.opacity = '0.4', 576);
-        setTimeout(() => {
-            flash.style.opacity = '0';
-            setTimeout(() => flash.remove(), 233);
-        }, 720);
-
-        // Trigger massive particle burst
-        if (window.ParticleCanvas && window.ParticleCanvas.triggerBeat) {
-            for (let i = 0; i < 5; i++) {
-                setTimeout(() => window.ParticleCanvas.triggerBeat(), i * 100);
-            }
-        }
-
-        // Spawn section bursts
-        if (window.ParticleCanvas && window.ParticleCanvas.spawnBurst) {
-            window.ParticleCanvas.spawnBurst('brass', 1);
-            setTimeout(() => window.ParticleCanvas.spawnBurst('percussion', 1), 144);
-            setTimeout(() => window.ParticleCanvas.spawnBurst('strings', 1), 288);
-        }
-
-        // Add temporary metal glow to title
-        const title = document.querySelector('.overture-title');
-        if (title) {
-            title.style.transition = 'all 377ms ease-out';
-            title.style.textShadow = '0 0 30px #8b0000, 0 0 60px #c0c0c0, 0 0 90px #8b0000';
-            setTimeout(() => {
-                title.style.textShadow = '';
-            }, 2000);
-        }
-
-        // Reset after effect
-        setTimeout(() => {
-            metalModeActive = false;
-        }, 3000);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // COMPLETION CELEBRATION
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    function initCompletionCelebration() {
-        if (!elements.audio) return;
-
-        elements.audio.addEventListener('ended', () => {
-            // Trigger celebration particle burst
-            if (window.ParticleCanvas && window.ParticleCanvas.spawnBurst) {
-                window.ParticleCanvas.spawnBurst('brass', 1);
-                setTimeout(() => window.ParticleCanvas.spawnBurst('strings', 1), 233);
-                setTimeout(() => window.ParticleCanvas.spawnBurst('percussion', 1), 466);
-            }
-
-            // Show completion message
-            const message = document.createElement('div');
-            message.innerHTML = `
-                <div style="
-                    position: fixed;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    text-align: center;
-                    z-index: 10000;
-                    animation: completion-fade 3000ms ease-out forwards;
-                ">
-                    <div style="
-                        font-family: 'EB Garamond', serif;
-                        font-size: clamp(1.5rem, 4vw, 2.5rem);
-                        color: #e5b84a;
-                        margin-bottom: 1rem;
-                        text-shadow: 0 0 20px rgba(229, 184, 74, 0.5);
-                    ">The symphony is complete.</div>
-                    <div style="
-                        font-size: 3rem;
-                        opacity: 0.8;
-                    ">鏡</div>
-                </div>
-            `;
-
-            // Add animation keyframes
-            const style = document.createElement('style');
-            style.textContent = `
-                @keyframes completion-fade {
-                    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
-                    20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-                    80% { opacity: 1; }
-                    100% { opacity: 0; }
-                }
-            `;
-            document.head.appendChild(style);
-            document.body.appendChild(message);
-
-            // Remove after animation
-            setTimeout(() => {
-                message.remove();
-                style.remove();
-            }, 3500);
-        });
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PLAY BUTTON STATE
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    // Audio state machine
-    const AudioState = {
-        LOADING: 'loading',
-        READY: 'ready',
-        PLAYING: 'playing',
-        PAUSED: 'paused',
-        ERROR: 'error'
-    };
-    let currentAudioState = AudioState.LOADING;
-
-    function setAudioState(newState) {
-        currentAudioState = newState;
-        updatePlayButtonState();
-    }
-
-    function updatePlayButtonState() {
-        if (!elements.playBtn) return;
-
-        // Remove all state classes
-        elements.playBtn.classList.remove('loading', 'playing', 'error');
-
-        switch (currentAudioState) {
-            case AudioState.LOADING:
-                elements.playBtn.classList.add('loading');
-                elements.playBtn.setAttribute('aria-label', 'Loading audio...');
-                elements.playBtn.disabled = true;
-                break;
-            case AudioState.READY:
-            case AudioState.PAUSED:
-                elements.playBtn.disabled = false;
-                elements.playBtn.setAttribute('aria-label', 'Play');
-                break;
-            case AudioState.PLAYING:
-                elements.playBtn.classList.add('playing');
-                elements.playBtn.disabled = false;
-                elements.playBtn.setAttribute('aria-label', 'Pause');
-                break;
-            case AudioState.ERROR:
-                elements.playBtn.classList.add('error');
-                elements.playBtn.disabled = true;
-                elements.playBtn.setAttribute('aria-label', 'Audio error');
-                break;
-        }
-    }
-
-    function initPlayButton() {
-        if (!elements.audio || !elements.playBtn) return;
-
-        // Initial state
-        setAudioState(AudioState.LOADING);
-
-        elements.playBtn.addEventListener('click', togglePlay);
-
-        // Audio events
-        elements.audio.addEventListener('loadstart', () => {
-            setAudioState(AudioState.LOADING);
-        });
-
-        elements.audio.addEventListener('canplaythrough', () => {
-            if (currentAudioState === AudioState.LOADING) {
-                setAudioState(AudioState.READY);
-            }
-        });
-
-        elements.audio.addEventListener('play', () => {
-            setAudioState(AudioState.PLAYING);
-        });
-
-        elements.audio.addEventListener('pause', () => {
-            if (currentAudioState !== AudioState.LOADING) {
-                setAudioState(AudioState.PAUSED);
-            }
-        });
-
-        elements.audio.addEventListener('ended', () => {
-            setAudioState(AudioState.PAUSED);
-        });
-
-        elements.audio.addEventListener('error', () => {
-            setAudioState(AudioState.ERROR);
-            console.error('Audio failed to load');
-        });
-
-        elements.audio.addEventListener('waiting', () => {
-            if (currentAudioState === AudioState.PLAYING) {
-                elements.playBtn.classList.add('loading');
-            }
-        });
-
-        elements.audio.addEventListener('canplay', () => {
-            elements.playBtn.classList.remove('loading');
-        });
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PROGRESS BAR SCRUBBING
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    function initProgressBar() {
-        if (!elements.progressBar || !elements.audio) return;
-
+        // Drag support
         let isDragging = false;
 
-        const seek = (e) => {
-            const rect = elements.progressBar.getBoundingClientRect();
-            const x = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
-            const pct = Math.max(0, Math.min(1, (x - rect.left) / rect.width));
-            elements.audio.currentTime = pct * DURATION;
-        };
-
-        elements.progressBar.addEventListener('mousedown', (e) => {
+        progressBar.addEventListener('mousedown', (e) => {
             isDragging = true;
-            seek(e);
+            const rect = progressBar.getBoundingClientRect();
+            const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            audio.currentTime = pct * DURATION;
         });
-
-        elements.progressBar.addEventListener('touchstart', (e) => {
-            isDragging = true;
-            seek(e);
-        }, { passive: true });
 
         document.addEventListener('mousemove', (e) => {
-            if (isDragging) seek(e);
+            if (!isDragging) return;
+            const rect = progressBar.getBoundingClientRect();
+            const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            audio.currentTime = pct * DURATION;
         });
 
-        document.addEventListener('touchmove', (e) => {
-            if (isDragging) seek(e);
-        }, { passive: true });
-
-        document.addEventListener('mouseup', () => { isDragging = false; });
-        document.addEventListener('touchend', () => { isDragging = false; });
-
-        // Update progress display
-        elements.audio.addEventListener('timeupdate', () => {
-            const progress = (elements.audio.currentTime / DURATION) * 100;
-            if (elements.progressFill) {
-                elements.progressFill.style.width = `${progress}%`;
-            }
-            if (elements.progressBar) {
-                elements.progressBar.setAttribute('aria-valuenow', Math.round(progress));
-            }
-            if (elements.timeDisplay) {
-                elements.timeDisplay.textContent = `${formatTime(elements.audio.currentTime)} / ${formatTime(DURATION)}`;
-            }
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
         });
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // INITIALIZE
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    function init() {
-        initTitleAnimation();
-        initOvertureAnimation();
-        initEasterEgg();
-        initWebXR();
-        initScrollAnimations();
-        initMovementNav();
-        initHeroPlay();
-        initVolumeControl();
-        initKeyboardNav();
-        initPlayButton();
-        initProgressBar();
-        initKonamiCode();
-        initCompletionCelebration();
-
-        console.log('Master of Puppets — A Fantasia');
-        console.log('Controls: Space (play/pause), ← → (seek), ↑ ↓ (volume), M (mute)');
-        console.log('h(x) >= 0');
+    // =========================================================================
+    // VOLUME CONTROL
+    // =========================================================================
+    
+    if (volumeSlider) {
+        volumeSlider.addEventListener('input', (e) => {
+            const vol = e.target.value / 100;
+            audio.volume = vol;
+            updateVolumeIcon(vol, audio.muted);
+        });
+        audio.volume = volumeSlider.value / 100;
     }
 
-    // Wait for DOM
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
+    if (volumeIcon) {
+        volumeIcon.addEventListener('click', () => {
+            audio.muted = !audio.muted;
+            updateVolumeIcon(audio.volume, audio.muted);
+        });
     }
+
+    function updateVolumeIcon(vol, muted) {
+        if (!volumeIcon) return;
+        if (muted || vol === 0) {
+            volumeIcon.textContent = '🔇';
+        } else if (vol < 0.5) {
+            volumeIcon.textContent = '🔉';
+        } else {
+            volumeIcon.textContent = '🔊';
+        }
+    }
+
+    // =========================================================================
+    // AUDIO EVENTS
+    // =========================================================================
+    
+    audio.addEventListener('timeupdate', () => {
+        const currentTimeSec = audio.currentTime;
+        const progress = (currentTimeSec / DURATION) * 100;
+        
+        if (progressFill) {
+            progressFill.style.width = `${Math.min(progress, 100)}%`;
+        }
+        if (timeDisplay) {
+            timeDisplay.textContent = `${formatTime(currentTimeSec)} / ${formatTime(DURATION)}`;
+        }
+    });
+
+    audio.addEventListener('ended', () => {
+        isPlaying = false;
+        playBtn.classList.remove('playing');
+        playBtn.setAttribute('aria-label', 'Play');
+        if (progressFill) progressFill.style.width = '0%';
+    });
+
+    audio.addEventListener('loadedmetadata', () => {
+        const dur = audio.duration || DURATION;
+        if (timeDisplay) {
+            timeDisplay.textContent = `0:00 / ${formatTime(dur)}`;
+        }
+        playBtn.style.opacity = '1';
+        console.log('✓ Audio metadata loaded:', formatTime(dur));
+    });
+
+    audio.addEventListener('canplaythrough', () => {
+        console.log('✓ Audio ready to play');
+    });
+
+    audio.addEventListener('error', (e) => {
+        console.error('✗ Audio error:', e);
+        if (timeDisplay) timeDisplay.textContent = 'Audio load error';
+    });
+
+    // =========================================================================
+    // KEYBOARD CONTROLS
+    // =========================================================================
+    
+    document.addEventListener('keydown', (e) => {
+        // Don't intercept if user is typing in an input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        
+        if (e.code === 'Space') {
+            e.preventDefault();
+            togglePlay();
+        }
+        if (e.code === 'ArrowRight') {
+            e.preventDefault();
+            audio.currentTime = Math.min(audio.currentTime + 5, DURATION);
+        }
+        if (e.code === 'ArrowLeft') {
+            e.preventDefault();
+            audio.currentTime = Math.max(audio.currentTime - 5, 0);
+        }
+        if (e.code === 'ArrowUp') {
+            e.preventDefault();
+            const newVol = Math.min(1, audio.volume + 0.1);
+            audio.volume = newVol;
+            if (volumeSlider) volumeSlider.value = newVol * 100;
+            updateVolumeIcon(newVol, audio.muted);
+        }
+        if (e.code === 'ArrowDown') {
+            e.preventDefault();
+            const newVol = Math.max(0, audio.volume - 0.1);
+            audio.volume = newVol;
+            if (volumeSlider) volumeSlider.value = newVol * 100;
+            updateVolumeIcon(newVol, audio.muted);
+        }
+        if (e.code === 'KeyM') {
+            audio.muted = !audio.muted;
+            updateVolumeIcon(audio.volume, audio.muted);
+        }
+    });
+
+    // =========================================================================
+    // SCROLL HANDLING
+    // =========================================================================
+    
+    function updateScroll() {
+        const scrollTop = window.pageYOffset;
+        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const progress = docHeight > 0 ? scrollTop / docHeight : 0;
+        
+        if (progressBarTop) {
+            progressBarTop.style.width = `${progress * 100}%`;
+        }
+
+        // Update current movement
+        let newMovement = 0;
+        movements.forEach((m, i) => {
+            const rect = m.getBoundingClientRect();
+            if (rect.top < window.innerHeight * 0.5) {
+                newMovement = i;
+            }
+        });
+
+        if (newMovement !== currentMovement) {
+            currentMovement = newMovement;
+            movementDots.forEach((d, i) => {
+                d.classList.toggle('active', i === currentMovement);
+            });
+        }
+    }
+
+    // Movement dot navigation
+    movementDots.forEach((dot, i) => {
+        dot.addEventListener('click', () => {
+            if (movements[i]) {
+                movements[i].scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    });
+
+    window.addEventListener('scroll', updateScroll, { passive: true });
+
+    // =========================================================================
+    // INTERSECTION OBSERVER FOR ANIMATIONS
+    // =========================================================================
+    
+    const observerOptions = { threshold: 0.1, rootMargin: '0px 0px -10% 0px' };
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+            }
+        });
+    }, observerOptions);
+
+    document.querySelectorAll('.movement, .technique-card, .instrument-section, .transformation-card').forEach(el => {
+        observer.observe(el);
+    });
+
+    // =========================================================================
+    // TITLE ANIMATION
+    // =========================================================================
+    
+    const titleWords = document.querySelectorAll('.title-word');
+    titleWords.forEach((word, i) => {
+        word.style.animation = `title-emerge 1s ease-out ${0.3 + i * 0.15}s forwards`;
+    });
+
+    // =========================================================================
+    // EASTER EGG
+    // =========================================================================
+    
+    if (mirrorSymbol && easterEggOverlay) {
+        const closeBtn = easterEggOverlay.querySelector('.easter-egg-close');
+
+        function showEasterEgg() {
+            easterEggOverlay.classList.add('active');
+            easterEggOverlay.setAttribute('aria-hidden', 'false');
+        }
+
+        function hideEasterEgg() {
+            easterEggOverlay.classList.remove('active');
+            easterEggOverlay.setAttribute('aria-hidden', 'true');
+        }
+
+        mirrorSymbol.addEventListener('click', showEasterEgg);
+        mirrorSymbol.addEventListener('keydown', (e) => {
+            if (e.code === 'Enter' || e.code === 'Space') {
+                e.preventDefault();
+                showEasterEgg();
+            }
+        });
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', hideEasterEgg);
+        }
+
+        easterEggOverlay.addEventListener('click', (e) => {
+            if (e.target === easterEggOverlay) {
+                hideEasterEgg();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Escape' && easterEggOverlay.classList.contains('active')) {
+                hideEasterEgg();
+            }
+        });
+    }
+
+    // =========================================================================
+    // INIT
+    // =========================================================================
+    
+    playBtn.style.opacity = '0.5';
+    audio.load();
+    updateScroll();
+
+    console.log('🎼 Master of Puppets — A Fantasia');
+    console.log('   Controls: Space (play/pause), ← → (scrub), ↑ ↓ (volume), M (mute)');
+    console.log('   h(x) ≥ 0');
 
 })();
