@@ -95,26 +95,19 @@
     // =========================================================================
     
     function seekTo(timeMs) {
-        // Binary search to find correct position for each instrument
+        // Recalculate all note indices for the new position
         Object.keys(NOTES).forEach(id => {
             const notes = NOTES[id];
-            if (!notes || notes.length === 0) {
-                noteIndices[id] = 0;
-                return;
-            }
-            
-            // Binary search for first note that might be playing
-            let lo = 0, hi = notes.length - 1;
-            while (lo < hi) {
-                const mid = Math.floor((lo + hi) / 2);
-                // Find first note whose end time is >= current time
-                if (notes[mid][0] + notes[mid][1] < timeMs - 200) {
-                    lo = mid + 1;
+            if (!notes) return;
+            let idx = 0;
+            for (let i = 0; i < notes.length; i++) {
+                if (notes[i][0] <= timeMs) {
+                    idx = i;
                 } else {
-                    hi = mid;
+                    break;
                 }
             }
-            noteIndices[id] = lo;
+            noteIndices[id] = idx;
         });
         
         // Update visualization immediately
@@ -143,6 +136,16 @@
     
     function updateVisualizationFrame() {
         const currentTimeMs = audio.currentTime * 1000;
+        const currentTimeSec = audio.currentTime;
+
+        // Update progress
+        const progress = (currentTimeSec / DURATION) * 100;
+        if (progressFill) {
+            progressFill.style.width = `${Math.min(progress, 100)}%`;
+        }
+        if (timeDisplay) {
+            timeDisplay.textContent = `${formatTime(currentTimeSec)} / ${formatTime(DURATION)}`;
+        }
 
         // Reset section activity
         Object.keys(sectionActivity).forEach(k => sectionActivity[k] = 0);
@@ -151,44 +154,26 @@
         Object.keys(NOTES).forEach(instId => {
             const notes = NOTES[instId];
             const inst = document.querySelector(`[data-id="${instId}"]`);
-            if (!inst || !notes || notes.length === 0) return;
-
-            // Binary search to find starting point
-            let lo = 0, hi = notes.length - 1;
-            while (lo < hi) {
-                const mid = Math.floor((lo + hi) / 2);
-                if (notes[mid][0] + notes[mid][1] < currentTimeMs - 200) {
-                    lo = mid + 1;
-                } else {
-                    hi = mid;
-                }
-            }
-            noteIndices[instId] = lo;
+            if (!inst || !notes) return;
 
             // Find notes that should be playing now
             let isCurrentlyPlaying = false;
-            let maxVelocity = 0;
             
-            // Search from binary search result forward
-            for (let i = lo; i < notes.length && i < lo + 30; i++) {
+            // Search around current index for active notes
+            const searchStart = Math.max(0, noteIndices[instId] - 5);
+            const searchEnd = Math.min(notes.length, noteIndices[instId] + 20);
+            
+            for (let i = searchStart; i < searchEnd; i++) {
                 const [start, dur, vel] = notes[i];
                 
-                // If note starts after current time + tolerance, stop searching
-                if (start > currentTimeMs + 100) break;
-                
-                // Note is currently playing (with tolerance for attack/release)
-                const noteEnd = start + dur;
-                if (currentTimeMs >= start - 30 && currentTimeMs <= noteEnd + 80) {
+                // Note is currently playing (with small tolerance)
+                if (currentTimeMs >= start - 10 && currentTimeMs <= start + dur + 50) {
                     isCurrentlyPlaying = true;
-                    maxVelocity = Math.max(maxVelocity, vel);
-                }
-            }
-
-            // Update section activity based on max velocity
-            if (isCurrentlyPlaying) {
-                const section = SECTIONS[instId];
-                if (section) {
-                    sectionActivity[section] = Math.max(sectionActivity[section], maxVelocity / 127);
+                    // Update section activity based on velocity
+                    const section = SECTIONS[instId];
+                    if (section) {
+                        sectionActivity[section] = Math.max(sectionActivity[section], vel / 127);
+                    }
                 }
             }
 
@@ -215,6 +200,17 @@
 
     function updateVisualization() {
         updateVisualizationFrame();
+        
+        // Advance note indices during playback
+        const currentTimeMs = audio.currentTime * 1000;
+        Object.keys(NOTES).forEach(instId => {
+            const notes = NOTES[instId];
+            if (!notes) return;
+            while (noteIndices[instId] < notes.length - 1 && 
+                   notes[noteIndices[instId]][0] + notes[noteIndices[instId]][1] < currentTimeMs - 100) {
+                noteIndices[instId]++;
+            }
+        });
 
         // Continue animation if playing
         if (!audio.paused) {
