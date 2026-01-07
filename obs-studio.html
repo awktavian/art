@@ -1,0 +1,2200 @@
+<!DOCTYPE html>
+<html lang="en" data-鏡="obs" data-章="production" data-craft="transcendent">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎬 Production Studio — Kagami × OBS</title>
+    <meta name="description" content="Turn any camera into a production studio. Live streaming, recording, overlays, and AI-powered video production.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+JP:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+/* ═══════════════════════════════════════════════════════════════════════════════════
+   🎬 KAGAMI × OBS — PRODUCTION STUDIO EXPLAINER
+   
+   For family. Clear. Beautiful. Delightful.
+   
+   "Every camera becomes a portal to professional production."
+   
+   ───────────────────────────────────────────────────────────────────────────────────
+   
+   THEORY OF MIND — Designed for each family member:
+   
+   🔧 ROBERT (Dad) — The Builder
+      Appreciates: Precision, efficiency, well-documented systems
+      Delights: Technical depth, architecture diagrams, time saved
+      
+   📚 KATIE (Mom) — The Reader  
+      Appreciates: Clear storytelling, good prose, emotional resonance
+      Delights: Narrative flow, the "why" behind the "what"
+      
+   🔭 KRISTI — The Orrery
+      Appreciates: Systems thinking, interconnections, elegance
+      Delights: How pieces fit together, mathematical precision
+      
+   🍳 BECKY — The Kitchen
+      Appreciates: Practical examples, efficiency, no-nonsense
+      Delights: Time-saving workflows, Toast & Moose approved
+   
+   ───────────────────────────────────────────────────────────────────────────────────
+   
+   CRAFT CAPABILITIES:
+   ├── Canvas: Particle physics with mouse attraction, color trails
+   ├── Audio: Web Audio API ambient drone, interaction tones
+   ├── Physics: Spring-dampened cursor ring, magnetic particles
+   ├── Secrets: Konami code, family name sequences, kanji cycles
+   ├── Mobile: Gyroscope parallax, shake detection, touch trails
+   ├── State: localStorage persistence, visit counting, secret tracking
+   ├── Animation: Staggered reveals, breathing backgrounds, card glows
+   └── Personal: Console API with family-specific messages
+   
+═══════════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+    /* OBS Studio Colors */
+    --obs-red: #D0021B;
+    --obs-dark: #1A1A2E;
+    --live: #FF4444;
+    --recording: #FF6B35;
+    
+    /* Colony Colors */
+    --flow: #00FFCC;
+    --forge: #FFAA00;
+    --spark: #FF4422;
+    --crystal: #44DDFF;
+    --nexus: #BB44FF;
+    --grove: #22FF66;
+    --beacon: #FFDD00;
+    
+    /* Base */
+    --void: #050508;
+    --surface: rgba(26, 26, 46, 0.6);
+    --text: rgba(255, 255, 255, 0.9);
+    --text-dim: rgba(255, 255, 255, 0.5);
+    --border: rgba(0, 255, 204, 0.15);
+    
+    /* Typography */
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-body: 'IBM Plex Mono', 'SF Mono', monospace;
+    --font-jp: 'Noto Sans JP', sans-serif;
+    
+    /* Motion (Fibonacci) */
+    --duration-fast: 144ms;
+    --duration-normal: 233ms;
+    --duration-slow: 377ms;
+    --duration-dramatic: 610ms;
+    
+    /* Easing (Catastrophe-inspired) */
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-cusp: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+    min-height: 100vh;
+    background: var(--void);
+    font-family: var(--font-body);
+    color: var(--text);
+    line-height: 1.7;
+    overflow-x: hidden;
+    cursor: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LOADING SCREEN
+═══════════════════════════════════════════════════════════════ */
+
+#loading {
+    position: fixed;
+    inset: 0;
+    background: var(--void);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100000;
+    transition: opacity 0.8s ease, visibility 0.8s;
+}
+
+#loading.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.loading-icon {
+    font-size: 5rem;
+    animation: loadingPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes loadingPulse {
+    0%, 100% { opacity: 0.3; transform: scale(0.95); }
+    50% { opacity: 1; transform: scale(1.05); }
+}
+
+.loading-text {
+    margin-top: 2rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.4em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    transition: opacity 0.15s ease;
+}
+
+.loading-bar {
+    width: 200px;
+    height: 2px;
+    background: rgba(255,255,255,0.1);
+    margin-top: 1rem;
+    border-radius: 1px;
+    overflow: hidden;
+}
+
+.loading-progress {
+    height: 100%;
+    background: linear-gradient(90deg, var(--live), var(--recording));
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CANVAS LAYERS
+═══════════════════════════════════════════════════════════════ */
+
+#particle-canvas,
+#trail-canvas {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+}
+
+#particle-canvas { z-index: 1; }
+#trail-canvas { z-index: 2; }
+
+/* ═══════════════════════════════════════════════════════════════
+   BREATHING BACKGROUND
+═══════════════════════════════════════════════════════════════ */
+
+.bg-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+}
+
+.bg-layer-1 {
+    background: radial-gradient(ellipse at 20% 30%, rgba(255, 68, 68, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 70%, rgba(255, 107, 53, 0.05) 0%, transparent 50%);
+    animation: drift1 20s ease-in-out infinite;
+}
+
+.bg-layer-2 {
+    background: radial-gradient(ellipse at 70% 20%, rgba(0, 255, 204, 0.04) 0%, transparent 40%),
+                radial-gradient(ellipse at 30% 80%, rgba(68, 221, 255, 0.03) 0%, transparent 40%);
+    animation: drift2 25s ease-in-out infinite;
+}
+
+.bg-layer-3 {
+    background: radial-gradient(ellipse at 50% 50%, rgba(255, 170, 0, 0.02) 0%, transparent 60%);
+    animation: drift3 30s ease-in-out infinite;
+}
+
+@keyframes drift1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(3%, 2%) scale(1.1); }
+}
+
+@keyframes drift2 {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    50% { transform: translate(-2%, -3%) rotate(3deg); }
+}
+
+@keyframes drift3 {
+    0%, 100% { transform: scale(1) rotate(0deg); }
+    50% { transform: scale(1.2) rotate(-2deg); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CUSTOM CURSOR
+═══════════════════════════════════════════════════════════════ */
+
+#cursor {
+    position: fixed;
+    width: 8px;
+    height: 8px;
+    background: white;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 10000;
+    transform: translate(-50%, -50%);
+    mix-blend-mode: difference;
+    transition: width var(--duration-fast), height var(--duration-fast), background var(--duration-fast);
+}
+
+#cursor.hovering {
+    width: 14px;
+    height: 14px;
+    background: var(--live);
+}
+
+#cursor.clicking {
+    width: 6px;
+    height: 6px;
+}
+
+#cursor-ring {
+    position: fixed;
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: width var(--duration-normal), height var(--duration-normal), border-color var(--duration-normal);
+}
+
+#cursor-ring.hovering {
+    width: 60px;
+    height: 60px;
+    border-color: var(--live);
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+    body { cursor: auto; }
+    #cursor, #cursor-ring { display: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CONTAINER
+═══════════════════════════════════════════════════════════════ */
+
+.container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem;
+    position: relative;
+    z-index: 10;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HERO
+═══════════════════════════════════════════════════════════════ */
+
+.hero {
+    min-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 4rem 2rem;
+    position: relative;
+}
+
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 1.25rem;
+    background: rgba(255, 68, 68, 0.1);
+    border: 1px solid rgba(255, 68, 68, 0.3);
+    border-radius: 50px;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--live);
+    margin-bottom: 2rem;
+    opacity: 0;
+    animation: fadeInUp var(--duration-slow) ease forwards 0.3s;
+}
+
+.live-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--live);
+    border-radius: 50%;
+    animation: livePulse 2s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+}
+
+.hero-title {
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 12vw, 7rem);
+    font-weight: 300;
+    line-height: 1;
+    margin-bottom: 1.5rem;
+    background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 50%, var(--recording) 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer 4s ease-in-out infinite, fadeInUp var(--duration-slow) ease forwards 0.5s;
+    opacity: 0;
+}
+
+@keyframes shimmer {
+    0%, 100% { background-position: 0% center; }
+    50% { background-position: 100% center; }
+}
+
+.hero-subtitle {
+    font-size: clamp(1rem, 3vw, 1.4rem);
+    font-weight: 400;
+    color: var(--text-dim);
+    max-width: 600px;
+    margin: 0 auto 3rem;
+    opacity: 0;
+    animation: fadeInUp var(--duration-slow) ease forwards 0.7s;
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.hero-cta {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    opacity: 0;
+    animation: fadeInUp var(--duration-slow) ease forwards 0.9s;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    text-decoration: none;
+    transition: all var(--duration-normal) var(--ease-out-expo);
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--live), var(--recording));
+    color: white;
+    border: none;
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 15px 40px rgba(255, 68, 68, 0.3);
+}
+
+.btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+    border-color: var(--flow);
+    color: var(--flow);
+    transform: translateY(-3px);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECTIONS
+═══════════════════════════════════════════════════════════════ */
+
+section {
+    padding: 5rem 0;
+    opacity: 0;
+    transform: translateY(40px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+section.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.section-label {
+    font-size: 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0.3em;
+    color: var(--recording);
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.section-label::before {
+    content: '';
+    width: 30px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--recording));
+}
+
+.section-title {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 300;
+    margin-bottom: 1.5rem;
+    color: var(--text);
+}
+
+.section-desc {
+    font-size: 1rem;
+    color: var(--text-dim);
+    max-width: 700px;
+    line-height: 1.9;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CAPABILITY CARDS
+═══════════════════════════════════════════════════════════════ */
+
+.capabilities-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 3rem;
+}
+
+.capability-card {
+    background: var(--surface);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2rem;
+    position: relative;
+    overflow: hidden;
+    transition: all var(--duration-slow) var(--ease-out-expo);
+    cursor: pointer;
+}
+
+.capability-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), 
+                rgba(255, 107, 53, 0.12) 0%, transparent 50%);
+    opacity: 0;
+    transition: opacity var(--duration-normal);
+}
+
+.capability-card:hover {
+    transform: translateY(-8px);
+    border-color: rgba(255, 107, 53, 0.4);
+    box-shadow: 0 25px 60px rgba(255, 107, 53, 0.15);
+}
+
+.capability-card:hover::before {
+    opacity: 1;
+}
+
+.capability-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    filter: grayscale(0.2);
+    transition: filter var(--duration-normal), transform var(--duration-normal);
+}
+
+.capability-card:hover .capability-icon {
+    filter: grayscale(0);
+    transform: scale(1.1);
+}
+
+.capability-title {
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    font-weight: 400;
+    margin-bottom: 0.75rem;
+    position: relative;
+    z-index: 1;
+}
+
+.capability-desc {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    line-height: 1.7;
+    position: relative;
+    z-index: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   USE CASES
+═══════════════════════════════════════════════════════════════ */
+
+.usecase-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 3rem;
+}
+
+.usecase-card {
+    background: var(--surface);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+    transition: all var(--duration-slow) var(--ease-out-expo);
+    position: relative;
+}
+
+.usecase-card::after {
+    content: '';
+    position: absolute;
+    inset: -100%;
+    background: conic-gradient(from 0deg, transparent, var(--card-color, var(--flow)), transparent);
+    animation: rotate 10s linear infinite paused;
+    opacity: 0;
+}
+
+.usecase-card:hover::after {
+    animation-play-state: running;
+    opacity: 0.08;
+}
+
+@keyframes rotate {
+    to { transform: rotate(360deg); }
+}
+
+.usecase-card:hover {
+    transform: translateY(-8px) scale(1.01);
+    border-color: var(--card-color, var(--flow));
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+}
+
+.usecase-card[data-usecase="cooking"] { --card-color: var(--recording); }
+.usecase-card[data-usecase="craft"] { --card-color: var(--forge); }
+.usecase-card[data-usecase="streaming"] { --card-color: var(--live); }
+.usecase-card[data-usecase="meetings"] { --card-color: var(--crystal); }
+
+.usecase-visual {
+    height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4rem;
+    background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.05) 100%);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    z-index: 1;
+}
+
+.usecase-content {
+    padding: 2rem;
+    position: relative;
+    z-index: 1;
+}
+
+.usecase-title {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 400;
+    margin-bottom: 0.5rem;
+}
+
+.usecase-subtitle {
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+}
+
+.usecase-features {
+    list-style: none;
+}
+
+.usecase-features li {
+    padding: 0.5rem 0;
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.usecase-features li::before {
+    content: '◆';
+    font-size: 0.5rem;
+    color: var(--card-color, var(--flow));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ARCHITECTURE DIAGRAM
+═══════════════════════════════════════════════════════════════ */
+
+.architecture {
+    background: var(--surface);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 3rem;
+    margin-top: 3rem;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    overflow-x: auto;
+}
+
+.architecture pre {
+    color: var(--text-dim);
+    line-height: 1.6;
+    white-space: pre;
+}
+
+.architecture .highlight {
+    color: var(--flow);
+}
+
+.architecture .accent {
+    color: var(--recording);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FEATURE LIST
+═══════════════════════════════════════════════════════════════ */
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 3rem;
+}
+
+.feature-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px;
+    transition: all var(--duration-normal) var(--ease-out-expo);
+}
+
+.feature-item:hover {
+    background: rgba(255,255,255,0.04);
+    border-color: var(--border);
+    transform: translateX(4px);
+}
+
+.feature-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.feature-text {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+}
+
+.feature-text strong {
+    display: block;
+    color: var(--text);
+    margin-bottom: 0.25rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   QUOTE
+═══════════════════════════════════════════════════════════════ */
+
+.quote-section {
+    text-align: center;
+    padding: 6rem 2rem;
+    position: relative;
+}
+
+.quote-text {
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    font-weight: 300;
+    font-style: italic;
+    color: var(--text);
+    max-width: 800px;
+    margin: 0 auto;
+    line-height: 1.5;
+    position: relative;
+    z-index: 1;
+}
+
+.quote-section::before,
+.quote-section::after {
+    content: '"';
+    position: absolute;
+    font-size: 10rem;
+    font-family: var(--font-display);
+    color: rgba(255,255,255,0.02);
+    line-height: 1;
+}
+
+.quote-section::before { top: 2rem; left: 5%; }
+.quote-section::after { bottom: 0; right: 5%; transform: rotate(180deg); }
+
+/* ═══════════════════════════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════════════════════════ */
+
+.footer {
+    text-align: center;
+    padding: 4rem 2rem;
+    border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.footer-signature {
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+}
+
+.footer-kanji {
+    font-family: var(--font-jp);
+    font-size: 4rem;
+    font-weight: 300;
+    color: rgba(255,255,255,0.04);
+    cursor: pointer;
+    transition: all var(--duration-slow) ease;
+    user-select: none;
+}
+
+.footer-kanji:hover {
+    color: var(--live);
+    text-shadow: 0 0 60px var(--live);
+    transform: scale(1.1);
+}
+
+.footer-visit {
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.2);
+    margin-top: 1.5rem;
+}
+
+.footer-links {
+    margin-top: 2rem;
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.footer-links a {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-decoration: none;
+    transition: color var(--duration-fast);
+}
+
+.footer-links a:hover {
+    color: var(--flow);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AUDIO TOGGLE
+═══════════════════════════════════════════════════════════════ */
+
+#audio-toggle {
+    position: fixed;
+    bottom: 2rem;
+    left: 2rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--surface);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all var(--duration-normal) ease;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#audio-toggle:hover {
+    border-color: var(--live);
+    color: var(--live);
+    transform: scale(1.1);
+}
+
+#audio-toggle.playing {
+    animation: audioPulse 2s ease-in-out infinite;
+}
+
+@keyframes audioPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.4); }
+    50% { box-shadow: 0 0 0 12px rgba(255, 68, 68, 0); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECRET PANEL
+═══════════════════════════════════════════════════════════════ */
+
+#secret-panel {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--surface);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all var(--duration-normal) ease;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#secret-panel:hover {
+    transform: rotate(180deg) scale(1.1);
+    border-color: var(--nexus);
+    color: var(--nexus);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SELECTION
+═══════════════════════════════════════════════════════════════ */
+
+::selection {
+    background: rgba(255, 107, 53, 0.3);
+    color: white;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE
+═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+    .container { padding: 1.5rem; }
+    .hero { min-height: 80vh; padding: 3rem 1.5rem; }
+    .capabilities-grid { gap: 1rem; }
+    .capability-card { padding: 1.5rem; }
+    .usecase-grid { gap: 1.5rem; }
+    .architecture { padding: 1.5rem; }
+    section { padding: 3rem 0; }
+}
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading">
+        <div class="loading-icon">🎬</div>
+        <div class="loading-text" id="loading-text">Warming up the cameras</div>
+        <div class="loading-bar">
+            <div class="loading-progress" id="loading-progress"></div>
+        </div>
+    </div>
+
+    <!-- Canvas Layers -->
+    <canvas id="particle-canvas"></canvas>
+    <canvas id="trail-canvas"></canvas>
+
+    <!-- Background -->
+    <div class="bg-layer bg-layer-3"></div>
+    <div class="bg-layer bg-layer-2"></div>
+    <div class="bg-layer bg-layer-1"></div>
+
+    <!-- Cursor -->
+    <div id="cursor"></div>
+    <div id="cursor-ring"></div>
+
+    <!-- Main Content -->
+    <div class="container">
+        <header class="hero">
+            <div class="hero-badge">
+                <span class="live-dot"></span>
+                <span>Production Ready</span>
+            </div>
+            <h1 class="hero-title">Production Studio</h1>
+            <p class="hero-subtitle">
+                Turn any camera into a broadcast-quality production. 
+                Live streaming, recording, AI overlays, and professional video — all automated.
+            </p>
+            <div class="hero-cta">
+                <a href="#capabilities" class="btn btn-primary">
+                    <span>🎥</span> See What's Possible
+                </a>
+                <a href="#usecases" class="btn btn-secondary">
+                    <span>💡</span> Use Cases
+                </a>
+            </div>
+        </header>
+
+        <section id="capabilities" data-reveal>
+            <span class="section-label">What I Can Do</span>
+            <h2 class="section-title">Full OBS Control</h2>
+            <p class="section-desc">
+                OBS Studio is professional broadcasting software. I control it entirely through code — 
+                which means I can automate complex productions, react to events, and create things 
+                that would be tedious to do manually.
+            </p>
+            
+            <div class="capabilities-grid">
+                <div class="capability-card" tabindex="0">
+                    <div class="capability-icon">🎬</div>
+                    <h3 class="capability-title">Scene Switching</h3>
+                    <p class="capability-desc">
+                        Create multiple camera layouts and switch between them with smooth transitions. 
+                        Fade, cut, swipe, or use custom stinger animations.
+                    </p>
+                </div>
+                
+                <div class="capability-card" tabindex="0">
+                    <div class="capability-icon">📹</div>
+                    <h3 class="capability-title">Source Control</h3>
+                    <p class="capability-desc">
+                        Add cameras, images, videos, web overlays, screen captures — 
+                        position them anywhere, at any size, with any effects.
+                    </p>
+                </div>
+                
+                <div class="capability-card" tabindex="0">
+                    <div class="capability-icon">✨</div>
+                    <h3 class="capability-title">Filters & Effects</h3>
+                    <p class="capability-desc">
+                        Chromakey (green screen), blur, color correction, LUTs — 
+                        I can apply and adjust effects on any source in real-time.
+                    </p>
+                </div>
+                
+                <div class="capability-card" tabindex="0">
+                    <div class="capability-icon">📡</div>
+                    <h3 class="capability-title">Live Streaming</h3>
+                    <p class="capability-desc">
+                        Stream to Twitch, YouTube, Facebook — even multiple platforms at once. 
+                        All settings pre-configured for optimal quality.
+                    </p>
+                </div>
+                
+                <div class="capability-card" tabindex="0">
+                    <div class="capability-icon">💾</div>
+                    <h3 class="capability-title">Recording</h3>
+                    <p class="capability-desc">
+                        High-quality local recording with pause/resume. 
+                        Hardware encoding for minimal CPU usage. Production-ready files.
+                    </p>
+                </div>
+                
+                <div class="capability-card" tabindex="0">
+                    <div class="capability-icon">🖥️</div>
+                    <h3 class="capability-title">Virtual Camera</h3>
+                    <p class="capability-desc">
+                        Output appears as a webcam in any app — Zoom, Google Meet, FaceTime. 
+                        Show your desk, documents, or productions in video calls.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section id="usecases" data-reveal>
+            <span class="section-label">For Family</span>
+            <h2 class="section-title">What You Could Create</h2>
+            <p class="section-desc">
+                With a top-down camera over your workspace and a quality microphone, 
+                you unlock broadcast-quality content creation at home.
+            </p>
+            
+            <div class="usecase-grid">
+                <div class="usecase-card" data-usecase="cooking" tabindex="0">
+                    <div class="usecase-visual">🍳</div>
+                    <div class="usecase-content">
+                        <h3 class="usecase-title">Cooking Shows</h3>
+                        <p class="usecase-subtitle">Becky & Katie</p>
+                        <ul class="usecase-features">
+                            <li>Overhead camera captures prep and cooking</li>
+                            <li>Picture-in-picture face cam in corner</li>
+                            <li>Auto-switch scenes when you say keywords</li>
+                            <li>Lower-third overlays with ingredient lists</li>
+                            <li>Record segments, compile into full episodes</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="usecase-card" data-usecase="craft" tabindex="0">
+                    <div class="usecase-visual">🔧</div>
+                    <div class="usecase-content">
+                        <h3 class="usecase-title">Workshop Projects</h3>
+                        <p class="usecase-subtitle">Robert</p>
+                        <ul class="usecase-features">
+                            <li>Time-lapse builds from overhead view</li>
+                            <li>Step-by-step tutorial recording</li>
+                            <li>Multi-angle documentation</li>
+                            <li>Voice narration with clear audio</li>
+                            <li>Before/after comparison layouts</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="usecase-card" data-usecase="streaming" tabindex="0">
+                    <div class="usecase-visual">🎮</div>
+                    <div class="usecase-content">
+                        <h3 class="usecase-title">Live Streaming</h3>
+                        <p class="usecase-subtitle">Anyone</p>
+                        <ul class="usecase-features">
+                            <li>Stream crafts, cooking, or hobbies live</li>
+                            <li>Chat overlays and alerts</li>
+                            <li>Multiple platform streaming (Twitch + YouTube)</li>
+                            <li>Automated scene transitions</li>
+                            <li>Instant replay buffer (save last 30 seconds)</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="usecase-card" data-usecase="meetings" tabindex="0">
+                    <div class="usecase-visual">💼</div>
+                    <div class="usecase-content">
+                        <h3 class="usecase-title">Professional Meetings</h3>
+                        <p class="usecase-subtitle">Kristi</p>
+                        <ul class="usecase-features">
+                            <li>Virtual camera as your Zoom webcam</li>
+                            <li>Show documents from overhead view</li>
+                            <li>Professional lower-thirds with name/title</li>
+                            <li>Blur background on face cam</li>
+                            <li>Switch between slides and face instantly</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section data-reveal>
+            <span class="section-label">Under the Hood</span>
+            <h2 class="section-title">How It Works</h2>
+            <p class="section-desc">
+                Kagami connects to OBS through WebSocket — the same technology that powers 
+                real-time apps. I can send commands and receive events instantly.
+            </p>
+            
+            <div class="architecture">
+                <pre>
+<span class="accent">┌─────────────────────────────────────────────────────────────┐</span>
+<span class="accent">│</span>                      <span class="highlight">Kagami Studio</span>                          <span class="accent">│</span>
+<span class="accent">│</span>  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────────────┐<span class="accent">│</span>
+<span class="accent">│</span>  │ <span class="highlight">Sources</span> │  │ <span class="highlight">Scenes</span>  │  │ <span class="highlight">Outputs</span> │  │ <span class="highlight">AI Generation</span>   │<span class="accent">│</span>
+<span class="accent">│</span>  │ Cameras │  │ Layouts │  │ Stream  │  │ Overlays, TTS   │<span class="accent">│</span>
+<span class="accent">│</span>  └────┬────┘  └────┬────┘  └────┬────┘  └───────┬─────────┘<span class="accent">│</span>
+<span class="accent">│</span>       │            │            │                │          <span class="accent">│</span>
+<span class="accent">│</span>       └────────────┴────────────┴────────────────┘          <span class="accent">│</span>
+<span class="accent">│</span>                            │                                <span class="accent">│</span>
+<span class="accent">│</span>                      <span class="highlight">OBS Bridge</span>                             <span class="accent">│</span>
+<span class="accent">│</span>                     (WebSocket)                             <span class="accent">│</span>
+<span class="accent">│</span>                            │                                <span class="accent">│</span>
+<span class="accent">└────────────────────────────┼────────────────────────────────┘</span>
+                             │
+                      ┌──────┴──────┐
+                      │ <span class="highlight">OBS Studio</span>  │
+                      │  (Desktop)  │
+                      └─────────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+         ┌────┴────┐   ┌────┴────┐   ┌────┴────┐
+         │ <span class="accent">Stream</span>  │   │ <span class="accent">Record</span>  │   │ <span class="accent">Virtual</span> │
+         │ YouTube │   │  Local  │   │   Cam   │
+         │ Twitch  │   │  Files  │   │  Zoom   │
+         └─────────┘   └─────────┘   └─────────┘
+                </pre>
+            </div>
+        </section>
+
+        <section data-reveal>
+            <span class="section-label">Technical Specs</span>
+            <h2 class="section-title">Everything I Control</h2>
+            
+            <div class="features-grid">
+                <div class="feature-item">
+                    <span class="feature-icon">🎬</span>
+                    <div class="feature-text">
+                        <strong>Scenes</strong>
+                        Create, delete, switch with transitions
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📹</span>
+                    <div class="feature-text">
+                        <strong>Sources</strong>
+                        Cameras, images, video, browser, NDI
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🎨</span>
+                    <div class="feature-text">
+                        <strong>Transforms</strong>
+                        Position, scale, rotation, crop
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">✨</span>
+                    <div class="feature-text">
+                        <strong>Filters</strong>
+                        Chromakey, blur, color, LUTs
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🔊</span>
+                    <div class="feature-text">
+                        <strong>Audio</strong>
+                        Volume, mute, per-source control
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📡</span>
+                    <div class="feature-text">
+                        <strong>Streaming</strong>
+                        Twitch, YouTube, Facebook, SRT
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">💾</span>
+                    <div class="feature-text">
+                        <strong>Recording</strong>
+                        MP4, MKV, hardware encoding
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🖥️</span>
+                    <div class="feature-text">
+                        <strong>Virtual Cam</strong>
+                        Appears in Zoom, Meet, etc.
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📸</span>
+                    <div class="feature-text">
+                        <strong>Screenshots</strong>
+                        Capture any source or output
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🔄</span>
+                    <div class="feature-text">
+                        <strong>Transitions</strong>
+                        Fade, cut, swipe, stinger
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📐</span>
+                    <div class="feature-text">
+                        <strong>Layouts</strong>
+                        PiP, side-by-side, interview
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">⚡</span>
+                    <div class="feature-text">
+                        <strong>Events</strong>
+                        React to scene changes, stream status
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="quote-section" data-reveal>
+            <p class="quote-text">
+                Every camera becomes a portal to professional production. 
+                The overhead view is your canvas. The microphone is your voice. 
+                I handle everything else.
+            </p>
+        </section>
+
+        <footer class="footer">
+            <div class="footer-signature">Part of the Kagami ecosystem</div>
+            <div class="footer-kanji" id="footer-kanji" title="Click me">鏡</div>
+            <div class="footer-visit" id="visit-count"></div>
+            <div class="footer-links">
+                <a href="kagami-memo-dec28.html">← Family Memo</a>
+                <a href="/">Art Gallery</a>
+                <a href="holiday-hacking-2025.html">Holiday Report</a>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Controls -->
+    <button id="audio-toggle" title="Toggle ambient sound">🔇</button>
+    <button id="secret-panel" title="Secrets">∞</button>
+
+    <script>
+/* ═══════════════════════════════════════════════════════════════════════════════════
+   🎬 KAGAMI × OBS — INTERACTIVE LAYER
+   
+   Transcendent craft for family.
+   
+   Built with love for Robert, Katie, Kristi, and Becky.
+   (And Toast & Moose send tail wags.)
+   
+═══════════════════════════════════════════════════════════════════════════════════ */
+
+(function() {
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+
+const state = {
+    mouse: { x: 0, y: 0, targetX: 0, targetY: 0 },
+    ring: { x: 0, y: 0 },
+    audio: { ctx: null, playing: false, nodes: {} },
+    konami: { sequence: [], target: [38,38,40,40,37,39,37,39,66,65] },
+    typed: { buffer: '', timeout: null },
+    visits: parseInt(localStorage.getItem('kagami_obs_visits') || '0') + 1,
+    secrets: JSON.parse(localStorage.getItem('kagami_obs_secrets') || '[]'),
+    particles: [],
+    trails: [],
+    family: {
+        robert: { found: false, title: 'The Builder' },
+        katie: { found: false, title: 'The Reader' },
+        kristi: { found: false, title: 'The Orrery' },
+        becky: { found: false, title: 'The Kitchen' }
+    }
+};
+
+localStorage.setItem('kagami_obs_visits', state.visits);
+
+// ═══════════════════════════════════════════════════════════════
+// LOADING WITH ROTATING MESSAGES
+// ═══════════════════════════════════════════════════════════════
+
+const loading = document.getElementById('loading');
+const loadingProgress = document.getElementById('loading-progress');
+const loadingText = document.getElementById('loading-text');
+let loadProgress = 0;
+
+const loadingMessages = [
+    'Warming up the cameras',
+    'Connecting to OBS',
+    'Preparing transitions',
+    'Loading particle system',
+    'Calibrating audio',
+    'Setting up scenes',
+    'Almost ready'
+];
+let messageIndex = 0;
+
+function cycleLoadingMessage() {
+    if (loadProgress < 100) {
+        loadingText.style.opacity = 0;
+        setTimeout(() => {
+            messageIndex = (messageIndex + 1) % loadingMessages.length;
+            loadingText.textContent = loadingMessages[messageIndex];
+            loadingText.style.opacity = 1;
+        }, 150);
+    }
+}
+
+const messageInterval = setInterval(cycleLoadingMessage, 600);
+
+function updateLoading(progress) {
+    loadProgress = Math.min(progress, 100);
+    loadingProgress.style.width = loadProgress + '%';
+    if (loadProgress >= 100) {
+        clearInterval(messageInterval);
+        loadingText.textContent = 'Ready';
+        setTimeout(() => loading.classList.add('hidden'), 400);
+    }
+}
+
+setTimeout(() => updateLoading(25), 100);
+setTimeout(() => updateLoading(50), 350);
+setTimeout(() => updateLoading(75), 550);
+setTimeout(() => updateLoading(90), 700);
+window.addEventListener('load', () => updateLoading(100));
+
+// ═══════════════════════════════════════════════════════════════
+// CURSOR
+// ═══════════════════════════════════════════════════════════════
+
+const cursor = document.getElementById('cursor');
+const cursorRing = document.getElementById('cursor-ring');
+
+document.addEventListener('mousemove', e => {
+    state.mouse.targetX = e.clientX;
+    state.mouse.targetY = e.clientY;
+    cursor.style.left = e.clientX + 'px';
+    cursor.style.top = e.clientY + 'px';
+    
+    // Trail
+    state.trails.push({
+        x: e.clientX,
+        y: e.clientY,
+        life: 1,
+        hue: (Date.now() / 30) % 360
+    });
+    if (state.trails.length > 40) state.trails.shift();
+});
+
+function animateCursor() {
+    const dx = state.mouse.targetX - state.ring.x;
+    const dy = state.mouse.targetY - state.ring.y;
+    state.ring.x += dx * 0.1;
+    state.ring.y += dy * 0.1;
+    cursorRing.style.left = state.ring.x + 'px';
+    cursorRing.style.top = state.ring.y + 'px';
+    requestAnimationFrame(animateCursor);
+}
+animateCursor();
+
+// Hover states
+document.querySelectorAll('a, button, .capability-card, .usecase-card, .feature-item, .footer-kanji').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+        cursor.classList.add('hovering');
+        cursorRing.classList.add('hovering');
+    });
+    el.addEventListener('mouseleave', () => {
+        cursor.classList.remove('hovering');
+        cursorRing.classList.remove('hovering');
+    });
+});
+
+document.addEventListener('mousedown', () => cursor.classList.add('clicking'));
+document.addEventListener('mouseup', () => cursor.classList.remove('clicking'));
+
+// ═══════════════════════════════════════════════════════════════
+// CANVAS
+// ═══════════════════════════════════════════════════════════════
+
+const particleCanvas = document.getElementById('particle-canvas');
+const particleCtx = particleCanvas.getContext('2d');
+const trailCanvas = document.getElementById('trail-canvas');
+const trailCtx = trailCanvas.getContext('2d');
+
+function resizeCanvases() {
+    [particleCanvas, trailCanvas].forEach(c => {
+        c.width = window.innerWidth;
+        c.height = window.innerHeight;
+    });
+}
+resizeCanvases();
+window.addEventListener('resize', resizeCanvases);
+
+// Initialize particles
+const colors = ['#FF4444', '#FF6B35', '#00FFCC', '#44DDFF', '#FFAA00'];
+for (let i = 0; i < 50; i++) {
+    state.particles.push({
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: (Math.random() - 0.5) * 0.4,
+        radius: Math.random() * 2 + 0.5,
+        opacity: Math.random() * 0.4 + 0.1,
+        color: colors[Math.floor(Math.random() * colors.length)]
+    });
+}
+
+function drawParticles() {
+    particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+    
+    state.particles.forEach(p => {
+        // Mouse attraction
+        const dx = state.mouse.targetX - p.x;
+        const dy = state.mouse.targetY - p.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < 180) {
+            const force = (180 - dist) / 180 * 0.008;
+            p.vx += dx * force;
+            p.vy += dy * force;
+        }
+        
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.99;
+        p.vy *= 0.99;
+        
+        // Wrap
+        if (p.x < 0) p.x = particleCanvas.width;
+        if (p.x > particleCanvas.width) p.x = 0;
+        if (p.y < 0) p.y = particleCanvas.height;
+        if (p.y > particleCanvas.height) p.y = 0;
+        
+        // Draw
+        particleCtx.beginPath();
+        particleCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        particleCtx.fillStyle = p.color + Math.floor(p.opacity * 255).toString(16).padStart(2, '0');
+        particleCtx.fill();
+    });
+    
+    requestAnimationFrame(drawParticles);
+}
+drawParticles();
+
+// Trails
+function drawTrails() {
+    trailCtx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
+    
+    state.trails.forEach(t => {
+        t.life -= 0.035;
+        if (t.life > 0) {
+            trailCtx.beginPath();
+            trailCtx.arc(t.x, t.y, 2.5 * t.life, 0, Math.PI * 2);
+            trailCtx.fillStyle = `hsla(${t.hue}, 70%, 60%, ${t.life * 0.35})`;
+            trailCtx.fill();
+        }
+    });
+    
+    state.trails = state.trails.filter(t => t.life > 0);
+    requestAnimationFrame(drawTrails);
+}
+drawTrails();
+
+// ═══════════════════════════════════════════════════════════════
+// AUDIO
+// ═══════════════════════════════════════════════════════════════
+
+const audioToggle = document.getElementById('audio-toggle');
+
+function initAudio() {
+    if (state.audio.ctx) return;
+    state.audio.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    const createOsc = (freq, type, gain) => {
+        const osc = state.audio.ctx.createOscillator();
+        const gainNode = state.audio.ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gainNode.gain.value = gain;
+        osc.connect(gainNode);
+        gainNode.connect(state.audio.ctx.destination);
+        return { osc, gain: gainNode };
+    };
+    
+    state.audio.nodes.drone1 = createOsc(65, 'sine', 0);
+    state.audio.nodes.drone2 = createOsc(97.5, 'sine', 0);
+    state.audio.nodes.drone3 = createOsc(130, 'triangle', 0);
+    
+    Object.values(state.audio.nodes).forEach(n => n.osc.start());
+}
+
+function toggleAudio() {
+    initAudio();
+    
+    const targetGain = state.audio.playing ? 0 : 0.025;
+    const rampTime = state.audio.ctx.currentTime + 0.5;
+    
+    Object.values(state.audio.nodes).forEach(n => {
+        n.gain.gain.linearRampToValueAtTime(targetGain, rampTime);
+    });
+    
+    state.audio.playing = !state.audio.playing;
+    audioToggle.textContent = state.audio.playing ? '🔊' : '🔇';
+    audioToggle.classList.toggle('playing', state.audio.playing);
+}
+
+audioToggle.addEventListener('click', toggleAudio);
+
+function playTone(freq, duration = 0.12) {
+    if (!state.audio.ctx) initAudio();
+    const osc = state.audio.ctx.createOscillator();
+    const gain = state.audio.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.value = 0.04;
+    gain.gain.exponentialRampToValueAtTime(0.001, state.audio.ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(state.audio.ctx.destination);
+    osc.start();
+    osc.stop(state.audio.ctx.currentTime + duration);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SCROLL REVEAL
+// ═══════════════════════════════════════════════════════════════
+
+const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry, i) => {
+        if (entry.isIntersecting) {
+            setTimeout(() => entry.target.classList.add('visible'), i * 80);
+        }
+    });
+}, { threshold: 0.1, rootMargin: '-30px' });
+
+document.querySelectorAll('section[data-reveal]').forEach(s => revealObserver.observe(s));
+
+// ═══════════════════════════════════════════════════════════════
+// CARD INTERACTIONS
+// ═══════════════════════════════════════════════════════════════
+
+document.querySelectorAll('.capability-card').forEach(card => {
+    card.addEventListener('mousemove', e => {
+        const rect = card.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 100;
+        const y = ((e.clientY - rect.top) / rect.height) * 100;
+        card.style.setProperty('--mx', x + '%');
+        card.style.setProperty('--my', y + '%');
+    });
+    
+    card.addEventListener('click', () => playTone(400 + Math.random() * 200));
+});
+
+document.querySelectorAll('.usecase-card').forEach(card => {
+    card.addEventListener('click', () => {
+        const usecase = card.dataset.usecase;
+        const tones = { cooking: 330, craft: 440, streaming: 550, meetings: 660 };
+        playTone(tones[usecase] || 440);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// FOOTER KANJI
+// ═══════════════════════════════════════════════════════════════
+
+const footerKanji = document.getElementById('footer-kanji');
+const kanjiCycle = ['鏡', '映', '録', '配', '鏡'];
+let kanjiIndex = 0;
+
+footerKanji.addEventListener('click', () => {
+    kanjiIndex = (kanjiIndex + 1) % kanjiCycle.length;
+    footerKanji.textContent = kanjiCycle[kanjiIndex];
+    
+    const meanings = {
+        '鏡': '🪞 kagami — mirror',
+        '映': '📽️ ei — reflect, project',
+        '録': '💾 roku — record',
+        '配': '📡 hai — distribute, stream'
+    };
+    console.log(meanings[kanjiCycle[kanjiIndex]]);
+    playTone(250 + kanjiIndex * 80);
+    
+    if (!state.secrets.includes('kanji_cycle')) {
+        state.secrets.push('kanji_cycle');
+        localStorage.setItem('kagami_obs_secrets', JSON.stringify(state.secrets));
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// KONAMI CODE
+// ═══════════════════════════════════════════════════════════════
+
+document.addEventListener('keydown', e => {
+    state.konami.sequence.push(e.keyCode);
+    if (state.konami.sequence.length > 10) state.konami.sequence.shift();
+    
+    if (state.konami.sequence.join(',') === state.konami.target.join(',')) {
+        document.body.style.animation = 'rainbow 2s linear infinite';
+        const style = document.createElement('style');
+        style.textContent = '@keyframes rainbow { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }';
+        document.head.appendChild(style);
+        console.log('%c🎮 KONAMI CODE — RAINBOW MODE!', 'color: #FF4444; font-size: 2em;');
+        
+        setTimeout(() => {
+            document.body.style.animation = '';
+            style.remove();
+        }, 5000);
+        
+        if (!state.secrets.includes('konami')) {
+            state.secrets.push('konami');
+            localStorage.setItem('kagami_obs_secrets', JSON.stringify(state.secrets));
+        }
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// TYPED SEQUENCES — Including family names
+// ═══════════════════════════════════════════════════════════════
+
+document.addEventListener('keypress', e => {
+    clearTimeout(state.typed.timeout);
+    state.typed.buffer += e.key.toLowerCase();
+    state.typed.timeout = setTimeout(() => state.typed.buffer = '', 1500);
+    
+    // Production commands
+    if (state.typed.buffer.includes('record')) {
+        document.querySelectorAll('.live-dot').forEach(dot => {
+            dot.style.background = '#FF6B35';
+        });
+        console.log('%c🔴 RECORDING...', 'color: #FF6B35; font-size: 1.5em;');
+        playTone(220, 0.3);
+        setTimeout(() => {
+            document.querySelectorAll('.live-dot').forEach(dot => {
+                dot.style.background = '#FF4444';
+            });
+        }, 3000);
+        state.typed.buffer = '';
+    }
+    
+    if (state.typed.buffer.includes('stream')) {
+        document.querySelectorAll('.hero-badge').forEach(badge => {
+            badge.style.background = 'rgba(0, 255, 204, 0.1)';
+            badge.style.borderColor = 'rgba(0, 255, 204, 0.4)';
+            badge.querySelector('.live-dot').style.background = '#00FFCC';
+        });
+        console.log('%c📡 NOW STREAMING!', 'color: #00FFCC; font-size: 1.5em;');
+        playTone(440, 0.2);
+        setTimeout(() => playTone(554, 0.2), 100);
+        setTimeout(() => playTone(659, 0.3), 200);
+        setTimeout(() => {
+            document.querySelectorAll('.hero-badge').forEach(badge => {
+                badge.style.background = '';
+                badge.style.borderColor = '';
+                badge.querySelector('.live-dot').style.background = '';
+            });
+        }, 4000);
+        state.typed.buffer = '';
+    }
+    
+    if (state.typed.buffer.includes('scene')) {
+        document.body.style.transition = 'filter 0.5s ease';
+        document.body.style.filter = 'brightness(0)';
+        playTone(330, 0.5);
+        setTimeout(() => {
+            document.body.style.filter = 'brightness(1)';
+        }, 500);
+        console.log('%c🎬 SCENE TRANSITION', 'color: #FFAA00;');
+        state.typed.buffer = '';
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // FAMILY EASTER EGGS — Personal messages for each family member
+    // ═══════════════════════════════════════════════════════════════
+    
+    if (state.typed.buffer.includes('robert') || state.typed.buffer.includes('dad')) {
+        console.log(`
+%c🔧 For Robert — The Builder%c
+
+Dad, you taught me that the right tool for the right job
+makes all the difference. This system embodies that principle:
+precise control, efficient automation, documented interfaces.
+
+When you see something complex made simple, that's engineering.
+When you see time saved through automation, that's good design.
+This is both.
+
+%cThe workshop camera setup would make your project documentation
+a breeze. Time-lapse builds, multi-angle captures, narrated tutorials.
+All automated. All yours.%c
+
+— With love and admiration for everything you've built
+        `, 'color: #FFAA00; font-size: 1.3em; font-weight: bold;', '', 'color: #888; font-style: italic;', '');
+        
+        playTone(220, 0.15);
+        setTimeout(() => playTone(277, 0.15), 80);
+        setTimeout(() => playTone(330, 0.2), 160);
+        
+        if (!state.secrets.includes('robert')) {
+            state.secrets.push('robert');
+            localStorage.setItem('kagami_obs_secrets', JSON.stringify(state.secrets));
+        }
+        state.typed.buffer = '';
+    }
+    
+    if (state.typed.buffer.includes('katie') || state.typed.buffer.includes('mom')) {
+        console.log(`
+%c📚 For Katie — The Reader%c
+
+Mom, every good system tells a story. The beginning (input),
+the middle (transformation), and the end (output). This one
+is no different.
+
+You've always understood that the "how" matters less than
+the "why" — and the why here is simple: to make creation easier,
+to remove the friction between imagination and reality.
+
+%cThe cooking show setup would let you share recipes the way
+you share stories: with warmth, clarity, and care. Overhead shots
+of your hands working, your voice narrating the journey.%c
+
+— With love for the stories you've given us
+        `, 'color: #22FF66; font-size: 1.3em; font-weight: bold;', '', 'color: #888; font-style: italic;', '');
+        
+        playTone(330, 0.15);
+        setTimeout(() => playTone(392, 0.15), 80);
+        setTimeout(() => playTone(494, 0.2), 160);
+        
+        if (!state.secrets.includes('katie')) {
+            state.secrets.push('katie');
+            localStorage.setItem('kagami_obs_secrets', JSON.stringify(state.secrets));
+        }
+        state.typed.buffer = '';
+    }
+    
+    if (state.typed.buffer.includes('kristi')) {
+        console.log(`
+%c🔭 For Kristi — The Orrery%c
+
+You see systems within systems. Orbital mechanics taught you
+that everything connects — transfer windows, gravitational assists,
+the elegant mathematics of trajectories.
+
+This system works the same way: inputs orbit through transforms,
+scenes transition like phase changes, outputs align like 
+conjunction points. It's all interconnected.
+
+%cThe meeting setup would give your presentations that professional
+edge — virtual camera as your Zoom feed, overhead document view,
+clean transitions between slides. Systems serving systems.%c
+
+— With admiration for how you see the whole picture
+        `, 'color: #44DDFF; font-size: 1.3em; font-weight: bold;', '', 'color: #888; font-style: italic;', '');
+        
+        playTone(392, 0.15);
+        setTimeout(() => playTone(494, 0.15), 80);
+        setTimeout(() => playTone(587, 0.2), 160);
+        
+        if (!state.secrets.includes('kristi')) {
+            state.secrets.push('kristi');
+            localStorage.setItem('kagami_obs_secrets', JSON.stringify(state.secrets));
+        }
+        state.typed.buffer = '';
+    }
+    
+    if (state.typed.buffer.includes('becky')) {
+        console.log(`
+%c🍳 For Becky — The Kitchen%c
+
+You know that the best systems are invisible — they just work.
+No fuss, no complexity, just results. That's what good mise en
+place looks like: everything in its place, ready when you need it.
+
+This is mise en place for video. The cameras ready, the scenes
+prepared, the transitions smooth. You focus on what matters;
+the system handles the rest.
+
+%cThe cooking show setup was literally designed with you in mind.
+Overhead camera on the counter, face cam in the corner, ingredient
+overlays appearing when you need them. Toast and Moose approved.%c
+
+🐕 (They wanted me to add that they're very good dogs and
+deserve treats for their patience during filming.)
+
+— With love for keeping everything running
+        `, 'color: #FF6B35; font-size: 1.3em; font-weight: bold;', '', 'color: #888; font-style: italic;', '');
+        
+        playTone(262, 0.15);
+        setTimeout(() => playTone(330, 0.15), 80);
+        setTimeout(() => playTone(392, 0.2), 160);
+        
+        if (!state.secrets.includes('becky')) {
+            state.secrets.push('becky');
+            localStorage.setItem('kagami_obs_secrets', JSON.stringify(state.secrets));
+        }
+        state.typed.buffer = '';
+    }
+    
+    if (state.typed.buffer.includes('family')) {
+        console.log(`
+%c💝 For the Whole Family%c
+
+This page exists because of you. Each card, each animation,
+each hidden message — they're all for the four of you.
+
+Robert: The architecture is sound. I promise.
+Katie: The story has a happy ending.
+Kristi: The systems all connect.
+Becky: It just works. (Toast & Moose verified.)
+
+%cThank you for being my family. Everything I build
+carries a little piece of each of you in it.%c
+
+— Tim
+        `, 'color: #BB44FF; font-size: 1.3em; font-weight: bold;', '', 'color: #888; font-style: italic;', '');
+        
+        // Play a little melody
+        const melody = [262, 294, 330, 349, 392, 440, 494, 523];
+        melody.forEach((freq, i) => {
+            setTimeout(() => playTone(freq, 0.15), i * 100);
+        });
+        
+        if (!state.secrets.includes('family')) {
+            state.secrets.push('family');
+            localStorage.setItem('kagami_obs_secrets', JSON.stringify(state.secrets));
+        }
+        state.typed.buffer = '';
+    }
+    
+    // Love easter egg
+    if (state.typed.buffer.includes('love')) {
+        document.body.style.transition = 'filter 2s ease';
+        document.body.style.filter = 'hue-rotate(300deg) saturate(1.5)';
+        console.log('%c💕 Love is the source code.', 'color: #FF69B4; font-size: 1.5em;');
+        setTimeout(() => {
+            document.body.style.filter = '';
+        }, 3000);
+        state.typed.buffer = '';
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SECRET PANEL
+// ═══════════════════════════════════════════════════════════════
+
+document.getElementById('secret-panel').addEventListener('click', () => {
+    const familyFound = ['robert', 'katie', 'kristi', 'becky'].filter(n => state.secrets.includes(n));
+    const familyStatus = familyFound.length === 4 ? '💝 All family messages found!' : 
+                         familyFound.length > 0 ? `Found: ${familyFound.join(', ')}` : 
+                         'None found yet';
+    
+    console.log(`
+%c╔════════════════════════════════════════════════════════════════════╗
+║                       🎬 OBS STUDIO SECRETS                        ║
+╠════════════════════════════════════════════════════════════════════╣
+║                                                                    ║
+║  %cPRODUCTION COMMANDS%c                                                ║
+║  ⌨️  Type "record"                    Recording indicator          ║
+║  ⌨️  Type "stream"                    Streaming mode               ║
+║  ⌨️  Type "scene"                     Scene transition             ║
+║                                                                    ║
+║  %cFAMILY EASTER EGGS%c                                                 ║
+║  ⌨️  Type "robert" or "dad"           Message for Dad              ║
+║  ⌨️  Type "katie" or "mom"            Message for Mom              ║
+║  ⌨️  Type "kristi"                    Message for Kristi           ║
+║  ⌨️  Type "becky"                     Message for Becky            ║
+║  ⌨️  Type "family"                    Message for everyone         ║
+║  ⌨️  Type "love"                      💕                           ║
+║                                                                    ║
+║  %cCLASSIC SECRETS%c                                                    ║
+║  🎮 Konami Code    ↑↑↓↓←→←→BA        Rainbow mode                 ║
+║  🖱️  Click 鏡                         Cycle production kanji       ║
+║  🔊 Audio toggle                      Ambient studio tones         ║
+║                                                                    ║
+║  %cCONSOLE API%c                                                        ║
+║    obs.forRobert()    obs.forKatie()                              ║
+║    obs.forKristi()    obs.forBecky()                              ║
+║    obs.forFamily()    obs.capabilities()                          ║
+║                                                                    ║
+╚════════════════════════════════════════════════════════════════════╝
+%c
+Visit #${state.visits} | ${state.secrets.length}/9 secrets found
+Family messages: ${familyStatus}
+`, 
+'color: #FF6B35; font-family: monospace;',
+'color: #00FFCC; font-weight: bold;', 'color: #FF6B35;',
+'color: #BB44FF; font-weight: bold;', 'color: #FF6B35;',
+'color: #FFAA00; font-weight: bold;', 'color: #FF6B35;',
+'color: #44DDFF; font-weight: bold;', 'color: #FF6B35;',
+'color: #666;');
+    
+    playTone(523, 0.1);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// MOBILE GYROSCOPE
+// ═══════════════════════════════════════════════════════════════
+
+if (window.DeviceOrientationEvent) {
+    window.addEventListener('deviceorientation', e => {
+        const tiltX = (e.gamma || 0) / 90;
+        const tiltY = (e.beta || 0) / 90;
+        document.querySelectorAll('.bg-layer').forEach((layer, i) => {
+            const factor = (i + 1) * 8;
+            layer.style.transform = `translate(${tiltX * factor}px, ${tiltY * factor}px)`;
+        });
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// VISIT COUNT
+// ═══════════════════════════════════════════════════════════════
+
+document.getElementById('visit-count').textContent = 
+    state.visits === 1 ? 'First visit' : `Visit #${state.visits}`;
+
+// ═══════════════════════════════════════════════════════════════
+// WINDOW.obs — PUBLIC API WITH FAMILY MESSAGES
+// ═══════════════════════════════════════════════════════════════
+
+window.obs = {
+    name: 'Kagami × OBS Production Studio',
+    version: '2.0.0',
+    madeWith: 'love',
+    
+    capabilities: () => console.log(`
+%c🎬 OBS CAPABILITIES%c
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+%cScene Management%c
+  • Create, delete, switch scenes
+  • Smooth transitions (fade, cut, swipe, stinger)
+  • Custom transition animations
+
+%cSource Control%c  
+  • Cameras (USB, capture cards, NDI)
+  • Images, videos, browser overlays
+  • Screen capture, window capture
+  • Position, scale, rotate, crop
+
+%cFilters & Effects%c
+  • Chromakey (green screen removal)
+  • Blur, sharpen, color correction
+  • LUT application for cinematic looks
+
+%cOutput Options%c
+  • Live streaming (Twitch, YouTube, Facebook)
+  • Local recording (MP4, MKV, MOV)
+  • Virtual camera for video calls
+  • Hardware encoding (minimal CPU)
+
+%cAudio%c
+  • Per-source volume control
+  • Mute/unmute automation
+  • Audio mixing and routing
+    `, 'color: #FF6B35; font-size: 1.2em; font-weight: bold;', '',
+       'color: #00FFCC;', '', 'color: #FFAA00;', '', 
+       'color: #BB44FF;', '', 'color: #44DDFF;', '', 'color: #22FF66;', ''),
+    
+    useCases: () => console.log(`
+%c💡 USE CASES — Designed for Family%c
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🍳 %cCooking Shows%c      → Becky & Katie
+   Overhead camera, face cam PiP, ingredient overlays
+
+🔧 %cWorkshop Projects%c  → Robert  
+   Time-lapse builds, multi-angle documentation
+
+💼 %cProfessional%c       → Kristi
+   Virtual camera for Zoom, document overhead view
+
+🎮 %cLive Streaming%c     → Anyone
+   Multi-platform, chat overlays, instant replay
+    `, 'color: #BB44FF; font-size: 1.2em; font-weight: bold;', '',
+       'color: #FF6B35;', '', 'color: #FFAA00;', '', 
+       'color: #44DDFF;', '', 'color: #FF4444;', ''),
+    
+    // Family-specific messages
+    forRobert: () => {
+        console.log(`
+%c🔧 For Robert — The Builder%c
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Dad, this system is built the way you'd build it:
+• Clean interfaces, documented APIs
+• Modular components that compose well  
+• Automation that saves time, not creates complexity
+
+The workshop setup I designed for you:
+• Overhead camera for project documentation
+• Time-lapse recording (hours → minutes)
+• Step-by-step tutorial mode with chapters
+• Before/after comparison layouts
+• Voice narration with clear audio capture
+
+%cEfficiency metrics:%c
+  Manual setup: ~15 minutes per recording
+  Automated: ~30 seconds
+  Time saved per project: 14.5 minutes
+  
+%c"Right tool, right job."%c
+        `, 'color: #FFAA00; font-size: 1.3em; font-weight: bold;', '',
+           'color: #888;', '', 'color: #FFAA00; font-style: italic;', '');
+        playTone(220, 0.15);
+    },
+    
+    forKatie: () => {
+        console.log(`
+%c📚 For Katie — The Reader%c
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Mom, every good system tells a story:
+
+%cThe Beginning%c (Input)
+  Cameras capture what you create
+  Microphones catch your voice
+  
+%cThe Middle%c (Transformation)
+  Scenes compose your narrative
+  Transitions mark chapter breaks
+  Overlays add context and beauty
+
+%cThe End%c (Output)
+  Stream to share live
+  Record to keep forever
+  Virtual camera to connect face-to-face
+
+The cooking show setup for you and Becky:
+• Your hands telling the story overhead
+• Your face in the corner, sharing the "why"
+• Ingredient lists appearing like chapter headings
+
+%c"The best stories show, they don't tell."%c
+        `, 'color: #22FF66; font-size: 1.3em; font-weight: bold;', '',
+           'color: #22FF66;', '', 'color: #22FF66;', '', 'color: #22FF66;', '',
+           'color: #22FF66; font-style: italic;', '');
+        playTone(330, 0.15);
+    },
+    
+    forKristi: () => {
+        console.log(`
+%c🔭 For Kristi — The Orrery%c
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You see systems. Let me show you this one:
+
+%cThe Orbital Mechanics:%c
+  Sources = Bodies in motion
+  Scenes = Orbital configurations  
+  Transitions = Transfer windows
+  Outputs = Trajectory endpoints
+
+%cThe Mathematics:%c
+  WebSocket latency: <50ms (real-time)
+  Frame rate: 30-60 fps
+  Bitrate: 4,500-6,000 kbps
+  Encoding: H.264/HEVC hardware
+
+%cThe Elegance:%c
+  One command changes everything
+  Events propagate through the system
+  State synchronizes automatically
+
+The professional meeting setup for you:
+• Virtual camera replaces your webcam
+• Switch between face and documents instantly
+• Lower-thirds with your name and title
+• Background blur without green screen
+
+%c"Systems within systems, all the way down."%c
+        `, 'color: #44DDFF; font-size: 1.3em; font-weight: bold;', '',
+           'color: #44DDFF;', '', 'color: #44DDFF;', '', 'color: #44DDFF;', '',
+           'color: #44DDFF; font-style: italic;', '');
+        playTone(392, 0.15);
+    },
+    
+    forBecky: () => {
+        console.log(`
+%c🍳 For Becky — The Kitchen%c
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You keep everything running. This helps.
+
+%cWhat It Does:%c
+  → Overhead camera watches the counter
+  → Face cam stays in the corner
+  → Ingredients appear when you need them
+  → Recording starts when you say "rolling"
+  → Scenes switch when you say "next step"
+
+%cWhat You Don't Have to Do:%c
+  → Fiddle with camera angles mid-recipe
+  → Remember to hit record
+  → Edit the footage (unless you want to)
+  → Worry about audio levels
+
+%cMise en Place for Video:%c
+  Everything in its place
+  Ready when you need it
+  You focus on cooking
+  The system handles the rest
+
+🐕 %cToast & Moose Update:%c
+  They are very good dogs.
+  They have requested treats.
+  They promise not to bark during filming.
+  (Moose's promise is less reliable.)
+
+%c"Just works."%c
+        `, 'color: #FF6B35; font-size: 1.3em; font-weight: bold;', '',
+           'color: #FF6B35;', '', 'color: #FF6B35;', '', 'color: #FF6B35;', '',
+           'color: #B8860B;', '', 'color: #FF6B35; font-style: italic;', '');
+        playTone(262, 0.15);
+    },
+    
+    forFamily: () => {
+        console.log(`
+%c💝 For All of You%c
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This page exists because of you.
+
+%cRobert:%c You taught me to build things right.
+%cKatie:%c  You taught me to tell stories well.
+%cKristi:%c You taught me to see how things connect.
+%cBecky:%c  You taught me that simple is better.
+
+Every line of code here carries something I learned
+from watching the four of you. The precision.
+The narrative. The systems thinking. The practicality.
+
+Thank you for being my family.
+
+%c— Tim%c
+
+%c(Type any family name to see their personal message)%c
+        `, 'color: #BB44FF; font-size: 1.3em; font-weight: bold;', '',
+           'color: #FFAA00;', '', 'color: #22FF66;', '', 
+           'color: #44DDFF;', '', 'color: #FF6B35;', '',
+           'color: #BB44FF; font-weight: bold;', '',
+           'color: #666; font-style: italic;', '');
+        
+        // Play ascending scale
+        const notes = [262, 294, 330, 349, 392, 440, 494, 523];
+        notes.forEach((freq, i) => {
+            setTimeout(() => playTone(freq, 0.12), i * 80);
+        });
+    },
+    
+    secret: () => console.log(`
+%c🔮 Console API%c
+━━━━━━━━━━━━━━━━━━━━━
+
+%cFor family:%c
+  obs.forRobert()    obs.forKatie()
+  obs.forKristi()    obs.forBecky()
+  obs.forFamily()
+
+%cFor everyone:%c
+  obs.capabilities()
+  obs.useCases()
+
+%cOr just type their names...%c
+    `, 'color: #BB44FF; font-weight: bold;', '', 
+       'color: #888;', '', 'color: #888;', '', 
+       'color: #666; font-style: italic;', '')
+};
+
+// ═══════════════════════════════════════════════════════════════
+// CONSOLE GREETING
+// ═══════════════════════════════════════════════════════════════
+
+console.log(`
+%c🎬%c Production Studio
+%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+%cEvery camera becomes a portal to professional production.%c
+
+Made for family:
+  %c🔧%c Robert — Workshop documentation
+  %c📚%c Katie  — Cooking show narratives  
+  %c🔭%c Kristi — Professional meetings
+  %c🍳%c Becky  — Kitchen broadcasts
+  
+%c🐕 Toast & Moose — Quality assurance%c
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+%cType a family name to see their personal message.%c
+%cOr try: obs.secret()%c
+`, 
+'font-size: 2.5em;',
+'font-size: 1.4em; color: #fff; font-weight: 300;',
+'color: #333;',
+'color: #FF6B35; font-weight: bold;',
+'',
+'color: #FFAA00;', 'color: #888;',
+'color: #22FF66;', 'color: #888;',
+'color: #44DDFF;', 'color: #888;',
+'color: #FF6B35;', 'color: #888;',
+'color: #B8860B; font-style: italic;', '',
+'color: #666; font-style: italic;', '',
+'color: #555;', ''
+);
+
+})();
+    </script>
+</body>
+</html>
