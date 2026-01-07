@@ -398,8 +398,19 @@
     function togglePlay() {
         if (!elements.audio || !elements.playBtn) return;
 
+        // Don't allow play during loading or error
+        if (currentAudioState === AudioState.LOADING || currentAudioState === AudioState.ERROR) {
+            return;
+        }
+
         if (elements.audio.paused) {
-            elements.audio.play().catch(e => console.log('Play failed:', e));
+            elements.audio.play().catch(e => {
+                console.error('Play failed:', e);
+                // On mobile, user gesture might be required
+                if (e.name === 'NotAllowedError') {
+                    setAudioState(AudioState.READY);
+                }
+            });
         } else {
             elements.audio.pause();
         }
@@ -556,24 +567,97 @@
     // PLAY BUTTON STATE
     // ═══════════════════════════════════════════════════════════════════════════
 
+    // Audio state machine
+    const AudioState = {
+        LOADING: 'loading',
+        READY: 'ready',
+        PLAYING: 'playing',
+        PAUSED: 'paused',
+        ERROR: 'error'
+    };
+    let currentAudioState = AudioState.LOADING;
+
+    function setAudioState(newState) {
+        currentAudioState = newState;
+        updatePlayButtonState();
+    }
+
+    function updatePlayButtonState() {
+        if (!elements.playBtn) return;
+
+        // Remove all state classes
+        elements.playBtn.classList.remove('loading', 'playing', 'error');
+
+        switch (currentAudioState) {
+            case AudioState.LOADING:
+                elements.playBtn.classList.add('loading');
+                elements.playBtn.setAttribute('aria-label', 'Loading audio...');
+                elements.playBtn.disabled = true;
+                break;
+            case AudioState.READY:
+            case AudioState.PAUSED:
+                elements.playBtn.disabled = false;
+                elements.playBtn.setAttribute('aria-label', 'Play');
+                break;
+            case AudioState.PLAYING:
+                elements.playBtn.classList.add('playing');
+                elements.playBtn.disabled = false;
+                elements.playBtn.setAttribute('aria-label', 'Pause');
+                break;
+            case AudioState.ERROR:
+                elements.playBtn.classList.add('error');
+                elements.playBtn.disabled = true;
+                elements.playBtn.setAttribute('aria-label', 'Audio error');
+                break;
+        }
+    }
+
     function initPlayButton() {
         if (!elements.audio || !elements.playBtn) return;
 
+        // Initial state
+        setAudioState(AudioState.LOADING);
+
         elements.playBtn.addEventListener('click', togglePlay);
 
+        // Audio events
+        elements.audio.addEventListener('loadstart', () => {
+            setAudioState(AudioState.LOADING);
+        });
+
+        elements.audio.addEventListener('canplaythrough', () => {
+            if (currentAudioState === AudioState.LOADING) {
+                setAudioState(AudioState.READY);
+            }
+        });
+
         elements.audio.addEventListener('play', () => {
-            elements.playBtn.classList.add('playing');
-            elements.playBtn.setAttribute('aria-label', 'Pause');
+            setAudioState(AudioState.PLAYING);
         });
 
         elements.audio.addEventListener('pause', () => {
-            elements.playBtn.classList.remove('playing');
-            elements.playBtn.setAttribute('aria-label', 'Play');
+            if (currentAudioState !== AudioState.LOADING) {
+                setAudioState(AudioState.PAUSED);
+            }
         });
 
         elements.audio.addEventListener('ended', () => {
-            elements.playBtn.classList.remove('playing');
-            elements.playBtn.setAttribute('aria-label', 'Play');
+            setAudioState(AudioState.PAUSED);
+        });
+
+        elements.audio.addEventListener('error', () => {
+            setAudioState(AudioState.ERROR);
+            console.error('Audio failed to load');
+        });
+
+        elements.audio.addEventListener('waiting', () => {
+            if (currentAudioState === AudioState.PLAYING) {
+                elements.playBtn.classList.add('loading');
+            }
+        });
+
+        elements.audio.addEventListener('canplay', () => {
+            elements.playBtn.classList.remove('loading');
         });
     }
 
