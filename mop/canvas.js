@@ -41,7 +41,7 @@
     let overallLevel = 0;
     let beatDetected = false;
     let lastBeatTime = 0;
-    let beatThreshold = 0.6;
+    let beatThreshold = 0.35; // Lower threshold catches more beats
     let previousBass = 0;
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -88,15 +88,15 @@
         try {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
-            // Main frequency analyser
+            // Main frequency analyser - lower smoothing for punchier response
             analyser = audioContext.createAnalyser();
-            analyser.fftSize = 512;
-            analyser.smoothingTimeConstant = 0.7;
+            analyser.fftSize = 1024;
+            analyser.smoothingTimeConstant = 0.4; // Faster response
 
-            // Waveform analyser
+            // Waveform analyser - very responsive
             analyserWaveform = audioContext.createAnalyser();
             analyserWaveform.fftSize = 2048;
-            analyserWaveform.smoothingTimeConstant = 0.3;
+            analyserWaveform.smoothingTimeConstant = 0.1; // Near-instant
 
             const source = audioContext.createMediaElementSource(audio);
             source.connect(analyser);
@@ -151,18 +151,21 @@
         midLevel = Math.min(1, midSum / ((midEnd - bassEnd) * 255));
         trebleLevel = Math.min(1, trebleSum / ((binCount - trebleStart) * 255));
 
-        // Smooth the levels for visual appeal
-        const smoothing = 0.15;
-        bassSmooth += (bassLevel - bassSmooth) * smoothing;
-        midSmooth += (midLevel - midSmooth) * smoothing;
-        trebleSmooth += (trebleLevel - trebleSmooth) * smoothing;
+        // Smooth the levels - fast attack, slower release (Winamp style)
+        const attackSmoothing = 0.4;  // Fast rise
+        const releaseSmoothing = 0.1; // Slower fall
+
+        // Attack/release smoothing for punchier visuals
+        bassSmooth += (bassLevel - bassSmooth) * (bassLevel > bassSmooth ? attackSmoothing : releaseSmoothing);
+        midSmooth += (midLevel - midSmooth) * (midLevel > midSmooth ? attackSmoothing : releaseSmoothing);
+        trebleSmooth += (trebleLevel - trebleSmooth) * (trebleLevel > trebleSmooth ? attackSmoothing : releaseSmoothing);
 
         overallLevel = (bassSmooth + midSmooth + trebleSmooth) / 3;
 
-        // Beat detection (look for sudden bass increases)
+        // Beat detection (look for sudden bass increases) - more sensitive
         const bassJump = bassLevel - previousBass;
         const now = performance.now();
-        if (bassJump > 0.15 && bassLevel > beatThreshold && now - lastBeatTime > 150) {
+        if (bassJump > 0.08 && bassLevel > beatThreshold && now - lastBeatTime > 100) {
             beatDetected = true;
             lastBeatTime = now;
             onBeat(bassLevel);
@@ -476,23 +479,53 @@
         if (!waveformData || !isPlaying) return;
 
         const sliceWidth = width / waveformData.length;
+        const centerY = height / 2;
 
+        // Draw filled waveform (more dramatic)
         ctx.beginPath();
-        ctx.moveTo(0, height / 2);
+        ctx.moveTo(0, centerY);
 
         for (let i = 0; i < waveformData.length; i++) {
-            const v = waveformData[i] / 128.0;
-            const y = (v * height / 4) + height / 2;
+            const v = (waveformData[i] - 128) / 128.0; // -1 to 1
+            const amplitude = height * 0.35 * (0.5 + bassSmooth * 0.5);
+            const y = centerY + v * amplitude;
 
             if (i === 0) {
-                ctx.moveTo(i * sliceWidth, y);
+                ctx.moveTo(0, y);
             } else {
                 ctx.lineTo(i * sliceWidth, y);
             }
         }
 
-        ctx.strokeStyle = `rgba(229, 184, 74, ${0.05 + bassSmooth * 0.1})`;
-        ctx.lineWidth = 1 + bassSmooth * 2;
+        // Close the shape for fill
+        ctx.lineTo(width, centerY);
+        ctx.lineTo(0, centerY);
+        ctx.closePath();
+
+        // Gradient fill
+        const waveGradient = ctx.createLinearGradient(0, centerY - height * 0.3, 0, centerY + height * 0.3);
+        waveGradient.addColorStop(0, `rgba(229, 184, 74, ${0.15 + overallLevel * 0.2})`);
+        waveGradient.addColorStop(0.5, `rgba(229, 184, 74, ${0.05 + overallLevel * 0.1})`);
+        waveGradient.addColorStop(1, `rgba(139, 0, 0, ${0.1 + bassSmooth * 0.15})`);
+        ctx.fillStyle = waveGradient;
+        ctx.fill();
+
+        // Stroke the waveform line
+        ctx.beginPath();
+        for (let i = 0; i < waveformData.length; i++) {
+            const v = (waveformData[i] - 128) / 128.0;
+            const amplitude = height * 0.35 * (0.5 + bassSmooth * 0.5);
+            const y = centerY + v * amplitude;
+
+            if (i === 0) {
+                ctx.moveTo(0, y);
+            } else {
+                ctx.lineTo(i * sliceWidth, y);
+            }
+        }
+
+        ctx.strokeStyle = `rgba(229, 184, 74, ${0.3 + overallLevel * 0.4})`;
+        ctx.lineWidth = 1.5 + bassSmooth * 3;
         ctx.stroke();
     }
 
@@ -503,19 +536,21 @@
     function drawFrequencyBars() {
         if (!frequencyData || !isPlaying) return;
 
-        const barCount = 64;
+        const barCount = 128; // More bars for detail
         const barWidth = width / barCount;
-        const maxHeight = height * 0.3;
+        const maxHeight = height * 0.5; // Taller bars
 
+        // Mirror effect - draw from both top and bottom
         for (let i = 0; i < barCount; i++) {
             const dataIndex = Math.floor(i * (frequencyData.length / barCount));
             const value = frequencyData[dataIndex] / 255;
             const barHeight = value * maxHeight;
 
-            // Gradient from bottom
+            // Bottom bars - hot colors
             const gradient = ctx.createLinearGradient(0, height, 0, height - barHeight);
-            gradient.addColorStop(0, `rgba(139, 0, 0, ${value * 0.3})`);
-            gradient.addColorStop(0.5, `rgba(229, 184, 74, ${value * 0.2})`);
+            gradient.addColorStop(0, `rgba(139, 0, 0, ${value * 0.7})`);
+            gradient.addColorStop(0.3, `rgba(229, 184, 74, ${value * 0.6})`);
+            gradient.addColorStop(0.7, `rgba(229, 184, 74, ${value * 0.4})`);
             gradient.addColorStop(1, `rgba(229, 184, 74, 0)`);
 
             ctx.fillStyle = gradient;
@@ -525,6 +560,19 @@
                 barWidth - 1,
                 barHeight
             );
+
+            // Top bars (mirrored, fainter) for symmetry
+            const topGradient = ctx.createLinearGradient(0, 0, 0, barHeight * 0.4);
+            topGradient.addColorStop(0, `rgba(139, 0, 0, ${value * 0.4})`);
+            topGradient.addColorStop(1, `rgba(139, 0, 0, 0)`);
+
+            ctx.fillStyle = topGradient;
+            ctx.fillRect(
+                i * barWidth,
+                0,
+                barWidth - 1,
+                barHeight * 0.4
+            );
         }
     }
 
@@ -533,11 +581,46 @@
     // ═══════════════════════════════════════════════════════════════════════════
 
     function drawCentralOrb() {
-        if (!isPlaying) return;
-
         const centerX = width / 2;
         const centerY = height / 2;
         const baseRadius = 50;
+
+        // Idle state - gentle breathing orb
+        if (!isPlaying) {
+            const breathe = Math.sin(frameCount * 0.02) * 0.2 + 1;
+            const idleRadius = baseRadius * breathe;
+
+            // Subtle idle glow
+            const idleGlow = ctx.createRadialGradient(
+                centerX, centerY, 0,
+                centerX, centerY, idleRadius * 1.5
+            );
+            idleGlow.addColorStop(0, 'rgba(229, 184, 74, 0.15)');
+            idleGlow.addColorStop(0.5, 'rgba(229, 184, 74, 0.05)');
+            idleGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, idleRadius * 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = idleGlow;
+            ctx.fill();
+
+            // Inner idle core
+            const innerIdle = ctx.createRadialGradient(
+                centerX, centerY, 0,
+                centerX, centerY, idleRadius
+            );
+            innerIdle.addColorStop(0, 'rgba(248, 246, 242, 0.1)');
+            innerIdle.addColorStop(0.5, 'rgba(229, 184, 74, 0.08)');
+            innerIdle.addColorStop(1, 'rgba(229, 184, 74, 0)');
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, idleRadius, 0, Math.PI * 2);
+            ctx.fillStyle = innerIdle;
+            ctx.fill();
+
+            return;
+        }
+
         const audioRadius = baseRadius + bassSmooth * 100;
 
         // Outer glow
@@ -583,7 +666,31 @@
     // ═══════════════════════════════════════════════════════════════════════════
 
     function drawConnections() {
-        if (!isPlaying || bassSmooth < 0.2) return;
+        // Idle state - subtle ambient connections
+        if (!isPlaying) {
+            const connectionDistance = 100;
+            ctx.lineWidth = 0.5;
+
+            for (let i = 0; i < Math.min(particles.length, 50); i++) {
+                for (let j = i + 1; j < Math.min(particles.length, i + 10); j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < connectionDistance) {
+                        const alpha = (1 - dist / connectionDistance) * 0.1;
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.strokeStyle = `rgba(229, 184, 74, ${alpha})`;
+                        ctx.stroke();
+                    }
+                }
+            }
+            return;
+        }
+
+        if (bassSmooth < 0.2) return;
 
         const connectionDistance = 80 + bassSmooth * 60;
         ctx.strokeStyle = `rgba(229, 184, 74, ${bassSmooth * 0.2})`;
@@ -629,8 +736,8 @@
             analyzeAudio();
         }
 
-        // Clear with dynamic trail effect
-        const trailOpacity = isPlaying ? (0.08 + (1 - overallLevel) * 0.12) : 0.1;
+        // Clear with dynamic trail effect - faster clear during playback for punchy response
+        const trailOpacity = isPlaying ? (0.2 + overallLevel * 0.3) : 0.08;
         ctx.fillStyle = `rgba(3, 3, 5, ${trailOpacity})`;
         ctx.fillRect(0, 0, width, height);
 
