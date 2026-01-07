@@ -96,8 +96,9 @@ body {
     min-height: 100vh;
     background: var(--void);
     font-family: var(--font-body);
+    font-size: 18px; /* Larger base for accessibility */
     color: var(--text);
-    line-height: 1.7;
+    line-height: 1.8;
     overflow-x: hidden;
     cursor: none;
 }
@@ -345,10 +346,10 @@ body {
 }
 
 .hero-subtitle {
-    font-size: clamp(1rem, 3vw, 1.4rem);
+    font-size: clamp(1.15rem, 3vw, 1.5rem);
     font-weight: 400;
     color: var(--text-dim);
-    max-width: 600px;
+    max-width: 650px;
     margin: 0 auto 3rem;
     opacity: 0;
     animation: fadeInUp var(--duration-slow) ease forwards 0.7s;
@@ -422,9 +423,9 @@ section.visible {
 }
 
 .section-label {
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     font-weight: 500;
-    letter-spacing: 0.3em;
+    letter-spacing: 0.25em;
     color: var(--recording);
     text-transform: uppercase;
     margin-bottom: 1rem;
@@ -449,9 +450,9 @@ section.visible {
 }
 
 .section-desc {
-    font-size: 1rem;
+    font-size: 1.1rem;
     color: var(--text-dim);
-    max-width: 700px;
+    max-width: 750px;
     line-height: 1.9;
 }
 
@@ -520,9 +521,9 @@ section.visible {
 }
 
 .capability-desc {
-    font-size: 0.9rem;
+    font-size: 1rem;
     color: var(--text-dim);
-    line-height: 1.7;
+    line-height: 1.8;
     position: relative;
     z-index: 1;
 }
@@ -615,12 +616,13 @@ section.visible {
 }
 
 .usecase-features li {
-    padding: 0.5rem 0;
-    font-size: 0.9rem;
+    padding: 0.6rem 0;
+    font-size: 1rem;
     color: var(--text-dim);
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    line-height: 1.6;
 }
 
 .usecase-features li::before {
@@ -693,8 +695,9 @@ section.visible {
 }
 
 .feature-text {
-    font-size: 0.9rem;
+    font-size: 1rem;
     color: var(--text-dim);
+    line-height: 1.6;
 }
 
 .feature-text strong {
@@ -802,10 +805,10 @@ section.visible {
    AUDIO TOGGLE
 ═══════════════════════════════════════════════════════════════ */
 
-#audio-toggle {
+#audio-toggle,
+#font-toggle {
     position: fixed;
     bottom: 2rem;
-    left: 2rem;
     width: 48px;
     height: 48px;
     border-radius: 50%;
@@ -822,10 +825,20 @@ section.visible {
     justify-content: center;
 }
 
-#audio-toggle:hover {
+#audio-toggle { left: 2rem; }
+#font-toggle { left: 5.5rem; font-size: 0.9rem; font-weight: 600; }
+
+#audio-toggle:hover,
+#font-toggle:hover {
     border-color: var(--live);
     color: var(--live);
     transform: scale(1.1);
+}
+
+#font-toggle.large {
+    background: rgba(255, 68, 68, 0.15);
+    border-color: var(--live);
+    color: var(--live);
 }
 
 #audio-toggle.playing {
@@ -835,6 +848,33 @@ section.visible {
 @keyframes audioPulse {
     0%, 100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.4); }
     50% { box-shadow: 0 0 0 12px rgba(255, 68, 68, 0); }
+}
+
+/* Large text mode for accessibility */
+body.large-text {
+    font-size: 22px;
+}
+
+body.large-text .hero-subtitle {
+    font-size: clamp(1.3rem, 3.5vw, 1.7rem);
+}
+
+body.large-text .section-desc {
+    font-size: 1.25rem;
+}
+
+body.large-text .capability-desc,
+body.large-text .usecase-features li,
+body.large-text .feature-text {
+    font-size: 1.15rem;
+}
+
+body.large-text .section-label {
+    font-size: 0.85rem;
+}
+
+body.large-text .architecture pre {
+    font-size: 0.95rem;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1227,6 +1267,7 @@ section.visible {
 
     <!-- Controls -->
     <button id="audio-toggle" title="Toggle ambient sound">🔇</button>
+    <button id="font-toggle" title="Increase text size">Aa</button>
     <button id="secret-panel" title="Secrets">∞</button>
 
     <script>
@@ -1497,6 +1538,35 @@ function toggleAudio() {
 }
 
 audioToggle.addEventListener('click', toggleAudio);
+
+// ═══════════════════════════════════════════════════════════════
+// FONT SIZE TOGGLE (Accessibility)
+// ═══════════════════════════════════════════════════════════════
+
+const fontToggle = document.getElementById('font-toggle');
+const largeTextEnabled = localStorage.getItem('kagami_large_text') === 'true';
+
+if (largeTextEnabled) {
+    document.body.classList.add('large-text');
+    fontToggle.classList.add('large');
+    fontToggle.title = 'Normal text size';
+}
+
+fontToggle.addEventListener('click', () => {
+    document.body.classList.toggle('large-text');
+    fontToggle.classList.toggle('large');
+    
+    const isLarge = document.body.classList.contains('large-text');
+    localStorage.setItem('kagami_large_text', isLarge);
+    fontToggle.title = isLarge ? 'Normal text size' : 'Increase text size';
+    
+    console.log(isLarge ? 
+        '%c📖 Large text mode enabled — easier reading for everyone!' : 
+        '%c📖 Normal text mode', 
+        'color: #FF6B35;');
+    
+    playTone(isLarge ? 440 : 330, 0.1);
+});
 
 function playTone(freq, duration = 0.12) {
     if (!state.audio.ctx) initAudio();
