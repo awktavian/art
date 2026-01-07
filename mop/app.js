@@ -406,6 +406,153 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // KONAMI CODE EASTER EGG
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
+    let konamiProgress = 0;
+    let metalModeActive = false;
+
+    function initKonamiCode() {
+        document.addEventListener('keydown', (e) => {
+            if (e.code === KONAMI_CODE[konamiProgress]) {
+                konamiProgress++;
+                if (konamiProgress === KONAMI_CODE.length) {
+                    activateMetalMode();
+                    konamiProgress = 0;
+                }
+            } else {
+                konamiProgress = 0;
+            }
+        });
+    }
+
+    function activateMetalMode() {
+        if (metalModeActive) return;
+        metalModeActive = true;
+
+        console.log('🤘 METAL MODE ACTIVATED 🤘');
+
+        // Flash the screen with Metallica colors
+        const flash = document.createElement('div');
+        flash.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, #8b0000, #0a0a0a, #c0c0c0);
+            z-index: 10000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 144ms ease-out;
+        `;
+        document.body.appendChild(flash);
+
+        // Flash sequence
+        setTimeout(() => flash.style.opacity = '0.8', 0);
+        setTimeout(() => flash.style.opacity = '0', 144);
+        setTimeout(() => flash.style.opacity = '0.6', 288);
+        setTimeout(() => flash.style.opacity = '0', 432);
+        setTimeout(() => flash.style.opacity = '0.4', 576);
+        setTimeout(() => {
+            flash.style.opacity = '0';
+            setTimeout(() => flash.remove(), 233);
+        }, 720);
+
+        // Trigger massive particle burst
+        if (window.ParticleCanvas && window.ParticleCanvas.triggerBeat) {
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => window.ParticleCanvas.triggerBeat(), i * 100);
+            }
+        }
+
+        // Spawn section bursts
+        if (window.ParticleCanvas && window.ParticleCanvas.spawnBurst) {
+            window.ParticleCanvas.spawnBurst('brass', 1);
+            setTimeout(() => window.ParticleCanvas.spawnBurst('percussion', 1), 144);
+            setTimeout(() => window.ParticleCanvas.spawnBurst('strings', 1), 288);
+        }
+
+        // Add temporary metal glow to title
+        const title = document.querySelector('.overture-title');
+        if (title) {
+            title.style.transition = 'all 377ms ease-out';
+            title.style.textShadow = '0 0 30px #8b0000, 0 0 60px #c0c0c0, 0 0 90px #8b0000';
+            setTimeout(() => {
+                title.style.textShadow = '';
+            }, 2000);
+        }
+
+        // Reset after effect
+        setTimeout(() => {
+            metalModeActive = false;
+        }, 3000);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // COMPLETION CELEBRATION
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    function initCompletionCelebration() {
+        if (!elements.audio) return;
+
+        elements.audio.addEventListener('ended', () => {
+            // Trigger celebration particle burst
+            if (window.ParticleCanvas && window.ParticleCanvas.spawnBurst) {
+                window.ParticleCanvas.spawnBurst('brass', 1);
+                setTimeout(() => window.ParticleCanvas.spawnBurst('strings', 1), 233);
+                setTimeout(() => window.ParticleCanvas.spawnBurst('percussion', 1), 466);
+            }
+
+            // Show completion message
+            const message = document.createElement('div');
+            message.innerHTML = `
+                <div style="
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    text-align: center;
+                    z-index: 10000;
+                    animation: completion-fade 3000ms ease-out forwards;
+                ">
+                    <div style="
+                        font-family: 'EB Garamond', serif;
+                        font-size: clamp(1.5rem, 4vw, 2.5rem);
+                        color: #e5b84a;
+                        margin-bottom: 1rem;
+                        text-shadow: 0 0 20px rgba(229, 184, 74, 0.5);
+                    ">The symphony is complete.</div>
+                    <div style="
+                        font-size: 3rem;
+                        opacity: 0.8;
+                    ">鏡</div>
+                </div>
+            `;
+
+            // Add animation keyframes
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes completion-fade {
+                    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+                    20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                    80% { opacity: 1; }
+                    100% { opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+            document.body.appendChild(message);
+
+            // Remove after animation
+            setTimeout(() => {
+                message.remove();
+                style.remove();
+            }, 3500);
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // PLAY BUTTON STATE
     // ═══════════════════════════════════════════════════════════════════════════
 
@@ -498,6 +645,8 @@
         initKeyboardNav();
         initPlayButton();
         initProgressBar();
+        initKonamiCode();
+        initCompletionCelebration();
 
         console.log('Master of Puppets — A Fantasia');
         console.log('Controls: Space (play/pause), ← → (seek), ↑ ↓ (volume), M (mute)');
