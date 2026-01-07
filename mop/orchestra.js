@@ -45,13 +45,12 @@
     // Section activity tracking
     const sectionActivity = { strings: 0, woodwinds: 0, brass: 0, percussion: 0 };
 
-    let isPlaying = false;
     let animationId = null;
 
     // =========================================================================
     // UTILITIES
     // =========================================================================
-    
+
     function formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
@@ -59,31 +58,18 @@
     }
 
     // =========================================================================
-    // PLAYBACK CONTROL
+    // PLAYBACK CONTROL (handled by app.js, we just listen to events)
     // =========================================================================
-    
-    function togglePlay() {
-        if (isPlaying) {
-            audio.pause();
-            playBtn.classList.remove('playing');
-            playBtn.innerHTML = '▶';
-            playBtn.setAttribute('aria-label', 'Play');
-            cancelAnimationFrame(animationId);
-        } else {
-            audio.play().catch(e => {
-                console.log('Audio play failed:', e);
-                // Show error state
-                playBtn.innerHTML = '⚠';
-            });
-            playBtn.classList.add('playing');
-            playBtn.innerHTML = '⏸';
-            playBtn.setAttribute('aria-label', 'Pause');
-            updateVisualization();
-        }
-        isPlaying = !isPlaying;
-    }
 
-    playBtn.addEventListener('click', togglePlay);
+    audio.addEventListener('play', () => {
+        console.log('▶ Audio playing');
+        updateVisualization();
+    });
+
+    audio.addEventListener('pause', () => {
+        console.log('⏸ Audio paused');
+        cancelAnimationFrame(animationId);
+    });
 
     // Volume control
     if (volumeSlider) {
@@ -244,14 +230,9 @@
     // =========================================================================
     
     audio.addEventListener('ended', () => {
-        isPlaying = false;
-        playBtn.classList.remove('playing');
-        playBtn.innerHTML = '▶';
-        playBtn.setAttribute('aria-label', 'Play');
         cancelAnimationFrame(animationId);
         // Reset indices
         Object.keys(noteIndices).forEach(id => noteIndices[id] = 0);
-        if (progressFill) progressFill.style.width = '0%';
     });
 
     audio.addEventListener('loadedmetadata', () => {
@@ -271,28 +252,6 @@
         console.error('✗ Audio error:', e);
         if (timeDisplay) timeDisplay.textContent = 'Audio load error';
         playBtn.innerHTML = '⚠';
-    });
-
-    // =========================================================================
-    // KEYBOARD CONTROLS
-    // =========================================================================
-    
-    document.addEventListener('keydown', (e) => {
-        // Don't intercept if user is typing in an input
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-        
-        if (e.code === 'Space') {
-            e.preventDefault();
-            togglePlay();
-        }
-        if (e.code === 'ArrowRight') {
-            e.preventDefault();
-            audio.currentTime = Math.min(audio.currentTime + 5, DURATION);
-        }
-        if (e.code === 'ArrowLeft') {
-            e.preventDefault();
-            audio.currentTime = Math.max(audio.currentTime - 5, 0);
-        }
     });
 
     // =========================================================================

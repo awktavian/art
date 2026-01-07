@@ -1,11 +1,12 @@
 /**
  * Master of Puppets — Audio-Reactive Particle Canvas
  *
- * Particles that respond to:
- * - Audio frequency data (bass, mid, treble)
- * - Note events from the orchestra
- * - Mouse/touch interaction
- * - Scroll position
+ * WORLD-CLASS visualization synced to audio:
+ * - Real-time FFT analysis with bass/mid/treble separation
+ * - Waveform visualization
+ * - Beat detection with burst spawning
+ * - Dramatic particle behaviors tied to frequency data
+ * - Orchestra section integration
  *
  * h(x) >= 0
  */
@@ -19,15 +20,38 @@
     const ctx = canvas.getContext('2d');
     const audio = document.getElementById('audio');
 
-    // Audio analysis
+    // ═══════════════════════════════════════════════════════════════════════════
+    // AUDIO ANALYSIS (Enhanced)
+    // ═══════════════════════════════════════════════════════════════════════════
+
     let audioContext = null;
     let analyser = null;
+    let analyserWaveform = null;
     let frequencyData = null;
+    let waveformData = null;
     let audioConnected = false;
 
-    // Particle system
+    // Audio levels with smoothing
+    let bassLevel = 0;
+    let midLevel = 0;
+    let trebleLevel = 0;
+    let bassSmooth = 0;
+    let midSmooth = 0;
+    let trebleSmooth = 0;
+    let overallLevel = 0;
+    let beatDetected = false;
+    let lastBeatTime = 0;
+    let beatThreshold = 0.6;
+    let previousBass = 0;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PARTICLE SYSTEM (Enhanced)
+    // ═══════════════════════════════════════════════════════════════════════════
+
     const particles = [];
-    const MAX_PARTICLES = 150;
+    const MAX_PARTICLES = 300;
+    const waveParticles = [];
+    const MAX_WAVE_PARTICLES = 100;
 
     // Color palette
     const COLORS = {
@@ -35,11 +59,14 @@
         gold: [229, 184, 74],
         copper: [184, 115, 51],
         red: [139, 0, 0],
+        deepRed: [100, 0, 0],
         flow: [0, 229, 204],
         strings: [193, 154, 107],
         brass: [255, 215, 0],
         woodwinds: [46, 139, 87],
-        percussion: [139, 69, 19]
+        percussion: [139, 69, 19],
+        white: [248, 246, 242],
+        purple: [102, 51, 153]
     };
 
     // State
@@ -47,12 +74,9 @@
     let height = window.innerHeight;
     let mouseX = width / 2;
     let mouseY = height / 2;
-    let scrollProgress = 0;
-    let bassLevel = 0;
-    let midLevel = 0;
-    let trebleLevel = 0;
     let isPlaying = false;
     let activeSection = null;
+    let frameCount = 0;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // AUDIO SETUP
@@ -63,18 +87,27 @@
 
         try {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+            // Main frequency analyser
             analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
-            analyser.smoothingTimeConstant = 0.8;
+            analyser.fftSize = 512;
+            analyser.smoothingTimeConstant = 0.7;
+
+            // Waveform analyser
+            analyserWaveform = audioContext.createAnalyser();
+            analyserWaveform.fftSize = 2048;
+            analyserWaveform.smoothingTimeConstant = 0.3;
 
             const source = audioContext.createMediaElementSource(audio);
             source.connect(analyser);
+            source.connect(analyserWaveform);
             analyser.connect(audioContext.destination);
 
             frequencyData = new Uint8Array(analyser.frequencyBinCount);
+            waveformData = new Uint8Array(analyserWaveform.frequencyBinCount);
             audioConnected = true;
 
-            console.log('Audio analysis connected');
+            console.log('🎵 Audio analysis connected - FFT size:', analyser.fftSize);
         } catch (e) {
             console.warn('Audio analysis not available:', e.message);
         }
@@ -84,31 +117,92 @@
         if (!analyser || !frequencyData) return;
 
         analyser.getByteFrequencyData(frequencyData);
+        if (analyserWaveform && waveformData) {
+            analyserWaveform.getByteTimeDomainData(waveformData);
+        }
 
         const binCount = frequencyData.length;
-        const bassEnd = Math.floor(binCount * 0.15);
-        const midEnd = Math.floor(binCount * 0.5);
+        const bassEnd = Math.floor(binCount * 0.1);     // 0-10% = sub bass + bass
+        const lowMidEnd = Math.floor(binCount * 0.25);  // 10-25% = low mids
+        const midEnd = Math.floor(binCount * 0.5);      // 25-50% = mids
+        const trebleStart = Math.floor(binCount * 0.5); // 50-100% = treble
 
-        // Calculate levels
+        // Calculate levels with better weighting
         let bassSum = 0, midSum = 0, trebleSum = 0;
 
+        // Bass (weighted toward sub-bass)
         for (let i = 0; i < bassEnd; i++) {
-            bassSum += frequencyData[i];
+            const weight = 1 + (bassEnd - i) / bassEnd; // More weight to lower frequencies
+            bassSum += frequencyData[i] * weight;
         }
+
+        // Mids
         for (let i = bassEnd; i < midEnd; i++) {
             midSum += frequencyData[i];
         }
-        for (let i = midEnd; i < binCount; i++) {
+
+        // Treble
+        for (let i = trebleStart; i < binCount; i++) {
             trebleSum += frequencyData[i];
         }
 
-        bassLevel = bassSum / (bassEnd * 255);
-        midLevel = midSum / ((midEnd - bassEnd) * 255);
-        trebleLevel = trebleSum / ((binCount - midEnd) * 255);
+        // Normalize to 0-1 range
+        bassLevel = Math.min(1, bassSum / (bassEnd * 255 * 1.5));
+        midLevel = Math.min(1, midSum / ((midEnd - bassEnd) * 255));
+        trebleLevel = Math.min(1, trebleSum / ((binCount - trebleStart) * 255));
+
+        // Smooth the levels for visual appeal
+        const smoothing = 0.15;
+        bassSmooth += (bassLevel - bassSmooth) * smoothing;
+        midSmooth += (midLevel - midSmooth) * smoothing;
+        trebleSmooth += (trebleLevel - trebleSmooth) * smoothing;
+
+        overallLevel = (bassSmooth + midSmooth + trebleSmooth) / 3;
+
+        // Beat detection (look for sudden bass increases)
+        const bassJump = bassLevel - previousBass;
+        const now = performance.now();
+        if (bassJump > 0.15 && bassLevel > beatThreshold && now - lastBeatTime > 150) {
+            beatDetected = true;
+            lastBeatTime = now;
+            onBeat(bassLevel);
+        } else {
+            beatDetected = false;
+        }
+        previousBass = bassLevel;
+    }
+
+    function onBeat(intensity) {
+        // Spawn burst of particles on beat
+        const count = Math.floor(5 + intensity * 15);
+        const colors = [COLORS.gold, COLORS.copper, COLORS.brass, COLORS.red];
+
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2 + intensity * 5;
+            const color = colors[Math.floor(Math.random() * colors.length)];
+
+            spawnParticle({
+                x: width / 2 + (Math.random() - 0.5) * 200,
+                y: height / 2 + (Math.random() - 0.5) * 200,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                color: color,
+                size: 2 + intensity * 4,
+                alpha: 0.8,
+                decay: 0.008 + Math.random() * 0.005,
+                glow: true
+            });
+        }
+
+        // Also spawn wave particles from edges
+        if (intensity > 0.5) {
+            spawnWaveFromEdge(intensity);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // PARTICLE CLASS
+    // PARTICLE CLASS (Enhanced)
     // ═══════════════════════════════════════════════════════════════════════════
 
     class Particle {
@@ -117,66 +211,80 @@
             this.y = y ?? Math.random() * height;
             this.size = options.size ?? 1 + Math.random() * 2;
             this.baseSize = this.size;
-            this.vx = (Math.random() - 0.5) * 0.5;
-            this.vy = (Math.random() - 0.5) * 0.5;
+            this.vx = options.vx ?? (Math.random() - 0.5) * 0.5;
+            this.vy = options.vy ?? (Math.random() - 0.5) * 0.5;
             this.life = 1;
             this.decay = options.decay ?? 0.001 + Math.random() * 0.002;
             this.color = options.color ?? COLORS.gold;
             this.alpha = options.alpha ?? 0.3 + Math.random() * 0.4;
+            this.baseAlpha = this.alpha;
             this.pulsePhase = Math.random() * Math.PI * 2;
-            this.pulseSpeed = 0.02 + Math.random() * 0.02;
+            this.pulseSpeed = 0.03 + Math.random() * 0.03;
             this.section = options.section ?? null;
+            this.glow = options.glow ?? false;
+            this.trail = [];
+            this.maxTrail = options.glow ? 8 : 3;
         }
 
-        update(dt) {
+        update() {
+            // Store trail position
+            if (this.trail.length >= this.maxTrail) {
+                this.trail.shift();
+            }
+            this.trail.push({ x: this.x, y: this.y, size: this.size });
+
             // Fibonacci-based pulse
             this.pulsePhase += this.pulseSpeed;
-            const pulse = Math.sin(this.pulsePhase) * 0.3 + 1;
+            const pulse = Math.sin(this.pulsePhase) * 0.4 + 1;
 
             // Audio reactivity
             let audioBoost = 1;
             if (isPlaying) {
-                if (this.section === 'percussion' || !this.section) {
-                    audioBoost += bassLevel * 2;
+                if (this.section === 'percussion' || this.glow) {
+                    audioBoost += bassSmooth * 3;
                 } else if (this.section === 'brass') {
-                    audioBoost += midLevel * 1.5;
+                    audioBoost += midSmooth * 2.5;
                 } else if (this.section === 'strings' || this.section === 'woodwinds') {
-                    audioBoost += trebleLevel * 1.2;
+                    audioBoost += trebleSmooth * 2;
                 } else {
-                    audioBoost += (bassLevel + midLevel + trebleLevel) / 3 * 1.5;
+                    audioBoost += overallLevel * 2;
                 }
             }
 
             this.size = this.baseSize * pulse * audioBoost;
+            this.alpha = this.baseAlpha * (0.5 + overallLevel * 0.5) * this.life;
 
             // Movement with audio influence
-            const audioMovement = isPlaying ? (bassLevel * 0.5 + 0.5) : 0.5;
-            this.x += this.vx * audioMovement;
-            this.y += this.vy * audioMovement;
+            const audioSpeed = isPlaying ? (1 + bassSmooth * 2) : 1;
+            this.x += this.vx * audioSpeed;
+            this.y += this.vy * audioSpeed;
 
-            // Gentle drift toward center when music plays
-            if (isPlaying && bassLevel > 0.3) {
+            // Dramatic movement during loud parts
+            if (isPlaying && bassSmooth > 0.4) {
                 const dx = width / 2 - this.x;
                 const dy = height / 2 - this.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist > 100) {
-                    this.vx += (dx / dist) * 0.01 * bassLevel;
-                    this.vy += (dy / dist) * 0.01 * bassLevel;
+                if (dist > 50) {
+                    // Spiral toward center on bass hits
+                    const perpX = -dy / dist;
+                    const perpY = dx / dist;
+                    this.vx += (dx / dist * 0.03 + perpX * 0.02) * bassSmooth;
+                    this.vy += (dy / dist * 0.03 + perpY * 0.02) * bassSmooth;
                 }
             }
 
-            // Mouse attraction
+            // Mouse interaction
             const mdx = mouseX - this.x;
             const mdy = mouseY - this.y;
             const mdist = Math.sqrt(mdx * mdx + mdy * mdy);
             if (mdist < 200 && mdist > 10) {
-                this.vx += (mdx / mdist) * 0.02;
-                this.vy += (mdy / mdist) * 0.02;
+                this.vx += (mdx / mdist) * 0.03;
+                this.vy += (mdy / mdist) * 0.03;
             }
 
             // Velocity damping
-            this.vx *= 0.99;
-            this.vy *= 0.99;
+            this.vx *= 0.98;
+            this.vy *= 0.98;
 
             // Wrap around edges
             if (this.x < -50) this.x = width + 50;
@@ -191,20 +299,125 @@
         }
 
         draw() {
-            const alpha = this.alpha * this.life;
             const [r, g, b] = this.color;
 
+            // Draw trail
+            if (this.trail.length > 1 && isPlaying) {
+                ctx.beginPath();
+                ctx.moveTo(this.trail[0].x, this.trail[0].y);
+                for (let i = 1; i < this.trail.length; i++) {
+                    ctx.lineTo(this.trail[i].x, this.trail[i].y);
+                }
+                ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${this.alpha * 0.3})`;
+                ctx.lineWidth = this.size * 0.5;
+                ctx.stroke();
+            }
+
+            // Main particle
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${this.alpha})`;
             ctx.fill();
 
-            // Glow effect when audio is loud
-            if (isPlaying && (bassLevel > 0.4 || this.section === activeSection)) {
+            // Glow effect
+            if (this.glow || (isPlaying && (bassSmooth > 0.5 || this.section === activeSection))) {
+                const glowSize = this.size * (2 + bassSmooth * 2);
+                const gradient = ctx.createRadialGradient(
+                    this.x, this.y, 0,
+                    this.x, this.y, glowSize
+                );
+                gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${this.alpha * 0.5})`);
+                gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
                 ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 2, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha * 0.3})`;
+                ctx.arc(this.x, this.y, glowSize, 0, Math.PI * 2);
+                ctx.fillStyle = gradient;
                 ctx.fill();
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // WAVE PARTICLE (for dramatic moments)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    class WaveParticle {
+        constructor(x, y, angle, speed, color) {
+            this.x = x;
+            this.y = y;
+            this.vx = Math.cos(angle) * speed;
+            this.vy = Math.sin(angle) * speed;
+            this.size = 3 + Math.random() * 2;
+            this.life = 1;
+            this.color = color;
+            this.alpha = 0.8;
+        }
+
+        update() {
+            this.x += this.vx * (1 + bassSmooth);
+            this.y += this.vy * (1 + bassSmooth);
+            this.vx *= 0.99;
+            this.vy *= 0.99;
+            this.life -= 0.015;
+            this.size *= 0.98;
+            return this.life > 0;
+        }
+
+        draw() {
+            const [r, g, b] = this.color;
+            const a = this.alpha * this.life;
+
+            // Core
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+            ctx.fill();
+
+            // Glow
+            const gradient = ctx.createRadialGradient(
+                this.x, this.y, 0,
+                this.x, this.y, this.size * 3
+            );
+            gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${a * 0.5})`);
+            gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size * 3, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+        }
+    }
+
+    function spawnWaveFromEdge(intensity) {
+        const edge = Math.floor(Math.random() * 4);
+        const count = Math.floor(10 + intensity * 20);
+        const color = Math.random() > 0.5 ? COLORS.gold : COLORS.copper;
+
+        for (let i = 0; i < count; i++) {
+            let x, y, angle;
+            switch (edge) {
+                case 0: // Top
+                    x = Math.random() * width;
+                    y = 0;
+                    angle = Math.PI / 2 + (Math.random() - 0.5) * 0.5;
+                    break;
+                case 1: // Right
+                    x = width;
+                    y = Math.random() * height;
+                    angle = Math.PI + (Math.random() - 0.5) * 0.5;
+                    break;
+                case 2: // Bottom
+                    x = Math.random() * width;
+                    y = height;
+                    angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.5;
+                    break;
+                case 3: // Left
+                    x = 0;
+                    y = Math.random() * height;
+                    angle = (Math.random() - 0.5) * 0.5;
+                    break;
+            }
+
+            if (waveParticles.length < MAX_WAVE_PARTICLES) {
+                waveParticles.push(new WaveParticle(x, y, angle, 3 + intensity * 5, color));
             }
         }
     }
@@ -221,31 +434,176 @@
 
     function spawnSectionBurst(section, intensity = 1) {
         const sectionColor = COLORS[section] || COLORS.gold;
-        const count = Math.floor(3 + intensity * 5);
+        const count = Math.floor(5 + intensity * 10);
 
         for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 1 + intensity * 3;
+
             spawnParticle({
-                x: width * (0.3 + Math.random() * 0.4),
-                y: height * (0.3 + Math.random() * 0.4),
+                x: width / 2 + (Math.random() - 0.5) * 300,
+                y: height / 2 + (Math.random() - 0.5) * 300,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
                 color: sectionColor,
-                size: 2 + Math.random() * 3,
-                alpha: 0.5 + intensity * 0.3,
-                decay: 0.005 + Math.random() * 0.005,
-                section: section
+                size: 2 + Math.random() * 4,
+                alpha: 0.6 + intensity * 0.3,
+                decay: 0.004 + Math.random() * 0.004,
+                section: section,
+                glow: true
             });
         }
 
         activeSection = section;
         setTimeout(() => {
             if (activeSection === section) activeSection = null;
-        }, 300);
+        }, 500);
     }
 
     function initParticles() {
-        for (let i = 0; i < MAX_PARTICLES * 0.6; i++) {
+        for (let i = 0; i < MAX_PARTICLES * 0.4; i++) {
             const colorKeys = ['gold', 'copper', 'strings', 'brass'];
             const color = COLORS[colorKeys[Math.floor(Math.random() * colorKeys.length)]];
             spawnParticle({ color });
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // WAVEFORM VISUALIZATION
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    function drawWaveform() {
+        if (!waveformData || !isPlaying) return;
+
+        const sliceWidth = width / waveformData.length;
+
+        ctx.beginPath();
+        ctx.moveTo(0, height / 2);
+
+        for (let i = 0; i < waveformData.length; i++) {
+            const v = waveformData[i] / 128.0;
+            const y = (v * height / 4) + height / 2;
+
+            if (i === 0) {
+                ctx.moveTo(i * sliceWidth, y);
+            } else {
+                ctx.lineTo(i * sliceWidth, y);
+            }
+        }
+
+        ctx.strokeStyle = `rgba(229, 184, 74, ${0.05 + bassSmooth * 0.1})`;
+        ctx.lineWidth = 1 + bassSmooth * 2;
+        ctx.stroke();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FREQUENCY BARS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    function drawFrequencyBars() {
+        if (!frequencyData || !isPlaying) return;
+
+        const barCount = 64;
+        const barWidth = width / barCount;
+        const maxHeight = height * 0.3;
+
+        for (let i = 0; i < barCount; i++) {
+            const dataIndex = Math.floor(i * (frequencyData.length / barCount));
+            const value = frequencyData[dataIndex] / 255;
+            const barHeight = value * maxHeight;
+
+            // Gradient from bottom
+            const gradient = ctx.createLinearGradient(0, height, 0, height - barHeight);
+            gradient.addColorStop(0, `rgba(139, 0, 0, ${value * 0.3})`);
+            gradient.addColorStop(0.5, `rgba(229, 184, 74, ${value * 0.2})`);
+            gradient.addColorStop(1, `rgba(229, 184, 74, 0)`);
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(
+                i * barWidth,
+                height - barHeight,
+                barWidth - 1,
+                barHeight
+            );
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CENTRAL ORB (responsive to audio)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    function drawCentralOrb() {
+        if (!isPlaying) return;
+
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const baseRadius = 50;
+        const audioRadius = baseRadius + bassSmooth * 100;
+
+        // Outer glow
+        const outerGlow = ctx.createRadialGradient(
+            centerX, centerY, 0,
+            centerX, centerY, audioRadius * 2
+        );
+        outerGlow.addColorStop(0, `rgba(229, 184, 74, ${0.1 + bassSmooth * 0.2})`);
+        outerGlow.addColorStop(0.5, `rgba(139, 0, 0, ${0.05 + bassSmooth * 0.1})`);
+        outerGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, audioRadius * 2, 0, Math.PI * 2);
+        ctx.fillStyle = outerGlow;
+        ctx.fill();
+
+        // Inner core
+        const innerGlow = ctx.createRadialGradient(
+            centerX, centerY, 0,
+            centerX, centerY, audioRadius
+        );
+        innerGlow.addColorStop(0, `rgba(255, 255, 255, ${0.1 + overallLevel * 0.3})`);
+        innerGlow.addColorStop(0.3, `rgba(229, 184, 74, ${0.1 + midSmooth * 0.2})`);
+        innerGlow.addColorStop(1, 'rgba(229, 184, 74, 0)');
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, audioRadius, 0, Math.PI * 2);
+        ctx.fillStyle = innerGlow;
+        ctx.fill();
+
+        // Pulsing ring on beats
+        if (beatDetected) {
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, audioRadius * 1.5, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(229, 184, 74, 0.5)`;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CONNECTION LINES
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    function drawConnections() {
+        if (!isPlaying || bassSmooth < 0.2) return;
+
+        const connectionDistance = 80 + bassSmooth * 60;
+        ctx.strokeStyle = `rgba(229, 184, 74, ${bassSmooth * 0.2})`;
+        ctx.lineWidth = 0.5 + bassSmooth;
+
+        for (let i = 0; i < particles.length; i++) {
+            for (let j = i + 1; j < Math.min(particles.length, i + 20); j++) {
+                const dx = particles[i].x - particles[j].x;
+                const dy = particles[i].y - particles[j].y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < connectionDistance) {
+                    const alpha = (1 - dist / connectionDistance) * bassSmooth * 0.3;
+                    ctx.beginPath();
+                    ctx.moveTo(particles[i].x, particles[i].y);
+                    ctx.lineTo(particles[j].x, particles[j].y);
+                    ctx.strokeStyle = `rgba(229, 184, 74, ${alpha})`;
+                    ctx.stroke();
+                }
+            }
         }
     }
 
@@ -264,16 +622,25 @@
     }
 
     function render() {
+        frameCount++;
+
         // Analyze audio if playing
         if (isPlaying) {
             analyzeAudio();
         }
 
-        // Clear with trail effect
-        ctx.fillStyle = `rgba(3, 3, 5, ${isPlaying ? 0.15 : 0.1})`;
+        // Clear with dynamic trail effect
+        const trailOpacity = isPlaying ? (0.08 + (1 - overallLevel) * 0.12) : 0.1;
+        ctx.fillStyle = `rgba(3, 3, 5, ${trailOpacity})`;
         ctx.fillRect(0, 0, width, height);
 
-        // Update and draw particles
+        // Draw layers (back to front)
+        drawFrequencyBars();
+        drawWaveform();
+        drawCentralOrb();
+        drawConnections();
+
+        // Update and draw main particles
         for (let i = particles.length - 1; i >= 0; i--) {
             if (!particles[i].update()) {
                 particles.splice(i, 1);
@@ -282,39 +649,32 @@
             }
         }
 
+        // Update and draw wave particles
+        for (let i = waveParticles.length - 1; i >= 0; i--) {
+            if (!waveParticles[i].update()) {
+                waveParticles.splice(i, 1);
+            } else {
+                waveParticles[i].draw();
+            }
+        }
+
         // Spawn new particles to maintain count
-        while (particles.length < MAX_PARTICLES * 0.5) {
+        if (particles.length < MAX_PARTICLES * 0.3) {
             const colorKeys = ['gold', 'copper', 'strings', 'brass'];
             const color = COLORS[colorKeys[Math.floor(Math.random() * colorKeys.length)]];
             spawnParticle({ color });
         }
 
-        // Draw connections when audio is loud
-        if (isPlaying && bassLevel > 0.3) {
-            drawConnections();
+        // Periodic spawning during playback
+        if (isPlaying && frameCount % 5 === 0 && particles.length < MAX_PARTICLES * 0.7) {
+            const colors = [COLORS.gold, COLORS.copper];
+            spawnParticle({
+                color: colors[Math.floor(Math.random() * colors.length)],
+                alpha: 0.2 + overallLevel * 0.3
+            });
         }
 
         requestAnimationFrame(render);
-    }
-
-    function drawConnections() {
-        ctx.strokeStyle = `rgba(229, 184, 74, ${bassLevel * 0.15})`;
-        ctx.lineWidth = 0.5;
-
-        for (let i = 0; i < particles.length; i++) {
-            for (let j = i + 1; j < particles.length; j++) {
-                const dx = particles[i].x - particles[j].x;
-                const dy = particles[i].y - particles[j].y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-
-                if (dist < 100) {
-                    ctx.beginPath();
-                    ctx.moveTo(particles[i].x, particles[i].y);
-                    ctx.lineTo(particles[j].x, particles[j].y);
-                    ctx.stroke();
-                }
-            }
-        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -335,11 +695,6 @@
         }
     });
 
-    document.addEventListener('scroll', () => {
-        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-        scrollProgress = window.scrollY / maxScroll;
-    });
-
     // Listen for play/pause
     if (audio) {
         audio.addEventListener('play', () => {
@@ -348,10 +703,12 @@
             if (audioContext && audioContext.state === 'suspended') {
                 audioContext.resume();
             }
+            console.log('▶ Visualization active');
         });
 
         audio.addEventListener('pause', () => {
             isPlaying = false;
+            console.log('⏸ Visualization paused');
         });
 
         audio.addEventListener('ended', () => {
@@ -366,7 +723,14 @@
     window.ParticleCanvas = {
         spawnBurst: spawnSectionBurst,
         setActiveSection: (section) => { activeSection = section; },
-        getAudioLevels: () => ({ bass: bassLevel, mid: midLevel, treble: trebleLevel })
+        getAudioLevels: () => ({
+            bass: bassSmooth,
+            mid: midSmooth,
+            treble: trebleSmooth,
+            overall: overallLevel,
+            beat: beatDetected
+        }),
+        triggerBeat: () => onBeat(0.8)
     };
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -377,6 +741,7 @@
     initParticles();
     render();
 
-    console.log('Particle canvas initialized');
+    console.log('🎨 Audio-reactive particle canvas initialized');
+    console.log('   Features: FFT analysis, beat detection, waveform, frequency bars');
 
 })();
