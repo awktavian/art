@@ -109,7 +109,7 @@ html {
     /* Text */
     --text-primary: #F4F1EA;
     --text-secondary: rgba(244, 241, 234, 0.7);
-    --text-tertiary: rgba(244, 241, 234, 0.4);
+    --text-tertiary: rgba(244, 241, 234, 0.55);
     
     /* Semantic */
     --success: #4ECB71;
@@ -171,6 +171,20 @@ html {
     --z-content: 10;
     --z-nav: 100;
     --z-cursor: 9999;
+
+    /* Atmosphere - DRAMATIC effects based on reader's real weather */
+    --atmosphere-hue-shift: 0deg;
+    --atmosphere-saturation: 1;
+    --atmosphere-brightness: 1;
+    --atmosphere-contrast: 1;
+    --atmosphere-timing: 1;
+    --atmosphere-particle-drift-x: 0;
+    --atmosphere-particle-drift-y: -0.5;
+    --atmosphere-turbulence: 0;
+    --atmosphere-particle-opacity: 1;
+    --atmosphere-glow: 1;
+    --atmosphere-vignette: 0;
+    --atmosphere-blur: 0px;
 }
 
 /* ========================================
@@ -205,6 +219,41 @@ html {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+}
+
+/* Focus indicators - visible for keyboard users */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 3px;
+    border-radius: var(--radius-sm);
+}
+
+/* Remove focus outline on mouse click but keep for keyboard */
+:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* High contrast mode support */
+@media (forced-colors: active) {
+    .card,
+    .code-block,
+    .callout,
+    .live-demo {
+        border: 2px solid CanvasText;
+    }
+
+    .cursor,
+    .cursor-ring,
+    .particles-container,
+    .breathing-glow {
+        display: none;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -300,6 +349,101 @@ body {
     overflow-x: hidden;
 }
 
+/* DRAMATIC Atmospheric color overlay - based on reader's real weather */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9998;
+    background: transparent;
+    filter:
+        hue-rotate(var(--atmosphere-hue-shift))
+        saturate(var(--atmosphere-saturation))
+        brightness(var(--atmosphere-brightness))
+        contrast(var(--atmosphere-contrast))
+        blur(var(--atmosphere-blur));
+    mix-blend-mode: color;
+    opacity: 0;
+    transition:
+        opacity var(--duration-987) var(--ease-smooth),
+        filter var(--duration-610) var(--ease-smooth);
+}
+
+/* DRAMATIC Vignette overlay for weather intensity */
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9997;
+    background: radial-gradient(
+        ellipse 80% 60% at 50% 50%,
+        transparent 30%,
+        rgba(0, 0, 0, calc(var(--atmosphere-vignette) * 0.8)) 100%
+    );
+    opacity: 0;
+    transition: opacity var(--duration-610) var(--ease-smooth);
+}
+
+/* Activate atmosphere when applied - DRAMATIC opacity */
+body.atmosphere-active::before {
+    opacity: 0.4;
+}
+
+body.atmosphere-active::after {
+    opacity: 1;
+}
+
+/* DRAMATIC Lightning Flash Effect */
+body.lightning-flash {
+    animation: lightning-shake 0.1s ease-out;
+}
+
+body.lightning-flash::before {
+    opacity: 0.8 !important;
+    filter:
+        hue-rotate(0deg)
+        saturate(0.2)
+        brightness(2)
+        contrast(1.5) !important;
+    transition: none !important;
+}
+
+body.lightning-flash .hero-sun,
+body.lightning-flash .celestial-sun {
+    filter: brightness(3) saturate(0) !important;
+    box-shadow: 0 0 200px 100px rgba(255, 255, 255, 0.8) !important;
+}
+
+@keyframes lightning-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-2px); }
+    75% { transform: translateX(2px); }
+}
+
+/* Weather-specific body styles */
+body[data-weather="thunderstorm"] {
+    --gold: #8B9DC3;
+    --gold-bright: #A0B4D4;
+}
+
+body[data-weather="rain"],
+body[data-weather="heavy_rain"],
+body[data-weather="showers"] {
+    --gold: #7B9AAF;
+}
+
+body[data-weather="snow"],
+body[data-weather="heavy_snow"] {
+    --gold: #B8C5D6;
+    --gold-bright: #D4E0ED;
+}
+
+body[data-weather="fog"] {
+    --gold: #9A9A9A;
+}
+
 .background-layer {
     position: fixed;
     inset: 0;
@@ -324,7 +468,36 @@ body {
     z-index: 1000;
 }
 
-/* Particles container */
+/* ========================================
+ * PARTICLES CANVAS — GPU-accelerated
+ * ======================================== */
+
+/* Canvas-based particle system */
+.particles-canvas {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: var(--z-particles);
+    /* GPU acceleration hints */
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+/* Weather particle color tokens */
+:root {
+    --particle-rain: rgba(110, 164, 191, 0.6);
+    --particle-snow: rgba(255, 255, 255, 0.8);
+    --particle-fog: rgba(180, 180, 190, 0.04);
+    --particle-spark: rgba(255, 255, 200, 0.9);
+    --particle-dust: rgba(212, 175, 55, 0.5);
+    --particle-wind: rgba(255, 255, 255, 0.15);
+    --particle-haze: rgba(180, 180, 170, 0.1);
+    --particle-heat: rgba(255, 200, 100, 0.02);
+    --particle-connection: rgba(212, 175, 55, 0.15);
+}
+
+/* Legacy particles container (fallback) */
 .particles-container {
     position: fixed;
     inset: 0;
@@ -340,7 +513,9 @@ body {
     background: var(--gold);
     border-radius: 50%;
     opacity: 0;
-    animation: particle-float 8s ease-in-out infinite;
+    animation: particle-float calc(8s * var(--atmosphere-timing)) ease-in-out infinite;
+    filter: hue-rotate(var(--atmosphere-hue-shift));
+    --particle-base-opacity: calc(0.6 * var(--atmosphere-particle-opacity));
 }
 
 @keyframes particle-float {
@@ -367,8 +542,9 @@ body {
     background: radial-gradient(circle, var(--gold-subtle), transparent 70%);
     pointer-events: none;
     z-index: -1;
-    animation: breathe var(--duration-2584) ease-in-out infinite;
-    filter: blur(60px);
+    animation: breathe calc(var(--duration-2584) * var(--atmosphere-timing)) ease-in-out infinite;
+    filter: blur(60px) hue-rotate(var(--atmosphere-hue-shift));
+    opacity: calc(0.3 * var(--atmosphere-glow));
 }
 
 @keyframes breathe {
@@ -488,7 +664,7 @@ body {
 }
 
 .hero-stats {
-    display: flex;
+    display: none; /* Hidden - focus on celestial mechanism, not numbers */
     justify-content: center;
     gap: var(--space-8);
     flex-wrap: wrap;
@@ -540,14 +716,17 @@ body {
     height: 150px;
     border-radius: 50%;
     background: radial-gradient(circle at 30% 30%, var(--sun-noon) 0%, var(--sun) 40%, var(--sun-morning) 100%);
-    box-shadow: 
+    box-shadow:
         0 0 60px var(--sun-glow),
         0 0 120px rgba(255, 215, 0, 0.2),
         inset -20px -20px 40px rgba(255, 140, 66, 0.3);
     top: 15%;
     right: 10%;
-    animation: sun-pulse 4s ease-in-out infinite, sun-float 8s ease-in-out infinite;
+    animation:
+        sun-pulse calc(4s * var(--atmosphere-timing)) ease-in-out infinite,
+        sun-float calc(8s * var(--atmosphere-timing)) ease-in-out infinite;
     z-index: 1;
+    filter: hue-rotate(var(--atmosphere-hue-shift)) saturate(var(--atmosphere-saturation));
 }
 
 .hero-sun::before {
@@ -728,10 +907,87 @@ body {
     transform-origin: left;
 }
 
+/* Hamburger menu button */
+.nav-toggle {
+    display: none;
+    background: none;
+    border: none;
+    padding: var(--space-2);
+    cursor: pointer;
+    flex-direction: column;
+    gap: 5px;
+    z-index: 101;
+}
+
+.hamburger-line {
+    width: 24px;
+    height: 2px;
+    background: var(--gold);
+    border-radius: 2px;
+    transition: all var(--duration-233) var(--ease-out);
+    transform-origin: center;
+}
+
+.nav-toggle[aria-expanded="true"] .hamburger-line:nth-child(1) {
+    transform: rotate(45deg) translate(5px, 5px);
+}
+
+.nav-toggle[aria-expanded="true"] .hamburger-line:nth-child(2) {
+    opacity: 0;
+    transform: scaleX(0);
+}
+
+.nav-toggle[aria-expanded="true"] .hamburger-line:nth-child(3) {
+    transform: rotate(-45deg) translate(5px, -5px);
+}
+
 @media (max-width: 768px) {
-    .nav-links {
-        display: none;
+    .nav-toggle {
+        display: flex;
     }
+
+    .nav-links {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(7, 6, 11, 0.98);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: var(--space-4);
+        opacity: 0;
+        visibility: hidden;
+        transition: all var(--duration-377) var(--ease-out);
+        z-index: 100;
+    }
+
+    .nav-links.open {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .nav-links .nav-link {
+        font-size: var(--text-2xl);
+        font-family: var(--font-display);
+        transform: translateY(20px);
+        opacity: 0;
+        transition: all var(--duration-377) var(--ease-out);
+    }
+
+    .nav-links.open .nav-link {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    .nav-links.open .nav-link:nth-child(1) { transition-delay: 50ms; }
+    .nav-links.open .nav-link:nth-child(2) { transition-delay: 100ms; }
+    .nav-links.open .nav-link:nth-child(3) { transition-delay: 150ms; }
+    .nav-links.open .nav-link:nth-child(4) { transition-delay: 200ms; }
+    .nav-links.open .nav-link:nth-child(5) { transition-delay: 250ms; }
 }
 
 /* ========================================
@@ -799,10 +1055,10 @@ body {
     padding: var(--space-4);
     position: relative;
     overflow: hidden;
-    transition: 
-        transform var(--duration-377) var(--ease-spring),
-        border-color var(--duration-233) var(--ease-out),
-        box-shadow var(--duration-377) var(--ease-out);
+    transition:
+        transform calc(var(--duration-377) * var(--atmosphere-timing)) var(--ease-spring),
+        border-color calc(var(--duration-233) * var(--atmosphere-timing)) var(--ease-out),
+        box-shadow calc(var(--duration-377) * var(--atmosphere-timing)) var(--ease-out);
 }
 
 .card::before {
@@ -1120,8 +1376,8 @@ body {
 .slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 20px;
-    height: 20px;
+    width: 44px;
+    height: 44px;
     background: var(--gold);
     border-radius: 50%;
     cursor: pointer;
@@ -1139,8 +1395,8 @@ body {
 }
 
 .slider::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
+    width: 44px;
+    height: 44px;
     background: var(--gold);
     border-radius: 50%;
     cursor: pointer;
@@ -1566,9 +1822,9 @@ body {
 [data-reveal] {
     opacity: 0;
     transform: translateY(30px);
-    transition: 
-        opacity var(--duration-610) var(--ease-out),
-        transform var(--duration-610) var(--ease-out);
+    transition:
+        opacity calc(var(--duration-610) * var(--atmosphere-timing)) var(--ease-out),
+        transform calc(var(--duration-610) * var(--atmosphere-timing)) var(--ease-out);
 }
 
 [data-reveal].visible {
@@ -1583,26 +1839,97 @@ body {
 [data-reveal-delay="4"] { transition-delay: 400ms; }
 [data-reveal-delay="5"] { transition-delay: 500ms; }
 
-/* Loading state */
+/* Loading state — Dramatic sun-rise entrance */
 body.loading {
     overflow: hidden;
 }
 
-body.loading .hero-content,
+body.loading .hero-content {
+    opacity: 0;
+    transform: translateY(40px);
+}
+
 body.loading .hero-sun {
+    opacity: 0;
+    transform: translateY(200px) scale(0.5);
+    filter: blur(20px);
+}
+
+body.loading .hero-badge {
     opacity: 0;
     transform: translateY(20px);
 }
 
-body:not(.loading) .hero-content,
+body.loading .hero-title {
+    opacity: 0;
+    transform: translateY(30px);
+}
+
+body.loading .hero-subtitle {
+    opacity: 0;
+    transform: translateY(30px);
+}
+
+body.loading .hero-stats {
+    opacity: 0;
+    transform: translateY(30px);
+}
+
+body.loading .scroll-indicator {
+    opacity: 0;
+}
+
+/* Entrance animation sequence */
 body:not(.loading) .hero-sun {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+    transition:
+        opacity var(--duration-987) var(--ease-out-expo),
+        transform var(--duration-1597) var(--ease-out-expo),
+        filter var(--duration-987) var(--ease-out);
+    transition-delay: 100ms;
+}
+
+body:not(.loading) .hero-content {
     opacity: 1;
     transform: translateY(0);
     transition: all var(--duration-987) var(--ease-out);
+    transition-delay: 400ms;
 }
 
-body:not(.loading) .hero-sun {
-    transition-delay: 200ms;
+body:not(.loading) .hero-badge {
+    opacity: 1;
+    transform: translateY(0);
+    transition: all var(--duration-610) var(--ease-out-expo);
+    transition-delay: 500ms;
+}
+
+body:not(.loading) .hero-title {
+    opacity: 1;
+    transform: translateY(0);
+    transition: all var(--duration-987) var(--ease-out-expo);
+    transition-delay: 600ms;
+}
+
+body:not(.loading) .hero-subtitle {
+    opacity: 1;
+    transform: translateY(0);
+    transition: all var(--duration-610) var(--ease-out);
+    transition-delay: 800ms;
+}
+
+body:not(.loading) .hero-stats {
+    opacity: 1;
+    transform: translateY(0);
+    transition: all var(--duration-610) var(--ease-out);
+    transition-delay: 1000ms;
+}
+
+body:not(.loading) .scroll-indicator {
+    opacity: 1;
+    transition: opacity var(--duration-610) var(--ease-out);
+    transition-delay: 1200ms;
 }
 
 /* Count-up animation for stats */
@@ -1645,4 +1972,815 @@ body:not(.loading) .hero-sun {
 
 @keyframes draw-check {
     to { stroke-dashoffset: 0; }
+}
+
+/* ========================================
+ * CELESTIAL SKY — Sun, Moon, and Sundial
+ * Luxury astronomical timepiece aesthetic
+ * ======================================== */
+
+.celestial-sky {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    overflow: hidden;
+}
+
+/* ========================================
+ * CELESTIAL SUN
+ * ======================================== */
+.celestial-sun {
+    --sun-hue: 45;
+    --sun-saturation: 95%;
+    --sun-lightness: 55%;
+    --sun-scale: 1;
+
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    transform: translate(-50%, -50%) scale(var(--sun-scale));
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 10;
+    transition:
+        left var(--duration-987) var(--ease-smooth),
+        top var(--duration-987) var(--ease-smooth),
+        opacity var(--duration-610) var(--ease-out),
+        transform var(--duration-377) var(--ease-spring);
+}
+
+.celestial-sun:hover {
+    transform: translate(-50%, -50%) scale(calc(var(--sun-scale) * 1.15));
+}
+
+.celestial-sun:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 8px;
+    border-radius: 50%;
+}
+
+.celestial-sun .sun-core {
+    position: absolute;
+    inset: 15%;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle at 35% 35%,
+        hsl(var(--sun-hue), 80%, 85%) 0%,
+        hsl(var(--sun-hue), var(--sun-saturation), var(--sun-lightness)) 40%,
+        hsl(calc(var(--sun-hue) - 15), 100%, 45%) 100%
+    );
+    box-shadow:
+        0 0 40px hsla(var(--sun-hue), 100%, 60%, 0.6),
+        0 0 80px hsla(var(--sun-hue), 100%, 50%, 0.3),
+        inset -8px -8px 20px hsla(calc(var(--sun-hue) - 20), 100%, 40%, 0.4);
+    animation: sun-core-pulse 4s ease-in-out infinite;
+}
+
+@keyframes sun-core-pulse {
+    0%, 100% {
+        box-shadow:
+            0 0 40px hsla(var(--sun-hue), 100%, 60%, 0.6),
+            0 0 80px hsla(var(--sun-hue), 100%, 50%, 0.3),
+            inset -8px -8px 20px hsla(calc(var(--sun-hue) - 20), 100%, 40%, 0.4);
+    }
+    50% {
+        box-shadow:
+            0 0 60px hsla(var(--sun-hue), 100%, 60%, 0.8),
+            0 0 120px hsla(var(--sun-hue), 100%, 50%, 0.4),
+            inset -8px -8px 20px hsla(calc(var(--sun-hue) - 20), 100%, 40%, 0.4);
+    }
+}
+
+.celestial-sun .sun-corona {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle,
+        hsla(var(--sun-hue), 100%, 60%, 0.4) 0%,
+        hsla(var(--sun-hue), 100%, 50%, 0.2) 40%,
+        transparent 70%
+    );
+    animation: sun-corona-breathe 3s ease-in-out infinite;
+    filter: blur(8px);
+}
+
+@keyframes sun-corona-breathe {
+    0%, 100% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.2); opacity: 0.9; }
+}
+
+.celestial-sun .sun-rays {
+    position: absolute;
+    inset: -30%;
+    background:
+        repeating-conic-gradient(
+            from 0deg,
+            hsla(var(--sun-hue), 100%, 60%, 0.15) 0deg,
+            transparent 3deg,
+            transparent 12deg,
+            hsla(var(--sun-hue), 100%, 60%, 0.15) 15deg
+        );
+    border-radius: 50%;
+    animation: sun-rays-rotate 60s linear infinite;
+    filter: blur(2px);
+}
+
+@keyframes sun-rays-rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.celestial-sun.below-horizon {
+    filter: saturate(0.5) brightness(0.6);
+}
+
+.celestial-sun.twilight .sun-core {
+    background: radial-gradient(
+        circle at 35% 35%,
+        hsl(25, 100%, 70%) 0%,
+        hsl(15, 100%, 50%) 50%,
+        hsl(5, 100%, 35%) 100%
+    );
+}
+
+/* ========================================
+ * CELESTIAL MOON
+ * ======================================== */
+.celestial-moon {
+    --moon-glow: 0.5;
+
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 9;
+    transition:
+        left var(--duration-987) var(--ease-smooth),
+        top var(--duration-987) var(--ease-smooth),
+        opacity var(--duration-610) var(--ease-out),
+        transform var(--duration-377) var(--ease-spring);
+}
+
+.celestial-moon:hover {
+    transform: translate(-50%, -50%) scale(1.15);
+}
+
+.celestial-moon:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 8px;
+    border-radius: 50%;
+}
+
+.celestial-moon .moon-surface {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background:
+        radial-gradient(circle at 30% 25%, #E8E4D9 0%, #C5C0B0 40%, #9A9588 80%, #7A756A 100%);
+    box-shadow:
+        inset -6px -6px 15px rgba(0, 0, 0, 0.3),
+        inset 4px 4px 10px rgba(255, 255, 255, 0.1);
+    /* Subtle crater texture */
+    background-image:
+        radial-gradient(circle at 20% 30%, rgba(0,0,0,0.08) 0%, transparent 8%),
+        radial-gradient(circle at 55% 25%, rgba(0,0,0,0.06) 0%, transparent 6%),
+        radial-gradient(circle at 70% 55%, rgba(0,0,0,0.1) 0%, transparent 10%),
+        radial-gradient(circle at 35% 65%, rgba(0,0,0,0.07) 0%, transparent 7%),
+        radial-gradient(circle at 80% 35%, rgba(0,0,0,0.05) 0%, transparent 5%),
+        radial-gradient(circle at 45% 80%, rgba(0,0,0,0.08) 0%, transparent 9%),
+        radial-gradient(circle at 30% 25%, #E8E4D9 0%, #C5C0B0 40%, #9A9588 80%, #7A756A 100%);
+}
+
+.celestial-moon .moon-phase-shadow {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    pointer-events: none;
+    transition: background var(--duration-610) var(--ease-smooth);
+}
+
+.celestial-moon .moon-glow {
+    position: absolute;
+    inset: -15px;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle,
+        rgba(200, 200, 220, calc(var(--moon-glow) * 0.3)) 0%,
+        rgba(180, 180, 200, calc(var(--moon-glow) * 0.15)) 40%,
+        transparent 70%
+    );
+    filter: blur(10px);
+    pointer-events: none;
+}
+
+.celestial-moon.below-horizon {
+    filter: brightness(0.4) saturate(0.5);
+}
+
+/* Moon phase dataset styles */
+.celestial-moon[data-phase="new-moon"] .moon-glow {
+    opacity: 0.2;
+}
+
+.celestial-moon[data-phase="full-moon"] .moon-glow {
+    opacity: 1;
+    box-shadow: 0 0 40px rgba(200, 200, 220, 0.4);
+}
+
+/* ========================================
+ * SUNDIAL — Luxury Astronomical Timepiece
+ * ======================================== */
+.sundial {
+    position: absolute;
+    bottom: 8%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: clamp(160px, 28vw, 260px);  /* Larger, more prominent */
+    aspect-ratio: 1;
+    pointer-events: auto;
+    z-index: 15;
+}
+
+.sundial-face {
+    --ambient-light: 1;
+
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background:
+        radial-gradient(
+            circle at 30% 30%,
+            rgba(212, 175, 55, calc(0.15 * var(--ambient-light))) 0%,
+            rgba(139, 115, 36, calc(0.08 * var(--ambient-light))) 50%,
+            rgba(90, 75, 24, calc(0.05 * var(--ambient-light))) 100%
+        ),
+        linear-gradient(
+            135deg,
+            rgba(255, 255, 255, calc(0.08 * var(--ambient-light))) 0%,
+            transparent 50%,
+            rgba(0, 0, 0, calc(0.1 * var(--ambient-light))) 100%
+        ),
+        #1a1815;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.5),
+        0 2px 8px rgba(0, 0, 0, 0.3),
+        inset 0 2px 4px rgba(255, 255, 255, 0.05),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.2);
+    border: 2px solid rgba(212, 175, 55, 0.4);
+    transition:
+        box-shadow var(--duration-377) var(--ease-out),
+        border-color var(--duration-377) var(--ease-out);
+}
+
+.sundial:hover .sundial-face {
+    box-shadow:
+        0 12px 40px rgba(0, 0, 0, 0.6),
+        0 4px 12px rgba(0, 0, 0, 0.4),
+        0 0 30px rgba(212, 175, 55, 0.15),
+        inset 0 2px 4px rgba(255, 255, 255, 0.08),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.2);
+    border-color: rgba(212, 175, 55, 0.6);
+}
+
+/* Decorative rings */
+.sundial-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(212, 175, 55, 0.25);
+}
+
+.sundial-ring-outer {
+    inset: 8%;
+}
+
+.sundial-ring-inner {
+    inset: 20%;
+    border-style: dashed;
+    border-color: rgba(212, 175, 55, 0.15);
+}
+
+/* Hour markers - simplified, only cardinals have labels */
+.sundial-hour-markers {
+    position: absolute;
+    inset: 0;
+}
+
+.sundial-hour-marker {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform-origin: center center;
+}
+
+.sundial-hour-marker.cardinal {
+    /* Position at outer edge, rotate to angle, then move outward */
+    transform: translate(-50%, -50%) rotate(var(--angle)) translateY(calc(-50% + 8px));
+}
+
+.sundial-numeral {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(12px, 2.2vw, 18px);
+    font-weight: 600;
+    color: var(--gold-bright);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+    transform: rotate(calc(-1 * var(--angle)));
+    display: block;
+    line-height: 1;
+}
+
+/* Subtle tick marks for non-cardinal hours */
+.sundial-tick-only {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 2px;
+    height: 8px;
+    background: var(--gold-dim);
+    transform-origin: center bottom;
+    transform: translate(-50%, -50%) rotate(var(--angle)) translateY(-38px);
+    opacity: 0.4;
+}
+
+/* Center ornament */
+.sundial-center-ornament {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background:
+        radial-gradient(
+            circle at 30% 30%,
+            var(--gold-bright) 0%,
+            var(--gold) 50%,
+            #8B7424 100%
+        );
+    box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.3),
+        inset 0 1px 2px rgba(255, 255, 255, 0.3);
+    z-index: 5;
+}
+
+/* Gnomon (shadow caster) */
+.sundial-gnomon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 4px;
+    height: 35%;
+    transform: translate(-50%, -100%);
+    transform-origin: bottom center;
+    background:
+        linear-gradient(
+            90deg,
+            #4A3C1A 0%,
+            #8B7424 30%,
+            var(--gold) 50%,
+            #8B7424 70%,
+            #4A3C1A 100%
+        );
+    clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    z-index: 4;
+}
+
+/* Shadow - THE CORE VISUAL MECHANISM */
+.sundial-shadow {
+    --shadow-rotation: 0deg;
+    --shadow-length: 90%;
+
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 6px;  /* Thicker, more visible */
+    height: var(--shadow-length);
+    transform: translate(-50%, 0) rotate(var(--shadow-rotation));
+    transform-origin: top center;
+    background:
+        linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.85) 0%,
+            rgba(0, 0, 0, 0.7) 20%,
+            rgba(0, 0, 0, 0.5) 50%,
+            rgba(0, 0, 0, 0.25) 80%,
+            transparent 100%
+        );
+    border-radius: 0 0 3px 3px;
+    z-index: 3;
+    transition:
+        transform var(--duration-987) var(--ease-smooth),  /* Slower, smoother */
+        opacity var(--duration-377) var(--ease-out);
+    filter: blur(2px);  /* Slightly more diffuse */
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);  /* Soft shadow around shadow */
+}
+
+/* Sundial base */
+.sundial-base {
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    height: 8px;
+    background:
+        linear-gradient(
+            to bottom,
+            rgba(212, 175, 55, 0.3) 0%,
+            rgba(90, 75, 24, 0.2) 100%
+        );
+    border-radius: 0 0 50% 50% / 0 0 100% 100%;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* ========================================
+ * CELESTIAL INFO PANEL - REMOVED
+ * Focus on visual mechanism, not text
+ * ======================================== */
+.celestial-info {
+    display: none !important;
+}
+
+/* ========================================
+ * RESPONSIVE ADJUSTMENTS
+ * ======================================== */
+@media (max-width: 768px) {
+    .celestial-sun {
+        width: 60px;
+        height: 60px;
+    }
+
+    .celestial-moon {
+        width: 45px;
+        height: 45px;
+    }
+
+    .sundial {
+        width: clamp(140px, 35vw, 200px);  /* Still prominent on tablet */
+        bottom: 10%;
+    }
+}
+
+@media (max-width: 480px) {
+    .celestial-sun {
+        width: 50px;
+        height: 50px;
+    }
+
+    .celestial-moon {
+        width: 35px;
+        height: 35px;
+    }
+
+    .sundial {
+        width: clamp(100px, 45vw, 140px);  /* Still visible on mobile */
+        bottom: 12%;
+    }
+
+    .sundial-numeral {
+        font-size: 10px;
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .celestial-sun,
+    .celestial-moon,
+    .sundial-shadow {
+        transition: none;
+    }
+
+    .celestial-sun .sun-core,
+    .celestial-sun .sun-corona,
+    .celestial-sun .sun-rays {
+        animation: none;
+    }
+}
+
+/* ========================================
+ * DEVICE ORIENTATION — Compass & Leveling
+ * ======================================== */
+
+/* Sundial orientation enabled state */
+.sundial.orientation-enabled {
+    box-shadow: 0 0 20px rgba(100, 217, 255, 0.3);
+}
+
+.sundial.orientation-enabled .sundial-face {
+    border-color: rgba(100, 217, 255, 0.5);
+    transform-style: preserve-3d;
+    perspective: 500px;
+}
+
+/* Level indicator */
+.sundial.is-level .sundial-face {
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.5),
+        0 0 25px rgba(78, 203, 113, 0.3),
+        inset 0 2px 4px rgba(255, 255, 255, 0.05);
+    border-color: rgba(78, 203, 113, 0.6);
+}
+
+/* Orientation indicator badge */
+.orientation-indicator {
+    position: absolute;
+    bottom: -8px;
+    right: -8px;
+    width: 24px;
+    height: 24px;
+    background: var(--surface-elevated);
+    border: 2px solid var(--gold);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gold);
+    z-index: 10;
+    animation: orientation-pulse 2s ease-in-out infinite;
+}
+
+@keyframes orientation-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+/* Celestial container compass rotation */
+.celestial-sky {
+    --compass-rotation: 0deg;
+}
+
+.celestial-sky.compass-active {
+    transform: rotate(var(--compass-rotation));
+    transition: transform 150ms ease-out;
+}
+
+/* Touch feedback for tap-to-enable */
+.sundial:active:not(.orientation-enabled) {
+    transform: scale(0.98);
+}
+
+.sundial:not(.orientation-enabled)::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle at center,
+        rgba(100, 217, 255, 0.1) 0%,
+        transparent 70%
+    );
+    opacity: 0;
+    transition: opacity var(--duration-233) ease;
+    pointer-events: none;
+}
+
+.sundial:not(.orientation-enabled):hover::after {
+    opacity: 1;
+}
+
+/* Mobile-specific: larger touch target hint */
+@media (hover: none) and (pointer: coarse) {
+    .sundial:not(.orientation-enabled) {
+        /* Subtle pulsing hint on mobile that it's tappable */
+        animation: sundial-tap-hint 3s ease-in-out infinite;
+    }
+
+    @keyframes sundial-tap-hint {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(100, 217, 255, 0); }
+        50% { box-shadow: 0 0 0 8px rgba(100, 217, 255, 0.15); }
+    }
+}
+
+/* ========================================
+ * CELESTIAL VOICE — Clickable Sun Styles
+ * ======================================== */
+
+/* Make sun elements interactive */
+.hero-sun,
+.celestial-sun,
+.sun-marker {
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Focus ring for keyboard navigation */
+.hero-sun:focus-visible,
+.celestial-sun:focus-visible,
+.sun-marker:focus-visible {
+    outline: 3px solid var(--gold);
+    outline-offset: 8px;
+}
+
+/* Hover enhancement */
+.hero-sun:hover,
+.celestial-sun:hover {
+    filter: brightness(1.1) saturate(1.1);
+}
+
+/* Active state - slight press effect */
+.hero-sun:active,
+.celestial-sun:active,
+.sun-marker:active {
+    transform: scale(0.98);
+}
+
+/* Speaking state - pulsing glow when voice is active */
+.hero-sun.speaking,
+.celestial-sun.speaking {
+    animation: voice-pulse 1s ease-in-out infinite;
+}
+
+@keyframes voice-pulse {
+    0%, 100% {
+        box-shadow:
+            0 0 60px var(--sun-glow),
+            0 0 120px rgba(255, 215, 0, 0.2),
+            0 0 20px rgba(212, 175, 55, 0.5);
+    }
+    50% {
+        box-shadow:
+            0 0 80px var(--sun-glow),
+            0 0 160px rgba(255, 215, 0, 0.4),
+            0 0 40px rgba(212, 175, 55, 0.8);
+    }
+}
+
+/* Moon clickable styles */
+.celestial-moon {
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.celestial-moon:focus-visible {
+    outline: 2px solid var(--moon-bright);
+    outline-offset: 4px;
+}
+
+.celestial-moon:hover {
+    filter: brightness(1.15);
+}
+
+.celestial-moon:active {
+    transform: scale(0.96);
+}
+
+/* ========================================
+ * LANGUAGE SELECTOR (i18n)
+ * ======================================== */
+.lang-selector {
+    display: flex;
+    gap: 4px;
+    margin-left: 16px;
+    padding-left: 16px;
+    border-left: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+.lang-option {
+    padding: 6px 10px;
+    background: transparent;
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 6px;
+    color: var(--dust);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all var(--duration-144) var(--ease-smooth);
+}
+
+.lang-option:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    background: rgba(212, 175, 55, 0.1);
+}
+
+.lang-option.active {
+    background: var(--gold);
+    border-color: var(--gold);
+    color: var(--obsidian);
+}
+
+.lang-option:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+}
+
+/* ========================================
+ * VR ENTER BUTTON (WebXR)
+ * ======================================== */
+.vr-enter-btn {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, rgba(159, 122, 234, 0.9), rgba(99, 102, 241, 0.9));
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--duration-233) var(--ease-smooth);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 20px rgba(159, 122, 234, 0.3);
+    z-index: 100;
+}
+
+.vr-enter-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(159, 122, 234, 0.5);
+}
+
+.vr-enter-btn:active {
+    transform: translateY(0);
+}
+
+.vr-enter-btn svg {
+    opacity: 0.9;
+}
+
+.vr-enter-btn.active {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.9));
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+}
+
+.vr-enter-btn.active span {
+    display: none;
+}
+
+.vr-enter-btn.active::after {
+    content: 'Exit VR';
+}
+
+.vr-enter-btn:focus-visible {
+    outline: 3px solid white;
+    outline-offset: 2px;
+}
+
+/* ========================================
+ * LANGUAGE SELECTOR (i18n)
+ * ======================================== */
+.lang-selector {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin-left: var(--space-3);
+    padding-left: var(--space-3);
+    border-left: 1px solid var(--gold-faint);
+}
+
+.lang-option {
+    padding: var(--space-1) var(--space-2);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all var(--duration-144) var(--ease-smooth);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.lang-option:hover {
+    color: var(--gold);
+    border-color: var(--gold-faint);
+}
+
+.lang-option:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+}
+
+.lang-option.active {
+    color: var(--gold);
+    background: var(--gold-faint);
+    border-color: var(--gold-dim);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .lang-selector {
+        margin-left: 0;
+        margin-top: var(--space-3);
+        padding-left: 0;
+        padding-top: var(--space-3);
+        border-left: none;
+        border-top: 1px solid var(--gold-faint);
+        justify-content: center;
+    }
 }
