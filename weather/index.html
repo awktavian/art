@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What About the Weather? — Celestial Shades System</title>
+    <meta name="description" content="A technical deep dive into building an astronomical shade automation system. Sun position calculation, window geometry, weather integration, and safety constraints.">
+    <meta name="author" content="Tim Jacoby">
+    <meta name="keywords" content="home automation, ephemeris, sun position, shade control, smart home, agentic systems, Python, async">
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#07060B">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="What About the Weather? — Celestial Shades System">
+    <meta property="og:description" content="A technical deep dive into astronomical shade automation. For engineers building agentic systems.">
+    <meta property="og:site_name" content="Tim Jacoby">
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="What About the Weather? — Celestial Shades System">
+    <meta name="twitter:description" content="Astronomical shade automation — ephemeris, geometry, weather, and safety.">
+    <meta name="twitter:creator" content="@awktavian">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>☀️</text></svg>">
+    
+    <!-- JSON-LD -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "TechArticle",
+        "headline": "What About the Weather? — Celestial Shades System",
+        "description": "A technical deep dive into building an astronomical shade automation system for agentic home control.",
+        "author": {
+            "@type": "Person",
+            "name": "Tim Jacoby"
+        },
+        "datePublished": "2026-01-08",
+        "keywords": "home automation, ephemeris, astronomy, smart shades, Python"
+    }
+    </script>
+</head>
+<body class="loading">
+    <!-- Skip Link -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
+    <!-- Background -->
+    <div class="background-layer gradient-bg" aria-hidden="true"></div>
+    <div class="grain-overlay" aria-hidden="true"></div>
+    
+    <!-- Navigation -->
+    <nav class="nav" aria-label="Main navigation">
+        <div class="nav-content container">
+            <a href="#hero" class="nav-logo">☀️ Weather</a>
+            <div class="nav-links">
+                <a href="#ephemeris" class="nav-link">Ephemeris</a>
+                <a href="#geometry" class="nav-link">Geometry</a>
+                <a href="#weather" class="nav-link">Weather</a>
+                <a href="#triggers" class="nav-link">Triggers</a>
+                <a href="#demo" class="nav-link">Live Demo</a>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Hero Section -->
+    <header class="hero" id="hero">
+        <div class="hero-sun" aria-hidden="true"></div>
+        
+        <div class="hero-content">
+            <div class="hero-badge">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="5"/>
+                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                </svg>
+                Technical Deep Dive
+            </div>
+            
+            <h1 class="hero-title">What About<br>the <em>Weather?</em></h1>
+            
+            <p class="hero-subtitle">
+                How astronomical calculations, window geometry, and weather data combine to create intelligent shade automation. For engineers building agentic systems.
+            </p>
+            
+            <div class="hero-stats">
+                <div class="stat-item">
+                    <span class="stat-value" data-count="11">0</span>
+                    <span class="stat-label">Shades</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" data-count="4">0</span>
+                    <span class="stat-label">Orientations</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" data-count="360">0</span>
+                    <span class="stat-label">Degrees</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" data-count="30">0</span>
+                    <span class="stat-label">Min Interval</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="scroll-indicator" role="button" tabindex="0" aria-label="Scroll to learn more">
+            <span>Scroll to explore</span>
+            <div class="scroll-line"></div>
+        </div>
+    </header>
+    
+    <!-- Main Content -->
+    <main id="main-content">
+        
+        <!-- Section 1: Ephemeris -->
+        <section class="section" id="ephemeris">
+            <div class="container">
+                <header class="section-header" data-reveal>
+                    <span class="section-number">01</span>
+                    <h2 class="section-title">The <em>Ephemeris</em></h2>
+                    <p class="section-description">
+                        Where is the sun right now? Not from a weather API—calculated from orbital mechanics.
+                    </p>
+                </header>
+                
+                <div class="grid-2">
+                    <div data-reveal data-reveal-delay="1">
+                        <h3 style="color: var(--gold); margin-bottom: var(--space-3);">Why Calculate?</h3>
+                        <p style="color: var(--text-secondary); margin-bottom: var(--space-4);">
+                            Weather APIs give you sunrise/sunset times—but that's not enough. We need the sun's <strong>exact position</strong> (azimuth and altitude) at any moment to know which windows have glare.
+                        </p>
+                        
+                        <div class="callout">
+                            <div class="callout-title">The Problem with APIs</div>
+                            <div class="callout-content">
+                                Weather APIs tell you <em>when</em> the sun rises. They don't tell you <em>where</em> it is at 2:47 PM or which direction it's shining. For that, you need astronomy.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div data-reveal data-reveal-delay="2">
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-dot"></span>
+                                <span class="code-dot"></span>
+                                <span class="code-dot"></span>
+                                <span class="code-title">ephemeris.py</span>
+                            </div>
+                            <div class="code-content">
+<pre><code><span class="code-keyword">def</span> <span class="code-function">sun_position</span>(<span class="code-param">lat</span>, <span class="code-param">lon</span>, <span class="code-param">dt</span>=<span class="code-keyword">None</span>):
+    <span class="code-string">"""Calculate sun azimuth and altitude."""</span>
+    jd = <span class="code-function">julian_date</span>(dt)
+    n = jd - <span class="code-number">2451545.0</span>  <span class="code-comment"># Days since J2000</span>
+    
+    <span class="code-comment"># Solar mean longitude</span>
+    L = (<span class="code-number">280.460</span> + <span class="code-number">0.9856474</span> * n) % <span class="code-number">360</span>
+    
+    <span class="code-comment"># Mean anomaly</span>
+    g = (<span class="code-number">357.528</span> + <span class="code-number">0.9856003</span> * n) % <span class="code-number">360</span>
+    
+    <span class="code-comment"># ... (orbital calculations)</span>
+    
+    <span class="code-keyword">return</span> SunPosition(
+        azimuth=azimuth,   <span class="code-comment"># 0-360° from N</span>
+        altitude=altitude, <span class="code-comment"># -90° to 90°</span>
+        is_day=altitude > <span class="code-number">0</span>
+    )</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="formula" data-reveal data-reveal-delay="3">
+                    <div class="formula-title">Julian Date Calculation</div>
+                    <div class="formula-content">
+                        JD = ⌊365.25(Y + 4716)⌋ + ⌊30.6001(M + 1)⌋ + D + H/24 + B − 1524.5
+                    </div>
+                    <div class="formula-description">
+                        The foundation of all astronomical calculations. Converts calendar date to continuous day count since 4713 BCE.
+                    </div>
+                </div>
+                
+                <div class="grid-3" style="margin-top: var(--space-8);">
+                    <div class="card" data-reveal data-reveal-delay="1">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>
+                            </div>
+                            <div>
+                                <div class="card-title">Azimuth</div>
+                                <div class="card-subtitle">0° = North</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            The sun's compass bearing. 0° is North, 90° is East, 180° is South, 270° is West. Tells us which direction the sun is shining.
+                        </div>
+                    </div>
+                    
+                    <div class="card" data-reveal data-reveal-delay="2">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+                            </div>
+                            <div>
+                                <div class="card-title">Altitude</div>
+                                <div class="card-subtitle">0° = Horizon</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            The sun's height above the horizon. 0° is sunrise/sunset, 90° is directly overhead. Lower sun = longer shadows = more glare through windows.
+                        </div>
+                    </div>
+                    
+                    <div class="card" data-reveal data-reveal-delay="3">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                            </div>
+                            <div>
+                                <div class="card-title">Is Day</div>
+                                <div class="card-subtitle">altitude > 0</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            Simple boolean—is the sun above the horizon? If not, we don't need to worry about glare. Open all shades for nighttime views.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Section 2: Window Geometry -->
+        <section class="section section-alt" id="geometry">
+            <div class="container">
+                <header class="section-header" data-reveal>
+                    <span class="section-number">02</span>
+                    <h2 class="section-title">Window <em>Geometry</em></h2>
+                    <p class="section-description">
+                        A house facing Green Lake. 11 shades. 4 cardinal orientations. Which windows get sun when?
+                    </p>
+                </header>
+                
+                <div class="diagram" data-reveal>
+                    <div class="diagram-title">House Orientation — 7331 W Green Lake Dr N</div>
+                    <div style="text-align: center; font-family: var(--font-mono); font-size: var(--text-sm); line-height: 1.8; color: var(--text-secondary);">
+<pre style="display: inline-block; text-align: left;">
+                     NORTH (0°) — ALLEY / BACKYARD
+                              ↑
+           ┌──────────────────┴──────────────────┐
+           │           SECOND FLOOR              │
+           │  ┌──────────┬──────────┬──────────┐ │
+           │  │ PRIMARY  │ PRIMARY  │          │ │
+           │  │  BATH    │   BED    │   LOFT   │ │
+           │  │ <span style="color: var(--north)">N(353,355)</span>│ <span style="color: var(--north)">N(66)</span> <span style="color: var(--west)">W(68)</span>│          │ │
+           │  └──────────┴──────────┴──────────┘ │
+           │                                     │
+ WEST 270° ├─────────────────────────────────────┤ EAST 90°
+           │            FIRST FLOOR              │
+           │  ┌──────────┬──────────┬──────────┐ │
+           │  │  GARAGE  │ KITCHEN  │  LIVING  │ │
+           │  │          │  DINING  │   ROOM   │ │
+           │  │  ENTRY   │ <span style="color: var(--south)">S(243,241)</span>│ <span style="color: var(--south)">S(235)</span> <span style="color: var(--east)">E(237)</span>│ │
+           │  │  <span style="color: var(--south)">S(229)</span>  │          │          │ │
+           │  └──────────┴──────────┴──────────┘ │
+           └──────────────────┬──────────────────┘
+                              ↓
+                     SOUTH (180°) — GREEN LAKE
+</pre>
+                    </div>
+                </div>
+                
+                <div class="grid-2" style="margin-top: var(--space-6);">
+                    <div data-reveal>
+                        <h3 style="color: var(--gold); margin-bottom: var(--space-3);">The Intensity Function</h3>
+                        <p style="color: var(--text-secondary); margin-bottom: var(--space-4);">
+                            Not all sun exposure is equal. We calculate <strong>glare intensity</strong> based on how directly the sun hits each window and the sun's altitude.
+                        </p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-dot"></span>
+                                <span class="code-dot"></span>
+                                <span class="code-dot"></span>
+                                <span class="code-title">home_geometry.py</span>
+                            </div>
+                            <div class="code-content">
+<pre><code><span class="code-keyword">def</span> <span class="code-function">get_sun_intensity</span>(sun_az, sun_alt, direction):
+    <span class="code-string">"""0.0-1.0 glare intensity."""</span>
+    <span class="code-keyword">if</span> sun_alt <= <span class="code-number">0</span>: <span class="code-keyword">return</span> <span class="code-number">0.0</span>
+    
+    window_az = AZIMUTH[direction]
+    diff = <span class="code-function">abs</span>(sun_az - window_az)
+    <span class="code-keyword">if</span> diff > <span class="code-number">180</span>: diff = <span class="code-number">360</span> - diff
+    
+    <span class="code-comment"># Sun within 60° acceptance angle?</span>
+    <span class="code-keyword">if</span> diff > <span class="code-number">60</span>: <span class="code-keyword">return</span> <span class="code-number">0.0</span>
+    
+    alignment = <span class="code-number">1.0</span> - (diff / <span class="code-number">60.0</span>)
+    
+    <span class="code-comment"># Lower sun = more glare</span>
+    <span class="code-keyword">if</span> sun_alt < <span class="code-number">15</span>:
+        altitude_factor = <span class="code-number">1.0</span>
+    <span class="code-keyword">elif</span> sun_alt < <span class="code-number">45</span>:
+        altitude_factor = <span class="code-number">1.0</span> - ((sun_alt - <span class="code-number">15</span>) / <span class="code-number">45</span>)
+    <span class="code-keyword">else</span>:
+        altitude_factor = <span class="code-function">max</span>(<span class="code-number">0</span>, <span class="code-number">0.33</span> - ...)
+    
+    <span class="code-keyword">return</span> alignment * altitude_factor</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div data-reveal data-reveal-delay="1">
+                        <h3 style="color: var(--gold); margin-bottom: var(--space-3);">Direction Constants</h3>
+                        
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Direction</th>
+                                        <th>Azimuth</th>
+                                        <th>What Faces It</th>
+                                        <th>Sun Times</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span style="color: var(--south)">●</span> SOUTH</td>
+                                        <td class="mono">180°</td>
+                                        <td>Living, Dining, Entry</td>
+                                        <td>10 AM – 3 PM</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span style="color: var(--east)">●</span> EAST</td>
+                                        <td class="mono">90°</td>
+                                        <td>Living Room side</td>
+                                        <td>6 AM – 11 AM</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span style="color: var(--west)">●</span> WEST</td>
+                                        <td class="mono">270°</td>
+                                        <td>Primary Bed, Bed 4</td>
+                                        <td>3 PM – 8 PM</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span style="color: var(--north)">●</span> NORTH</td>
+                                        <td class="mono">0°</td>
+                                        <td>Primary Bath</td>
+                                        <td>Never direct</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="callout info" style="margin-top: var(--space-4);">
+                            <div class="callout-title">North-Facing = Always Open</div>
+                            <div class="callout-content">
+                                At Seattle's latitude (47.7°N), north-facing windows never get direct sun. The Primary Bath shades can stay open all day.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Section 3: Weather Integration -->
+        <section class="section" id="weather">
+            <div class="container">
+                <header class="section-header" data-reveal>
+                    <span class="section-number">03</span>
+                    <h2 class="section-title">Weather <em>Integration</em></h2>
+                    <p class="section-description">
+                        Celestial calculations assume clear skies. Clouds change everything.
+                    </p>
+                </header>
+                
+                <div class="grid-2">
+                    <div data-reveal>
+                        <h3 style="color: var(--gold); margin-bottom: var(--space-3);">The Override Logic</h3>
+                        <p style="color: var(--text-secondary); margin-bottom: var(--space-4);">
+                            When it's cloudy or raining, there's no glare to block. Weather data from OpenWeatherMap One Call API 3.0 can override celestial calculations.
+                        </p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-dot"></span>
+                                <span class="code-dot"></span>
+                                <span class="code-dot"></span>
+                                <span class="code-title">device_service.py</span>
+                            </div>
+                            <div class="code-content">
+<pre><code><span class="code-keyword">async def</span> <span class="code-function">optimize_shades_celestial</span>(<span class="code-param">self</span>):
+    <span class="code-comment"># Get current weather</span>
+    weather = <span class="code-keyword">await</span> <span class="code-param">self</span>._weather.<span class="code-function">get_current</span>()
+    
+    <span class="code-comment"># Weather override?</span>
+    <span class="code-keyword">if</span> weather.cloud_coverage > <span class="code-number">70</span>:
+        <span class="code-keyword">return</span> <span class="code-function">open_all_shades</span>()  <span class="code-comment"># No glare</span>
+    
+    <span class="code-keyword">if</span> weather.condition <span class="code-keyword">in</span> [<span class="code-string">'rain'</span>, <span class="code-string">'thunderstorm'</span>]:
+        <span class="code-keyword">return</span> <span class="code-function">open_all_shades</span>()  <span class="code-comment"># Enjoy the rain</span>
+    
+    <span class="code-comment"># Normal celestial optimization</span>
+    sun = <span class="code-function">sun_position</span>(HOME_LAT, HOME_LON)
+    <span class="code-keyword">for</span> shade <span class="code-keyword">in</span> SHADES:
+        level = <span class="code-function">calculate_shade_level</span>(
+            shade, sun.azimuth, sun.altitude, sun.is_day
+        )
+        <span class="code-keyword">await</span> <span class="code-param">self</span>.<span class="code-function">set_shade</span>(shade.id, level)</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div data-reveal data-reveal-delay="1">
+                        <h3 style="color: var(--gold); margin-bottom: var(--space-3);">Weather Conditions</h3>
+                        
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Condition</th>
+                                        <th>Action</th>
+                                        <th>Why</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>☀️ Clear</td>
+                                        <td>Celestial optimization</td>
+                                        <td>Full sun exposure</td>
+                                    </tr>
+                                    <tr>
+                                        <td>⛅ Partly Cloudy</td>
+                                        <td>Celestial optimization</td>
+                                        <td>Still significant glare</td>
+                                    </tr>
+                                    <tr>
+                                        <td>☁️ Cloudy (70%+)</td>
+                                        <td class="mono" style="color: var(--success)">100% OPEN</td>
+                                        <td>Diffused light, no glare</td>
+                                    </tr>
+                                    <tr>
+                                        <td>🌧️ Rain</td>
+                                        <td class="mono" style="color: var(--success)">100% OPEN</td>
+                                        <td>Enjoy watching it rain</td>
+                                    </tr>
+                                    <tr>
+                                        <td>⛈️ Thunderstorm</td>
+                                        <td class="mono" style="color: var(--success)">100% OPEN</td>
+                                        <td>Nature's show</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="callout warning" style="margin-top: var(--space-4);">
+                            <div class="callout-title">Seattle Reality</div>
+                            <div class="callout-content">
+                                Seattle averages 226 cloudy days per year. The weather override is not an edge case—it's the common case. Celestial optimization happens on the <em>other</em> 139 days.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Section 4: Trigger System -->
+        <section class="section section-alt" id="triggers">
+            <div class="container">
+                <header class="section-header" data-reveal>
+                    <span class="section-number">04</span>
+                    <h2 class="section-title">Celestial <em>Triggers</em></h2>
+                    <p class="section-description">
+                        Event-driven automation. The system doesn't poll—it watches for astronomical events.
+                    </p>
+                </header>
+                
+                <div class="timeline" data-reveal>
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <time class="timeline-time">Sunrise</time>
+                        <h3 class="timeline-title">Morning Optimization</h3>
+                        <p class="timeline-description">
+                            East-facing windows get adjusted first. Living Room East (237) may close to 60% as morning sun streams in. Other shades stay open.
+                        </p>
+                    </div>
+                    
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <time class="timeline-time">Solar Noon</time>
+                        <h3 class="timeline-title">Peak Sun</h3>
+                        <p class="timeline-description">
+                            South-facing windows see maximum exposure. Living South (235), Dining South (243), Entry (229) adjust based on altitude. High sun = less glare.
+                        </p>
+                    </div>
+                    
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <time class="timeline-time">Afternoon</time>
+                        <h3 class="timeline-title">West Exposure</h3>
+                        <p class="timeline-description">
+                            Sun moves west. Primary West (68) and Bed 4 shades (359, 361) begin adjusting. Late afternoon sun is low and intense—maximum glare potential.
+                        </p>
+                    </div>
+                    
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <time class="timeline-time">Civil Dusk</time>
+                        <h3 class="timeline-title">Evening Opening</h3>
+                        <p class="timeline-description">
+                            Sun drops below horizon. All shades open to 100%. Enjoy the evening light. Prepare for sunset views over Green Lake.
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="callout" style="margin-top: var(--space-8);" data-reveal>
+                    <div class="callout-title">CBF Safety: Manual Override Protection</div>
+                    <div class="callout-content">
+                        The system respects manual adjustments. If you close a shade yourself, the <code>ResidentOverrideCBF</code> (Control Barrier Function) prevents automation from changing it for 30 minutes. Your intent matters more than the algorithm.
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Section 5: Live Demo -->
+        <section class="section" id="demo">
+            <div class="container">
+                <header class="section-header" data-reveal>
+                    <span class="section-number">05</span>
+                    <h2 class="section-title">Live <em>Demo</em></h2>
+                    <p class="section-description">
+                        Interactive simulation. Drag the time slider to see how shade recommendations change throughout the day.
+                    </p>
+                </header>
+                
+                <div class="live-demo" data-reveal>
+                    <div class="demo-grid">
+                        <div>
+                            <div class="control-panel" style="margin-bottom: var(--space-4);">
+                                <div class="control-group">
+                                    <div class="control-label">
+                                        <span>Time of Day</span>
+                                        <span class="control-value" id="time-display">12:00 PM</span>
+                                    </div>
+                                    <input type="range" class="slider" id="time-slider" min="0" max="24" step="0.25" value="12">
+                                </div>
+                                
+                                <div class="control-group">
+                                    <div class="control-label">
+                                        <span>Include Weather</span>
+                                        <span class="control-value">
+                                            <label style="display: flex; align-items: center; gap: var(--space-1); cursor: pointer;">
+                                                <input type="checkbox" id="weather-toggle" style="width: 16px; height: 16px;">
+                                                <span style="font-size: var(--text-sm);">Simulate clouds</span>
+                                            </label>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="demo-visualization" id="sun-visualization">
+                                <!-- Sun position visualization rendered by JS -->
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 style="color: var(--gold); margin-bottom: var(--space-3); font-family: var(--font-mono); font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.1em;">Sun Position</h4>
+                            
+                            <div class="demo-output" style="margin-bottom: var(--space-4);">
+                                <div class="output-row">
+                                    <span class="output-label">Azimuth</span>
+                                    <span class="output-value" id="sun-azimuth">—</span>
+                                </div>
+                                <div class="output-row">
+                                    <span class="output-label">Altitude</span>
+                                    <span class="output-value" id="sun-altitude">—</span>
+                                </div>
+                                <div class="output-row">
+                                    <span class="output-label">Direction</span>
+                                    <span class="output-value" id="sun-direction">—</span>
+                                </div>
+                                <div class="output-row">
+                                    <span class="output-label">Is Day</span>
+                                    <span class="output-value" id="is-day">—</span>
+                                </div>
+                                <div class="output-row">
+                                    <span class="output-label">Weather</span>
+                                    <span class="output-value" id="weather-condition">—</span>
+                                </div>
+                                <div class="output-row">
+                                    <span class="output-label">Cloud Coverage</span>
+                                    <span class="output-value" id="cloud-coverage">—</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h4 style="color: var(--gold); margin: var(--space-6) 0 var(--space-3); font-family: var(--font-mono); font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.1em;">Shade Recommendations</h4>
+                    
+                    <div class="table-wrapper" id="shade-table">
+                        <!-- Shade table rendered by JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Section 6: Architecture Summary -->
+        <section class="section section-alt" id="architecture">
+            <div class="container">
+                <header class="section-header" data-reveal>
+                    <span class="section-number">06</span>
+                    <h2 class="section-title">The <em>Architecture</em></h2>
+                    <p class="section-description">
+                        How it all fits together. From orbital mechanics to motor commands.
+                    </p>
+                </header>
+                
+                <div class="diagram" data-reveal>
+                    <div class="diagram-title">Data Flow</div>
+                    <div style="text-align: center; font-family: var(--font-mono); font-size: var(--text-sm); line-height: 2; color: var(--text-secondary);">
+<pre style="display: inline-block; text-align: left;">
+┌─────────────────────────────────────────────────────────────────┐
+│                     CELESTIAL TRIGGER ENGINE                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   ┌──────────────┐    ┌──────────────┐    ┌──────────────┐     │
+│   │  <span style="color: var(--gold)">EPHEMERIS</span>   │    │  <span style="color: var(--gold)">HOME GEOM</span>   │    │   <span style="color: var(--gold)">WEATHER</span>   │     │
+│   │              │    │              │    │              │     │
+│   │ sun_position │───▶│ get_sun_    │    │ cloud_cover  │     │
+│   │ (lat, lon,   │    │ intensity() │◀───│ condition    │     │
+│   │  datetime)   │    │              │    │              │     │
+│   └──────────────┘    └──────────────┘    └──────────────┘     │
+│                              │                   │              │
+│                              ▼                   │              │
+│                    ┌──────────────────┐          │              │
+│                    │ <span style="color: var(--gold)">calculate_shade</span> │◀─────────┘              │
+│                    │    <span style="color: var(--gold)">_level()</span>     │                         │
+│                    └────────┬─────────┘                         │
+│                             │                                   │
+│                             ▼                                   │
+│   ┌──────────────────────────────────────────────────────────┐ │
+│   │                  <span style="color: var(--gold)">RESIDENT OVERRIDE CBF</span>                   │ │
+│   │            h(x) ≥ 0  →  Manual overrides protected       │ │
+│   └─────────────────────────────┬────────────────────────────┘ │
+│                                 │                               │
+│                                 ▼                               │
+│   ┌──────────────────────────────────────────────────────────┐ │
+│   │                    <span style="color: var(--success)">CONTROL4 / LUTRON</span>                     │ │
+│   │              11 Motorized Shades · 4 Directions          │ │
+│   └──────────────────────────────────────────────────────────┘ │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+</pre>
+                    </div>
+                </div>
+                
+                <div class="grid-3" style="margin-top: var(--space-6);">
+                    <div class="card" data-reveal data-reveal-delay="1">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                            </div>
+                            <div>
+                                <div class="card-title">Every 30 Minutes</div>
+                                <div class="card-subtitle">Re-optimization interval</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            The sun moves ~7.5° every 30 minutes. That's enough to shift glare from one window orientation to another. Too frequent = motor wear. Too infrequent = stale recommendations.
+                        </div>
+                    </div>
+                    
+                    <div class="card" data-reveal data-reveal-delay="2">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            </div>
+                            <div>
+                                <div class="card-title">CBF Protected</div>
+                                <div class="card-subtitle">Safety constraint</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            Control Barrier Functions ensure <code>h(x) ≥ 0</code>. If you manually adjust a shade, the system won't override you. Your explicit intent is protected for 30 minutes.
+                        </div>
+                    </div>
+                    
+                    <div class="card" data-reveal data-reveal-delay="3">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <svg viewBox="0 0 24 24"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>
+                            </div>
+                            <div>
+                                <div class="card-title">Portable</div>
+                                <div class="card-subtitle">Location-agnostic</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            Home coordinates come from <code>config/location.yaml</code> or environment variables. Move houses? Just update the config. The algorithms don't change.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+    </main>
+    
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-kanji">☀️</div>
+            <div class="footer-title">What About the Weather?</div>
+            <div class="footer-subtitle">Celestial Shades System — Technical Deep Dive</div>
+            
+            <nav class="footer-links" aria-label="Footer navigation">
+                <a href="https://github.com/awktavian" class="footer-link" target="_blank" rel="noopener noreferrer">
+                    <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                    GitHub
+                </a>
+                <a href="https://twitter.com/awktavian" class="footer-link" target="_blank" rel="noopener noreferrer">
+                    <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                    Twitter
+                </a>
+                <a href="mailto:timothyjacoby@gmail.com" class="footer-link">
+                    <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                    Email
+                </a>
+            </nav>
+            
+            <div class="footer-meta">
+                <span>Tim Jacoby</span> · <span>January 2026</span> · <span>Part of the Kagami Project</span>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Scripts -->
+    <script src="main.js"></script>
+</body>
+</html>
