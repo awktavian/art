@@ -28,8 +28,7 @@
 const HOME = {
     latitude: 47.6799,
     longitude: -122.3410,
-    timezone: 'America/Los_Angeles',
-    address: '7331 W Green Lake Dr N, Seattle'
+    timezone: 'America/Los_Angeles'
 };
 
 const DIRECTIONS = {
