@@ -5632,11 +5632,13 @@ class MiniGlobe {
         // Calculate globe rotation to center target location facing camera
         // Blue Marble texture: 0° longitude at center of image
         // Three.js SphereGeometry: texture center maps to front (+Z) when rotation.y=0
-        // So rotation.y=0 shows London (0°), rotation.y=-122° shows Seattle (-122°)
-        // Positive rotation.y = counter-clockwise = Eastern longitudes to front
-        // Negative rotation.y = clockwise = Western longitudes to front
+        // When rotation.y=0, longitude 0° (London) is at front
+        // When we ROTATE the globe, we move the texture:
+        //   rotation.y = +X brings what was at longitude -X to the front
+        //   rotation.y = -X brings what was at longitude +X to the front
+        // Therefore: to show longitude L, we need rotation.y = -L
         // dragOffsetLon adds user interaction offset (springs back to 0)
-        const lonRotation = (this.currentLon + this.autoRotateOffset + this.dragOffsetLon) * Math.PI / 180;
+        const lonRotation = (-this.currentLon + this.autoRotateOffset + this.dragOffsetLon) * Math.PI / 180;
         
         this.globe.rotation.y = lonRotation;
         this.globe.rotation.x = this.dragOffsetLat * Math.PI / 180; // Vertical drag tilts globe
