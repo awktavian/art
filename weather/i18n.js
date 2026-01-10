@@ -20,10 +20,13 @@ class I18n {
 
                 // Hero
                 'hero.badge': 'Technical Deep Dive',
+                'hero.title.line1': 'What About',
+                'hero.title.line2': 'the <em>Weather?</em>',
                 'hero.title': 'What About<br>the <em>Weather?</em>',
                 'hero.subtitle': 'How astronomical calculations, window geometry, and weather data combine to create intelligent shade automation.',
                 'hero.subtitle.emphasis': 'Because your home should know when to shield you from the sun — and when to let the storm roll in.',
                 'hero.scroll': "Follow the sun's path",
+                'hero.scrollAria': 'Scroll to learn more',
 
                 // Hero stats
                 'stat.shades': 'Shades',
@@ -158,7 +161,26 @@ class I18n {
                 'yes': 'Yes',
                 'no': 'No',
                 'night': 'Night — open for views',
-                'noSunOn': 'No sun on'
+                'noSunOn': 'No sun on',
+                
+                // Compass & VR
+                'compass.hint': 'Tap to enable device orientation',
+                'compass.hint.enabled': 'Orientation enabled',
+                'compass.orientationActive': 'Compass orientation active — dial is leveled',
+                'secret.info.title': 'Secret Location',
+                'secret.info.subtitle': 'Unlocked location details',
+                'secret.info.revertTitle': 'Back to Your Location',
+                'secret.info.revertSubtitle': 'Weather and globe reset to your coordinates',
+                'secret.info.teleportHome': 'Welcome Home',
+                'secret.info.teleportGeneric': 'Teleported to {location}',
+                'secret.info.closeLabel': 'Close secret info',
+                'weather.unknown': 'Unknown',
+                'weather.sunrise': 'Sunrise',
+                'weather.sunset': 'Sunset',
+                'vr.enter': 'Enter VR',
+                'vr.exit': 'Exit VR',
+                'vr.enterAria': 'Enter immersive VR mode to view celestial bodies',
+                'vr.exitAria': 'Exit immersive VR mode'
             },
             es: {
                 // Navigation
@@ -170,10 +192,13 @@ class I18n {
 
                 // Hero
                 'hero.badge': 'Inmersión Técnica',
+                'hero.title.line1': '¿Qué pasa con',
+                'hero.title.line2': 'el <em>clima?</em>',
                 'hero.title': '¿Y el <em>Clima?</em>',
                 'hero.subtitle': 'Cómo los cálculos astronómicos, la geometría de ventanas y los datos climáticos se combinan para crear automatización inteligente de persianas.',
                 'hero.subtitle.emphasis': 'Porque tu hogar debe saber cuándo protegerte del sol — y cuándo dejar entrar la tormenta.',
                 'hero.scroll': 'Sigue el camino del sol',
+                'hero.scrollAria': 'Desplázate para aprender más',
 
                 // Hero stats
                 'stat.shades': 'Persianas',
@@ -308,7 +333,26 @@ class I18n {
                 'yes': 'Sí',
                 'no': 'No',
                 'night': 'Noche — abrir para vistas',
-                'noSunOn': 'Sin sol en'
+                'noSunOn': 'Sin sol en',
+                
+                // Compass & VR
+                'compass.hint': 'Toca para activar la orientación del dispositivo',
+                'compass.hint.enabled': 'Orientación habilitada',
+                'compass.orientationActive': 'Orientación activa: la brújula está nivelada',
+                'secret.info.title': 'Ubicación secreta',
+                'secret.info.subtitle': 'Detalles desbloqueados',
+                'secret.info.revertTitle': 'De vuelta a tu ubicación',
+                'secret.info.revertSubtitle': 'Clima y globo reiniciados a tus coordenadas',
+                'secret.info.teleportHome': 'Bienvenido a casa',
+                'secret.info.teleportGeneric': 'Teletransportado a {location}',
+                'secret.info.closeLabel': 'Cerrar información secreta',
+                'weather.unknown': 'Desconocido',
+                'weather.sunrise': 'Amanecer',
+                'weather.sunset': 'Atardecer',
+                'vr.enter': 'Entrar en VR',
+                'vr.exit': 'Salir de VR',
+                'vr.enterAria': 'Entrar en modo VR inmersivo para ver cuerpos celestes',
+                'vr.exitAria': 'Salir del modo VR inmersivo'
             },
             ja: {
                 // Navigation
@@ -320,10 +364,13 @@ class I18n {
 
                 // Hero
                 'hero.badge': '技術的深掘り',
+                'hero.title.line1': '天気は',
+                'hero.title.line2': '<em>どうなの？</em>',
                 'hero.title': '<em>天気</em>は<br>どうなの？',
                 'hero.subtitle': '天文計算、窓の形状、気象データを組み合わせて、インテリジェントなシェード自動化を実現。',
                 'hero.subtitle.emphasis': '家は太陽から守るべき時と、嵐を迎え入れるべき時を知っているべき。',
                 'hero.scroll': '太陽の軌跡をたどる',
+                'hero.scrollAria': '詳しく見るにはスクロール',
 
                 // Hero stats
                 'stat.shades': 'シェード',
@@ -458,7 +505,26 @@ class I18n {
                 'yes': 'はい',
                 'no': 'いいえ',
                 'night': '夜間 — 眺望のため開放',
-                'noSunOn': '日光なし'
+                'noSunOn': '日光なし',
+                
+                // Compass & VR
+                'compass.hint': 'タップして端末の向きを有効化',
+                'compass.hint.enabled': '方位が有効になりました',
+                'compass.orientationActive': 'コンパス補正が有効 — ダイヤルは水平です',
+                'secret.info.title': 'シークレットロケーション',
+                'secret.info.subtitle': '解放された場所の詳細',
+                'secret.info.revertTitle': '元の場所に戻りました',
+                'secret.info.revertSubtitle': '天気と地球儀をあなたの座標に同期',
+                'secret.info.teleportHome': 'おかえりなさい',
+                'secret.info.teleportGeneric': '{location} にテレポートしました',
+                'secret.info.closeLabel': '秘密の情報を閉じる',
+                'weather.unknown': '不明',
+                'weather.sunrise': '日の出',
+                'weather.sunset': '日の入り',
+                'vr.enter': 'VRに入る',
+                'vr.exit': 'VRを終了',
+                'vr.enterAria': '天体を見る没入型VRモードに入る',
+                'vr.exitAria': '没入型VRモードを終了する'
             },
             fr: {
                 // Navigation
@@ -470,10 +536,13 @@ class I18n {
 
                 // Hero
                 'hero.badge': 'Plongée Technique',
+                'hero.title.line1': "Qu'en est-il",
+                'hero.title.line2': 'de la <em>météo ?</em>',
                 'hero.title': 'Et la <em>Météo ?</em>',
                 'hero.subtitle': "Comment les calculs astronomiques, la géométrie des fenêtres et les données météo créent une automatisation intelligente.",
                 'hero.subtitle.emphasis': 'Parce que votre maison devrait savoir quand vous protéger du soleil.',
                 'hero.scroll': 'Suivez le chemin du soleil',
+                'hero.scrollAria': 'Faites défiler pour en savoir plus',
 
                 // Hero stats
                 'stat.shades': 'Stores',
@@ -608,7 +677,26 @@ class I18n {
                 'yes': 'Oui',
                 'no': 'Non',
                 'night': 'Nuit — ouvert pour la vue',
-                'noSunOn': 'Pas de soleil sur'
+                'noSunOn': 'Pas de soleil sur',
+                
+                // Compass & VR
+                'compass.hint': "Touchez pour activer l’orientation de l’appareil",
+                'compass.hint.enabled': 'Orientation activée',
+                'compass.orientationActive': 'Orientation boussole active — le cadran est nivelé',
+                'secret.info.title': 'Emplacement secret',
+                'secret.info.subtitle': 'Détails débloqués',
+                'secret.info.revertTitle': 'Retour à votre position',
+                'secret.info.revertSubtitle': 'Météo et globe synchronisés sur vos coordonnées',
+                'secret.info.teleportHome': 'Bienvenue chez vous',
+                'secret.info.teleportGeneric': 'Téléporté à {location}',
+                'secret.info.closeLabel': 'Fermer les infos secrètes',
+                'weather.unknown': 'Inconnu',
+                'weather.sunrise': 'Lever',
+                'weather.sunset': 'Coucher',
+                'vr.enter': 'Entrer en VR',
+                'vr.exit': 'Quitter la VR',
+                'vr.enterAria': "Entrer en mode VR immersif pour observer les corps célestes",
+                'vr.exitAria': 'Quitter le mode VR immersif'
             },
             de: {
                 // Navigation
@@ -620,10 +708,13 @@ class I18n {
 
                 // Hero
                 'hero.badge': 'Technischer Tiefgang',
+                'hero.title.line1': 'Was ist mit',
+                'hero.title.line2': 'dem <em>Wetter?</em>',
                 'hero.title': 'Was ist mit<br>dem <em>Wetter?</em>',
                 'hero.subtitle': 'Wie astronomische Berechnungen, Fenstergeometrie und Wetterdaten intelligente Jalousienautomatisierung ermöglichen.',
                 'hero.subtitle.emphasis': 'Weil Ihr Zuhause wissen sollte, wann es Sie vor der Sonne schützen muss.',
                 'hero.scroll': 'Folge dem Sonnenpfad',
+                'hero.scrollAria': 'Zum Entdecken nach unten scrollen',
 
                 // Hero stats
                 'stat.shades': 'Jalousien',
@@ -758,7 +849,26 @@ class I18n {
                 'yes': 'Ja',
                 'no': 'Nein',
                 'night': 'Nacht — offen für die Aussicht',
-                'noSunOn': 'Keine Sonne auf'
+                'noSunOn': 'Keine Sonne auf',
+                
+                // Compass & VR
+                'compass.hint': 'Tippen, um die Geräteausrichtung zu aktivieren',
+                'compass.hint.enabled': 'Ausrichtung aktiviert',
+                'compass.orientationActive': 'Kompassausrichtung aktiv — Zifferblatt ist nivelliert',
+                'secret.info.title': 'Geheimer Ort',
+                'secret.info.subtitle': 'Freigeschaltete Details',
+                'secret.info.revertTitle': 'Zurück an deinem Ort',
+                'secret.info.revertSubtitle': 'Wetter und Globus auf deine Koordinaten gesetzt',
+                'secret.info.teleportHome': 'Willkommen zu Hause',
+                'secret.info.teleportGeneric': 'Nach {location} teleportiert',
+                'secret.info.closeLabel': 'Geheime Infos schließen',
+                'weather.unknown': 'Unbekannt',
+                'weather.sunrise': 'Sonnenaufgang',
+                'weather.sunset': 'Sonnenuntergang',
+                'vr.enter': 'VR starten',
+                'vr.exit': 'VR beenden',
+                'vr.enterAria': 'In den immersiven VR-Modus wechseln, um Himmelskörper zu sehen',
+                'vr.exitAria': 'Immersiven VR-Modus verlassen'
             },
             zh: {
                 // Navigation
@@ -770,10 +880,13 @@ class I18n {
 
                 // Hero
                 'hero.badge': '技术深度',
+                'hero.title.line1': '关于',
+                'hero.title.line2': '<em>天气</em>怎么样？',
                 'hero.title': '<em>天气</em><br>怎么样？',
                 'hero.subtitle': '天文计算、窗户几何和天气数据如何结合创建智能窗帘自动化。',
                 'hero.subtitle.emphasis': '因为您的家应该知道何时遮阳——何时让风暴进来。',
                 'hero.scroll': '跟随太阳的轨迹',
+                'hero.scrollAria': '向下滚动了解更多',
 
                 // Hero stats
                 'stat.shades': '窗帘',
@@ -908,7 +1021,26 @@ class I18n {
                 'yes': '是',
                 'no': '否',
                 'night': '夜间——打开欣赏景色',
-                'noSunOn': '没有阳光在'
+                'noSunOn': '没有阳光在',
+                
+                // Compass & VR
+                'compass.hint': '点按以启用设备方向',
+                'compass.hint.enabled': '方向已启用',
+                'compass.orientationActive': '罗盘校准已启用 — 表盘保持水平',
+                'secret.info.title': '隐藏位置',
+                'secret.info.subtitle': '已解锁的位置信息',
+                'secret.info.revertTitle': '回到你的位置',
+                'secret.info.revertSubtitle': '天气与地球同步到你的坐标',
+                'secret.info.teleportHome': '欢迎回家',
+                'secret.info.teleportGeneric': '已传送至 {location}',
+                'secret.info.closeLabel': '关闭隐藏信息',
+                'weather.unknown': '未知',
+                'weather.sunrise': '日出',
+                'weather.sunset': '日落',
+                'vr.enter': '进入 VR',
+                'vr.exit': '退出 VR',
+                'vr.enterAria': '进入沉浸式VR模式以观察天体',
+                'vr.exitAria': '退出沉浸式VR模式'
             },
             it: {
                 // Navigation
@@ -920,10 +1052,13 @@ class I18n {
 
                 // Hero
                 'hero.badge': 'Approfondimento Tecnico',
+                'hero.title.line1': 'E il',
+                'hero.title.line2': '<em>Meteo?</em>',
                 'hero.title': 'E il <em>Meteo?</em>',
                 'hero.subtitle': 'Come i calcoli astronomici, la geometria delle finestre e i dati meteo creano automazione intelligente delle tapparelle.',
                 'hero.subtitle.emphasis': 'Perché la tua casa dovrebbe sapere quando proteggerti dal sole.',
                 'hero.scroll': 'Segui il percorso del sole',
+                'hero.scrollAria': 'Scorri per scoprire di più',
 
                 // Hero stats
                 'stat.shades': 'Tapparelle',
@@ -1056,7 +1191,26 @@ class I18n {
                 'yes': 'Sì',
                 'no': 'No',
                 'night': 'Notte — aperto per la vista',
-                'noSunOn': 'Nessun sole su'
+                'noSunOn': 'Nessun sole su',
+                
+                // Compass & VR
+                'compass.hint': 'Tocca per attivare l’orientamento del dispositivo',
+                'compass.hint.enabled': 'Orientamento attivato',
+                'compass.orientationActive': 'Orientamento bussola attivo — il quadrante è livellato',
+                'secret.info.title': 'Posizione segreta',
+                'secret.info.subtitle': 'Dettagli sbloccati',
+                'secret.info.revertTitle': 'Tornato alla tua posizione',
+                'secret.info.revertSubtitle': 'Meteo e globo sincronizzati alle tue coordinate',
+                'secret.info.teleportHome': 'Bentornato a casa',
+                'secret.info.teleportGeneric': 'Teletrasportato a {location}',
+                'secret.info.closeLabel': 'Chiudi info segrete',
+                'weather.unknown': 'Sconosciuto',
+                'weather.sunrise': 'Alba',
+                'weather.sunset': 'Tramonto',
+                'vr.enter': 'Entra in VR',
+                'vr.exit': 'Esci dalla VR',
+                'vr.enterAria': 'Entra in VR immersiva per osservare i corpi celesti',
+                'vr.exitAria': 'Esci dalla modalità VR immersiva'
             },
             pt: {
                 // Navigation
@@ -1068,10 +1222,13 @@ class I18n {
 
                 // Hero
                 'hero.badge': 'Aprofundamento Técnico',
+                'hero.title.line1': 'E o',
+                'hero.title.line2': '<em>Clima?</em>',
                 'hero.title': 'E o <em>Clima?</em>',
                 'hero.subtitle': 'Como cálculos astronômicos, geometria de janelas e dados climáticos criam automação inteligente de persianas.',
                 'hero.subtitle.emphasis': 'Porque sua casa deve saber quando te proteger do sol.',
                 'hero.scroll': 'Siga o caminho do sol',
+                'hero.scrollAria': 'Role para saber mais',
 
                 // Hero stats
                 'stat.shades': 'Persianas',
@@ -1204,7 +1361,26 @@ class I18n {
                 'yes': 'Sim',
                 'no': 'Não',
                 'night': 'Noite — aberto para a vista',
-                'noSunOn': 'Sem sol em'
+                'noSunOn': 'Sem sol em',
+                
+                // Compass & VR
+                'compass.hint': 'Toque para ativar a orientação do dispositivo',
+                'compass.hint.enabled': 'Orientação ativada',
+                'compass.orientationActive': 'Orientação da bússola ativa — o mostrador está nivelado',
+                'secret.info.title': 'Local secreto',
+                'secret.info.subtitle': 'Detalhes desbloqueados',
+                'secret.info.revertTitle': 'De volta à sua localização',
+                'secret.info.revertSubtitle': 'Clima e globo sincronizados às suas coordenadas',
+                'secret.info.teleportHome': 'Bem-vindo de volta',
+                'secret.info.teleportGeneric': 'Teletransportado para {location}',
+                'secret.info.closeLabel': 'Fechar info secreta',
+                'weather.unknown': 'Desconhecido',
+                'weather.sunrise': 'Nascer do sol',
+                'weather.sunset': 'Pôr do sol',
+                'vr.enter': 'Entrar em VR',
+                'vr.exit': 'Sair da VR',
+                'vr.enterAria': 'Entrar no modo VR imersivo para ver corpos celestes',
+                'vr.exitAria': 'Sair do modo VR imersivo'
             },
 
             // Arabic (RTL)
@@ -1215,9 +1391,12 @@ class I18n {
                 'nav.triggers': 'المحفزات',
                 'nav.demo': 'عرض مباشر',
                 'hero.badge': 'دراسة تقنية معمقة',
+                'hero.title.line1': 'ماذا عن',
+                'hero.title.line2': '<em>الطقس؟</em>',
                 'hero.title': 'ماذا عن <em>الطقس؟</em>',
                 'hero.subtitle': 'كيف تجتمع الحسابات الفلكية وهندسة النوافذ وبيانات الطقس لإنشاء أتمتة ذكية للستائر.',
                 'hero.scroll': 'تتبع مسار الشمس',
+                'hero.scrollAria': 'مرر لأسفل للتعرف أكثر',
                 'stat.shades': 'الستائر',
                 'stat.orientations': 'الاتجاهات',
                 'stat.degrees': 'الدرجات',
@@ -1247,7 +1426,26 @@ class I18n {
                 'footer.title': 'ماذا عن الطقس؟',
                 'footer.subtitle': 'حيث يلتقي علم الفلك براحة المنزل',
                 'yes': 'نعم',
-                'no': 'لا'
+                'no': 'لا',
+                
+                // Compass & VR
+                'compass.hint': 'اضغط لتفعيل اتجاه الجهاز',
+                'compass.hint.enabled': 'تم تفعيل الاتجاه',
+                'compass.orientationActive': 'البوصلة مفعلة — القرص مستوٍ',
+                'secret.info.title': 'موقع سري',
+                'secret.info.subtitle': 'تفاصيل تم فتحها',
+                'secret.info.revertTitle': 'الرجوع إلى موقعك',
+                'secret.info.revertSubtitle': 'تمت مزامنة الطقس والكرة مع إحداثياتك',
+                'secret.info.teleportHome': 'مرحباً بعودتك',
+                'secret.info.teleportGeneric': 'تم النقل إلى {location}',
+                'secret.info.closeLabel': 'إغلاق المعلومات السرية',
+                'weather.unknown': 'غير معروف',
+                'weather.sunrise': 'شروق الشمس',
+                'weather.sunset': 'غروب الشمس',
+                'vr.enter': 'دخول الواقع الافتراضي',
+                'vr.exit': 'الخروج من الواقع الافتراضي',
+                'vr.enterAria': 'دخول وضع الواقع الافتراضي لمشاهدة الأجرام السماوية',
+                'vr.exitAria': 'الخروج من وضع الواقع الافتراضي'
             },
 
             // Hebrew (RTL)
@@ -1258,9 +1456,12 @@ class I18n {
                 'nav.triggers': 'טריגרים',
                 'nav.demo': 'הדגמה חיה',
                 'hero.badge': 'צלילה טכנית מעמיקה',
+                'hero.title.line1': 'מה עם',
+                'hero.title.line2': '<em>מזג האוויר?</em>',
                 'hero.title': 'מה עם <em>מזג האוויר?</em>',
                 'hero.subtitle': 'כיצד חישובים אסטרונומיים וגאומטריית חלונות יוצרים אוטומציה חכמה.',
                 'hero.scroll': 'עקוב אחר נתיב השמש',
+                'hero.scrollAria': 'גלול למטה כדי ללמוד עוד',
                 'stat.shades': 'תריסים',
                 'stat.orientations': 'כיוונים',
                 'stat.degrees': 'מעלות',
@@ -1290,7 +1491,26 @@ class I18n {
                 'footer.title': 'מה עם מזג האוויר?',
                 'footer.subtitle': 'היכן אסטרונומיה פוגשת נוחות ביתית',
                 'yes': 'כן',
-                'no': 'לא'
+                'no': 'לא',
+                
+                // Compass & VR
+                'compass.hint': 'הקש כדי להפעיל את כיוון המכשיר',
+                'compass.hint.enabled': 'ההתמצאות הופעלה',
+                'compass.orientationActive': 'מצפן פעיל — החוגה מאוזנת',
+                'secret.info.title': 'מיקום סודי',
+                'secret.info.subtitle': 'פרטים שנפתחו',
+                'secret.info.revertTitle': 'חזרה למיקום שלך',
+                'secret.info.revertSubtitle': 'המזג והגלובוס הותאמו לקואורדינטות שלך',
+                'secret.info.teleportHome': 'ברוך הבא הביתה',
+                'secret.info.teleportGeneric': 'עברת אל {location}',
+                'secret.info.closeLabel': 'סגור מידע סודי',
+                'weather.unknown': 'לא ידוע',
+                'weather.sunrise': 'זריחה',
+                'weather.sunset': 'שקיעה',
+                'vr.enter': 'כניסה ל-VR',
+                'vr.exit': 'יציאה מ-VR',
+                'vr.enterAria': 'כניסה למצב VR חווייתי לצפייה בגופים שמימיים',
+                'vr.exitAria': 'יציאה ממצב VR חווייתי'
             }
         };
 
