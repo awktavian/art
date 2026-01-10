@@ -4920,7 +4920,10 @@ class CelestialDemo {
             }, 500);
         });
 
-        // Secret words: "monmouth" and "home" — Teleport to secret locations
+        // Secret words: "monmouth" and "home" — Teleport to secret locations (10 second preview)
+        this.secretLocationTimeout = null;
+        this.originalLocation = null;
+        
         new SecretWord(['monmouth', 'home'], (word) => {
             const location = SECRET_LOCATIONS[word];
             if (!location) return;
@@ -4934,6 +4937,7 @@ class CelestialDemo {
             console.log(`%c${location.name}`, `font-size: 16px; color: ${nameColor}; font-weight: bold;`);
             console.log(`%c${location.address}, ${location.city}`, 'color: #888;');
             console.log(`%c${location.description}`, 'color: #666; font-style: italic;');
+            console.log(`%c⏱️ Location preview for 10 seconds...`, 'color: #888; font-style: italic;');
             
             // Random trivia
             const trivia = location.trivia[Math.floor(Math.random() * location.trivia.length)];
@@ -4942,8 +4946,22 @@ class CelestialDemo {
             // Play success sound
             sound.init().then(() => sound.playSuccess());
 
-            // Update the demo location
+            // Update the demo location temporarily
             if (window.celestialDemo) {
+                // Store original location (from IP geolocation) if not already stored
+                if (!this.originalLocation && typeof atmosphere !== 'undefined') {
+                    this.originalLocation = {
+                        latitude: atmosphere.latitude,
+                        longitude: atmosphere.longitude
+                    };
+                }
+                
+                // Clear any existing revert timeout
+                if (this.secretLocationTimeout) {
+                    clearTimeout(this.secretLocationTimeout);
+                }
+                
+                // Apply the secret location
                 window.celestialDemo.latitude = location.latitude;
                 window.celestialDemo.longitude = location.longitude;
                 
@@ -4965,6 +4983,11 @@ class CelestialDemo {
                 
                 // FETCH NEW WEATHER for the location!
                 this.updateWeatherForLocation(location);
+                
+                // Revert to original location after 10 seconds
+                this.secretLocationTimeout = setTimeout(() => {
+                    this.revertToOriginalLocation();
+                }, 10000);
             }
         });
     }
@@ -4985,6 +5008,78 @@ class CelestialDemo {
                 console.log('%c⚠️ Weather fetch failed', 'color: #FFA726;', e);
             }
         }
+    }
+    
+    async revertToOriginalLocation() {
+        if (!this.originalLocation) return;
+        
+        console.log('%c🔄 Reverting to your location...', 'color: #64B5F6;');
+        
+        // Restore original coordinates
+        const orig = this.originalLocation;
+        
+        if (window.celestialDemo) {
+            window.celestialDemo.latitude = orig.latitude;
+            window.celestialDemo.longitude = orig.longitude;
+        }
+        
+        // Restore atmosphere location and fetch weather
+        if (typeof atmosphere !== 'undefined') {
+            atmosphere.latitude = orig.latitude;
+            atmosphere.longitude = orig.longitude;
+            
+            try {
+                await atmosphere.fetchWeather(orig.latitude, orig.longitude);
+                atmosphere.applyAtmosphere();
+                console.log(`%c✓ Back to your weather: ${atmosphere.condition}, ${atmosphere.temperature}°C`, 'color: #4CAF50;');
+            } catch (e) {
+                console.log('%c⚠️ Weather revert failed', 'color: #FFA726;', e);
+            }
+        }
+        
+        // Update compass/globe
+        if (window.compassSundial) {
+            window.compassSundial.updateGlobeLocation();
+            window.compassSundial.updateCelestialBodies();
+        }
+        
+        // Remove location-specific CSS classes
+        document.body.classList.remove('monmouth-mode', 'home-mode');
+        
+        // Show revert toast
+        this.showRevertToast();
+        
+        // Clear the stored original location
+        this.originalLocation = null;
+        this.secretLocationTimeout = null;
+    }
+    
+    showRevertToast() {
+        // Remove existing toasts
+        const existing = document.querySelector('.secret-toast');
+        if (existing) existing.remove();
+        
+        const toast = document.createElement('div');
+        toast.className = 'secret-toast revert-toast';
+        toast.innerHTML = `
+            <div class="toast-emoji">📍</div>
+            <div class="toast-content">
+                <div class="toast-title">Back to Your Location</div>
+                <div class="toast-subtitle">Weather and globe updated</div>
+            </div>
+        `;
+        document.body.appendChild(toast);
+        
+        // Animate in
+        requestAnimationFrame(() => {
+            toast.classList.add('show');
+        });
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 500);
+        }, 3000);
     }
 
     showLocationToast(location, word) {
