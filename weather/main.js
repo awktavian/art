@@ -5039,15 +5039,27 @@ class CompassSundial {
         this.moonIndicator = document.getElementById('compass-moon-indicator');
         this.hint = document.getElementById('compass-hint');
         this.body = this.element?.querySelector('.compass-body');
+        this.mapImg = document.getElementById('compass-map-img');
+        this.mapBg = document.getElementById('compass-map-bg');
         
         this.orientationEnabled = false;
         this.tiltX = 55; // Default isometric tilt
         this.tiltY = 0;
         this.rotation = 0;
+        this.mapLoaded = false;
         
         if (this.element) {
             this.init();
         }
+    }
+    
+    // Get viewer's location (from celestialDemo or fallback)
+    getLocation() {
+        const demo = window.celestialDemo;
+        return {
+            latitude: demo?.latitude || 47.6,
+            longitude: demo?.longitude || -122.3
+        };
     }
     
     init() {
@@ -5078,17 +5090,48 @@ class CompassSundial {
             this.element.classList.add('orientation-active');
         }
         
+        // Load map when location is ready
+        this.loadMap();
+        
         // Initial update
         this.updateCelestialBodies();
         
         // Update every 30 seconds
         setInterval(() => this.updateCelestialBodies(), 30000);
+        
+        // Retry map loading if location updates
+        setTimeout(() => this.loadMap(), 2000);
+    }
+    
+    loadMap() {
+        if (this.mapLoaded || !this.mapImg) return;
+        
+        const loc = this.getLocation();
+        if (!loc.latitude || !loc.longitude) return;
+        
+        // Mapbox static API with viewer's location
+        const mapboxToken = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
+        const zoom = 14;
+        const size = '300x300@2x';
+        
+        const mapUrl = `https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/${loc.longitude.toFixed(4)},${loc.latitude.toFixed(4)},${zoom},0/${size}?access_token=${mapboxToken}`;
+        
+        this.mapImg.src = mapUrl;
+        this.mapImg.onload = () => {
+            this.mapLoaded = true;
+            console.log('%c🗺️ Map centered on your location', 'color: #d4af37;');
+        };
+        this.mapImg.onerror = () => {
+            // Hide map on error
+            if (this.mapBg) this.mapBg.style.display = 'none';
+        };
     }
     
     sunSpeak() {
         const now = window.celestialDemo?.currentTime || new Date();
-        const sun = Ephemeris.sunPosition(HOME.latitude, HOME.longitude, now);
-        const times = Ephemeris.sunTimes(HOME.latitude, HOME.longitude, now);
+        const loc = this.getLocation();
+        const sun = Ephemeris.sunPosition(loc.latitude, loc.longitude, now);
+        const times = Ephemeris.sunTimes(loc.latitude, loc.longitude, now);
         
         const isDay = sun.altitude > 0;
         const greeting = isDay ? "Hello! ☀️" : "Goodnight... 🌅";
@@ -5109,7 +5152,8 @@ class CompassSundial {
     
     moonSpeak() {
         const now = window.celestialDemo?.currentTime || new Date();
-        const moon = Ephemeris.moonPosition(HOME.latitude, HOME.longitude, now);
+        const loc = this.getLocation();
+        const moon = Ephemeris.moonPosition(loc.latitude, loc.longitude, now);
         
         const moonUp = moon.altitude > 0;
         const phaseEmoji = this.getMoonEmoji(moon.phase);
@@ -5209,8 +5253,9 @@ class CompassSundial {
     
     updateCelestialBodies() {
         const now = window.celestialDemo?.currentTime || new Date();
-        const sun = Ephemeris.sunPosition(HOME.latitude, HOME.longitude, now);
-        const moon = Ephemeris.moonPosition(HOME.latitude, HOME.longitude, now);
+        const loc = this.getLocation();
+        const sun = Ephemeris.sunPosition(loc.latitude, loc.longitude, now);
+        const moon = Ephemeris.moonPosition(loc.latitude, loc.longitude, now);
         
         // Update sun position - radius 38 keeps it inside the face
         if (this.sunIndicator) {
@@ -5244,19 +5289,30 @@ class CompassSundial {
             this.moonIndicator.style.transform = `translate(-50%, -50%) scale(${scale})`;
         }
         
-        // Update shadow
+        // Update sundial shadow — points OPPOSITE to the sun (180° offset)
+        // The shadow is cast by the gnomon, falling away from the sun
         if (this.shadow) {
-            const isDay = sun.altitude > 0;
-            const shadowAngle = sun.azimuth;
+            const isDay = sun.altitude > -6; // Include civil twilight
+            // Shadow points opposite to sun direction
+            // Sun azimuth = where sun IS, shadow points opposite
+            const shadowAngle = sun.azimuth + 180;
+            
             this.shadow.style.setProperty('--shadow-angle', `${shadowAngle}deg`);
             
-            if (isDay) {
-                const shadowLength = Math.max(15, 40 - sun.altitude * 0.4);
-                this.shadow.style.height = `${shadowLength}%`;
-                this.shadow.style.opacity = '0.5';
+            // Remove previous state classes
+            this.shadow.classList.remove('night', 'below-horizon');
+            
+            if (sun.altitude > 0) {
+                // Daytime - full shadow
+                this.shadow.style.opacity = '1';
+            } else if (sun.altitude > -6) {
+                // Twilight - faded shadow
+                this.shadow.classList.add('night');
+                this.shadow.style.opacity = '0.4';
             } else {
-                this.shadow.style.height = '0%';
-                this.shadow.style.opacity = '0';
+                // Night - very faint
+                this.shadow.classList.add('below-horizon');
+                this.shadow.style.opacity = '0.15';
             }
         }
     }
