@@ -5058,7 +5058,14 @@ class CelestialDemo {
             // Update the demo location temporarily
             if (window.celestialDemo) {
                 // Store original location (from IP geolocation) if not already stored
-                if (!this.originalLocation && typeof atmosphere !== 'undefined') {
+                // CRITICAL: Validate that atmosphere has VALID coordinates before storing
+                const hasValidAtmosphere = (
+                    typeof atmosphere !== 'undefined' &&
+                    typeof atmosphere.latitude === 'number' &&
+                    typeof atmosphere.longitude === 'number'
+                );
+                
+                if (!this.originalLocation && hasValidAtmosphere) {
                     this.originalLocation = {
                         latitude: atmosphere.latitude,
                         longitude: atmosphere.longitude
@@ -5122,7 +5129,22 @@ class CelestialDemo {
     }
     
     async revertToOriginalLocation() {
-        if (!this.originalLocation) return;
+        // Validate originalLocation has valid coordinates
+        const hasValidOriginal = (
+            this.originalLocation &&
+            typeof this.originalLocation.latitude === 'number' &&
+            typeof this.originalLocation.longitude === 'number'
+        );
+        
+        if (!hasValidOriginal) {
+            console.log('%c⚠️ No valid original location to revert to', 'color: #FFA726;');
+            // Clear any partial state
+            this.originalLocation = null;
+            this.secretLocationTimeout = null;
+            document.body.classList.remove('monmouth-mode', 'home-mode');
+            window.compassSundial?.clearSecretLocation?.({ preserveInfo: true });
+            return;
+        }
         
         console.log('%c🔄 Reverting to your location...', 'color: #64B5F6;');
         
@@ -6219,18 +6241,37 @@ class CompassSundial {
         this.celestialInterval = setInterval(() => this.updateCelestialBodies(), 5000);
         
         // Listen for atmosphere location ready event
+        // This is the PRIMARY trigger for globe initialization since we wait for IP geolocation
         window.addEventListener('atmosphere-location-ready', (e) => {
-            console.log('%c🌍 Location ready, updating globe...', 'color: #64B5F6;');
-            if (this.globe) {
-                this.updateGlobeLocation(e.detail.latitude, e.detail.longitude);
-            } else {
+            const { latitude, longitude } = e.detail;
+            console.log(`%c🌍 IP geolocation ready: ${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°`, 'color: #64B5F6;');
+            
+            if (!this.globe) {
+                // Globe hasn't been created yet - create it now with correct location
                 this.initGlobe();
+            } else {
+                // Globe exists (shouldn't happen normally, but handle gracefully)
+                this.updateGlobeLocation(latitude, longitude);
             }
-            this.updateCelestialBodies(e.detail.latitude, e.detail.longitude);
+            
+            // Update celestial bodies for the correct location
+            this.updateCelestialBodies(latitude, longitude);
         });
         
-        // Retry globe init if location becomes available
-        setTimeout(() => this.initGlobe(), 1000);
+        // Fallback: If IP geolocation fails after 3 seconds, initialize with HOME
+        // This handles network errors, blocked APIs, file:// protocol, etc.
+        setTimeout(() => {
+            if (!this.globeInitialized) {
+                console.log('%c🌍 IP geolocation timeout, falling back to HOME', 'color: #FFA726;');
+                // Manually set atmosphere fallback so initGlobe will work
+                if (typeof atmosphere !== 'undefined' && atmosphere.latitude == null) {
+                    atmosphere.latitude = HOME.latitude;
+                    atmosphere.longitude = HOME.longitude;
+                }
+                this.initGlobe();
+                this.updateCelestialBodies();
+            }
+        }, 3000);
 
         window.addEventListener('languageChanged', this.boundLanguageHandler);
     }
@@ -6238,27 +6279,37 @@ class CompassSundial {
     initGlobe() {
         if (this.globeInitialized || !this.globeCanvas) return;
         
-        // Get location from IP geolocation (atmosphere)
-        const loc = this.getLocation();
-        if (loc.latitude == null || loc.longitude == null) {
-            console.log('%c🌍 Globe waiting for geolocation...', 'color: #FFA500;');
-            return; // Will retry
+        // CRITICAL: Wait for REAL IP geolocation, don't fall back to HOME
+        // Check atmosphere directly - it has the IP-based location
+        const hasAtmosphereLocation = (
+            typeof atmosphere !== 'undefined' &&
+            typeof atmosphere.latitude === 'number' &&
+            typeof atmosphere.longitude === 'number'
+        );
+        
+        if (!hasAtmosphereLocation) {
+            console.log('%c🌍 Globe waiting for IP geolocation...', 'color: #FFA500;');
+            return; // Event handler will trigger init when atmosphere is ready
         }
         
-        console.log(`%c🌍 Initializing globe at ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`, 'color: #64B5F6;');
+        // Use atmosphere's IP-based location as the starting point
+        const lat = atmosphere.latitude;
+        const lon = atmosphere.longitude;
+        
+        console.log(`%c🌍 Initializing globe at ${lat.toFixed(2)}°, ${lon.toFixed(2)}° (IP location)`, 'color: #64B5F6;');
         
         this.globe = new MiniGlobe(this.globeCanvas, {
-            latitude: loc.latitude,
-            longitude: loc.longitude,
+            latitude: lat,
+            longitude: lon,
             dragSurface: this.element,
             skipDragSelectors: ['.compass-shadow', '.compass-gnomon']
         });
-        this.focusedLatLon = { latitude: loc.latitude, longitude: loc.longitude };
+        this.focusedLatLon = { latitude: lat, longitude: lon };
         this.globe.setOrientationCallback(() => this.updateSecretEmojiPositions());
         this.broadcastFocusLocation();
         
         this.globeInitialized = true;
-        console.log('%c🌍 Globe initialized', 'color: #64B5F6;');
+        console.log('%c🌍 Globe initialized at current location', 'color: #64B5F6;');
     }
     
     initSecretInfoBar() {
