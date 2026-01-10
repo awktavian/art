@@ -2734,16 +2734,23 @@ class SecretWord {
         this.buffer = '';
         this.timeout = null;
         this.init();
+        console.log('%c🔑 Secret words activated:', 'color: #666;', this.words.join(', '));
     }
 
     init() {
-        document.addEventListener('keydown', (e) => {
-            // Ignore if user is typing in an input
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        document.addEventListener('keypress', (e) => {
+            // Ignore if user is typing in an input/textarea/contenteditable
+            const target = e.target;
+            if (target.tagName === 'INPUT' || 
+                target.tagName === 'TEXTAREA' || 
+                target.isContentEditable) return;
             
-            // Only track letters
-            if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
-                this.buffer += e.key.toLowerCase();
+            // Get the typed character
+            const char = e.key.toLowerCase();
+            
+            // Only track single letters
+            if (char.length === 1 && /[a-z]/.test(char)) {
+                this.buffer += char;
                 
                 // Keep buffer to max word length + some slack
                 const maxLen = Math.max(...this.words.map(w => w.length)) + 5;
@@ -2752,17 +2759,18 @@ class SecretWord {
                 // Check if any secret word is at the end of the buffer
                 for (const word of this.words) {
                     if (this.buffer.endsWith(word)) {
+                        console.log('%c🎉 Secret word detected:', 'color: #D4AF37;', word);
                         this.callback(word);
                         this.buffer = '';
                         break;
                     }
                 }
                 
-                // Clear buffer after 2 seconds of inactivity
+                // Clear buffer after 3 seconds of inactivity
                 clearTimeout(this.timeout);
                 this.timeout = setTimeout(() => {
                     this.buffer = '';
-                }, 2000);
+                }, 3000);
             }
         });
     }
