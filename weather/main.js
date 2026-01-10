@@ -1484,12 +1484,25 @@ class Ephemeris {
 
         // Get phase info
         const phaseInfo = this.moonPhase(date);
+        
+        // Calculate sub-lunar point (where moon is directly overhead)
+        // Right ascension in degrees
+        const alphaDeg = this.normalizeAngle(alpha * this.RAD_TO_DEG);
+        // Geographic longitude where moon is at zenith
+        const subLunarLon = this.wrapLongitude(alphaDeg - gmst);
+        // Geographic latitude where moon is at zenith (= declination)
+        const subLunarLat = delta * this.RAD_TO_DEG;
+        // Cartesian vector for globe positioning
+        const vector = this.latLonToCartesian(subLunarLat, subLunarLon);
 
         return {
             altitude: Math.round(altitude * 10) / 10,
             azimuth: Math.round(azimuth * 10) / 10,
             isVisible: altitude > -5,
             direction: this.azimuthToDirection(azimuth),
+            subsolarLatitude: subLunarLat,  // Named "subsolar" for API consistency
+            subsolarLongitude: subLunarLon,
+            vector,
             ...phaseInfo
         };
     }
@@ -6456,11 +6469,8 @@ class MiniGlobe {
         // This applies the home rotation first, then drag on top
         this.currentQuat.multiplyQuaternions(this.dragQuat, this.homeQuat);
         
-        // Apply to globe
+        // Apply to globe (callback is triggered in animate() for consistent updates)
         this.applyQuaternion();
-        if (this.onOrientationChange) {
-            this.onOrientationChange(this);
-        }
     }
 
     updateSunLighting(sunData) {
@@ -6673,6 +6683,12 @@ class MiniGlobe {
         // Update marker position in world space (follows globe rotation)
         this.updateMarkerPosition();
         
+        // ALWAYS trigger callback for real-time sun/moon indicator updates
+        // This ensures indicators stay in sync during auto-rotate and momentum
+        if (this.onOrientationChange) {
+            this.onOrientationChange(this);
+        }
+        
         // Pulse marker
         if (this.markerGlow) {
             const pulse = 1 + 0.3 * Math.sin(now / 400);
@@ -6812,8 +6828,8 @@ class CompassSundial {
         // Initial update
         this.updateCelestialBodies();
         
-        // Update every 5 seconds for smooth motion
-        this.celestialInterval = setInterval(() => this.updateCelestialBodies(), 5000);
+        // Update every second for responsive motion (sun/moon move slowly)
+        this.celestialInterval = setInterval(() => this.updateCelestialBodies(), 1000);
         
         // Listen for atmosphere location ready event
         // This is the PRIMARY trigger for globe initialization since we wait for IP geolocation
@@ -7350,86 +7366,112 @@ class CompassSundial {
         const sun = Ephemeris.sunPosition(useLat, useLon, now);
         const moon = Ephemeris.moonPosition(useLat, useLon, now);
         
+        // Update globe lighting with sun data
         if (this.globe && sun.vector) {
             this.globe.updateSunLighting(sun);
         }
         
-        // Update sun position based on globe's current rotation
-        // Project the subsolar point onto the globe to get indicator position
+        // ═══════════════════════════════════════════════════════════════════
+        // SUN INDICATOR — Project subsolar point onto visible globe face
+        // ═══════════════════════════════════════════════════════════════════
         if (this.sunIndicator && sun.subsolarLatitude !== undefined) {
             let x, y;
             const isDay = sun.altitude > 0;
+            let onGlobe = false;
             
-            // If globe exists, project the subsolar point
+            // Project the subsolar point (where sun is directly overhead)
             if (this.globe && this.globe.projectLatLon) {
                 const projected = this.globe.projectLatLon(sun.subsolarLatitude, sun.subsolarLongitude);
                 if (projected && projected.facingFront) {
-                    // Sun's geographic position is on the visible side
+                    // Subsolar point is on the visible hemisphere
                     x = projected.x;
                     y = projected.y;
-                } else {
-                    // Sun is on the far side - place on ring edge based on azimuth
-                    const radius = 48;
-                    const angleRad = (sun.azimuth - 90) * Math.PI / 180;
-                    x = 50 + radius * Math.cos(angleRad);
-                    y = 50 + radius * Math.sin(angleRad);
+                    onGlobe = true;
                 }
-            } else {
-                // Fallback to azimuth-based positioning
-                const radius = 38;
+            }
+            
+            // If not on visible hemisphere, position on bezel edge
+            if (!onGlobe) {
+                const radius = 47;
                 const angleRad = (sun.azimuth - 90) * Math.PI / 180;
                 x = 50 + radius * Math.cos(angleRad);
                 y = 50 + radius * Math.sin(angleRad);
             }
             
+            // Apply position with smooth transition
             this.sunIndicator.style.left = `${x}%`;
             this.sunIndicator.style.top = `${y}%`;
             
-            const scale = isDay ? 1 + (sun.altitude / 150) : 0.75;
-            this.sunIndicator.style.opacity = isDay ? '1' : '0.4';
+            // Scale and opacity based on altitude and position
+            const baseScale = onGlobe ? 1.1 : 0.85;
+            const altitudeBonus = isDay ? sun.altitude / 120 : 0;
+            const scale = baseScale + altitudeBonus;
+            
+            this.sunIndicator.style.opacity = isDay ? '1' : '0.35';
             this.sunIndicator.style.transform = `translate(-50%, -50%) scale(${scale})`;
+            
+            // Add/remove class for on-globe vs on-bezel styling
+            this.sunIndicator.classList.toggle('on-globe', onGlobe);
         }
         
-        // Update moon position based on globe's current rotation
-        if (this.moonIndicator && moon && moon.subsolarLatitude !== undefined) {
+        // ═══════════════════════════════════════════════════════════════════
+        // MOON INDICATOR — Project sub-lunar point onto visible globe face
+        // ═══════════════════════════════════════════════════════════════════
+        if (this.moonIndicator && moon) {
             let x, y;
             const moonUp = moon.altitude > 0;
+            let onGlobe = false;
             
-            if (this.globe && this.globe.projectLatLon) {
+            // Project the sub-lunar point (where moon is directly overhead)
+            if (this.globe && this.globe.projectLatLon && moon.subsolarLatitude !== undefined) {
                 const projected = this.globe.projectLatLon(moon.subsolarLatitude, moon.subsolarLongitude);
                 if (projected && projected.facingFront) {
                     x = projected.x;
                     y = projected.y;
-                } else {
-                    const radius = 48;
-                    const angleRad = (moon.azimuth - 90) * Math.PI / 180;
-                    x = 50 + radius * Math.cos(angleRad);
-                    y = 50 + radius * Math.sin(angleRad);
+                    onGlobe = true;
                 }
-            } else {
-                const radius = 38;
+            }
+            
+            // If not on visible hemisphere, position on bezel edge
+            if (!onGlobe) {
+                const radius = 47;
                 const angleRad = (moon.azimuth - 90) * Math.PI / 180;
                 x = 50 + radius * Math.cos(angleRad);
                 y = 50 + radius * Math.sin(angleRad);
             }
             
+            // Apply position
             this.moonIndicator.style.left = `${x}%`;
             this.moonIndicator.style.top = `${y}%`;
             
-            const scale = moonUp ? 0.9 + (moon.altitude / 150) : 0.65;
-            this.moonIndicator.style.opacity = moonUp ? '1' : '0.35';
+            // Scale and opacity
+            const baseScale = onGlobe ? 0.95 : 0.7;
+            const altitudeBonus = moonUp ? moon.altitude / 150 : 0;
+            const scale = baseScale + altitudeBonus;
+            
+            this.moonIndicator.style.opacity = moonUp ? '1' : '0.3';
             this.moonIndicator.style.transform = `translate(-50%, -50%) scale(${scale})`;
+            
+            // Add/remove class for styling
+            this.moonIndicator.classList.toggle('on-globe', onGlobe);
         }
         
-        // Update sundial shadow — points OPPOSITE to the sun (180° offset)
-        // The shadow is cast by the gnomon, falling away from the sun
+        // ═══════════════════════════════════════════════════════════════════
+        // GNOMON SHADOW — Points opposite to sun direction
+        // ═══════════════════════════════════════════════════════════════════
         if (this.shadow) {
-            const isDay = sun.altitude > -6; // Include civil twilight
-            // Shadow points opposite to sun direction
-            // Sun azimuth = where sun IS, shadow points opposite
+            const isCivilDay = sun.altitude > -6;
+            // Shadow falls opposite to sun direction
             const shadowAngle = sun.azimuth + 180;
             
             this.shadow.style.setProperty('--shadow-angle', `${shadowAngle}deg`);
+            
+            // Shadow length varies with sun altitude
+            // Low sun = long shadow, high sun = short shadow
+            const shadowLength = sun.altitude > 0 
+                ? Math.max(20, 80 - sun.altitude) 
+                : 80;
+            this.shadow.style.setProperty('--shadow-length', `${shadowLength}%`);
             
             // Remove previous state classes
             this.shadow.classList.remove('night', 'below-horizon');
