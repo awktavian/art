@@ -5249,12 +5249,13 @@ class MiniGlobe {
         this.targetLat = options.latitude || 0;
         this.targetLon = options.longitude || 0;
         
-        // Current rotation (smoothly animates)
+        // Current view (smoothly animates to target)
         this.currentLat = this.targetLat;
         this.currentLon = this.targetLon;
         
-        // Auto rotation
-        this.autoRotateSpeed = 0.0002;
+        // Auto rotation offset (adds gentle drift without changing target)
+        this.autoRotateOffset = 0;
+        this.autoRotateSpeed = 0.002; // degrees per second
         
         // Three.js components
         this.scene = null;
@@ -5896,46 +5897,68 @@ class MiniGlobe {
     setLocation(lat, lon) {
         this.targetLat = lat;
         this.targetLon = lon;
+        // Reset auto-rotate offset so new location is centered
+        this.autoRotateOffset = 0;
     }
     
     updateMarkerPosition() {
-        if (!this.marker) return;
+        if (!this.marker || !this.globe) return;
         
-        // Convert lat/lon to 3D position on sphere
+        // Convert lat/lon to 3D position on sphere surface
+        // phi = colatitude (0 at north pole, PI at south pole)
+        // theta = longitude angle
         const phi = (90 - this.targetLat) * Math.PI / 180;
-        const theta = (this.targetLon + 180) * Math.PI / 180;
+        const theta = this.targetLon * Math.PI / 180;
         
-        const x = -Math.sin(phi) * Math.cos(theta);
-        const y = Math.cos(phi);
-        const z = Math.sin(phi) * Math.sin(theta);
+        // Spherical to Cartesian (before globe rotation)
+        // Using standard math: x = sin(phi)cos(theta), z = sin(phi)sin(theta), y = cos(phi)
+        let x = Math.sin(phi) * Math.cos(theta);
+        let y = Math.cos(phi);
+        let z = Math.sin(phi) * Math.sin(theta);
         
-        this.marker.position.set(x * 1.01, y * 1.01, z * 1.01);
+        // Apply same rotation as globe
+        const globeRotY = this.globe.rotation.y;
+        const cosR = Math.cos(globeRotY);
+        const sinR = Math.sin(globeRotY);
+        const newX = x * cosR - z * sinR;
+        const newZ = x * sinR + z * cosR;
+        
+        // Position marker just above globe surface
+        const r = 1.02;
+        this.marker.position.set(newX * r, y * r, newZ * r);
         this.markerGlow.position.copy(this.marker.position);
     }
     
     updateRotation(immediate = false) {
         if (!this.globe) return;
         
-        // Smoothly interpolate to target
-        const smoothing = immediate ? 1 : 0.03;
+        // Smoothly interpolate to target location
+        const smoothing = immediate ? 1 : 0.05;
         this.currentLat += (this.targetLat - this.currentLat) * smoothing;
         this.currentLon += (this.targetLon - this.currentLon) * smoothing;
         
-        // Rotate globe to center on location
-        // Y rotation = longitude, X rotation = latitude tilt
-        this.globe.rotation.y = -this.currentLon * Math.PI / 180 - Math.PI / 2;
-        this.globe.rotation.x = 0; // Keep upright for clarity
+        // Calculate globe rotation to center target location facing camera
+        // The texture is mapped with 0° longitude at center, so we need to offset
+        // Add auto-rotate offset for gentle drift
+        const lonRotation = (-this.currentLon + this.autoRotateOffset) * Math.PI / 180;
         
+        this.globe.rotation.y = lonRotation;
+        this.globe.rotation.x = 0;
+        
+        // Keep all layers in sync
         if (this.clouds) {
-            this.clouds.rotation.y = this.globe.rotation.y;
+            this.clouds.rotation.y = lonRotation;
         }
         
         if (this.nightLights) {
-            this.nightLights.rotation.y = this.globe.rotation.y;
+            this.nightLights.rotation.y = lonRotation;
         }
         
-        // Tilt camera slightly based on latitude for perspective
-        this.camera.position.y = Math.sin(this.currentLat * Math.PI / 180) * 0.3;
+        // Tilt camera based on latitude to show correct perspective
+        const latRad = this.currentLat * Math.PI / 180;
+        this.camera.position.y = Math.sin(latRad) * 0.5;
+        this.camera.position.z = 2.5 * Math.cos(latRad * 0.3);
+        this.camera.lookAt(0, 0, 0);
     }
     
     animate() {
@@ -5943,17 +5966,17 @@ class MiniGlobe {
         const delta = now - this.lastTime;
         this.lastTime = now;
         
-        // Slow auto-rotation
-        this.targetLon += this.autoRotateSpeed * delta;
-        if (this.targetLon > 180) this.targetLon -= 360;
+        // Slow auto-rotation offset (gentle drift, doesn't change target)
+        this.autoRotateOffset += this.autoRotateSpeed * delta / 1000;
+        if (this.autoRotateOffset > 360) this.autoRotateOffset -= 360;
         
         // Update rotation
         this.updateRotation();
         this.updateMarkerPosition();
         
-        // Rotate clouds slightly faster than globe
+        // Rotate clouds slightly faster than globe for parallax
         if (this.clouds) {
-            this.clouds.rotation.y += 0.00005 * delta;
+            this.clouds.rotation.y += 0.00002 * delta;
         }
         
         // Pulse marker
