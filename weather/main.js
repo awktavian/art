@@ -323,6 +323,8 @@ class WeatherAtmosphere {
         this.cloudCover = 0;
         this.windSpeed = 0;
         this.temperature = 20;
+        this.temperatureHigh = null;
+        this.temperatureLow = null;
         this.initialized = false;
         this.refreshInterval = null;
         this.lightningTimeout = null;
@@ -403,7 +405,8 @@ class WeatherAtmosphere {
 
     async fetchWeather(lat, lon) {
         // Open-Meteo API - free, no key required
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code,temperature_2m,wind_speed_10m,cloud_cover`;
+        // Include daily forecast for high/low temperatures
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code,temperature_2m,wind_speed_10m,cloud_cover&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1`;
 
         const response = await fetch(url);
         const data = await response.json();
@@ -413,6 +416,12 @@ class WeatherAtmosphere {
             this.cloudCover = data.current.cloud_cover || 0;
             this.windSpeed = data.current.wind_speed_10m || 0;
             this.temperature = data.current.temperature_2m || 20;
+        }
+        
+        // Store daily high/low
+        if (data.daily) {
+            this.temperatureHigh = data.daily.temperature_2m_max?.[0] ?? null;
+            this.temperatureLow = data.daily.temperature_2m_min?.[0] ?? null;
         }
     }
 
@@ -5741,6 +5750,7 @@ class CompassSundial {
         
         const isDay = sun.altitude > 0;
         const tempStr = this.getTemperatureString();
+        const highLowStr = this.getHighLowString();
         
         let greeting = isDay ? "Hello! ☀️" : "Goodnight... 🌅";
         if (tempStr) {
@@ -5757,9 +5767,32 @@ class CompassSundial {
         console.log(`%c${greeting}`, 'color: #FFD700; font-size: 16px; font-weight: bold;');
         console.log(`%c${status}`, 'color: #FFA500;');
         console.log(`%cRise: ${sunrise} | Set: ${sunset}`, 'color: #888;');
+        if (highLowStr) {
+            console.log(`%cToday: ${highLowStr}`, 'color: #888;');
+        }
         
-        // Show toast
-        this.showToast(`${greeting} ${status}`);
+        // Show toast with high/low
+        const toastMsg = highLowStr 
+            ? `${greeting} ${status} Today: ${highLowStr}`
+            : `${greeting} ${status}`;
+        this.showToast(toastMsg);
+    }
+    
+    getHighLowString() {
+        const atmos = window.atmosphere;
+        if (!atmos || atmos.temperatureHigh === null || atmos.temperatureLow === null) {
+            return null;
+        }
+        
+        const useCelsius = localStorage.getItem('weather_temp_unit') === 'celsius';
+        
+        if (useCelsius) {
+            return `↑${atmos.temperatureHigh.toFixed(0)}° ↓${atmos.temperatureLow.toFixed(0)}°C`;
+        } else {
+            const highF = (atmos.temperatureHigh * 9/5) + 32;
+            const lowF = (atmos.temperatureLow * 9/5) + 32;
+            return `↑${highF.toFixed(0)}° ↓${lowF.toFixed(0)}°F`;
+        }
     }
     
     moonSpeak() {
