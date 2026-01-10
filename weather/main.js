@@ -8084,12 +8084,10 @@ class CompassSundial {
             this.sunIndicator.style.left = `${x}%`;
             this.sunIndicator.style.top = `${y}%`;
             
-            // Scale and opacity based on altitude and position
-            const baseScale = onGlobe ? 1.1 : 0.85;
-            const altitudeBonus = isDay ? sun.altitude / 120 : 0;
-            const scale = baseScale + altitudeBonus;
+            // Scale and opacity — keep subtle, no altitude bonus
+            const scale = onGlobe ? 1.0 : 0.9;
             
-            this.sunIndicator.style.opacity = isDay ? '1' : '0.35';
+            this.sunIndicator.style.opacity = isDay ? '1' : '0.3';
             this.sunIndicator.style.transform = `translate(-50%, -50%) scale(${scale})`;
             
             // Add/remove class for on-globe vs on-bezel styling
@@ -8126,12 +8124,10 @@ class CompassSundial {
             this.moonIndicator.style.left = `${x}%`;
             this.moonIndicator.style.top = `${y}%`;
             
-            // Scale and opacity
-            const baseScale = onGlobe ? 0.95 : 0.7;
-            const altitudeBonus = moonUp ? moon.altitude / 150 : 0;
-            const scale = baseScale + altitudeBonus;
+            // Scale and opacity — keep subtle, no altitude bonus
+            const scale = onGlobe ? 1.0 : 0.85;
             
-            this.moonIndicator.style.opacity = moonUp ? '1' : '0.3';
+            this.moonIndicator.style.opacity = moonUp ? '1' : '0.25';
             this.moonIndicator.style.transform = `translate(-50%, -50%) scale(${scale})`;
             
             // Add/remove class for styling
