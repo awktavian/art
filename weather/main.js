@@ -68,6 +68,34 @@ const TIMING = {
 const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
 
 // ============================================================================
+// SECRET LOCATIONS — Easter Egg Destinations
+// ============================================================================
+
+const SECRET_LOCATIONS = {
+    monmouth: {
+        name: 'Monmouth Coffee Company',
+        address: '27 Monmouth Street, Covent Garden',
+        city: 'London',
+        postcode: 'WC2H 9EU',
+        country: 'UK',
+        latitude: 51.5143,
+        longitude: -0.1268,
+        timezone: 'Europe/London',
+        founded: 1978,
+        founders: 'Nicholas Saunders & Anita Le Roy',
+        description: 'Pioneer of London\'s specialty coffee scene. Coffee roasted in the basement since 1978.',
+        trivia: [
+            'Founded in 1978, one of London\'s first specialty coffee roasters',
+            'Originally roasted coffee in the basement of 27 Monmouth Street',
+            'Helped revitalize the Neal\'s Yard area of Covent Garden',
+            'A cornerstone of London\'s third wave coffee movement',
+            'The queue outside is legendary — worth every minute'
+        ],
+        emoji: '☕'
+    }
+};
+
+// ============================================================================
 // ACCESSIBILITY — Reduced Motion Preference
 // ============================================================================
 
@@ -2696,6 +2724,51 @@ class KonamiCode {
 }
 
 // ============================================================================
+// SECRET WORD — Type a word anywhere to trigger easter eggs
+// ============================================================================
+
+class SecretWord {
+    constructor(words, callback) {
+        this.words = words.map(w => w.toLowerCase());
+        this.callback = callback;
+        this.buffer = '';
+        this.timeout = null;
+        this.init();
+    }
+
+    init() {
+        document.addEventListener('keydown', (e) => {
+            // Ignore if user is typing in an input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            
+            // Only track letters
+            if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+                this.buffer += e.key.toLowerCase();
+                
+                // Keep buffer to max word length + some slack
+                const maxLen = Math.max(...this.words.map(w => w.length)) + 5;
+                this.buffer = this.buffer.slice(-maxLen);
+                
+                // Check if any secret word is at the end of the buffer
+                for (const word of this.words) {
+                    if (this.buffer.endsWith(word)) {
+                        this.callback(word);
+                        this.buffer = '';
+                        break;
+                    }
+                }
+                
+                // Clear buffer after 2 seconds of inactivity
+                clearTimeout(this.timeout);
+                this.timeout = setTimeout(() => {
+                    this.buffer = '';
+                }, 2000);
+            }
+        });
+    }
+}
+
+// ============================================================================
 // DEVICE ORIENTATION — Accelerometer & Magnetometer for Compass
 // ============================================================================
 
@@ -4810,6 +4883,84 @@ class CelestialDemo {
                 document.body.classList.remove('konami-unlocked');
             }, 500);
         });
+
+        // Secret word: "monmouth" — Teleport to Monmouth Coffee Co
+        new SecretWord(['monmouth'], (word) => {
+            const location = SECRET_LOCATIONS[word];
+            if (!location) return;
+
+            console.log(`%c${location.emoji} SECRET LOCATION UNLOCKED!`, 'font-size: 24px; color: #8B4513;');
+            console.log(`%c${location.name}`, 'font-size: 16px; color: #D2691E; font-weight: bold;');
+            console.log(`%c${location.address}, ${location.city}`, 'color: #888;');
+            console.log(`%c${location.description}`, 'color: #666; font-style: italic;');
+            
+            // Random trivia
+            const trivia = location.trivia[Math.floor(Math.random() * location.trivia.length)];
+            console.log(`%c💡 ${trivia}`, 'color: #D4AF37;');
+
+            // Play success sound
+            sound.init().then(() => sound.playSuccess());
+
+            // Update the demo location
+            if (window.celestialDemo) {
+                window.celestialDemo.latitude = location.latitude;
+                window.celestialDemo.longitude = location.longitude;
+                
+                // Show fancy toast
+                this.showMonmouthToast(location);
+                
+                // Force compass to reload map and update celestial positions
+                if (window.compassSundial) {
+                    window.compassSundial.mapLoaded = false;
+                    window.compassSundial.loadMap();
+                    window.compassSundial.updateCelestialBodies();
+                }
+                
+                // Add coffee-themed class for potential CSS effects
+                document.body.classList.add('monmouth-mode');
+                
+                // Update any location displays
+                this.updateLocationDisplays(location);
+            }
+        });
+    }
+
+    showMonmouthToast(location) {
+        // Remove existing toast
+        const existing = document.querySelector('.secret-toast');
+        if (existing) existing.remove();
+
+        const toast = document.createElement('div');
+        toast.className = 'secret-toast monmouth-toast';
+        toast.innerHTML = `
+            <div class="toast-emoji">${location.emoji}</div>
+            <div class="toast-content">
+                <div class="toast-title">Teleported to ${location.name}</div>
+                <div class="toast-subtitle">${location.address}, ${location.city}</div>
+                <div class="toast-trivia">"${location.trivia[Math.floor(Math.random() * location.trivia.length)]}"</div>
+                <div class="toast-founded">Est. ${location.founded}</div>
+            </div>
+        `;
+        document.body.appendChild(toast);
+
+        // Animate in
+        requestAnimationFrame(() => {
+            toast.classList.add('show');
+        });
+
+        // Remove after 6 seconds
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 400);
+        }, 6000);
+    }
+
+    updateLocationDisplays(location) {
+        // Update any elements showing coordinates
+        const coordElements = document.querySelectorAll('[data-location]');
+        coordElements.forEach(el => {
+            el.textContent = `${location.city} • ${location.latitude.toFixed(4)}°N, ${Math.abs(location.longitude).toFixed(4)}°W`;
+        });
     }
 
     setupCelestialVoice() {
@@ -5109,37 +5260,53 @@ class CompassSundial {
         const loc = this.getLocation();
         if (!loc.latitude || !loc.longitude) return;
         
-        // Use OpenStreetMap static tiles via Wikimedia (no API key needed, reliable)
-        // Alternative: use tile server directly
         const zoom = 14;
         const lat = loc.latitude;
         const lon = loc.longitude;
         
-        // Calculate tile coordinates from lat/lon
+        // Calculate tile coordinates from lat/lon (Web Mercator)
         const n = Math.pow(2, zoom);
         const x = Math.floor((lon + 180) / 360 * n);
         const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n);
         
-        // Use CartoDB dark_all tiles (dark theme, no API key)
-        const tileUrl = `https://cartodb-basemaps-a.global.ssl.fastly.net/dark_all/${zoom}/${x}/${y}@2x.png`;
+        // Set crossorigin for CORS
+        this.mapImg.crossOrigin = 'anonymous';
         
-        this.mapImg.src = tileUrl;
+        // Try multiple tile sources in order of preference
+        const tileSources = [
+            // Stamen Toner (dark, artistic)
+            `https://tiles.stadiamaps.com/tiles/stamen_toner/${zoom}/${x}/${y}@2x.png`,
+            // CartoDB dark
+            `https://a.basemaps.cartocdn.com/dark_all/${zoom}/${x}/${y}@2x.png`,
+            // OSM standard (fallback)
+            `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`
+        ];
+        
+        let sourceIndex = 0;
+        
+        const tryNextSource = () => {
+            if (sourceIndex >= tileSources.length) {
+                // All sources failed - hide map
+                if (this.mapBg) this.mapBg.style.display = 'none';
+                return;
+            }
+            
+            this.mapImg.src = tileSources[sourceIndex];
+            sourceIndex++;
+        };
+        
         this.mapImg.onload = () => {
             this.mapLoaded = true;
-            console.log('%c🗺️ Map centered on your location', 'color: #d4af37;');
+            console.log('%c🗺️ Map loaded', 'color: #d4af37;');
         };
+        
         this.mapImg.onerror = () => {
-            // Try fallback to standard OSM if CartoDB fails
-            const osmUrl = `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`;
-            this.mapImg.src = osmUrl;
-            this.mapImg.onload = () => {
-                this.mapLoaded = true;
-            };
-            this.mapImg.onerror = () => {
-                // Hide map on total failure
-                if (this.mapBg) this.mapBg.style.display = 'none';
-            };
+            console.log(`Map source ${sourceIndex} failed, trying next...`);
+            tryNextSource();
         };
+        
+        // Start loading
+        tryNextSource();
     }
     
     sunSpeak() {
@@ -5339,6 +5506,10 @@ class CompassSundial {
 
 const celestialDemo = new CelestialDemo();
 const compassSundial = new CompassSundial();
+
+// Expose to window for easter egg access
+window.celestialDemo = celestialDemo;
+window.compassSundial = compassSundial;
 
 // Debug: Log celestial calculations on page load
 (() => {
