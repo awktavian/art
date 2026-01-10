@@ -5266,6 +5266,16 @@ class MiniGlobe {
         this.autoRotateOffset = 0;
         this.autoRotateSpeed = 0.5; // degrees per second (slow drift)
         
+        // Drag interaction state
+        this.isDragging = false;
+        this.dragStartX = 0;
+        this.dragStartY = 0;
+        this.dragOffsetLon = 0;  // User drag offset (springs back to 0)
+        this.dragOffsetLat = 0;
+        this.dragVelocityLon = 0; // For momentum
+        this.dragVelocityLat = 0;
+        this.lastDragTime = 0;
+        
         // Three.js components
         this.scene = null;
         this.camera = null;
@@ -5317,6 +5327,9 @@ class MiniGlobe {
         
         // Set initial rotation to face target location
         this.updateRotation(true);
+        
+        // Setup drag interaction
+        this.setupDragInteraction();
         
         // Start animation
         this.animate();
@@ -5505,6 +5518,77 @@ class MiniGlobe {
         this.scene.add(rimLight);
     }
     
+    setupDragInteraction() {
+        const canvas = this.canvas;
+        
+        // Mouse events
+        canvas.addEventListener('mousedown', (e) => this.onDragStart(e.clientX, e.clientY));
+        canvas.addEventListener('mousemove', (e) => this.onDragMove(e.clientX, e.clientY));
+        canvas.addEventListener('mouseup', () => this.onDragEnd());
+        canvas.addEventListener('mouseleave', () => this.onDragEnd());
+        
+        // Touch events
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            this.onDragStart(touch.clientX, touch.clientY);
+        }, { passive: false });
+        
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            this.onDragMove(touch.clientX, touch.clientY);
+        }, { passive: false });
+        
+        canvas.addEventListener('touchend', () => this.onDragEnd());
+        canvas.addEventListener('touchcancel', () => this.onDragEnd());
+        
+        // Cursor style
+        canvas.style.cursor = 'grab';
+    }
+    
+    onDragStart(x, y) {
+        this.isDragging = true;
+        this.dragStartX = x;
+        this.dragStartY = y;
+        this.lastDragTime = performance.now();
+        this.dragVelocityLon = 0;
+        this.dragVelocityLat = 0;
+        this.canvas.style.cursor = 'grabbing';
+    }
+    
+    onDragMove(x, y) {
+        if (!this.isDragging) return;
+        
+        const now = performance.now();
+        const dt = Math.max(now - this.lastDragTime, 1);
+        
+        // Calculate drag delta (pixels to degrees)
+        const deltaX = x - this.dragStartX;
+        const deltaY = y - this.dragStartY;
+        
+        // Convert pixels to degrees (sensitivity: ~0.5° per pixel)
+        const sensitivity = 0.5;
+        const newOffsetLon = deltaX * sensitivity;
+        const newOffsetLat = -deltaY * sensitivity * 0.5; // Less sensitive vertically
+        
+        // Calculate velocity for momentum
+        this.dragVelocityLon = (newOffsetLon - this.dragOffsetLon) / dt * 16;
+        this.dragVelocityLat = (newOffsetLat - this.dragOffsetLat) / dt * 16;
+        
+        this.dragOffsetLon = newOffsetLon;
+        this.dragOffsetLat = Math.max(-60, Math.min(60, newOffsetLat)); // Clamp vertical
+        
+        this.lastDragTime = now;
+    }
+    
+    onDragEnd() {
+        if (!this.isDragging) return;
+        this.isDragging = false;
+        this.canvas.style.cursor = 'grab';
+        // Momentum and spring-back handled in animate()
+    }
+    
     setLocation(lat, lon) {
         this.targetLat = lat;
         this.targetLon = lon;
@@ -5551,22 +5635,25 @@ class MiniGlobe {
         // So rotation.y=0 shows London (0°), rotation.y=-122° shows Seattle (-122°)
         // Positive rotation.y = counter-clockwise = Eastern longitudes to front
         // Negative rotation.y = clockwise = Western longitudes to front
-        const lonRotation = (this.currentLon + this.autoRotateOffset) * Math.PI / 180;
+        // dragOffsetLon adds user interaction offset (springs back to 0)
+        const lonRotation = (this.currentLon + this.autoRotateOffset + this.dragOffsetLon) * Math.PI / 180;
         
         this.globe.rotation.y = lonRotation;
-        this.globe.rotation.x = 0;
+        this.globe.rotation.x = this.dragOffsetLat * Math.PI / 180; // Vertical drag tilts globe
         
         // Keep all layers in sync
         if (this.clouds) {
             this.clouds.rotation.y = lonRotation;
+            this.clouds.rotation.x = this.globe.rotation.x;
         }
         
         if (this.nightLights) {
             this.nightLights.rotation.y = lonRotation;
+            this.nightLights.rotation.x = this.globe.rotation.x;
         }
         
         // Tilt camera based on latitude to show correct perspective
-        const latRad = this.currentLat * Math.PI / 180;
+        const latRad = (this.currentLat + this.dragOffsetLat) * Math.PI / 180;
         this.camera.position.y = Math.sin(latRad) * 0.5;
         this.camera.position.z = 2.5 * Math.cos(latRad * 0.3);
         this.camera.lookAt(0, 0, 0);
@@ -5578,8 +5665,40 @@ class MiniGlobe {
         this.lastTime = now;
         
         // Slow auto-rotation offset (gentle drift, doesn't change target)
-        this.autoRotateOffset += this.autoRotateSpeed * delta / 1000;
-        if (this.autoRotateOffset > 360) this.autoRotateOffset -= 360;
+        // Pause auto-rotate while dragging or springing back
+        if (!this.isDragging && Math.abs(this.dragOffsetLon) < 1 && Math.abs(this.dragOffsetLat) < 1) {
+            this.autoRotateOffset += this.autoRotateSpeed * delta / 1000;
+            if (this.autoRotateOffset > 360) this.autoRotateOffset -= 360;
+        }
+        
+        // Spring physics when not dragging
+        if (!this.isDragging) {
+            // Spring constant and damping for smooth return
+            // Using critically damped spring for optimal feel
+            const springK = 0.08;    // Spring stiffness (higher = faster return)
+            const damping = 0.85;    // Velocity damping (lower = less overshoot)
+            
+            // Apply momentum first
+            this.dragOffsetLon += this.dragVelocityLon;
+            this.dragOffsetLat += this.dragVelocityLat;
+            
+            // Spring force pulls back to center
+            const springForceLon = -this.dragOffsetLon * springK;
+            const springForceLat = -this.dragOffsetLat * springK;
+            
+            this.dragVelocityLon = (this.dragVelocityLon + springForceLon) * damping;
+            this.dragVelocityLat = (this.dragVelocityLat + springForceLat) * damping;
+            
+            // Snap to zero when very close (avoid endless tiny oscillations)
+            if (Math.abs(this.dragOffsetLon) < 0.1 && Math.abs(this.dragVelocityLon) < 0.01) {
+                this.dragOffsetLon = 0;
+                this.dragVelocityLon = 0;
+            }
+            if (Math.abs(this.dragOffsetLat) < 0.1 && Math.abs(this.dragVelocityLat) < 0.01) {
+                this.dragOffsetLat = 0;
+                this.dragVelocityLat = 0;
+            }
+        }
         
         // Update rotation
         this.updateRotation();
