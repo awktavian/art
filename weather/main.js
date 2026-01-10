@@ -2959,9 +2959,10 @@ class SecretWord {
             }
         };
         
-        // Auto-start listening
-        this.shouldRestart = true;
-        this.startListening();
+        // DON'T auto-start - wait for user tap (respect permissions)
+        this.shouldRestart = false;
+        // Show the indicator but NOT listening yet
+        this.showVoiceButton();
     }
     
     startListening() {
@@ -2979,61 +2980,128 @@ class SecretWord {
         if (this.recognition && this.isListening) {
             this.recognition.stop();
         }
+        this.updateVoiceButton(false);
+    }
+    
+    showVoiceButton() {
+        // Create voice button (shows even when not listening)
+        let btn = document.getElementById('voice-indicator');
+        if (btn) return;
+        
+        btn = document.createElement('button');
+        btn.id = 'voice-indicator';
+        btn.type = 'button';
+        btn.setAttribute('aria-label', 'Tap to enable voice commands');
+        btn.innerHTML = `
+            <span class="voice-icon">🎤</span>
+            <span class="voice-label">Voice</span>
+        `;
+        
+        btn.onclick = () => {
+            if (this.isListening) {
+                this.stopListening();
+            } else {
+                this.shouldRestart = true;
+                this.startListening();
+            }
+        };
+        
+        document.body.appendChild(btn);
+        
+        // Add styles
+        if (!document.getElementById('voice-indicator-style')) {
+            const style = document.createElement('style');
+            style.id = 'voice-indicator-style';
+            style.textContent = `
+                #voice-indicator {
+                    position: fixed;
+                    bottom: max(20px, env(safe-area-inset-bottom, 20px));
+                    right: max(16px, env(safe-area-inset-right, 16px));
+                    min-width: 52px;
+                    height: 52px;
+                    padding: 0 16px;
+                    background: linear-gradient(145deg, rgba(20, 20, 18, 0.95), rgba(30, 28, 24, 0.95));
+                    border-radius: 26px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    font-size: 14px;
+                    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+                    font-weight: 500;
+                    z-index: 9999;
+                    cursor: pointer;
+                    border: 1.5px solid rgba(212, 175, 55, 0.25);
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
+                    backdrop-filter: blur(12px);
+                    -webkit-backdrop-filter: blur(12px);
+                    color: rgba(255, 255, 255, 0.7);
+                    transition: all 0.233s cubic-bezier(0.34, 1.56, 0.64, 1);
+                    -webkit-tap-highlight-color: transparent;
+                    touch-action: manipulation;
+                }
+                
+                #voice-indicator:hover {
+                    transform: scale(1.05);
+                    border-color: rgba(212, 175, 55, 0.5);
+                    color: rgba(255, 255, 255, 0.9);
+                }
+                
+                #voice-indicator:active {
+                    transform: scale(0.95);
+                }
+                
+                #voice-indicator .voice-icon {
+                    font-size: 20px;
+                    line-height: 1;
+                }
+                
+                #voice-indicator .voice-label {
+                    display: none;
+                }
+                
+                #voice-indicator.listening {
+                    border-color: rgba(76, 175, 80, 0.7);
+                    background: linear-gradient(145deg, rgba(20, 35, 20, 0.95), rgba(25, 40, 25, 0.95));
+                    animation: voice-pulse 1.5s ease-in-out infinite;
+                }
+                
+                #voice-indicator.listening .voice-label {
+                    display: inline;
+                    color: rgba(76, 175, 80, 0.9);
+                }
+                
+                @keyframes voice-pulse {
+                    0%, 100% { box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 0 rgba(76, 175, 80, 0); }
+                    50% { box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 8px rgba(76, 175, 80, 0.15); }
+                }
+                
+                /* Larger touch target on mobile */
+                @media (hover: none) and (pointer: coarse) {
+                    #voice-indicator {
+                        min-width: 56px;
+                        height: 56px;
+                        padding: 0 18px;
+                    }
+                    #voice-indicator .voice-icon {
+                        font-size: 22px;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+    
+    updateVoiceButton(listening) {
+        const btn = document.getElementById('voice-indicator');
+        if (btn) {
+            btn.classList.toggle('listening', listening);
+            btn.setAttribute('aria-label', listening ? 'Voice commands active - tap to stop' : 'Tap to enable voice commands');
+        }
     }
     
     showListeningIndicator(show) {
-        // Create or update a listening indicator
-        let indicator = document.getElementById('voice-indicator');
-        if (!indicator && show) {
-            indicator = document.createElement('div');
-            indicator.id = 'voice-indicator';
-            indicator.innerHTML = '🎤';
-            indicator.style.cssText = `
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                width: 40px;
-                height: 40px;
-                background: rgba(0, 0, 0, 0.7);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 20px;
-                z-index: 9999;
-                animation: pulse 1.5s ease-in-out infinite;
-                cursor: pointer;
-                border: 2px solid rgba(76, 175, 80, 0.5);
-            `;
-            indicator.title = 'Listening for voice commands:\n• "home" → Seattle\n• "Monmouth" → London coffee';
-            indicator.onclick = () => {
-                if (this.isListening) {
-                    this.stopListening();
-                } else {
-                    this.shouldRestart = true;
-                    this.startListening();
-                }
-            };
-            document.body.appendChild(indicator);
-            
-            // Add pulse animation
-            if (!document.getElementById('voice-indicator-style')) {
-                const style = document.createElement('style');
-                style.id = 'voice-indicator-style';
-                style.textContent = `
-                    @keyframes pulse {
-                        0%, 100% { transform: scale(1); opacity: 1; }
-                        50% { transform: scale(1.1); opacity: 0.8; }
-                    }
-                `;
-                document.head.appendChild(style);
-            }
-        }
-        
-        if (indicator) {
-            indicator.style.display = show ? 'flex' : 'none';
-            indicator.style.borderColor = show ? 'rgba(76, 175, 80, 0.8)' : 'rgba(255, 255, 255, 0.3)';
-        }
+        this.updateVoiceButton(show);
     }
 }
 
