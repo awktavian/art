@@ -5355,6 +5355,12 @@ class CelestialDemo {
 class MiniGlobe {
     constructor(canvas, options = {}) {
         this.canvas = canvas;
+        this.dragSurface = options.dragSurface || canvas;
+        const defaultSkipSelectors = ['.compass-sun', '.compass-moon'];
+        this.skipDragSelectors = options.skipDragSelectors
+            ? [...defaultSkipSelectors, ...options.skipDragSelectors]
+            : defaultSkipSelectors;
+        this.activePointerId = null;
         
         // Location to center on - REQUIRED, no hardcoded defaults
         this.targetLat = options.latitude;
@@ -5716,32 +5722,56 @@ class MiniGlobe {
     }
     
     setupDragInteraction() {
-        const canvas = this.canvas;
+        const surface = this.dragSurface || this.canvas;
+        if (!surface) return;
         
-        // Mouse events
-        canvas.addEventListener('mousedown', (e) => this.onDragStart(e.clientX, e.clientY));
-        canvas.addEventListener('mousemove', (e) => this.onDragMove(e.clientX, e.clientY));
-        canvas.addEventListener('mouseup', () => this.onDragEnd());
-        canvas.addEventListener('mouseleave', () => this.onDragEnd());
+        const onPointerDown = (event) => {
+            if (this.isDragging) return;
+            if (this.shouldIgnorePointer(event)) return;
+            if (!this.isPointInsideGlobe(event.clientX, event.clientY)) return;
+            
+            this.activePointerId = event.pointerId;
+            surface.setPointerCapture?.(event.pointerId);
+            this.onDragStart(event.clientX, event.clientY);
+            event.preventDefault();
+        };
         
-        // Touch events
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            this.onDragStart(touch.clientX, touch.clientY);
-        }, { passive: false });
+        const onPointerMove = (event) => {
+            if (!this.isDragging) return;
+            if (this.activePointerId == null || event.pointerId !== this.activePointerId) return;
+            this.onDragMove(event.clientX, event.clientY);
+        };
         
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            this.onDragMove(touch.clientX, touch.clientY);
-        }, { passive: false });
+        const onPointerUp = (event) => {
+            if (this.activePointerId == null || event.pointerId !== this.activePointerId) return;
+            surface.releasePointerCapture?.(event.pointerId);
+            this.onDragEnd();
+            this.activePointerId = null;
+        };
         
-        canvas.addEventListener('touchend', () => this.onDragEnd());
-        canvas.addEventListener('touchcancel', () => this.onDragEnd());
+        surface.addEventListener('pointerdown', onPointerDown);
+        surface.addEventListener('pointermove', onPointerMove);
+        surface.addEventListener('pointerup', onPointerUp);
+        surface.addEventListener('pointercancel', onPointerUp);
         
-        // Cursor style
-        canvas.style.cursor = 'grab';
+        // Cursor feedback
+        this.canvas.style.cursor = 'grab';
+    }
+    
+    shouldIgnorePointer(event) {
+        if (!event || !event.target) return false;
+        return this.skipDragSelectors.some((selector) => event.target.closest(selector));
+    }
+    
+    isPointInsideGlobe(clientX, clientY) {
+        if (!this.canvas) return false;
+        const rect = this.canvas.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const radius = Math.min(rect.width, rect.height) / 2;
+        const dx = clientX - cx;
+        const dy = clientY - cy;
+        return (dx * dx + dy * dy) <= (radius * radius);
     }
     
     onDragStart(x, y) {
@@ -5758,6 +5788,9 @@ class MiniGlobe {
         }
         
         this.canvas.style.cursor = 'grabbing';
+        if (this.dragSurface && this.dragSurface !== this.canvas) {
+            this.dragSurface.style.cursor = 'grabbing';
+        }
     }
     
     onDragMove(x, y) {
@@ -5780,6 +5813,9 @@ class MiniGlobe {
         if (!this.isDragging) return;
         this.isDragging = false;
         this.canvas.style.cursor = 'grab';
+        if (this.dragSurface && this.dragSurface !== this.canvas) {
+            this.dragSurface.style.cursor = 'grab';
+        }
         // Momentum and spring-back handled in animate()
     }
     
@@ -5807,17 +5843,21 @@ class MiniGlobe {
     }
     
     updateMarkerPosition() {
-        if (!this.marker || !this.globe) return;
+        if (!this.marker || this.targetLat == null || this.targetLon == null) return;
         
-        // The marker is placed in the globe's LOCAL coordinate space.
-        // Since we rotate the globe to center the target location at camera,
-        // we place the marker at a fixed "center front" position.
-        // The globe rotation brings the target location there.
+        const latRad = THREE.MathUtils.degToRad(this.targetLat);
+        const lonRad = THREE.MathUtils.degToRad(this.targetLon + 90); // Align with rotation formula
         
-        // Position marker at front of globe (where target location is after rotation)
-        const r = 1.03; // Slightly above surface
-        this.marker.position.set(0, 0, r);
-        this.markerGlow.position.copy(this.marker.position);
+        const r = 1.03;
+        const cosLat = Math.cos(latRad);
+        const x = cosLat * Math.sin(lonRad) * r;
+        const y = Math.sin(latRad) * r;
+        const z = cosLat * Math.cos(lonRad) * r;
+        
+        this.marker.position.set(x, y, z);
+        if (this.markerGlow) {
+            this.markerGlow.position.set(x, y, z);
+        }
     }
     
     // ═══════════════════════════════════════════════════════════════════════
@@ -6049,7 +6089,9 @@ class CompassSundial {
         
         this.globe = new MiniGlobe(this.globeCanvas, {
             latitude: loc.latitude,
-            longitude: loc.longitude
+            longitude: loc.longitude,
+            dragSurface: this.element,
+            skipDragSelectors: ['.compass-shadow', '.compass-gnomon']
         });
         
         this.globeInitialized = true;
