@@ -356,8 +356,14 @@ class WeatherAtmosphere {
             this.startAutoRefresh();
             this.initialized = true;
 
+            // Dispatch event so globe can update to correct location
+            window.dispatchEvent(new CustomEvent('atmosphere-location-ready', {
+                detail: { latitude: this.latitude, longitude: this.longitude }
+            }));
+
             // Sneaky console message
             console.log('%c☁️ The atmosphere adapts to your sky.', 'color: #666; font-size: 10px; font-style: italic;');
+            console.log(`%c📍 Location: ${this.latitude.toFixed(4)}°, ${this.longitude.toFixed(4)}°`, 'color: #666; font-size: 10px;');
         } catch (e) {
             // Silent fallback - no location or API error
             this.applyAtmosphere(); // Apply neutral defaults
@@ -5461,39 +5467,34 @@ class MiniGlobe {
     }
     
     // ═══════════════════════════════════════════════════════════════════════
-    // QUATERNION MATH — Proper spherical coordinate mapping
+    // QUATERNION MATH — Empirically calibrated for Blue Marble texture
     // ═══════════════════════════════════════════════════════════════════════
     //
-    // THREE.js SphereGeometry UV mapping:
-    //   - U wraps around Y axis: U=0 at phi=0 (+X axis), U=0.5 at phi=π (-X axis)
-    //   - Equirectangular textures have lon=0° at center (U=0.5)
-    //   - So lon=0° maps to -X axis on the unrotated sphere
+    // EMPIRICAL CALIBRATION (tested via Puppeteer screenshots):
+    //   - rotY = 0°   → shows Pacific Ocean (center at ~lon -150°)
+    //   - rotY = -90° → shows South America (center at ~lon -60°)
+    //   
+    // Derived formula: lon_visible = -150° - rotY
+    // Therefore:       rotY = -150° - lon
     //
-    // To show a target (lat, lon) facing camera (+Z direction):
-    //   1. The target point on the texture at lon=L is at U = 0.5 + L/360
-    //   2. On the unrotated sphere, U=0.5+L/360 is at angle phi = π + L*π/180
-    //   3. We need to rotate this point to +Z (phi = π/2)
-    //   4. Required Y rotation = π/2 - (π + L*π/180) = -π/2 - L*π/180
-    //   5. Simplified: rotY = -(90 + L)° in radians
+    // Examples:
+    //   - Seattle (lon=-122°): rotY = -150 - (-122) = -28°
+    //   - London  (lon=0°):    rotY = -150 - 0 = -150°
+    //   - Tokyo   (lon=+140°): rotY = -150 - 140 = -290° = +70°
     //
-    // For latitude, rotate around X to tilt the view
+    // For latitude: tilt the globe to show the location at a pleasing angle
     // ═══════════════════════════════════════════════════════════════════════
     
     computeHomeQuaternion() {
-        // Convert geographic coordinates to rotation
-        const lat = this.targetLat;
-        const lon = this.targetLon;
+        const lat = this.targetLat || 0;
+        const lon = this.targetLon || 0;
         
-        // Y rotation to center longitude at camera
-        // lon=0° (UK) → rotY = -90° (brings -X to +Z)
-        // lon=-122° (Seattle) → rotY = -90 - (-122) = 32°
-        // lon=139° (Tokyo) → rotY = -90 - 139 = -229° = 131°
-        const rotY = -(90 + lon) * Math.PI / 180;
+        // Longitude rotation (empirically calibrated)
+        const rotY = (-150 - lon) * Math.PI / 180;
         
-        // X rotation to bring latitude into view
-        // Positive lat (northern) → tilt globe down (negative X rotation)
-        // This creates a "looking down at" perspective for northern locations
-        const rotX = -lat * Math.PI / 180;
+        // Latitude tilt - use ~50% of latitude for pleasing "looking at" angle
+        // Positive lat (northern hemisphere) → tilt top toward viewer
+        const rotX = lat * 0.5 * Math.PI / 180;
         
         // Build quaternions
         const qY = new THREE.Quaternion();
@@ -5502,11 +5503,10 @@ class MiniGlobe {
         const qX = new THREE.Quaternion();
         qX.setFromAxisAngle(new THREE.Vector3(1, 0, 0), rotX);
         
-        // Compose: first rotate for longitude (Y), then tilt for latitude (X)
-        // Order matters for quaternions: qX * qY applies qY first, then qX
+        // Compose: qX * qY means apply qY (longitude) first, then qX (tilt)
         this.homeQuat.multiplyQuaternions(qX, qY);
         
-        console.log(`%c🌍 Globe orientation: lat=${lat.toFixed(1)}°, lon=${lon.toFixed(1)}° → rotY=${(rotY*180/Math.PI).toFixed(1)}°, rotX=${(rotX*180/Math.PI).toFixed(1)}°`, 'color: #64B5F6;');
+        console.log(`%c🌍 Globe centered: lat=${lat.toFixed(2)}°, lon=${lon.toFixed(2)}° → rotY=${(rotY*180/Math.PI).toFixed(1)}°`, 'color: #64B5F6;');
     }
     
     applyQuaternion() {
@@ -5807,31 +5807,14 @@ class MiniGlobe {
     updateMarkerPosition() {
         if (!this.marker || !this.globe) return;
         
-        // Position marker at the target lat/lon in globe's LOCAL coordinate space
-        // (before globe rotation is applied)
-        //
-        // Geographic to 3D conversion for equirectangular texture on sphere:
-        // - Longitude: angle around Y axis, with lon=0° at -X
-        // - Latitude: angle from equator toward poles
-        //
-        // Point on unit sphere at (lat, lon):
-        //   phi = lon + 90° (since lon=0 is at -X, we offset by 90° to put it at -X)
-        //   theta = 90° - lat (theta from +Y pole)
+        // The marker is placed in the globe's LOCAL coordinate space.
+        // Since we rotate the globe to center the target location at camera,
+        // we place the marker at a fixed "center front" position.
+        // The globe rotation brings the target location there.
         
-        const latRad = this.targetLat * Math.PI / 180;
-        const lonRad = this.targetLon * Math.PI / 180;
-        
-        // Standard spherical to Cartesian (lon=0 at -X axis for equirectangular)
-        // x = cos(lat) * cos(lon + 90°) = cos(lat) * (-sin(lon))
-        // y = sin(lat)
-        // z = cos(lat) * sin(lon + 90°) = cos(lat) * cos(lon)
-        const x = -Math.cos(latRad) * Math.sin(lonRad);
-        const y = Math.sin(latRad);
-        const z = Math.cos(latRad) * Math.cos(lonRad);
-        
-        // Position marker just above globe surface
-        const r = 1.03;
-        this.marker.position.set(x * r, y * r, z * r);
+        // Position marker at front of globe (where target location is after rotation)
+        const r = 1.03; // Slightly above surface
+        this.marker.position.set(0, 0, r);
         this.markerGlow.position.copy(this.marker.position);
     }
     
@@ -6035,8 +6018,19 @@ class CompassSundial {
         // Update every 30 seconds
         setInterval(() => this.updateCelestialBodies(), 30000);
         
-        // Retry globe init if location updates
-        setTimeout(() => this.initGlobe(), 2000);
+        // Listen for atmosphere location ready event
+        window.addEventListener('atmosphere-location-ready', (e) => {
+            console.log('%c🌍 Location ready, updating globe...', 'color: #64B5F6;');
+            if (this.globe) {
+                this.updateGlobeLocation(e.detail.latitude, e.detail.longitude);
+            } else {
+                this.initGlobe();
+            }
+            this.updateCelestialBodies(e.detail.latitude, e.detail.longitude);
+        });
+        
+        // Retry globe init if location becomes available
+        setTimeout(() => this.initGlobe(), 1000);
     }
     
     initGlobe() {
