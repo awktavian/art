@@ -3040,13 +3040,15 @@ class SunVisualization {
      * @param {Array} recommendations - Array of shade recommendations from HomeGeometry
      */
     updateShades(recommendations) {
-        // Map recommendations to cardinal directions
+        // Map full direction names to cardinal letters
+        const dirMap = { 'NORTH': 'N', 'SOUTH': 'S', 'EAST': 'E', 'WEST': 'W' };
+        
         // Group by direction and find highest intensity for each
         const directionIntensity = { N: 0, S: 0, E: 0, W: 0 };
         const directionLevel = { N: 100, S: 100, E: 100, W: 100 };
         
         recommendations.forEach(rec => {
-            const dir = rec.facing;
+            const dir = dirMap[rec.facing] || rec.facing;  // Handle both "SOUTH" and "S"
             if (directionIntensity[dir] !== undefined) {
                 // Track max intensity and min level (most closed)
                 directionIntensity[dir] = Math.max(directionIntensity[dir], rec.intensity || 0);
