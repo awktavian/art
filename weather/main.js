@@ -4970,8 +4970,9 @@ class CelestialDemo {
                 
                 // Force compass to update globe and celestial positions
                 if (window.compassSundial) {
-                    window.compassSundial.updateGlobeLocation();
-                    window.compassSundial.updateCelestialBodies();
+                    // Pass the location directly so it updates immediately
+                    window.compassSundial.updateGlobeLocation(location.latitude, location.longitude);
+                    window.compassSundial.updateCelestialBodies(location.latitude, location.longitude);
                 }
                 
                 // Update location-specific CSS classes
@@ -5037,10 +5038,10 @@ class CelestialDemo {
             }
         }
         
-        // Update compass/globe
+        // Update compass/globe with original coordinates
         if (window.compassSundial) {
-            window.compassSundial.updateGlobeLocation();
-            window.compassSundial.updateCelestialBodies();
+            window.compassSundial.updateGlobeLocation(orig.latitude, orig.longitude);
+            window.compassSundial.updateCelestialBodies(orig.latitude, orig.longitude);
         }
         
         // Remove location-specific CSS classes
@@ -5359,22 +5360,33 @@ class MiniGlobe {
             this.targetLon = 0;
         }
         
-        // Current view (smoothly animates to target)
-        this.currentLat = this.targetLat;
-        this.currentLon = this.targetLon;
+        // ═══════════════════════════════════════════════════════════════════
+        // QUATERNION-BASED ORIENTATION (Fano-inspired: proper composition)
+        // ═══════════════════════════════════════════════════════════════════
+        // 
+        // We use quaternions for all rotations because:
+        // 1. They compose correctly (q1 * q2 gives proper combined rotation)
+        // 2. They interpolate smoothly (slerp avoids gimbal lock)
+        // 3. They're the natural representation for 3D orientation
+        //
+        // The "home" quaternion represents: globe rotated so target lat/lon faces camera
+        // The "drag" quaternion represents: temporary user rotation (springs back)
+        // Final orientation = drag * home (drag applied after home)
+        // ═══════════════════════════════════════════════════════════════════
         
-        // Auto rotation offset (adds gentle drift without changing target)
-        this.autoRotateOffset = 0;
-        this.autoRotateSpeed = 0.5; // degrees per second (slow drift)
+        this.homeQuat = null;      // Quaternion to center target location
+        this.dragQuat = null;      // Quaternion for user drag interaction
+        this.currentQuat = null;   // Current interpolated orientation
+        this.dragVelocity = null;  // Angular velocity for momentum
+        
+        // Auto rotation (gentle drift around Y axis)
+        this.autoRotateAngle = 0;
+        this.autoRotateSpeed = 0.3; // degrees per second
         
         // Drag interaction state
         this.isDragging = false;
         this.dragStartX = 0;
         this.dragStartY = 0;
-        this.dragOffsetLon = 0;  // User drag offset (springs back to 0)
-        this.dragOffsetLat = 0;
-        this.dragVelocityLon = 0; // For momentum
-        this.dragVelocityLat = 0;
         this.lastDragTime = 0;
         
         // Three.js components
@@ -5406,9 +5418,10 @@ class MiniGlobe {
         // Scene
         this.scene = new THREE.Scene();
         
-        // Camera
+        // Camera - positioned to look at globe
         this.camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-        this.camera.position.z = 2.5;
+        this.camera.position.set(0, 0, 2.5);
+        this.camera.lookAt(0, 0, 0);
         
         // Renderer
         this.renderer = new THREE.WebGLRenderer({
@@ -5420,14 +5433,22 @@ class MiniGlobe {
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.setClearColor(0x000000, 0);
         
+        // Initialize quaternions
+        this.homeQuat = new THREE.Quaternion();
+        this.dragQuat = new THREE.Quaternion(); // Identity = no drag
+        this.currentQuat = new THREE.Quaternion();
+        this.dragVelocity = new THREE.Quaternion(); // Identity = no velocity
+        
         // Create globe
         this.createGlobe();
         this.createAtmosphere();
         this.createMarker();
         this.createLights();
         
-        // Set initial rotation to face target location
-        this.updateRotation(true);
+        // Compute initial home quaternion and apply immediately
+        this.computeHomeQuaternion();
+        this.currentQuat.copy(this.homeQuat);
+        this.applyQuaternion();
         
         // Setup drag interaction
         this.setupDragInteraction();
@@ -5435,9 +5456,67 @@ class MiniGlobe {
         // Start animation
         this.animate();
         
-        console.log('%c🌍 3D Globe initialized', 'color: #64B5F6;');
-        console.log(`   Target: ${this.targetLat.toFixed(2)}°N, ${this.targetLon.toFixed(2)}°E`);
-        console.log(`   (Negative longitude = West)`);
+        console.log('%c🌍 3D Globe initialized (Quaternion mode)', 'color: #64B5F6;');
+        console.log(`   Target: ${this.targetLat.toFixed(2)}°, ${this.targetLon.toFixed(2)}°`);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // QUATERNION MATH (Fano plane composition principle)
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    computeHomeQuaternion() {
+        // Goal: Rotate globe so that (targetLat, targetLon) faces the camera (+Z)
+        //
+        // The Blue Marble texture has 0° longitude at its center.
+        // When globe.quaternion = identity, the texture center (lon=0°) faces +Z.
+        //
+        // To show targetLon at front:
+        //   - Rotate around Y axis by -targetLon (bring targetLon to center)
+        //
+        // To show targetLat at equator level:
+        //   - Rotate around X axis by +targetLat (tilt globe to bring lat to horizon)
+        //
+        // Quaternion composition: first Y rotation, then X rotation
+        // q = qX * qY (applied right to left)
+        
+        const lonRad = -this.targetLon * Math.PI / 180;
+        const latRad = this.targetLat * Math.PI / 180;
+        
+        // Rotation around Y (longitude)
+        const qY = new THREE.Quaternion();
+        qY.setFromAxisAngle(new THREE.Vector3(0, 1, 0), lonRad);
+        
+        // Rotation around X (latitude) 
+        const qX = new THREE.Quaternion();
+        qX.setFromAxisAngle(new THREE.Vector3(1, 0, 0), latRad);
+        
+        // Compose: apply qY first, then qX
+        this.homeQuat.multiplyQuaternions(qX, qY);
+    }
+    
+    applyQuaternion() {
+        if (!this.globe) return;
+        
+        // Apply auto-rotation (gentle drift around world Y axis)
+        const autoRotRad = this.autoRotateAngle * Math.PI / 180;
+        const qAuto = new THREE.Quaternion();
+        qAuto.setFromAxisAngle(new THREE.Vector3(0, 1, 0), autoRotRad);
+        
+        // Final quaternion: auto * current
+        // (auto-rotation is in world space, applied first)
+        const finalQuat = new THREE.Quaternion();
+        finalQuat.multiplyQuaternions(qAuto, this.currentQuat);
+        
+        // Apply to globe and all layers
+        this.globe.quaternion.copy(finalQuat);
+        
+        if (this.clouds) {
+            this.clouds.quaternion.copy(finalQuat);
+        }
+        
+        if (this.nightLights) {
+            this.nightLights.quaternion.copy(finalQuat);
+        }
     }
     
     createGlobe() {
@@ -5652,35 +5731,32 @@ class MiniGlobe {
         this.isDragging = true;
         this.dragStartX = x;
         this.dragStartY = y;
+        this.lastDragX = x;
+        this.lastDragY = y;
         this.lastDragTime = performance.now();
-        this.dragVelocityLon = 0;
-        this.dragVelocityLat = 0;
+        
+        // Reset velocity when starting new drag
+        if (this.dragVelocity) {
+            this.dragVelocity.identity();
+        }
+        
         this.canvas.style.cursor = 'grabbing';
     }
     
     onDragMove(x, y) {
         if (!this.isDragging) return;
         
-        const now = performance.now();
-        const dt = Math.max(now - this.lastDragTime, 1);
+        // Calculate delta from last position (not start position)
+        const deltaX = x - this.lastDragX;
+        const deltaY = y - this.lastDragY;
         
-        // Calculate drag delta (pixels to degrees)
-        const deltaX = x - this.dragStartX;
-        const deltaY = y - this.dragStartY;
+        // Apply incremental drag rotation
+        this.applyDragDelta(deltaX, deltaY);
         
-        // Convert pixels to degrees (sensitivity: ~0.5° per pixel)
-        const sensitivity = 0.5;
-        const newOffsetLon = deltaX * sensitivity;
-        const newOffsetLat = -deltaY * sensitivity * 0.5; // Less sensitive vertically
-        
-        // Calculate velocity for momentum
-        this.dragVelocityLon = (newOffsetLon - this.dragOffsetLon) / dt * 16;
-        this.dragVelocityLat = (newOffsetLat - this.dragOffsetLat) / dt * 16;
-        
-        this.dragOffsetLon = newOffsetLon;
-        this.dragOffsetLat = Math.max(-60, Math.min(60, newOffsetLat)); // Clamp vertical
-        
-        this.lastDragTime = now;
+        // Update last position
+        this.lastDragX = x;
+        this.lastDragY = y;
+        this.lastDragTime = performance.now();
     }
     
     onDragEnd() {
@@ -5691,76 +5767,92 @@ class MiniGlobe {
     }
     
     setLocation(lat, lon) {
+        console.log(`%c🌍 Globe setLocation: ${lat.toFixed(2)}°, ${lon.toFixed(2)}°`, 'color: #64B5F6;');
         this.targetLat = lat;
         this.targetLon = lon;
-        // Reset auto-rotate offset so new location is centered
-        this.autoRotateOffset = 0;
+        
+        // Recompute home quaternion for new location
+        this.computeHomeQuaternion();
+        
+        // Reset auto-rotate and drag state
+        this.autoRotateAngle = 0;
+        this.dragQuat.identity();
+        this.dragVelocity.identity();
     }
     
     updateMarkerPosition() {
         if (!this.marker || !this.globe) return;
         
-        // The marker is now a child of the globe, so we position in local coordinates
-        // The globe rotates to center on target, so marker just needs lat/lon position
+        // The marker is a child of the globe, positioned in local coordinates
+        // In globe's local space, the target location should be at the front (+Z)
+        // since we rotated the globe to center it
         
-        // Convert lat/lon to 3D position on unit sphere
-        // Standard geographic: lat from equator, lon from prime meridian
-        const latRad = this.targetLat * Math.PI / 180;
-        const lonRad = this.targetLon * Math.PI / 180;
-        
-        // Spherical to Cartesian (Y-up, Z-forward at lon=0)
-        // x = cos(lat) * sin(lon)
-        // y = sin(lat)  
-        // z = cos(lat) * cos(lon)
-        const x = Math.cos(latRad) * Math.sin(lonRad);
-        const y = Math.sin(latRad);
-        const z = Math.cos(latRad) * Math.cos(lonRad);
-        
-        // Position marker just above globe surface
-        const r = 1.03;
-        this.marker.position.set(x * r, y * r, z * r);
+        // Position marker at front of globe (where target location is centered)
+        const r = 1.03; // Slightly above surface
+        this.marker.position.set(0, 0, r);
         this.markerGlow.position.copy(this.marker.position);
     }
     
-    updateRotation(immediate = false) {
-        if (!this.globe) return;
+    // ═══════════════════════════════════════════════════════════════════════
+    // DRAG HANDLING (Quaternion-based with spring physics)
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    applyDragDelta(deltaX, deltaY) {
+        // Convert pixel drag to rotation angles
+        const sensitivity = 0.005; // radians per pixel
+        const angleX = -deltaY * sensitivity; // Vertical drag → X rotation
+        const angleY = deltaX * sensitivity;  // Horizontal drag → Y rotation
         
-        // Smoothly interpolate to target location
-        const smoothing = immediate ? 1 : 0.05;
-        this.currentLat += (this.targetLat - this.currentLat) * smoothing;
-        this.currentLon += (this.targetLon - this.currentLon) * smoothing;
+        // Create incremental rotation quaternions
+        const qX = new THREE.Quaternion();
+        const qY = new THREE.Quaternion();
+        qX.setFromAxisAngle(new THREE.Vector3(1, 0, 0), angleX);
+        qY.setFromAxisAngle(new THREE.Vector3(0, 1, 0), angleY);
         
-        // Globe rotation formula (empirically calibrated for three-globe Blue Marble texture):
-        // rotation.y = 0° shows Asia (+130°E), rotation increases clockwise
-        // Formula: rotation = 160 + longitude
-        //   Seattle (-122°): rotation = 160 + (-122) = 38° → shows Pacific NW ✓
-        //   London (0°): rotation = 160 + 0 = 160° → shows UK ✓
-        //   Tokyo (+139°): rotation = 160 + 139 = 299° → shows Japan ✓
-        //
-        // dragOffsetLon: temporary offset from user drag (springs back to 0)
-        // autoRotateOffset: slow continuous drift for visual interest
-        const baseRotation = 160 + this.currentLon;
-        const totalRotation = (baseRotation + this.autoRotateOffset + this.dragOffsetLon) * Math.PI / 180;
+        // Compose with existing drag: newDrag = qY * qX * oldDrag
+        const incrementalDrag = new THREE.Quaternion();
+        incrementalDrag.multiplyQuaternions(qY, qX);
+        this.dragQuat.premultiply(incrementalDrag);
         
-        this.globe.rotation.y = totalRotation;
-        this.globe.rotation.x = this.dragOffsetLat * Math.PI / 180;
+        // Store velocity for momentum
+        this.dragVelocity.copy(incrementalDrag);
+    }
+    
+    updateOrientation() {
+        if (!this.homeQuat) return;
         
-        // Keep all layers in sync
-        if (this.clouds) {
-            this.clouds.rotation.y = totalRotation;
-            this.clouds.rotation.x = this.globe.rotation.x;
+        // Compose: current = drag * home
+        // This applies the home rotation first, then drag on top
+        this.currentQuat.multiplyQuaternions(this.dragQuat, this.homeQuat);
+        
+        // Apply to globe
+        this.applyQuaternion();
+    }
+    
+    springBackDrag() {
+        // Spring the drag quaternion back to identity (no drag)
+        // Using slerp for smooth interpolation
+        const springStrength = 0.08;
+        const damping = 0.85;
+        
+        // Apply momentum first (if we have velocity)
+        if (!this.dragVelocity.equals(new THREE.Quaternion())) {
+            // Slerp velocity towards identity (decay)
+            this.dragVelocity.slerp(new THREE.Quaternion(), 1 - damping);
+            
+            // Apply velocity to drag
+            this.dragQuat.premultiply(this.dragVelocity);
         }
         
-        if (this.nightLights) {
-            this.nightLights.rotation.y = totalRotation;
-            this.nightLights.rotation.x = this.globe.rotation.x;
-        }
+        // Spring force pulls drag towards identity
+        this.dragQuat.slerp(new THREE.Quaternion(), springStrength);
         
-        // Tilt camera based on latitude for better viewing angle
-        const latRad = (this.currentLat + this.dragOffsetLat) * Math.PI / 180;
-        this.camera.position.y = Math.sin(latRad) * 0.5;
-        this.camera.position.z = 2.5 * Math.cos(latRad * 0.3);
-        this.camera.lookAt(0, 0, 0);
+        // Snap to identity when very close
+        const identity = new THREE.Quaternion();
+        if (Math.abs(this.dragQuat.dot(identity) - 1) < 0.0001) {
+            this.dragQuat.identity();
+            this.dragVelocity.identity();
+        }
     }
     
     animate() {
@@ -5768,50 +5860,23 @@ class MiniGlobe {
         const delta = now - this.lastTime;
         this.lastTime = now;
         
-        // Slow auto-rotation offset (gentle drift, doesn't change target)
-        // Pause auto-rotate while dragging or springing back
-        if (!this.isDragging && Math.abs(this.dragOffsetLon) < 1 && Math.abs(this.dragOffsetLat) < 1) {
-            this.autoRotateOffset += this.autoRotateSpeed * delta / 1000;
-            if (this.autoRotateOffset > 360) this.autoRotateOffset -= 360;
+        // Auto-rotation (gentle drift) - pause while dragging
+        const identity = new THREE.Quaternion();
+        const dragIsActive = this.dragQuat && Math.abs(this.dragQuat.dot(identity) - 1) > 0.001;
+        
+        if (!this.isDragging && !dragIsActive) {
+            this.autoRotateAngle += this.autoRotateSpeed * delta / 1000;
+            if (this.autoRotateAngle > 360) this.autoRotateAngle -= 360;
         }
         
-        // Spring physics when not dragging
-        if (!this.isDragging) {
-            // Spring constant and damping for smooth return
-            // Using critically damped spring for optimal feel
-            const springK = 0.08;    // Spring stiffness (higher = faster return)
-            const damping = 0.85;    // Velocity damping (lower = less overshoot)
-            
-            // Apply momentum first
-            this.dragOffsetLon += this.dragVelocityLon;
-            this.dragOffsetLat += this.dragVelocityLat;
-            
-            // Spring force pulls back to center
-            const springForceLon = -this.dragOffsetLon * springK;
-            const springForceLat = -this.dragOffsetLat * springK;
-            
-            this.dragVelocityLon = (this.dragVelocityLon + springForceLon) * damping;
-            this.dragVelocityLat = (this.dragVelocityLat + springForceLat) * damping;
-            
-            // Snap to zero when very close (avoid endless tiny oscillations)
-            if (Math.abs(this.dragOffsetLon) < 0.1 && Math.abs(this.dragVelocityLon) < 0.01) {
-                this.dragOffsetLon = 0;
-                this.dragVelocityLon = 0;
-            }
-            if (Math.abs(this.dragOffsetLat) < 0.1 && Math.abs(this.dragVelocityLat) < 0.01) {
-                this.dragOffsetLat = 0;
-                this.dragVelocityLat = 0;
-            }
+        // Spring physics for drag (when not dragging)
+        if (!this.isDragging && this.dragQuat) {
+            this.springBackDrag();
         }
         
-        // Update rotation
-        this.updateRotation();
+        // Update globe orientation
+        this.updateOrientation();
         this.updateMarkerPosition();
-        
-        // Rotate clouds slightly faster than globe for parallax
-        if (this.clouds) {
-            this.clouds.rotation.y += 0.00002 * delta;
-        }
         
         // Pulse marker
         if (this.markerGlow) {
@@ -5953,10 +6018,15 @@ class CompassSundial {
         console.log('%c🌍 Globe initialized', 'color: #64B5F6;');
     }
     
-    updateGlobeLocation() {
+    updateGlobeLocation(lat = null, lon = null) {
         if (!this.globe) return;
-        const loc = this.getLocation();
-        this.globe.setLocation(loc.latitude, loc.longitude);
+        // Use provided coordinates or fall back to getLocation()
+        if (lat !== null && lon !== null) {
+            this.globe.setLocation(lat, lon);
+        } else {
+            const loc = this.getLocation();
+            this.globe.setLocation(loc.latitude, loc.longitude);
+        }
     }
     
     getTemperatureString() {
@@ -6215,11 +6285,22 @@ class CompassSundial {
         this.body.style.transform = `rotate(${this.rotation}deg)`;
     }
     
-    updateCelestialBodies() {
+    updateCelestialBodies(lat = null, lon = null) {
         const now = window.celestialDemo?.currentTime || new Date();
-        const loc = this.getLocation();
-        const sun = Ephemeris.sunPosition(loc.latitude, loc.longitude, now);
-        const moon = Ephemeris.moonPosition(loc.latitude, loc.longitude, now);
+        
+        // Use provided coordinates or fall back to getLocation()
+        let useLat, useLon;
+        if (lat !== null && lon !== null) {
+            useLat = lat;
+            useLon = lon;
+        } else {
+            const loc = this.getLocation();
+            useLat = loc.latitude;
+            useLon = loc.longitude;
+        }
+        
+        const sun = Ephemeris.sunPosition(useLat, useLon, now);
+        const moon = Ephemeris.moonPosition(useLat, useLon, now);
         
         // Update sun position - radius 38 keeps it inside the face
         if (this.sunIndicator) {
