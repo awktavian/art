@@ -2940,12 +2940,21 @@ class SecretWord {
             const spoken = transcript.toLowerCase().trim();
             console.log('%c🎤 Heard:', 'color: #2196F3;', spoken);
             
-            // Check for secret words in the transcript
+            // Phonetic alternatives for tricky words
+            const PHONETIC_ALIASES = {
+                'monmouth': ['monmouth', 'mom mouth', 'mon mouth', 'mammoth', 'monmoth', 'manmouth', 'mon math', 'monmuth', 'mon muth'],
+                'home': ['home', 'own', 'ohm']
+            };
+            
+            // Check for secret words in the transcript (with phonetic matching)
             for (const word of this.words) {
-                if (spoken.includes(word)) {
-                    console.log('%c🎉 Voice command detected:', 'color: #D4AF37;', word);
-                    this.callback(word);
-                    break;
+                const aliases = PHONETIC_ALIASES[word] || [word];
+                for (const alias of aliases) {
+                    if (spoken.includes(alias)) {
+                        console.log('%c🎉 Voice command detected:', 'color: #D4AF37;', `"${alias}" → ${word}`);
+                        this.callback(word);
+                        return; // Exit after first match
+                    }
                 }
             }
         };
@@ -2996,7 +3005,7 @@ class SecretWord {
                 cursor: pointer;
                 border: 2px solid rgba(76, 175, 80, 0.5);
             `;
-            indicator.title = 'Listening for voice commands (say "home" or "monmouth")';
+            indicator.title = 'Listening for voice commands:\n• "home" → Seattle\n• "Monmouth" → London coffee';
             indicator.onclick = () => {
                 if (this.isListening) {
                     this.stopListening();
