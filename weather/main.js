@@ -5507,10 +5507,9 @@ class MiniGlobe {
         
         // Convert lat/lon to 3D position on sphere surface
         // phi = colatitude (0 at north pole, PI at south pole)
-        // theta = longitude angle (adjusted for texture mapping)
+        // theta = longitude angle
         const phi = (90 - this.targetLat) * Math.PI / 180;
-        // Add 90° offset to match texture mapping
-        const theta = (this.targetLon + 90) * Math.PI / 180;
+        const theta = this.targetLon * Math.PI / 180;
         
         // Spherical to Cartesian (before globe rotation)
         let x = Math.sin(phi) * Math.cos(theta);
@@ -5539,12 +5538,11 @@ class MiniGlobe {
         this.currentLon += (this.targetLon - this.currentLon) * smoothing;
         
         // Calculate globe rotation to center target location facing camera
-        // Three.js SphereGeometry UV mapping: U=0.5 is at front (+Z), texture center
-        // Blue Marble texture: longitude 0° is at center of image
-        // So rotation.y = 0 shows lon 0° (Prime Meridian/London)
-        // To show lon X, rotate by -X (e.g., Seattle -122° → rotate +122°)
-        // Add 90° offset because texture starts at -180° not 0°
-        const lonRotation = (-(this.currentLon + 90) + this.autoRotateOffset) * Math.PI / 180;
+        // Three.js SphereGeometry: rotation.y = 0 shows lon 0° (Prime Meridian)
+        // Positive rotation.y = counter-clockwise = shows eastern longitudes
+        // To show Seattle at -122°, rotate by +122° to bring it to front
+        // Formula: rotation = -longitude (negating brings target to front)
+        const lonRotation = (-this.currentLon + this.autoRotateOffset) * Math.PI / 180;
         
         this.globe.rotation.y = lonRotation;
         this.globe.rotation.x = 0;
