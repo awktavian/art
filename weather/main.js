@@ -4844,14 +4844,23 @@ class CompassSundial {
     }
     
     init() {
-        // Click to enable orientation
+        // Click handlers for sun and moon (they talk!)
+        if (this.sunIndicator) {
+            this.sunIndicator.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.sunSpeak();
+            });
+        }
+        
+        if (this.moonIndicator) {
+            this.moonIndicator.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.moonSpeak();
+            });
+        }
+        
+        // Compass click for orientation
         this.element.addEventListener('click', () => this.requestOrientation());
-        this.element.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                this.requestOrientation();
-            }
-        });
         
         // Listen for orientation updates
         deviceOrientation.addListener((data) => this.handleOrientation(data));
@@ -4867,6 +4876,81 @@ class CompassSundial {
         
         // Update every 30 seconds
         setInterval(() => this.updateCelestialBodies(), 30000);
+    }
+    
+    sunSpeak() {
+        const now = window.celestialDemo?.currentTime || new Date();
+        const sun = Ephemeris.sunPosition(HOME.latitude, HOME.longitude, now);
+        const times = Ephemeris.sunTimes(HOME.latitude, HOME.longitude, now);
+        
+        const isDay = sun.altitude > 0;
+        const greeting = isDay ? "Hello! ☀️" : "Goodnight... 🌅";
+        const status = isDay 
+            ? `I'm ${sun.altitude.toFixed(1)}° above the horizon, shining from the ${sun.direction}.`
+            : `I'm ${Math.abs(sun.altitude).toFixed(1)}° below the horizon, resting.`;
+        
+        const sunrise = times.sunrise ? times.sunrise.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A';
+        const sunset = times.sunset ? times.sunset.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A';
+        
+        console.log(`%c${greeting}`, 'color: #FFD700; font-size: 16px; font-weight: bold;');
+        console.log(`%c${status}`, 'color: #FFA500;');
+        console.log(`%cRise: ${sunrise} | Set: ${sunset}`, 'color: #888;');
+        
+        // Show toast
+        this.showToast(`${greeting} ${status}`);
+    }
+    
+    moonSpeak() {
+        const now = window.celestialDemo?.currentTime || new Date();
+        const moon = Ephemeris.moonPosition(HOME.latitude, HOME.longitude, now);
+        
+        const moonUp = moon.altitude > 0;
+        const phaseEmoji = this.getMoonEmoji(moon.phase);
+        const greeting = moonUp ? `${phaseEmoji} Hello from above!` : `${phaseEmoji} I'm below the horizon...`;
+        const status = moonUp
+            ? `I'm ${moon.altitude.toFixed(1)}° up, ${moon.illumination.toFixed(0)}% illuminated.`
+            : `Currently ${Math.abs(moon.altitude).toFixed(1)}° below, ${moon.illumination.toFixed(0)}% illuminated.`;
+        
+        console.log(`%c${greeting}`, 'color: #C0C0C0; font-size: 16px; font-weight: bold;');
+        console.log(`%c${status}`, 'color: #A0A0A0;');
+        console.log(`%cPhase: ${moon.phaseName}`, 'color: #888;');
+        
+        // Show toast
+        this.showToast(`${greeting} ${status}`);
+    }
+    
+    getMoonEmoji(phase) {
+        if (phase < 0.03) return '🌑';
+        if (phase < 0.22) return '🌒';
+        if (phase < 0.28) return '🌓';
+        if (phase < 0.47) return '🌔';
+        if (phase < 0.53) return '🌕';
+        if (phase < 0.72) return '🌖';
+        if (phase < 0.78) return '🌗';
+        if (phase < 0.97) return '🌘';
+        return '🌑';
+    }
+    
+    showToast(message) {
+        // Remove existing toast
+        const existing = document.querySelector('.celestial-toast');
+        if (existing) existing.remove();
+        
+        const toast = document.createElement('div');
+        toast.className = 'celestial-toast';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        
+        // Animate in
+        requestAnimationFrame(() => {
+            toast.classList.add('show');
+        });
+        
+        // Remove after 4 seconds
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
     }
     
     async requestOrientation() {
@@ -5143,6 +5227,80 @@ class LocationMap {
 }
 
 const locationMap = new LocationMap();
+
+// ============================================================================
+// TEMPERATURE UNIT TOGGLE — Celsius/Fahrenheit
+// ============================================================================
+
+class UnitToggle {
+    constructor() {
+        this.container = document.getElementById('unit-toggle');
+        this.buttons = this.container?.querySelectorAll('.unit-btn');
+        this.currentUnit = localStorage.getItem('tempUnit') || 'C';
+        
+        if (this.container) {
+            this.init();
+        }
+    }
+    
+    init() {
+        // Set initial state
+        this.setUnit(this.currentUnit, false);
+        
+        // Add click handlers
+        this.buttons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const unit = btn.dataset.unit;
+                this.setUnit(unit, true);
+            });
+        });
+    }
+    
+    setUnit(unit, notify = true) {
+        this.currentUnit = unit;
+        localStorage.setItem('tempUnit', unit);
+        
+        // Update button states
+        this.buttons.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.unit === unit);
+        });
+        
+        // Dispatch event for other components
+        if (notify) {
+            window.dispatchEvent(new CustomEvent('unitChanged', { 
+                detail: { unit } 
+            }));
+            
+            // Show feedback
+            const label = unit === 'C' ? 'Celsius' : 'Fahrenheit';
+            console.log(`🌡️ Temperature unit: ${label}`);
+        }
+    }
+    
+    // Convert temperature
+    static convert(celsius, toUnit) {
+        if (toUnit === 'F') {
+            return (celsius * 9/5) + 32;
+        }
+        return celsius;
+    }
+    
+    // Format temperature with unit
+    static format(celsius, unit) {
+        const value = UnitToggle.convert(celsius, unit);
+        return `${Math.round(value)}°${unit}`;
+    }
+    
+    get unit() {
+        return this.currentUnit;
+    }
+}
+
+const unitToggle = new UnitToggle();
+
+// Expose globally for use in other components
+window.tempUnit = () => unitToggle.unit;
+window.formatTemp = (celsius) => UnitToggle.format(celsius, unitToggle.unit);
 
 // Expose for XR time sync
 window.celestialDemo = celestialDemo;
