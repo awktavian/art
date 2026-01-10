@@ -5782,26 +5782,33 @@ class MiniGlobe {
     }
     
     createMarker() {
-        // Location marker as a glowing point
-        const markerGeometry = new THREE.SphereGeometry(0.03, 16, 16);
+        // Location marker - bright red/orange pulsing dot
+        // In world space, updated each frame to follow globe rotation
+        const markerGeometry = new THREE.SphereGeometry(0.1, 16, 16);
         const markerMaterial = new THREE.MeshBasicMaterial({
-            color: 0xd4af37,
+            color: 0xff3300,
             transparent: true,
-            opacity: 1
+            opacity: 1.0,
+            depthTest: false,  // Always render on top
+            depthWrite: false
         });
         this.marker = new THREE.Mesh(markerGeometry, markerMaterial);
-        // Add marker as child of globe so it rotates with it
-        this.globe.add(this.marker);
+        this.marker.renderOrder = 999;  // Render last
+        this.scene.add(this.marker);
         
-        // Marker glow
-        const glowGeometry = new THREE.SphereGeometry(0.06, 16, 16);
+        // Marker glow (larger, always visible)
+        const glowGeometry = new THREE.SphereGeometry(0.18, 16, 16);
         const glowMaterial = new THREE.MeshBasicMaterial({
-            color: 0xd4af37,
+            color: 0xff6600,
             transparent: true,
-            opacity: 0.3
+            opacity: 0.6,
+            depthTest: false,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
         });
         this.markerGlow = new THREE.Mesh(glowGeometry, glowMaterial);
-        this.globe.add(this.markerGlow);
+        this.markerGlow.renderOrder = 998;
+        this.scene.add(this.markerGlow);
         
         this.updateMarkerPosition();
     }
@@ -5831,6 +5838,34 @@ class MiniGlobe {
         this.scene.add(rimLight);
 
         this.sunBaseVector = new THREE.Vector3(1, 0, 0);
+        
+        // Create terminator (day/night boundary line)
+        this.createTerminator();
+    }
+    
+    createTerminator() {
+        // The terminator is the day/night boundary - golden ring showing sunrise/sunset line
+        // Rendered in WORLD space, perpendicular to sun direction
+        
+        const segments = 128;
+        const radius = 1.02;
+        
+        const geometry = new THREE.TorusGeometry(radius, 0.025, 8, segments);
+        
+        const material = new THREE.MeshBasicMaterial({
+            color: 0xffaa00,
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide,
+            depthTest: false,  // Always visible
+            depthWrite: false
+        });
+        
+        this.terminator = new THREE.Mesh(geometry, material);
+        this.terminator.renderOrder = 997;  // Render after globe but before marker
+        this.scene.add(this.terminator);
+        
+        console.log('%c☀️ Terminator (sunlight line) created', 'color: #FFAA33;');
     }
     
     setupDragInteraction() {
@@ -5957,18 +5992,36 @@ class MiniGlobe {
     updateMarkerPosition() {
         if (!this.marker || this.targetLat == null || this.targetLon == null) return;
         
-        const latRad = THREE.MathUtils.degToRad(this.targetLat);
-        const lonRad = THREE.MathUtils.degToRad(this.targetLon + 90); // Align with rotation formula
+        // Since the globe is rotated to center the target location toward the camera,
+        // the marker should appear at approximately the CENTER of the visible globe face
+        // 
+        // The latitude tilt (rotX = -lat * 0.5) shifts the marker slightly up from center
+        // We calculate where the marker ends up after globe rotation
         
-        const r = 1.03;
+        const lat = this.targetLat;
+        const lon = this.targetLon;
+        const latRad = THREE.MathUtils.degToRad(lat);
+        const lonRad = THREE.MathUtils.degToRad(lon + 90);
+        
+        // Position on the unrotated globe
+        const r = 1.08;
         const cosLat = Math.cos(latRad);
-        const x = cosLat * Math.sin(lonRad) * r;
-        const y = Math.sin(latRad) * r;
-        const z = cosLat * Math.cos(lonRad) * r;
+        const localX = r * cosLat * Math.sin(lonRad);
+        const localY = r * Math.sin(latRad);
+        const localZ = r * cosLat * Math.cos(lonRad);
         
-        this.marker.position.set(x, y, z);
+        // Create local position vector
+        const localPos = new THREE.Vector3(localX, localY, localZ);
+        
+        // Apply the globe's final rotation (home + drag + auto)
+        const worldPos = localPos.clone();
+        if (this.lastFinalQuat) {
+            worldPos.applyQuaternion(this.lastFinalQuat);
+        }
+        
+        this.marker.position.copy(worldPos);
         if (this.markerGlow) {
-            this.markerGlow.position.set(x, y, z);
+            this.markerGlow.position.copy(worldPos);
         }
     }
     
@@ -6026,6 +6079,25 @@ class MiniGlobe {
             // Fill light opposite side for soft bounce
             this.fillLight.position.copy(this.sunBaseVector.clone().multiplyScalar(-4));
             this.fillLight.lookAt(0, 0, 0);
+            
+            // Update terminator orientation in WORLD space
+            // The terminator ring is perpendicular to the sun direction
+            // sunBaseVector is the sun's direction in globe LOCAL coordinates
+            // We need to transform it to world space using the globe's rotation
+            if (this.terminator && this.lastFinalQuat) {
+                // Transform sun direction from local to world space
+                const sunDirLocal = this.sunBaseVector.clone().normalize();
+                const sunDirWorld = sunDirLocal.clone().applyQuaternion(this.lastFinalQuat);
+                
+                // Orient the torus so its normal aligns with the sun direction
+                // Torus default: ring in XY plane, normal along +Z
+                const defaultNormal = new THREE.Vector3(0, 0, 1);
+                const quat = new THREE.Quaternion();
+                quat.setFromUnitVectors(defaultNormal, sunDirWorld);
+                
+                this.terminator.quaternion.copy(quat);
+                this.terminator.position.set(0, 0, 0);
+            }
         }
         
         const altitude = sunData.altitude ?? 0;
@@ -6045,6 +6117,21 @@ class MiniGlobe {
         
         if (this.nightLights && this.nightLights.material) {
             this.nightLights.material.opacity = darkness ? 0.65 : twilight ? 0.35 : 0.1;
+        }
+        
+        // Update terminator color based on time of day
+        if (this.terminator && this.terminator.material) {
+            // Golden during day, reddish during twilight, dim blue at night
+            if (isDay) {
+                this.terminator.material.color.setHex(0xffaa33);
+                this.terminator.material.opacity = 0.9;
+            } else if (twilight) {
+                this.terminator.material.color.setHex(0xff6633);
+                this.terminator.material.opacity = 0.8;
+            } else {
+                this.terminator.material.color.setHex(0x4466aa);
+                this.terminator.material.opacity = 0.5;
+            }
         }
     }
     
@@ -6095,6 +6182,8 @@ class MiniGlobe {
         
         // Update globe orientation
         this.updateOrientation();
+        
+        // Update marker position in world space (follows globe rotation)
         this.updateMarkerPosition();
         
         // Pulse marker
