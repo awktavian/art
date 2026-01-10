@@ -5635,18 +5635,16 @@ class MiniGlobe {
         this.currentLat += (this.targetLat - this.currentLat) * smoothing;
         this.currentLon += (this.targetLon - this.currentLon) * smoothing;
         
-        // Globe rotation math:
-        // Three.js SphereGeometry UV: U=0 starts at +X axis, wraps around Y
-        // Blue Marble texture: 0° longitude at center (U=0.5)
-        // So texture's 0° longitude maps to -Z axis (U=0.5 = 180° from +X)
-        // When rotation.y=0, -Z (lon 0°) is at back, +Z has lon 180°
-        // To face camera (+Z), we need lon 180° initially
-        // To show target longitude L, rotate by: 180° - L
-        // (Rotate globe so L comes to +Z from its natural position)
+        // Globe rotation formula (empirically calibrated for three-globe Blue Marble texture):
+        // rotation.y = 0° shows Asia (+130°E), rotation increases clockwise
+        // Formula: rotation = 160 + longitude
+        //   Seattle (-122°): rotation = 160 + (-122) = 38° → shows Pacific NW ✓
+        //   London (0°): rotation = 160 + 0 = 160° → shows UK ✓
+        //   Tokyo (+139°): rotation = 160 + 139 = 299° → shows Japan ✓
         //
-        // dragOffsetLon: user drag offset (springs back to 0 after release)
-        // autoRotateOffset: slow drift for visual interest
-        const baseRotation = 180 - this.currentLon;
+        // dragOffsetLon: temporary offset from user drag (springs back to 0)
+        // autoRotateOffset: slow continuous drift for visual interest
+        const baseRotation = 160 + this.currentLon;
         const totalRotation = (baseRotation + this.autoRotateOffset + this.dragOffsetLon) * Math.PI / 180;
         
         this.globe.rotation.y = totalRotation;
