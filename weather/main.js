@@ -2850,7 +2850,10 @@ class SecretWord {
         this.callback = callback;
         this.buffer = '';
         this.timeout = null;
+        this.recognition = null;
+        this.isListening = false;
         this.init();
+        this.initSpeechRecognition();
         console.log('%c🔑 Secret words activated:', 'color: #666;', this.words.join(', '));
     }
 
@@ -2890,6 +2893,138 @@ class SecretWord {
                 }, 3000);
             }
         });
+    }
+    
+    initSpeechRecognition() {
+        // Check for Web Speech API support
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            console.log('%c🎤 Speech recognition not supported', 'color: #999;');
+            return;
+        }
+        
+        this.recognition = new SpeechRecognition();
+        this.recognition.continuous = true;
+        this.recognition.interimResults = true;
+        this.recognition.lang = 'en-US';
+        
+        this.recognition.onstart = () => {
+            this.isListening = true;
+            console.log('%c🎤 Listening for voice commands...', 'color: #4CAF50;');
+            this.showListeningIndicator(true);
+        };
+        
+        this.recognition.onend = () => {
+            this.isListening = false;
+            console.log('%c🎤 Voice recognition stopped', 'color: #999;');
+            this.showListeningIndicator(false);
+            // Auto-restart if we want continuous listening
+            if (this.shouldRestart) {
+                setTimeout(() => this.startListening(), 500);
+            }
+        };
+        
+        this.recognition.onerror = (event) => {
+            console.log('%c🎤 Speech error:', 'color: #f44336;', event.error);
+            if (event.error === 'not-allowed') {
+                this.shouldRestart = false;
+            }
+        };
+        
+        this.recognition.onresult = (event) => {
+            let transcript = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                transcript += event.results[i][0].transcript;
+            }
+            
+            const spoken = transcript.toLowerCase().trim();
+            console.log('%c🎤 Heard:', 'color: #2196F3;', spoken);
+            
+            // Check for secret words in the transcript
+            for (const word of this.words) {
+                if (spoken.includes(word)) {
+                    console.log('%c🎉 Voice command detected:', 'color: #D4AF37;', word);
+                    this.callback(word);
+                    break;
+                }
+            }
+        };
+        
+        // Auto-start listening
+        this.shouldRestart = true;
+        this.startListening();
+    }
+    
+    startListening() {
+        if (this.recognition && !this.isListening) {
+            try {
+                this.recognition.start();
+            } catch (e) {
+                // Already started
+            }
+        }
+    }
+    
+    stopListening() {
+        this.shouldRestart = false;
+        if (this.recognition && this.isListening) {
+            this.recognition.stop();
+        }
+    }
+    
+    showListeningIndicator(show) {
+        // Create or update a listening indicator
+        let indicator = document.getElementById('voice-indicator');
+        if (!indicator && show) {
+            indicator = document.createElement('div');
+            indicator.id = 'voice-indicator';
+            indicator.innerHTML = '🎤';
+            indicator.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                width: 40px;
+                height: 40px;
+                background: rgba(0, 0, 0, 0.7);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                z-index: 9999;
+                animation: pulse 1.5s ease-in-out infinite;
+                cursor: pointer;
+                border: 2px solid rgba(76, 175, 80, 0.5);
+            `;
+            indicator.title = 'Listening for voice commands (say "home" or "monmouth")';
+            indicator.onclick = () => {
+                if (this.isListening) {
+                    this.stopListening();
+                } else {
+                    this.shouldRestart = true;
+                    this.startListening();
+                }
+            };
+            document.body.appendChild(indicator);
+            
+            // Add pulse animation
+            if (!document.getElementById('voice-indicator-style')) {
+                const style = document.createElement('style');
+                style.id = 'voice-indicator-style';
+                style.textContent = `
+                    @keyframes pulse {
+                        0%, 100% { transform: scale(1); opacity: 1; }
+                        50% { transform: scale(1.1); opacity: 0.8; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+        }
+        
+        if (indicator) {
+            indicator.style.display = show ? 'flex' : 'none';
+            indicator.style.borderColor = show ? 'rgba(76, 175, 80, 0.8)' : 'rgba(255, 255, 255, 0.3)';
+        }
     }
 }
 
@@ -5649,78 +5784,115 @@ class MiniGlobe {
     }
     
     createGlobe() {
-        // High-detail Earth sphere
+        // Earth globe with dramatic day/night lighting
         const geometry = new THREE.SphereGeometry(1, 64, 64);
-        
-        // Use NASA Blue Marble texture from reliable CDN
         const textureLoader = new THREE.TextureLoader();
         
-        // Earth day texture (Blue Marble)
+        // Day texture (Blue Marble)
         const earthTexture = textureLoader.load(
             'https://unpkg.com/three-globe@2.24.13/example/img/earth-blue-marble.jpg',
-            () => console.log('%c🌍 Earth texture loaded', 'color: #4CAF50;'),
-            undefined,
-            () => {
-                console.warn('Earth texture failed, using fallback');
-                this.createFallbackTexture();
-            }
+            () => console.log('%c🌍 Earth day texture loaded', 'color: #4CAF50;')
         );
         earthTexture.anisotropy = 16;
         
-        // Earth bump map for terrain
+        // Night texture (city lights)
+        const nightTexture = textureLoader.load(
+            'https://unpkg.com/three-globe@2.24.13/example/img/earth-night.jpg',
+            () => console.log('%c🌃 Earth night texture loaded', 'color: #9C27B0;')
+        );
+        nightTexture.anisotropy = 16;
+        
+        // Bump map for terrain
         const bumpTexture = textureLoader.load(
             'https://unpkg.com/three-globe@2.24.13/example/img/earth-topology.png'
         );
         
-        // Earth specular map (water shine)
-        const specTexture = textureLoader.load(
-            'https://unpkg.com/three-globe@2.24.13/example/img/earth-water.png'
-        );
-        
-        const material = new THREE.MeshPhongMaterial({
+        // Main globe with day texture - lit by directional sun light
+        const dayMaterial = new THREE.MeshPhongMaterial({
             map: earthTexture,
             bumpMap: bumpTexture,
-            bumpScale: 0.015,
-            specularMap: specTexture,
-            specular: new THREE.Color(0x333333),
-            shininess: 15
+            bumpScale: 0.02,
+            specular: new THREE.Color(0x222222),
+            shininess: 8
         });
         
-        this.globe = new THREE.Mesh(geometry, material);
+        this.globe = new THREE.Mesh(geometry, dayMaterial);
         this.scene.add(this.globe);
         
-        // Night lights layer
-        const nightTexture = textureLoader.load(
-            'https://unpkg.com/three-globe@2.24.13/example/img/earth-night.jpg'
-        );
-        
-        const nightGeometry = new THREE.SphereGeometry(1.001, 64, 64);
+        // Night lights layer - shows through where it's dark
+        const nightGeometry = new THREE.SphereGeometry(1.002, 64, 64);
         const nightMaterial = new THREE.MeshBasicMaterial({
             map: nightTexture,
             transparent: true,
-            opacity: 0.5,
+            opacity: 0.8,
             blending: THREE.AdditiveBlending,
             depthWrite: false
         });
-        
         this.nightLights = new THREE.Mesh(nightGeometry, nightMaterial);
-        this.scene.add(this.nightLights);
+        this.globe.add(this.nightLights);
+        
+        // Terminator band - a ring showing sunset/sunrise
+        this.createTerminatorBand();
+        
+        // Atmosphere glow
+        const atmoGeometry = new THREE.SphereGeometry(1.08, 64, 64);
+        const atmoMaterial = new THREE.MeshBasicMaterial({
+            color: 0x4488ff,
+            transparent: true,
+            opacity: 0.12,
+            side: THREE.BackSide
+        });
+        this.atmosphere = new THREE.Mesh(atmoGeometry, atmoMaterial);
+        this.scene.add(this.atmosphere);
         
         // Cloud layer
         const cloudTexture = textureLoader.load(
             'https://unpkg.com/three-globe@2.24.13/example/img/earth-clouds.png'
         );
-        
-        const cloudGeometry = new THREE.SphereGeometry(1.01, 64, 64);
+        const cloudGeometry = new THREE.SphereGeometry(1.012, 64, 64);
         const cloudMaterial = new THREE.MeshPhongMaterial({
             map: cloudTexture,
             transparent: true,
-            opacity: 0.4,
+            opacity: 0.35,
+            depthWrite: false
+        });
+        this.clouds = new THREE.Mesh(cloudGeometry, cloudMaterial);
+        this.globe.add(this.clouds);
+        
+        console.log('%c🌍 Globe created with sun-lit day/night', 'color: #4CAF50;');
+    }
+    
+    createTerminatorBand() {
+        // Create a glowing band that sits on the terminator (day/night boundary)
+        // This is a torus that we'll orient perpendicular to the sun
+        const geometry = new THREE.TorusGeometry(1.004, 0.025, 16, 100);
+        
+        // Gradient material for sunset colors
+        const material = new THREE.MeshBasicMaterial({
+            color: 0xff6622,
+            transparent: true,
+            opacity: 0.7,
+            side: THREE.DoubleSide,
             depthWrite: false
         });
         
-        this.clouds = new THREE.Mesh(cloudGeometry, cloudMaterial);
-        this.scene.add(this.clouds);
+        this.terminatorBand = new THREE.Mesh(geometry, material);
+        this.scene.add(this.terminatorBand);
+        
+        // Secondary outer glow
+        const glowGeometry = new THREE.TorusGeometry(1.006, 0.05, 16, 100);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff4400,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        this.terminatorGlow = new THREE.Mesh(glowGeometry, glowMaterial);
+        this.scene.add(this.terminatorGlow);
+        
+        console.log('%c🌅 Terminator band created', 'color: #FF5722;');
     }
     
     createFallbackTexture() {
@@ -5814,58 +5986,33 @@ class MiniGlobe {
     }
     
     createLights() {
-        // Ambient light
-        this.ambientLight = new THREE.AmbientLight(0x3c3c4a, 0.35);
+        // Very dim ambient - we want strong contrast between day/night
+        this.ambientLight = new THREE.AmbientLight(0x222233, 0.15);
         this.scene.add(this.ambientLight);
         
-        // Main light (sun) with target
-        this.sunLightTarget = new THREE.Object3D();
-        this.scene.add(this.sunLightTarget);
-        
-        this.sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
-        this.sunLight.position.set(5, 3, 5);
-        this.sunLight.target = this.sunLightTarget;
+        // Main sun light - this creates the terminator shadow
+        this.sunLight = new THREE.DirectionalLight(0xffffee, 1.8);
+        this.sunLight.position.set(5, 0, 0);
         this.scene.add(this.sunLight);
         
-        // Fill light (sky bounce)
-        this.fillLight = new THREE.DirectionalLight(0x4466aa, 0.25);
-        this.fillLight.position.set(-5, -2, 2);
-        this.scene.add(this.fillLight);
+        // Warm fill on the sunset edge
+        this.sunsetFill = new THREE.DirectionalLight(0xff6633, 0.4);
+        this.sunsetFill.position.set(3, 0, 4);
+        this.scene.add(this.sunsetFill);
         
-        // Rim light for atmosphere
-        const rimLight = new THREE.DirectionalLight(0x88aaff, 0.18);
-        rimLight.position.set(0, 0, -5);
-        this.scene.add(rimLight);
+        // Cool fill on the night side
+        this.nightFill = new THREE.DirectionalLight(0x334466, 0.15);
+        this.nightFill.position.set(-5, 0, 0);
+        this.scene.add(this.nightFill);
 
         this.sunBaseVector = new THREE.Vector3(1, 0, 0);
-        
-        // Create terminator (day/night boundary line)
-        this.createTerminator();
     }
     
     createTerminator() {
-        // The terminator is the day/night boundary - golden ring showing sunrise/sunset line
-        // Rendered in WORLD space, perpendicular to sun direction
-        
-        const segments = 128;
-        const radius = 1.02;
-        
-        const geometry = new THREE.TorusGeometry(radius, 0.025, 8, segments);
-        
-        const material = new THREE.MeshBasicMaterial({
-            color: 0xffaa00,
-            transparent: true,
-            opacity: 0.9,
-            side: THREE.DoubleSide,
-            depthTest: false,  // Always visible
-            depthWrite: false
-        });
-        
-        this.terminator = new THREE.Mesh(geometry, material);
-        this.terminator.renderOrder = 997;  // Render after globe but before marker
-        this.scene.add(this.terminator);
-        
-        console.log('%c☀️ Terminator (sunlight line) created', 'color: #FFAA33;');
+        // Terminator is now handled by the globe shader - no separate geometry needed
+        // The shader creates a dramatic sunset band directly on the globe surface
+        this.terminator = null;
+        console.log('%c☀️ Terminator rendered via shader (no separate geometry)', 'color: #FFAA33;');
     }
     
     setupDragInteraction() {
@@ -6065,73 +6212,67 @@ class MiniGlobe {
     }
 
     updateSunLighting(sunData) {
-        if (!this.sunLight || !sunData) return;
+        if (!sunData) return;
         this.currentSunData = sunData;
         
         if (sunData.vector) {
             const { x, y, z } = sunData.vector;
-            this.sunBaseVector.set(x, y, z);
-            const sunPos = this.sunBaseVector.clone().multiplyScalar(5);
-            this.sunLight.position.copy(sunPos);
-            this.sunLightTarget.position.set(0, 0, 0);
-            this.sunLight.lookAt(this.sunLightTarget.position);
+            this.sunBaseVector.set(x, y, z).normalize();
             
-            // Fill light opposite side for soft bounce
-            this.fillLight.position.copy(this.sunBaseVector.clone().multiplyScalar(-4));
-            this.fillLight.lookAt(0, 0, 0);
+            // Transform sun direction to WORLD space using globe rotation
+            const sunWorldDir = this.sunBaseVector.clone();
+            if (this.lastFinalQuat) {
+                sunWorldDir.applyQuaternion(this.lastFinalQuat);
+            }
             
-            // Update terminator orientation in WORLD space
-            // The terminator ring is perpendicular to the sun direction
-            // sunBaseVector is the sun's direction in globe LOCAL coordinates
-            // We need to transform it to world space using the globe's rotation
-            if (this.terminator && this.lastFinalQuat) {
-                // Transform sun direction from local to world space
-                const sunDirLocal = this.sunBaseVector.clone().normalize();
-                const sunDirWorld = sunDirLocal.clone().applyQuaternion(this.lastFinalQuat);
-                
-                // Orient the torus so its normal aligns with the sun direction
-                // Torus default: ring in XY plane, normal along +Z
-                const defaultNormal = new THREE.Vector3(0, 0, 1);
+            // Position the main sun light
+            if (this.sunLight) {
+                this.sunLight.position.copy(sunWorldDir.clone().multiplyScalar(5));
+            }
+            
+            // Position sunset fill light perpendicular to sun
+            if (this.sunsetFill) {
+                const perpDir = new THREE.Vector3(0, 1, 0).cross(sunWorldDir).normalize();
+                this.sunsetFill.position.copy(sunWorldDir.clone().add(perpDir).normalize().multiplyScalar(4));
+            }
+            
+            // Night fill opposite to sun
+            if (this.nightFill) {
+                this.nightFill.position.copy(sunWorldDir.clone().multiplyScalar(-4));
+            }
+            
+            // Orient the terminator band perpendicular to sun direction
+            if (this.terminatorBand) {
+                // Terminator ring should be perpendicular to sun direction
+                const up = new THREE.Vector3(0, 0, 1);
                 const quat = new THREE.Quaternion();
-                quat.setFromUnitVectors(defaultNormal, sunDirWorld);
-                
-                this.terminator.quaternion.copy(quat);
-                this.terminator.position.set(0, 0, 0);
+                quat.setFromUnitVectors(up, sunWorldDir);
+                this.terminatorBand.quaternion.copy(quat);
+                this.terminatorBand.position.set(0, 0, 0);
+            }
+            if (this.terminatorGlow) {
+                const up = new THREE.Vector3(0, 0, 1);
+                const quat = new THREE.Quaternion();
+                quat.setFromUnitVectors(up, sunWorldDir);
+                this.terminatorGlow.quaternion.copy(quat);
+                this.terminatorGlow.position.set(0, 0, 0);
             }
         }
         
+        // Adjust night lights visibility based on local time of day
         const altitude = sunData.altitude ?? 0;
         const isDay = altitude > 0;
         const twilight = altitude > -6 && altitude <= 0;
-        const darkness = altitude <= -6;
-        
-        this.sunLight.intensity = isDay ? 1.2 : twilight ? 0.6 : 0.15;
-        this.fillLight.intensity = isDay ? 0.25 : 0.15;
-        this.ambientLight.intensity = isDay ? 0.4 : 0.18;
-        
-        // Warmth shift based on altitude
-        const hue = isDay ? 0.12 - Math.min(0.08, altitude / 600) : 0.08;
-        const saturation = isDay ? 0.4 : 0.25;
-        const lightness = isDay ? 0.95 : 0.6;
-        this.sunLight.color.setHSL(hue, saturation, lightness);
         
         if (this.nightLights && this.nightLights.material) {
-            this.nightLights.material.opacity = darkness ? 0.65 : twilight ? 0.35 : 0.1;
+            // Night lights more visible at night
+            this.nightLights.material.opacity = isDay ? 0.3 : twilight ? 0.6 : 0.9;
         }
         
-        // Update terminator color based on time of day
-        if (this.terminator && this.terminator.material) {
-            // Golden during day, reddish during twilight, dim blue at night
-            if (isDay) {
-                this.terminator.material.color.setHex(0xffaa33);
-                this.terminator.material.opacity = 0.9;
-            } else if (twilight) {
-                this.terminator.material.color.setHex(0xff6633);
-                this.terminator.material.opacity = 0.8;
-            } else {
-                this.terminator.material.color.setHex(0x4466aa);
-                this.terminator.material.opacity = 0.5;
-            }
+        // Terminator band color/intensity
+        if (this.terminatorBand && this.terminatorBand.material) {
+            this.terminatorBand.material.opacity = twilight ? 0.9 : 0.6;
+            this.terminatorBand.material.color.setHex(twilight ? 0xff4400 : 0xff6622);
         }
     }
     
@@ -6192,10 +6333,9 @@ class MiniGlobe {
             this.markerGlow.scale.setScalar(pulse);
         }
         
-        // Twinkle city lights
-        if (this.nightLights && this.nightLights.material) {
-            const twinkle = 0.6 + 0.15 * Math.sin(now / 800);
-            this.nightLights.material.opacity = twinkle;
+        // Update shader time uniform (for any animated effects)
+        if (this.globeMaterial) {
+            this.globeMaterial.uniforms.time.value = now / 1000.0;
         }
         
         // Render
@@ -6394,7 +6534,11 @@ class CompassSundial {
             skipDragSelectors: ['.compass-shadow', '.compass-gnomon']
         });
         this.focusedLatLon = { latitude: lat, longitude: lon };
-        this.globe.setOrientationCallback(() => this.updateSecretEmojiPositions());
+        this.globe.setOrientationCallback(() => {
+            this.updateSecretEmojiPositions();
+            // Update sun/moon positions in realtime as globe rotates
+            this.updateCelestialBodies();
+        });
         this.broadcastFocusLocation();
         
         this.globeInitialized = true;
@@ -6864,33 +7008,68 @@ class CompassSundial {
             this.globe.updateSunLighting(sun);
         }
         
-        // Update sun position - radius 38 keeps it inside the face
-        if (this.sunIndicator) {
-            const radius = 38;
-            const angleRad = (sun.azimuth - 90) * Math.PI / 180;
-            const x = 50 + radius * Math.cos(angleRad);
-            const y = 50 + radius * Math.sin(angleRad);
+        // Update sun position based on globe's current rotation
+        // Project the subsolar point onto the globe to get indicator position
+        if (this.sunIndicator && sun.subsolarLatitude !== undefined) {
+            let x, y;
+            const isDay = sun.altitude > 0;
+            
+            // If globe exists, project the subsolar point
+            if (this.globe && this.globe.projectLatLon) {
+                const projected = this.globe.projectLatLon(sun.subsolarLatitude, sun.subsolarLongitude);
+                if (projected && projected.facingFront) {
+                    // Sun's geographic position is on the visible side
+                    x = projected.x;
+                    y = projected.y;
+                } else {
+                    // Sun is on the far side - place on ring edge based on azimuth
+                    const radius = 48;
+                    const angleRad = (sun.azimuth - 90) * Math.PI / 180;
+                    x = 50 + radius * Math.cos(angleRad);
+                    y = 50 + radius * Math.sin(angleRad);
+                }
+            } else {
+                // Fallback to azimuth-based positioning
+                const radius = 38;
+                const angleRad = (sun.azimuth - 90) * Math.PI / 180;
+                x = 50 + radius * Math.cos(angleRad);
+                y = 50 + radius * Math.sin(angleRad);
+            }
             
             this.sunIndicator.style.left = `${x}%`;
             this.sunIndicator.style.top = `${y}%`;
             
-            const isDay = sun.altitude > 0;
             const scale = isDay ? 1 + (sun.altitude / 150) : 0.75;
             this.sunIndicator.style.opacity = isDay ? '1' : '0.4';
             this.sunIndicator.style.transform = `translate(-50%, -50%) scale(${scale})`;
         }
         
-        // Update moon position
-        if (this.moonIndicator && moon) {
-            const radius = 38;
-            const angleRad = (moon.azimuth - 90) * Math.PI / 180;
-            const x = 50 + radius * Math.cos(angleRad);
-            const y = 50 + radius * Math.sin(angleRad);
+        // Update moon position based on globe's current rotation
+        if (this.moonIndicator && moon && moon.subsolarLatitude !== undefined) {
+            let x, y;
+            const moonUp = moon.altitude > 0;
+            
+            if (this.globe && this.globe.projectLatLon) {
+                const projected = this.globe.projectLatLon(moon.subsolarLatitude, moon.subsolarLongitude);
+                if (projected && projected.facingFront) {
+                    x = projected.x;
+                    y = projected.y;
+                } else {
+                    const radius = 48;
+                    const angleRad = (moon.azimuth - 90) * Math.PI / 180;
+                    x = 50 + radius * Math.cos(angleRad);
+                    y = 50 + radius * Math.sin(angleRad);
+                }
+            } else {
+                const radius = 38;
+                const angleRad = (moon.azimuth - 90) * Math.PI / 180;
+                x = 50 + radius * Math.cos(angleRad);
+                y = 50 + radius * Math.sin(angleRad);
+            }
             
             this.moonIndicator.style.left = `${x}%`;
             this.moonIndicator.style.top = `${y}%`;
             
-            const moonUp = moon.altitude > 0;
             const scale = moonUp ? 0.9 + (moon.altitude / 150) : 0.65;
             this.moonIndicator.style.opacity = moonUp ? '1' : '0.35';
             this.moonIndicator.style.transform = `translate(-50%, -50%) scale(${scale})`;
