@@ -5254,9 +5254,15 @@ class MiniGlobe {
     constructor(canvas, options = {}) {
         this.canvas = canvas;
         
-        // Location to center on
-        this.targetLat = options.latitude || 0;
-        this.targetLon = options.longitude || 0;
+        // Location to center on - REQUIRED, no hardcoded defaults
+        this.targetLat = options.latitude;
+        this.targetLon = options.longitude;
+        
+        if (this.targetLat == null || this.targetLon == null) {
+            console.warn('MiniGlobe: No location provided, waiting for geolocation...');
+            this.targetLat = 0;
+            this.targetLon = 0;
+        }
         
         // Current view (smoothly animates to target)
         this.currentLat = this.targetLat;
@@ -5629,32 +5635,35 @@ class MiniGlobe {
         this.currentLat += (this.targetLat - this.currentLat) * smoothing;
         this.currentLon += (this.targetLon - this.currentLon) * smoothing;
         
-        // Calculate globe rotation to center target location facing camera
-        // Blue Marble texture: 0° longitude at center of image
-        // Three.js SphereGeometry: texture center maps to front (+Z) when rotation.y=0
-        // When rotation.y=0, longitude 0° (London) is at front
-        // When we ROTATE the globe, we move the texture:
-        //   rotation.y = +X brings what was at longitude -X to the front
-        //   rotation.y = -X brings what was at longitude +X to the front
-        // Therefore: to show longitude L, we need rotation.y = -L
-        // dragOffsetLon adds user interaction offset (springs back to 0)
-        const lonRotation = (-this.currentLon + this.autoRotateOffset + this.dragOffsetLon) * Math.PI / 180;
+        // Globe rotation math:
+        // Three.js SphereGeometry UV: U=0 starts at +X axis, wraps around Y
+        // Blue Marble texture: 0° longitude at center (U=0.5)
+        // So texture's 0° longitude maps to -Z axis (U=0.5 = 180° from +X)
+        // When rotation.y=0, -Z (lon 0°) is at back, +Z has lon 180°
+        // To face camera (+Z), we need lon 180° initially
+        // To show target longitude L, rotate by: 180° - L
+        // (Rotate globe so L comes to +Z from its natural position)
+        //
+        // dragOffsetLon: user drag offset (springs back to 0 after release)
+        // autoRotateOffset: slow drift for visual interest
+        const baseRotation = 180 - this.currentLon;
+        const totalRotation = (baseRotation + this.autoRotateOffset + this.dragOffsetLon) * Math.PI / 180;
         
-        this.globe.rotation.y = lonRotation;
-        this.globe.rotation.x = this.dragOffsetLat * Math.PI / 180; // Vertical drag tilts globe
+        this.globe.rotation.y = totalRotation;
+        this.globe.rotation.x = this.dragOffsetLat * Math.PI / 180;
         
         // Keep all layers in sync
         if (this.clouds) {
-            this.clouds.rotation.y = lonRotation;
+            this.clouds.rotation.y = totalRotation;
             this.clouds.rotation.x = this.globe.rotation.x;
         }
         
         if (this.nightLights) {
-            this.nightLights.rotation.y = lonRotation;
+            this.nightLights.rotation.y = totalRotation;
             this.nightLights.rotation.x = this.globe.rotation.x;
         }
         
-        // Tilt camera based on latitude to show correct perspective
+        // Tilt camera based on latitude for better viewing angle
         const latRad = (this.currentLat + this.dragOffsetLat) * Math.PI / 180;
         this.camera.position.y = Math.sin(latRad) * 0.5;
         this.camera.position.z = 2.5 * Math.cos(latRad * 0.3);
@@ -5772,19 +5781,20 @@ class CompassSundial {
         }
     }
     
-    // Get viewer's location (from atmosphere which has IP geolocation)
+    // Get viewer's location - ALWAYS from IP geolocation (atmosphere)
     getLocation() {
-        // Priority: atmosphere (IP geolocation) > celestialDemo > fallback (Seattle)
-        if (typeof atmosphere !== 'undefined' && atmosphere.latitude && atmosphere.longitude) {
+        // Primary: atmosphere has the IP-based geolocation
+        if (typeof atmosphere !== 'undefined' && atmosphere.latitude != null && atmosphere.longitude != null) {
             return {
                 latitude: atmosphere.latitude,
                 longitude: atmosphere.longitude
             };
         }
-        const demo = window.celestialDemo;
+        // Fallback: use HOME constant (defined at top of file)
+        // This should only happen before atmosphere initializes
         return {
-            latitude: demo?.latitude || 47.6,
-            longitude: demo?.longitude || -122.3
+            latitude: HOME.latitude,
+            longitude: HOME.longitude
         };
     }
     
@@ -5832,15 +5842,18 @@ class CompassSundial {
     initGlobe() {
         if (this.globeInitialized || !this.globeCanvas) return;
         
+        // Get location from IP geolocation (atmosphere)
         const loc = this.getLocation();
-        if (!loc.latitude || !loc.longitude) return;
+        if (loc.latitude == null || loc.longitude == null) {
+            console.log('%c🌍 Globe waiting for geolocation...', 'color: #FFA500;');
+            return; // Will retry
+        }
+        
+        console.log(`%c🌍 Initializing globe at ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`, 'color: #64B5F6;');
         
         this.globe = new MiniGlobe(this.globeCanvas, {
             latitude: loc.latitude,
-            longitude: loc.longitude,
-            rotationSpeed: 0.0003,
-            showGrid: true,
-            showLocation: true
+            longitude: loc.longitude
         });
         
         this.globeInitialized = true;
