@@ -2716,120 +2716,20 @@ class CelestialSky {
     }
 
     init() {
-        // Find existing hero-sun container or create celestial sky
-        const heroSection = document.querySelector('.hero');
-        if (!heroSection) return;
-
-        // Create celestial sky container
-        this.container = document.createElement('div');
-        this.container.className = 'celestial-sky';
-        this.container.setAttribute('aria-hidden', 'true');
-
-        // Create sun element (replacing hero-sun)
-        this.sunElement = document.createElement('div');
-        this.sunElement.className = 'celestial-sun';
-        this.sunElement.id = 'celestial-sun';
-        this.sunElement.setAttribute('role', 'button');
-        this.sunElement.setAttribute('tabindex', '0');
-        this.sunElement.setAttribute('aria-label', 'Sun position');
-        this.sunElement.innerHTML = `
-            <div class="sun-core"></div>
-            <div class="sun-corona"></div>
-            <div class="sun-rays"></div>
-        `;
-        this.container.appendChild(this.sunElement);
-
-        // Create moon element
-        this.moonElement = document.createElement('div');
-        this.moonElement.className = 'celestial-moon';
-        this.moonElement.id = 'celestial-moon';
-        this.moonElement.setAttribute('role', 'button');
-        this.moonElement.setAttribute('tabindex', '0');
-        this.moonElement.setAttribute('aria-label', 'Moon position');
-        this.moonElement.innerHTML = `
-            <div class="moon-surface"></div>
-            <div class="moon-phase-shadow"></div>
-            <div class="moon-glow"></div>
-        `;
-        this.container.appendChild(this.moonElement);
-
-        // Create sundial
-        const sundial = document.createElement('div');
-        sundial.className = 'sundial';
-        sundial.setAttribute('aria-label', 'Sundial showing current solar time');
-        sundial.innerHTML = `
-            <div class="sundial-face">
-                <div class="sundial-ring sundial-ring-outer"></div>
-                <div class="sundial-ring sundial-ring-inner"></div>
-                <div class="sundial-hour-markers">
-                    ${this.createHourMarkers()}
-                </div>
-                <div class="sundial-center-ornament"></div>
-                <div class="sundial-gnomon"></div>
-                <div class="sundial-shadow" id="sundial-shadow"></div>
-            </div>
-            <div class="sundial-base"></div>
-        `;
-        this.container.appendChild(sundial);
-
-        // Info panel removed - focus on visual mechanism, not text
-        // Users can click sun/moon for details in console
-
-        // Insert into hero section
-        heroSection.appendChild(this.container);
-
-        // Get shadow element reference
-        this.sundialShadow = document.getElementById('sundial-shadow');
-
-        // Remove old hero-sun if exists
-        const oldHeroSun = heroSection.querySelector('.hero-sun');
+        // DISABLED: Using compass-sundial in HTML instead
+        // The compass-sundial already has sun indicator and shadow
+        // This class now only provides update() for time synchronization
+        
+        // Reference the existing compass-sundial elements
+        this.sunElement = document.getElementById('compass-sun-indicator');
+        this.sundialShadow = document.getElementById('compass-shadow');
+        
+        // Hide the old hero-sun if it exists
+        const oldHeroSun = document.querySelector('.hero-sun');
         if (oldHeroSun) {
             oldHeroSun.style.display = 'none';
         }
-
-        // Add click handlers for celestial bodies
-        this.sunElement.addEventListener('click', () => this.showSunDetails());
-        this.moonElement.addEventListener('click', () => this.showMoonDetails());
-
-        // Sundial tap to request orientation permission
-        this.sundialElement = sundial;
-        sundial.style.cursor = 'pointer';
-        sundial.setAttribute('role', 'button');
-        sundial.setAttribute('tabindex', '0');
-        sundial.setAttribute('aria-label', 'Tap to enable compass orientation');
-
-        sundial.addEventListener('click', () => this.requestOrientationPermission());
-        sundial.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                this.requestOrientationPermission();
-            }
-        });
-
-        // Listen to device orientation changes
-        this.deviceHeading = 0;
-        this.deviceTiltX = 0;
-        this.deviceTiltY = 0;
-        this.orientationEnabled = false;
-
-        deviceOrientation.addListener((data) => this.handleOrientationUpdate(data));
-
-        // Check if orientation is already enabled (from localStorage)
-        if (deviceOrientation.hasPermission) {
-            this.orientationEnabled = true;
-            this.updateOrientationIndicator(true);
-        }
-
-        // Keyboard accessibility
-        [this.sunElement, this.moonElement].forEach(el => {
-            el.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    el.click();
-                }
-            });
-        });
-
+        
         this.initialized = true;
     }
 
@@ -2869,21 +2769,9 @@ class CelestialSky {
      * Update celestial positions based on current time
      */
     update(date = new Date()) {
-        if (!this.initialized) return;
-
-        const lat = atmosphere.latitude || HOME.latitude;
-        const lon = atmosphere.longitude || HOME.longitude;
-
-        // Get sun position
-        const sun = Ephemeris.sunPosition(lat, lon, date);
-
-        // Get moon position
-        const moon = Ephemeris.moonPosition(lat, lon, date);
-
-        // Update positions
-        this.updateSunPosition(sun);
-        this.updateMoonPosition(moon);
-        this.updateSundial(sun);
+        // DISABLED: CompassSundial class now handles all updates
+        // The compass-sundial in the hero section has its own sun indicator and shadow
+        return;
     }
 
     /**
@@ -5034,30 +4922,43 @@ class CompassSundial {
         if (!this.sunIndicator || !this.shadow) return;
         
         // Position sun on compass face based on azimuth
-        // Compass face radius is roughly 40% of container
-        const radius = 35; // percentage from center
-        const azimuthRad = (sun.azimuth - 90) * Math.PI / 180; // Adjust for compass orientation
+        // Sun travels around the dial: N=top, E=right, S=bottom, W=left
+        // Azimuth: 0=N, 90=E, 180=S, 270=W
+        // CSS angle: 0deg=right, so we need: CSS = azimuth - 90
+        const radius = 38; // percentage from center (38% of 50% = ~76% from center)
+        const angleRad = (sun.azimuth - 90) * Math.PI / 180;
         
-        const x = 50 + radius * Math.cos(azimuthRad);
-        const y = 50 + radius * Math.sin(azimuthRad);
+        const x = 50 + radius * Math.cos(angleRad);
+        const y = 50 + radius * Math.sin(angleRad);
         
         this.sunIndicator.style.left = `${x}%`;
         this.sunIndicator.style.top = `${y}%`;
         
-        // Adjust sun visibility based on altitude
+        // Adjust sun visibility and size based on altitude
         const isDay = sun.altitude > 0;
-        this.sunIndicator.style.opacity = isDay ? 1 : 0.3;
-        this.sunIndicator.style.transform = `translate(-50%, -50%) scale(${isDay ? 1 : 0.7})`;
+        const scale = isDay ? 1 + (sun.altitude / 180) : 0.6; // Bigger when higher
+        this.sunIndicator.style.opacity = isDay ? '1' : '0.3';
+        this.sunIndicator.style.transform = `translate(-50%, -50%) scale(${scale})`;
         
-        // Update shadow angle (opposite to sun direction)
-        // Shadow points away from sun
-        const shadowAngle = sun.azimuth + 180;
+        // Shadow points OPPOSITE to sun (180° from sun azimuth)
+        // When sun is at East (90°), shadow points West (270°)
+        // Shadow rotation: CSS 0deg points right, so shadow angle = azimuth
+        const shadowAngle = sun.azimuth;
         this.shadow.style.setProperty('--shadow-angle', `${shadowAngle}deg`);
         
-        // Shadow length based on sun altitude (longer when sun is low)
-        const shadowLength = isDay ? Math.max(20, 50 - sun.altitude * 0.4) : 0;
-        this.shadow.style.height = `${shadowLength}%`;
-        this.shadow.style.opacity = isDay ? Math.min(0.6, (90 - sun.altitude) / 100) : 0;
+        // Shadow length: longer when sun is LOW, shorter when HIGH
+        // At altitude 0°, shadow is longest; at 90° (directly overhead), shortest
+        if (isDay) {
+            const shadowLength = Math.max(20, 45 - sun.altitude * 0.4);
+            this.shadow.style.height = `${shadowLength}%`;
+            this.shadow.style.opacity = '0.7';
+        } else {
+            this.shadow.style.height = '0%';
+            this.shadow.style.opacity = '0';
+        }
+        
+        // Debug info
+        console.log(`☀️ Sun: az=${sun.azimuth.toFixed(1)}° alt=${sun.altitude.toFixed(1)}° → shadow=${shadowAngle.toFixed(1)}°`);
     }
 }
 
