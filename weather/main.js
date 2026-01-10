@@ -5461,34 +5461,52 @@ class MiniGlobe {
     }
     
     // ═══════════════════════════════════════════════════════════════════════
-    // QUATERNION MATH (Fano plane composition principle)
+    // QUATERNION MATH — Proper spherical coordinate mapping
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // THREE.js SphereGeometry UV mapping:
+    //   - U wraps around Y axis: U=0 at phi=0 (+X axis), U=0.5 at phi=π (-X axis)
+    //   - Equirectangular textures have lon=0° at center (U=0.5)
+    //   - So lon=0° maps to -X axis on the unrotated sphere
+    //
+    // To show a target (lat, lon) facing camera (+Z direction):
+    //   1. The target point on the texture at lon=L is at U = 0.5 + L/360
+    //   2. On the unrotated sphere, U=0.5+L/360 is at angle phi = π + L*π/180
+    //   3. We need to rotate this point to +Z (phi = π/2)
+    //   4. Required Y rotation = π/2 - (π + L*π/180) = -π/2 - L*π/180
+    //   5. Simplified: rotY = -(90 + L)° in radians
+    //
+    // For latitude, rotate around X to tilt the view
     // ═══════════════════════════════════════════════════════════════════════
     
     computeHomeQuaternion() {
-        // Goal: Rotate globe so that (targetLat, targetLon) faces the camera (+Z)
-        //
-        // EMPIRICAL CALIBRATION (from testing with Blue Marble texture):
-        // - When rotation.y = 0°, Asia (~+130°E) faces camera
-        // - To show Seattle (-122°): rotation = 160 + (-122) = 38°
-        // - Formula: rotation_y = (160 + targetLon)° in radians
-        //
-        // For latitude, we tilt around X axis
-        //
-        // Quaternion composition: Y rotation (longitude), then X rotation (latitude)
+        // Convert geographic coordinates to rotation
+        const lat = this.targetLat;
+        const lon = this.targetLon;
         
-        // Longitude rotation (empirically calibrated for Blue Marble texture)
-        const lonRotation = (160 + this.targetLon) * Math.PI / 180;
+        // Y rotation to center longitude at camera
+        // lon=0° (UK) → rotY = -90° (brings -X to +Z)
+        // lon=-122° (Seattle) → rotY = -90 - (-122) = 32°
+        // lon=139° (Tokyo) → rotY = -90 - 139 = -229° = 131°
+        const rotY = -(90 + lon) * Math.PI / 180;
+        
+        // X rotation to bring latitude into view
+        // Positive lat (northern) → tilt globe down (negative X rotation)
+        // This creates a "looking down at" perspective for northern locations
+        const rotX = -lat * Math.PI / 180;
+        
+        // Build quaternions
         const qY = new THREE.Quaternion();
-        qY.setFromAxisAngle(new THREE.Vector3(0, 1, 0), lonRotation);
+        qY.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rotY);
         
-        // Latitude tilt (small tilt based on latitude for viewing perspective)
-        // Not a full lat rotation - just subtle camera perspective
-        const latTilt = this.targetLat * 0.3 * Math.PI / 180;
         const qX = new THREE.Quaternion();
-        qX.setFromAxisAngle(new THREE.Vector3(1, 0, 0), latTilt);
+        qX.setFromAxisAngle(new THREE.Vector3(1, 0, 0), rotX);
         
-        // Compose: apply qY first (rotate to longitude), then qX (tilt for latitude)
+        // Compose: first rotate for longitude (Y), then tilt for latitude (X)
+        // Order matters for quaternions: qX * qY applies qY first, then qX
         this.homeQuat.multiplyQuaternions(qX, qY);
+        
+        console.log(`%c🌍 Globe orientation: lat=${lat.toFixed(1)}°, lon=${lon.toFixed(1)}° → rotY=${(rotY*180/Math.PI).toFixed(1)}°, rotX=${(rotX*180/Math.PI).toFixed(1)}°`, 'color: #64B5F6;');
     }
     
     applyQuaternion() {
@@ -5771,22 +5789,49 @@ class MiniGlobe {
         // Recompute home quaternion for new location
         this.computeHomeQuaternion();
         
+        // Update marker position
+        this.updateMarkerPosition();
+        
         // Reset auto-rotate and drag state
         this.autoRotateAngle = 0;
-        this.dragQuat.identity();
-        this.dragVelocity.identity();
+        if (this.dragQuat) this.dragQuat.identity();
+        if (this.dragVelocity) this.dragVelocity.identity();
+        
+        // Immediately update current quaternion to home (snap to new location)
+        if (this.currentQuat && this.homeQuat) {
+            this.currentQuat.copy(this.homeQuat);
+            this.applyQuaternion();
+        }
     }
     
     updateMarkerPosition() {
         if (!this.marker || !this.globe) return;
         
-        // The marker is a child of the globe, positioned in local coordinates
-        // In globe's local space, the target location should be at the front (+Z)
-        // since we rotated the globe to center it
+        // Position marker at the target lat/lon in globe's LOCAL coordinate space
+        // (before globe rotation is applied)
+        //
+        // Geographic to 3D conversion for equirectangular texture on sphere:
+        // - Longitude: angle around Y axis, with lon=0° at -X
+        // - Latitude: angle from equator toward poles
+        //
+        // Point on unit sphere at (lat, lon):
+        //   phi = lon + 90° (since lon=0 is at -X, we offset by 90° to put it at -X)
+        //   theta = 90° - lat (theta from +Y pole)
         
-        // Position marker at front of globe (where target location is centered)
-        const r = 1.03; // Slightly above surface
-        this.marker.position.set(0, 0, r);
+        const latRad = this.targetLat * Math.PI / 180;
+        const lonRad = this.targetLon * Math.PI / 180;
+        
+        // Standard spherical to Cartesian (lon=0 at -X axis for equirectangular)
+        // x = cos(lat) * cos(lon + 90°) = cos(lat) * (-sin(lon))
+        // y = sin(lat)
+        // z = cos(lat) * sin(lon + 90°) = cos(lat) * cos(lon)
+        const x = -Math.cos(latRad) * Math.sin(lonRad);
+        const y = Math.sin(latRad);
+        const z = Math.cos(latRad) * Math.cos(lonRad);
+        
+        // Position marker just above globe surface
+        const r = 1.03;
+        this.marker.position.set(x * r, y * r, z * r);
         this.markerGlow.position.copy(this.marker.position);
     }
     
