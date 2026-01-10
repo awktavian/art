@@ -6055,27 +6055,22 @@ class MiniGlobe {
     
     createTerminatorBand() {
         // ═══════════════════════════════════════════════════════════════════
-        // BEAUTIFUL SUNSET TERMINATOR — Multi-layered atmospheric glow
+        // SUBTLE SUNSET TERMINATOR — Soft, elegant atmospheric glow
         // ═══════════════════════════════════════════════════════════════════
         // 
-        // Real sunsets have multiple color layers from atmospheric scattering:
-        // 1. Hot core: Bright yellow/white at the sun's position
-        // 2. Inner band: Deep orange where sun meets horizon
-        // 3. Middle glow: Soft red/pink spreading outward  
-        // 4. Outer twilight: Purple/blue from Rayleigh scattering
-        // 5. Night fade: Dark blue gradient into darkness
+        // Real sunsets are subtle gradients, not garish neon bands.
+        // Use muted warm tones that blend naturally into the globe.
         //
-        // We create concentric torus rings, each slightly larger
         // ═══════════════════════════════════════════════════════════════════
         
         this.terminatorLayers = [];
         
-        // Layer 1: Inner hot core (bright golden yellow)
-        const coreGeometry = new THREE.TorusGeometry(1.003, 0.008, 16, 120);
+        // Layer 1: Warm golden core (subtle)
+        const coreGeometry = new THREE.TorusGeometry(1.002, 0.006, 16, 120);
         const coreMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffdd44,
+            color: 0xffeecc,  // Soft warm white
             transparent: true,
-            opacity: 0.9,
+            opacity: 0.35,
             side: THREE.DoubleSide,
             depthWrite: false,
             blending: THREE.AdditiveBlending
@@ -6084,12 +6079,12 @@ class MiniGlobe {
         this.globe.add(this.terminatorCore);
         this.terminatorLayers.push(this.terminatorCore);
         
-        // Layer 2: Inner orange band
-        const innerGeometry = new THREE.TorusGeometry(1.004, 0.018, 16, 120);
+        // Layer 2: Soft peach/coral
+        const innerGeometry = new THREE.TorusGeometry(1.003, 0.012, 16, 120);
         const innerMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff8822,
+            color: 0xffcc99,  // Soft peach
             transparent: true,
-            opacity: 0.75,
+            opacity: 0.28,
             side: THREE.DoubleSide,
             depthWrite: false,
             blending: THREE.AdditiveBlending
@@ -6098,12 +6093,12 @@ class MiniGlobe {
         this.globe.add(this.terminatorInner);
         this.terminatorLayers.push(this.terminatorInner);
         
-        // Layer 3: Middle sunset band (deep orange-red)
-        const midGeometry = new THREE.TorusGeometry(1.006, 0.035, 16, 120);
+        // Layer 3: Muted salmon
+        const midGeometry = new THREE.TorusGeometry(1.004, 0.02, 16, 120);
         const midMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff4411,
+            color: 0xeeaa88,  // Muted salmon
             transparent: true,
-            opacity: 0.55,
+            opacity: 0.22,
             side: THREE.DoubleSide,
             depthWrite: false,
             blending: THREE.AdditiveBlending
@@ -6112,12 +6107,12 @@ class MiniGlobe {
         this.globe.add(this.terminatorBand);
         this.terminatorLayers.push(this.terminatorBand);
         
-        // Layer 4: Outer pink/magenta glow
-        const outerGeometry = new THREE.TorusGeometry(1.008, 0.055, 16, 120);
+        // Layer 4: Soft rose
+        const outerGeometry = new THREE.TorusGeometry(1.006, 0.03, 16, 120);
         const outerMaterial = new THREE.MeshBasicMaterial({
-            color: 0xdd3366,
+            color: 0xdd9999,  // Soft rose
             transparent: true,
-            opacity: 0.35,
+            opacity: 0.15,
             side: THREE.DoubleSide,
             depthWrite: false,
             blending: THREE.AdditiveBlending
@@ -6126,12 +6121,12 @@ class MiniGlobe {
         this.globe.add(this.terminatorOuter);
         this.terminatorLayers.push(this.terminatorOuter);
         
-        // Layer 5: Twilight purple glow (widest)
-        const twilightGeometry = new THREE.TorusGeometry(1.012, 0.08, 16, 120);
+        // Layer 5: Twilight lavender
+        const twilightGeometry = new THREE.TorusGeometry(1.008, 0.04, 16, 120);
         const twilightMaterial = new THREE.MeshBasicMaterial({
-            color: 0x8844aa,
+            color: 0xccaacc,  // Soft lavender
             transparent: true,
-            opacity: 0.2,
+            opacity: 0.1,
             side: THREE.DoubleSide,
             depthWrite: false,
             blending: THREE.AdditiveBlending
@@ -6140,12 +6135,12 @@ class MiniGlobe {
         this.globe.add(this.terminatorTwilight);
         this.terminatorLayers.push(this.terminatorTwilight);
         
-        // Layer 6: Far twilight blue (atmospheric scatter)
-        const farGeometry = new THREE.TorusGeometry(1.018, 0.12, 16, 120);
+        // Layer 6: Atmospheric blue edge
+        const farGeometry = new THREE.TorusGeometry(1.01, 0.05, 16, 120);
         const farMaterial = new THREE.MeshBasicMaterial({
-            color: 0x4466aa,
+            color: 0x8899bb,  // Dusty blue
             transparent: true,
-            opacity: 0.1,
+            opacity: 0.06,
             side: THREE.DoubleSide,
             depthWrite: false,
             blending: THREE.AdditiveBlending
@@ -6154,10 +6149,9 @@ class MiniGlobe {
         this.globe.add(this.terminatorFar);
         this.terminatorLayers.push(this.terminatorFar);
         
-        // Remove old terminatorGlow reference (we use layers now)
         this.terminatorGlow = null;
         
-        console.log('%c🌅 Beautiful sunset terminator created (6 layers)', 'color: #FF5722;');
+        console.log('%c🌅 Subtle sunset terminator created', 'color: #FF9966;');
     }
     
     createFallbackTexture() {
@@ -6219,26 +6213,30 @@ class MiniGlobe {
     }
     
     createMarker() {
-        // Location marker - bright red/orange pulsing dot
-        // In world space, updated each frame to follow globe rotation
-        const markerGeometry = new THREE.SphereGeometry(0.1, 16, 16);
+        // ═══════════════════════════════════════════════════════════════════
+        // ELEGANT LOCATION MARKER — Subtle, refined, professional
+        // ═══════════════════════════════════════════════════════════════════
+        // Small white/gold dot with soft halo - not garish
+        
+        // Core pin - small, crisp, elegant gold
+        const markerGeometry = new THREE.SphereGeometry(0.04, 16, 16);
         const markerMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff3300,
+            color: 0xffd700,  // Gold
             transparent: true,
-            opacity: 1.0,
-            depthTest: false,  // Always render on top
+            opacity: 0.95,
+            depthTest: false,
             depthWrite: false
         });
         this.marker = new THREE.Mesh(markerGeometry, markerMaterial);
-        this.marker.renderOrder = 999;  // Render last
+        this.marker.renderOrder = 999;
         this.scene.add(this.marker);
         
-        // Marker glow (larger, always visible)
-        const glowGeometry = new THREE.SphereGeometry(0.18, 16, 16);
+        // Soft halo - subtle white glow
+        const glowGeometry = new THREE.SphereGeometry(0.08, 16, 16);
         const glowMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff6600,
+            color: 0xffffff,
             transparent: true,
-            opacity: 0.6,
+            opacity: 0.25,
             depthTest: false,
             depthWrite: false,
             blending: THREE.AdditiveBlending
@@ -6540,40 +6538,40 @@ class MiniGlobe {
         }
         
         // ═══════════════════════════════════════════════════════════════
-        // DYNAMIC SUNSET INTENSITY — Brighter during twilight
+        // SUBTLE SUNSET INTENSITY — Slightly brighter during twilight
         // ═══════════════════════════════════════════════════════════════
         
-        // Twilight factor: 0 at day, 1 at twilight, 0.5 at night
-        const twilightFactor = twilight ? 1.0 : isDay ? 0.6 : 0.4;
+        // Twilight factor: subtle variations
+        const twilightFactor = twilight ? 1.0 : isDay ? 0.7 : 0.5;
         
-        // Core layer (brightest during twilight)
+        // Core layer (soft warm glow)
         if (this.terminatorCore && this.terminatorCore.material) {
-            this.terminatorCore.material.opacity = 0.7 * twilightFactor + 0.2;
+            this.terminatorCore.material.opacity = 0.25 * twilightFactor + 0.1;
         }
         
-        // Inner orange (always visible)
+        // Inner peach
         if (this.terminatorInner && this.terminatorInner.material) {
-            this.terminatorInner.material.opacity = 0.6 * twilightFactor + 0.15;
+            this.terminatorInner.material.opacity = 0.2 * twilightFactor + 0.08;
         }
         
-        // Middle band
+        // Middle salmon
         if (this.terminatorBand && this.terminatorBand.material) {
-            this.terminatorBand.material.opacity = 0.45 * twilightFactor + 0.1;
+            this.terminatorBand.material.opacity = 0.15 * twilightFactor + 0.07;
         }
         
-        // Outer pink
+        // Outer rose
         if (this.terminatorOuter && this.terminatorOuter.material) {
-            this.terminatorOuter.material.opacity = 0.3 * twilightFactor + 0.05;
+            this.terminatorOuter.material.opacity = 0.1 * twilightFactor + 0.05;
         }
         
-        // Twilight purple (stronger during actual twilight)
+        // Twilight lavender
         if (this.terminatorTwilight && this.terminatorTwilight.material) {
-            this.terminatorTwilight.material.opacity = twilight ? 0.35 : 0.15;
+            this.terminatorTwilight.material.opacity = twilight ? 0.12 : 0.06;
         }
         
-        // Far blue glow
+        // Far blue edge
         if (this.terminatorFar && this.terminatorFar.material) {
-            this.terminatorFar.material.opacity = twilight ? 0.2 : 0.08;
+            this.terminatorFar.material.opacity = twilight ? 0.08 : 0.04;
         }
     }
     
