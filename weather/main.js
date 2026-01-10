@@ -3154,37 +3154,51 @@ class SunVisualization {
             });
             
             // === SKY/GLASS BEHIND LOUVERS ===
-            // Brighter when sun hits, visible between open louvers
+            // Brilliant sky when sun hits, darker when no sun
             if (intensity > 0.1) {
-                const skyBrightness = 0.4 + intensity * 0.6;
-                const warmth = intensity * 60;  // More orange when intense
+                const skyBrightness = 0.5 + intensity * 0.5;
+                const warmth = intensity * 80;  // More orange when intense
                 win.glass.style.background = `linear-gradient(180deg, 
-                    rgba(${135 + warmth}, ${180 + warmth * 0.5}, 220, ${skyBrightness}) 0%, 
-                    rgba(255, ${230 - warmth * 0.3}, ${180 - warmth * 0.5}, ${skyBrightness * 0.9}) 50%,
-                    rgba(255, ${200 - warmth * 0.5}, ${140 - warmth * 0.5}, ${skyBrightness * 0.8}) 100%)`;
+                    rgba(${100 + warmth}, ${160 + warmth * 0.6}, ${230 - warmth * 0.3}, ${skyBrightness}) 0%, 
+                    rgba(255, ${240 - warmth * 0.2}, ${200 - warmth * 0.4}, ${skyBrightness}) 40%,
+                    rgba(255, ${200 - warmth * 0.3}, ${140 - warmth * 0.4}, ${skyBrightness * 0.95}) 70%,
+                    rgba(255, ${180 - warmth * 0.4}, ${100 - warmth * 0.3}, ${skyBrightness * 0.9}) 100%)`;
+                win.glass.style.boxShadow = `inset 0 0 20px rgba(255, 200, 100, ${intensity * 0.5})`;
             } else {
-                // Night or no sun - darker blue
+                // Night or no sun - cool blue twilight
                 win.glass.style.background = `linear-gradient(180deg, 
-                    rgba(40, 60, 100, 0.5) 0%, 
-                    rgba(30, 40, 70, 0.4) 50%,
-                    rgba(20, 30, 50, 0.3) 100%)`;
+                    rgba(30, 50, 90, 0.6) 0%, 
+                    rgba(25, 35, 65, 0.5) 50%,
+                    rgba(20, 25, 45, 0.4) 100%)`;
+                win.glass.style.boxShadow = 'none';
             }
             
             // === LIGHT RAYS ===
             // Visible between louvers when open and sun is hitting
-            const rayOpacity = intensity * openness * 0.8;
-            win.lightRays.style.opacity = rayOpacity;
+            const rayOpacity = intensity * openness * 1.2;
+            win.lightRays.style.opacity = Math.min(rayOpacity, 1);
+            // Animate ray width based on intensity
+            const raySpacing = 6 - intensity * 2;
+            win.lightRays.style.background = `repeating-linear-gradient(
+                ${win.lightAngle}deg,
+                rgba(255, 250, 220, ${0.6 + intensity * 0.4}) 0px,
+                rgba(255, 240, 200, ${0.4 + intensity * 0.4}) 2px,
+                transparent 2px,
+                transparent ${raySpacing}px
+            )`;
             
             // === OUTER GLOW (light spilling from window) ===
-            if (intensity > 0.2 && openness > 0.2) {
-                const glowIntensity = intensity * openness;
-                const glowSize = 30 + glowIntensity * 40;
+            if (intensity > 0.15 && openness > 0.15) {
+                const glowIntensity = intensity * Math.sqrt(openness);
+                const glowSize = 60 + glowIntensity * 80;
                 win.glowOuter.style.background = `radial-gradient(ellipse at center, 
-                    rgba(255, 220, 150, ${glowIntensity * 0.6}) 0%, 
-                    rgba(255, 180, 100, ${glowIntensity * 0.3}) 40%,
-                    transparent 70%)`;
+                    rgba(255, 230, 180, ${glowIntensity * 0.8}) 0%, 
+                    rgba(255, 200, 120, ${glowIntensity * 0.5}) 30%,
+                    rgba(255, 160, 80, ${glowIntensity * 0.2}) 60%,
+                    transparent 85%)`;
                 win.glowOuter.style.width = `${glowSize}px`;
-                win.glowOuter.style.height = `${glowSize * 0.75}px`;
+                win.glowOuter.style.height = `${glowSize * 0.8}px`;
+                win.glowOuter.style.filter = `blur(${8 + glowIntensity * 8}px)`;
             } else {
                 win.glowOuter.style.background = 'transparent';
             }
