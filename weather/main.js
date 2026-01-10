@@ -5467,30 +5467,27 @@ class MiniGlobe {
     computeHomeQuaternion() {
         // Goal: Rotate globe so that (targetLat, targetLon) faces the camera (+Z)
         //
-        // The Blue Marble texture has 0° longitude at its center.
-        // When globe.quaternion = identity, the texture center (lon=0°) faces +Z.
+        // EMPIRICAL CALIBRATION (from testing with Blue Marble texture):
+        // - When rotation.y = 0°, Asia (~+130°E) faces camera
+        // - To show Seattle (-122°): rotation = 160 + (-122) = 38°
+        // - Formula: rotation_y = (160 + targetLon)° in radians
         //
-        // To show targetLon at front:
-        //   - Rotate around Y axis by -targetLon (bring targetLon to center)
+        // For latitude, we tilt around X axis
         //
-        // To show targetLat at equator level:
-        //   - Rotate around X axis by +targetLat (tilt globe to bring lat to horizon)
-        //
-        // Quaternion composition: first Y rotation, then X rotation
-        // q = qX * qY (applied right to left)
+        // Quaternion composition: Y rotation (longitude), then X rotation (latitude)
         
-        const lonRad = -this.targetLon * Math.PI / 180;
-        const latRad = this.targetLat * Math.PI / 180;
-        
-        // Rotation around Y (longitude)
+        // Longitude rotation (empirically calibrated for Blue Marble texture)
+        const lonRotation = (160 + this.targetLon) * Math.PI / 180;
         const qY = new THREE.Quaternion();
-        qY.setFromAxisAngle(new THREE.Vector3(0, 1, 0), lonRad);
+        qY.setFromAxisAngle(new THREE.Vector3(0, 1, 0), lonRotation);
         
-        // Rotation around X (latitude) 
+        // Latitude tilt (small tilt based on latitude for viewing perspective)
+        // Not a full lat rotation - just subtle camera perspective
+        const latTilt = this.targetLat * 0.3 * Math.PI / 180;
         const qX = new THREE.Quaternion();
-        qX.setFromAxisAngle(new THREE.Vector3(1, 0, 0), latRad);
+        qX.setFromAxisAngle(new THREE.Vector3(1, 0, 0), latTilt);
         
-        // Compose: apply qY first, then qX
+        // Compose: apply qY first (rotate to longitude), then qX (tilt for latitude)
         this.homeQuat.multiplyQuaternions(qX, qY);
     }
     
