@@ -5255,7 +5255,7 @@ class MiniGlobe {
         
         // Auto rotation offset (adds gentle drift without changing target)
         this.autoRotateOffset = 0;
-        this.autoRotateSpeed = 0.002; // degrees per second
+        this.autoRotateSpeed = 0.5; // degrees per second (slow drift)
         
         // Three.js components
         this.scene = null;
@@ -5313,6 +5313,8 @@ class MiniGlobe {
         this.animate();
         
         console.log('%c🌍 3D Globe initialized', 'color: #64B5F6;');
+        console.log(`   Target: ${this.targetLat.toFixed(2)}°N, ${this.targetLon.toFixed(2)}°E`);
+        console.log(`   (Negative longitude = West)`);
     }
     
     createGlobe() {
@@ -5505,12 +5507,12 @@ class MiniGlobe {
         
         // Convert lat/lon to 3D position on sphere surface
         // phi = colatitude (0 at north pole, PI at south pole)
-        // theta = longitude angle
+        // theta = longitude angle (adjusted for texture mapping)
         const phi = (90 - this.targetLat) * Math.PI / 180;
-        const theta = this.targetLon * Math.PI / 180;
+        // Add 90° offset to match texture mapping
+        const theta = (this.targetLon + 90) * Math.PI / 180;
         
         // Spherical to Cartesian (before globe rotation)
-        // Using standard math: x = sin(phi)cos(theta), z = sin(phi)sin(theta), y = cos(phi)
         let x = Math.sin(phi) * Math.cos(theta);
         let y = Math.cos(phi);
         let z = Math.sin(phi) * Math.sin(theta);
@@ -5523,7 +5525,7 @@ class MiniGlobe {
         const newZ = x * sinR + z * cosR;
         
         // Position marker just above globe surface
-        const r = 1.02;
+        const r = 1.025;
         this.marker.position.set(newX * r, y * r, newZ * r);
         this.markerGlow.position.copy(this.marker.position);
     }
@@ -5537,9 +5539,12 @@ class MiniGlobe {
         this.currentLon += (this.targetLon - this.currentLon) * smoothing;
         
         // Calculate globe rotation to center target location facing camera
-        // The texture is mapped with 0° longitude at center, so we need to offset
-        // Add auto-rotate offset for gentle drift
-        const lonRotation = (-this.currentLon + this.autoRotateOffset) * Math.PI / 180;
+        // Three.js SphereGeometry UV mapping: U=0.5 is at front (+Z), texture center
+        // Blue Marble texture: longitude 0° is at center of image
+        // So rotation.y = 0 shows lon 0° (Prime Meridian/London)
+        // To show lon X, rotate by -X (e.g., Seattle -122° → rotate +122°)
+        // Add 90° offset because texture starts at -180° not 0°
+        const lonRotation = (-(this.currentLon + 90) + this.autoRotateOffset) * Math.PI / 180;
         
         this.globe.rotation.y = lonRotation;
         this.globe.rotation.x = 0;
