@@ -5881,6 +5881,9 @@ class MiniGlobe {
         // Setup drag interaction
         this.setupDragInteraction();
         
+        // Setup visibility observer (recenter when globe comes back into view)
+        this.setupVisibilityObserver();
+        
         // Start animation
         this.animate();
         
@@ -6038,36 +6041,110 @@ class MiniGlobe {
     }
     
     createTerminatorBand() {
-        // Create a glowing band that sits on the terminator (day/night boundary)
-        // This is a torus that we'll orient perpendicular to the sun
-        const geometry = new THREE.TorusGeometry(1.004, 0.025, 16, 100);
+        // ═══════════════════════════════════════════════════════════════════
+        // BEAUTIFUL SUNSET TERMINATOR — Multi-layered atmospheric glow
+        // ═══════════════════════════════════════════════════════════════════
+        // 
+        // Real sunsets have multiple color layers from atmospheric scattering:
+        // 1. Hot core: Bright yellow/white at the sun's position
+        // 2. Inner band: Deep orange where sun meets horizon
+        // 3. Middle glow: Soft red/pink spreading outward  
+        // 4. Outer twilight: Purple/blue from Rayleigh scattering
+        // 5. Night fade: Dark blue gradient into darkness
+        //
+        // We create concentric torus rings, each slightly larger
+        // ═══════════════════════════════════════════════════════════════════
         
-        // Gradient material for sunset colors
-        const material = new THREE.MeshBasicMaterial({
-            color: 0xff6622,
+        this.terminatorLayers = [];
+        
+        // Layer 1: Inner hot core (bright golden yellow)
+        const coreGeometry = new THREE.TorusGeometry(1.003, 0.008, 16, 120);
+        const coreMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffdd44,
             transparent: true,
-            opacity: 0.7,
+            opacity: 0.9,
             side: THREE.DoubleSide,
-            depthWrite: false
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
         });
+        this.terminatorCore = new THREE.Mesh(coreGeometry, coreMaterial);
+        this.globe.add(this.terminatorCore);
+        this.terminatorLayers.push(this.terminatorCore);
         
-        this.terminatorBand = new THREE.Mesh(geometry, material);
-        this.scene.add(this.terminatorBand);
-        
-        // Secondary outer glow
-        const glowGeometry = new THREE.TorusGeometry(1.006, 0.05, 16, 100);
-        const glowMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff4400,
+        // Layer 2: Inner orange band
+        const innerGeometry = new THREE.TorusGeometry(1.004, 0.018, 16, 120);
+        const innerMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff8822,
             transparent: true,
-            opacity: 0.3,
+            opacity: 0.75,
             side: THREE.DoubleSide,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
         });
-        this.terminatorGlow = new THREE.Mesh(glowGeometry, glowMaterial);
-        this.scene.add(this.terminatorGlow);
+        this.terminatorInner = new THREE.Mesh(innerGeometry, innerMaterial);
+        this.globe.add(this.terminatorInner);
+        this.terminatorLayers.push(this.terminatorInner);
         
-        console.log('%c🌅 Terminator band created', 'color: #FF5722;');
+        // Layer 3: Middle sunset band (deep orange-red)
+        const midGeometry = new THREE.TorusGeometry(1.006, 0.035, 16, 120);
+        const midMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff4411,
+            transparent: true,
+            opacity: 0.55,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+        this.terminatorBand = new THREE.Mesh(midGeometry, midMaterial);
+        this.globe.add(this.terminatorBand);
+        this.terminatorLayers.push(this.terminatorBand);
+        
+        // Layer 4: Outer pink/magenta glow
+        const outerGeometry = new THREE.TorusGeometry(1.008, 0.055, 16, 120);
+        const outerMaterial = new THREE.MeshBasicMaterial({
+            color: 0xdd3366,
+            transparent: true,
+            opacity: 0.35,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+        this.terminatorOuter = new THREE.Mesh(outerGeometry, outerMaterial);
+        this.globe.add(this.terminatorOuter);
+        this.terminatorLayers.push(this.terminatorOuter);
+        
+        // Layer 5: Twilight purple glow (widest)
+        const twilightGeometry = new THREE.TorusGeometry(1.012, 0.08, 16, 120);
+        const twilightMaterial = new THREE.MeshBasicMaterial({
+            color: 0x8844aa,
+            transparent: true,
+            opacity: 0.2,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+        this.terminatorTwilight = new THREE.Mesh(twilightGeometry, twilightMaterial);
+        this.globe.add(this.terminatorTwilight);
+        this.terminatorLayers.push(this.terminatorTwilight);
+        
+        // Layer 6: Far twilight blue (atmospheric scatter)
+        const farGeometry = new THREE.TorusGeometry(1.018, 0.12, 16, 120);
+        const farMaterial = new THREE.MeshBasicMaterial({
+            color: 0x4466aa,
+            transparent: true,
+            opacity: 0.1,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+        this.terminatorFar = new THREE.Mesh(farGeometry, farMaterial);
+        this.globe.add(this.terminatorFar);
+        this.terminatorLayers.push(this.terminatorFar);
+        
+        // Remove old terminatorGlow reference (we use layers now)
+        this.terminatorGlow = null;
+        
+        console.log('%c🌅 Beautiful sunset terminator created (6 layers)', 'color: #FF5722;');
     }
     
     createFallbackTexture() {
@@ -6400,7 +6477,7 @@ class MiniGlobe {
                 sunWorldDir.applyQuaternion(this.lastFinalQuat);
             }
             
-            // Position the main sun light
+            // Position the main sun light (in world space)
             if (this.sunLight) {
                 this.sunLight.position.copy(sunWorldDir.clone().multiplyScalar(5));
             }
@@ -6416,21 +6493,28 @@ class MiniGlobe {
                 this.nightFill.position.copy(sunWorldDir.clone().multiplyScalar(-4));
             }
             
-            // Orient the terminator band perpendicular to sun direction
-            if (this.terminatorBand) {
-                // Terminator ring should be perpendicular to sun direction
+            // ═══════════════════════════════════════════════════════════════
+            // TERMINATOR ORIENTATION — Position in LOCAL globe space
+            // ═══════════════════════════════════════════════════════════════
+            // Terminator layers are children of the globe, so we use the
+            // sun's LOCAL direction (sunBaseVector, not sunWorldDir)
+            // The ring is perpendicular to the sun direction
+            // ═══════════════════════════════════════════════════════════════
+            
+            if (this.terminatorLayers && this.terminatorLayers.length > 0) {
+                // Quaternion to orient torus perpendicular to sun (in local space)
+                const localSunDir = this.sunBaseVector.clone().normalize();
                 const up = new THREE.Vector3(0, 0, 1);
                 const quat = new THREE.Quaternion();
-                quat.setFromUnitVectors(up, sunWorldDir);
-                this.terminatorBand.quaternion.copy(quat);
-                this.terminatorBand.position.set(0, 0, 0);
-            }
-            if (this.terminatorGlow) {
-                const up = new THREE.Vector3(0, 0, 1);
-                const quat = new THREE.Quaternion();
-                quat.setFromUnitVectors(up, sunWorldDir);
-                this.terminatorGlow.quaternion.copy(quat);
-                this.terminatorGlow.position.set(0, 0, 0);
+                quat.setFromUnitVectors(up, localSunDir);
+                
+                // Apply to all terminator layers
+                for (const layer of this.terminatorLayers) {
+                    if (layer) {
+                        layer.quaternion.copy(quat);
+                        layer.position.set(0, 0, 0);
+                    }
+                }
             }
         }
         
@@ -6438,43 +6522,130 @@ class MiniGlobe {
         const altitude = sunData.altitude ?? 0;
         const isDay = altitude > 0;
         const twilight = altitude > -6 && altitude <= 0;
+        const deepNight = altitude < -12;
         
         if (this.nightLights && this.nightLights.material) {
             // Night lights more visible at night
-            this.nightLights.material.opacity = isDay ? 0.3 : twilight ? 0.6 : 0.9;
+            this.nightLights.material.opacity = isDay ? 0.25 : twilight ? 0.5 : deepNight ? 1.0 : 0.75;
         }
         
-        // Terminator band color/intensity
+        // ═══════════════════════════════════════════════════════════════
+        // DYNAMIC SUNSET INTENSITY — Brighter during twilight
+        // ═══════════════════════════════════════════════════════════════
+        
+        // Twilight factor: 0 at day, 1 at twilight, 0.5 at night
+        const twilightFactor = twilight ? 1.0 : isDay ? 0.6 : 0.4;
+        
+        // Core layer (brightest during twilight)
+        if (this.terminatorCore && this.terminatorCore.material) {
+            this.terminatorCore.material.opacity = 0.7 * twilightFactor + 0.2;
+        }
+        
+        // Inner orange (always visible)
+        if (this.terminatorInner && this.terminatorInner.material) {
+            this.terminatorInner.material.opacity = 0.6 * twilightFactor + 0.15;
+        }
+        
+        // Middle band
         if (this.terminatorBand && this.terminatorBand.material) {
-            this.terminatorBand.material.opacity = twilight ? 0.9 : 0.6;
-            this.terminatorBand.material.color.setHex(twilight ? 0xff4400 : 0xff6622);
+            this.terminatorBand.material.opacity = 0.45 * twilightFactor + 0.1;
+        }
+        
+        // Outer pink
+        if (this.terminatorOuter && this.terminatorOuter.material) {
+            this.terminatorOuter.material.opacity = 0.3 * twilightFactor + 0.05;
+        }
+        
+        // Twilight purple (stronger during actual twilight)
+        if (this.terminatorTwilight && this.terminatorTwilight.material) {
+            this.terminatorTwilight.material.opacity = twilight ? 0.35 : 0.15;
+        }
+        
+        // Far blue glow
+        if (this.terminatorFar && this.terminatorFar.material) {
+            this.terminatorFar.material.opacity = twilight ? 0.2 : 0.08;
         }
     }
     
     springBackDrag() {
-        // Spring the drag quaternion back to identity (no drag)
-        // Using slerp for smooth interpolation
-        const springStrength = 0.08;
-        const damping = 0.85;
+        // NO AUTO SPRING-BACK — Globe stays where you drag it
+        // Only decay the velocity (momentum), not the position
+        const damping = 0.92;
         
-        // Apply momentum first (if we have velocity)
-        if (!this.dragVelocity.equals(new THREE.Quaternion())) {
-            // Slerp velocity towards identity (decay)
+        // Apply momentum (if we have velocity)
+        if (this.dragVelocity && !this.dragVelocity.equals(new THREE.Quaternion())) {
+            // Decay velocity over time
             this.dragVelocity.slerp(new THREE.Quaternion(), 1 - damping);
             
             // Apply velocity to drag
             this.dragQuat.premultiply(this.dragVelocity);
+            
+            // Stop momentum when very slow
+            const identity = new THREE.Quaternion();
+            if (Math.abs(this.dragVelocity.dot(identity) - 1) < 0.0001) {
+                this.dragVelocity.identity();
+            }
         }
+    }
+    
+    recenterToHome() {
+        // Smoothly recenter the globe to home position
+        // Called when globe becomes visible again after being off-screen
+        if (!this.dragQuat) return;
         
-        // Spring force pulls drag towards identity
-        this.dragQuat.slerp(new THREE.Quaternion(), springStrength);
-        
-        // Snap to identity when very close
         const identity = new THREE.Quaternion();
-        if (Math.abs(this.dragQuat.dot(identity) - 1) < 0.0001) {
+        const springStrength = 0.1;
+        
+        this.dragQuat.slerp(identity, springStrength);
+        
+        // Snap when close enough
+        if (Math.abs(this.dragQuat.dot(identity) - 1) < 0.001) {
             this.dragQuat.identity();
-            this.dragVelocity.identity();
+            this.dragVelocity?.identity();
         }
+    }
+    
+    setupVisibilityObserver() {
+        // Recenter the globe when it comes back into view after being hidden
+        if (!this.canvas || typeof IntersectionObserver === 'undefined') return;
+        
+        let wasVisible = true;
+        let recenteringActive = false;
+        
+        this.visibilityObserver = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                const isVisible = entry.isIntersecting;
+                
+                // If globe was hidden and is now visible, start recentering
+                if (!wasVisible && isVisible && !recenteringActive) {
+                    console.log('%c🌍 Globe visible again, recentering...', 'color: #4CAF50;');
+                    recenteringActive = true;
+                    
+                    // Animate recenter over ~30 frames
+                    const recenterAnimation = () => {
+                        this.recenterToHome();
+                        
+                        // Check if we're done
+                        const identity = new THREE.Quaternion();
+                        if (this.dragQuat && Math.abs(this.dragQuat.dot(identity) - 1) < 0.001) {
+                            recenteringActive = false;
+                            this.dragQuat.identity();
+                            console.log('%c🌍 Globe recentered', 'color: #4CAF50;');
+                        } else if (recenteringActive) {
+                            requestAnimationFrame(recenterAnimation);
+                        }
+                    };
+                    
+                    recenterAnimation();
+                }
+                
+                wasVisible = isVisible;
+            }
+        }, {
+            threshold: 0.1 // Trigger when 10% visible
+        });
+        
+        this.visibilityObserver.observe(this.canvas);
     }
     
     animate() {
