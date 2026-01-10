@@ -5109,21 +5109,36 @@ class CompassSundial {
         const loc = this.getLocation();
         if (!loc.latitude || !loc.longitude) return;
         
-        // Mapbox static API with viewer's location
-        const mapboxToken = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
+        // Use OpenStreetMap static tiles via Wikimedia (no API key needed, reliable)
+        // Alternative: use tile server directly
         const zoom = 14;
-        const size = '300x300@2x';
+        const lat = loc.latitude;
+        const lon = loc.longitude;
         
-        const mapUrl = `https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/${loc.longitude.toFixed(4)},${loc.latitude.toFixed(4)},${zoom},0/${size}?access_token=${mapboxToken}`;
+        // Calculate tile coordinates from lat/lon
+        const n = Math.pow(2, zoom);
+        const x = Math.floor((lon + 180) / 360 * n);
+        const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n);
         
-        this.mapImg.src = mapUrl;
+        // Use CartoDB dark_all tiles (dark theme, no API key)
+        const tileUrl = `https://cartodb-basemaps-a.global.ssl.fastly.net/dark_all/${zoom}/${x}/${y}@2x.png`;
+        
+        this.mapImg.src = tileUrl;
         this.mapImg.onload = () => {
             this.mapLoaded = true;
             console.log('%c🗺️ Map centered on your location', 'color: #d4af37;');
         };
         this.mapImg.onerror = () => {
-            // Hide map on error
-            if (this.mapBg) this.mapBg.style.display = 'none';
+            // Try fallback to standard OSM if CartoDB fails
+            const osmUrl = `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`;
+            this.mapImg.src = osmUrl;
+            this.mapImg.onload = () => {
+                this.mapLoaded = true;
+            };
+            this.mapImg.onerror = () => {
+                // Hide map on total failure
+                if (this.mapBg) this.mapBg.style.display = 'none';
+            };
         };
     }
     
