@@ -5434,16 +5434,27 @@ class CelestialDemo {
     }
     
     async updateWeatherForLocation(location) {
-        // Update atmosphere with new location's weather
-        if (typeof atmosphere !== 'undefined' && atmosphere.fetchWeather) {
-            console.log(`%c🌤️ Fetching weather for ${location.city}...`, 'color: #64B5F6;');
-            
+        // ═══════════════════════════════════════════════════════════════════
+        // Update weather for a secret location (codeword triggered)
+        // Uses the same core logic as globe drag weather updates
+        // ═══════════════════════════════════════════════════════════════════
+        
+        const locationName = location.city || location.name || 'location';
+        console.log(`%c🌤️ Fetching weather for ${locationName}...`, 'color: #64B5F6;');
+        
+        // Use CompassSundial's weather update if available (ensures consistency)
+        if (window.compassSundial && window.compassSundial.updateWeatherForSpotlitLocation) {
+            await window.compassSundial.updateWeatherForSpotlitLocation(
+                location.latitude, 
+                location.longitude
+            );
+        } else if (typeof atmosphere !== 'undefined' && atmosphere.fetchWeather) {
+            // Fallback to direct atmosphere update
             try {
                 atmosphere.latitude = location.latitude;
                 atmosphere.longitude = location.longitude;
                 await atmosphere.fetchWeather(location.latitude, location.longitude);
                 atmosphere.applyAtmosphere();
-                
                 console.log(`%c✓ Weather updated: ${atmosphere.condition}, ${atmosphere.temperature}°C`, 'color: #4CAF50;');
             } catch (e) {
                 console.log('%c⚠️ Weather fetch failed', 'color: #FFA726;', e);
@@ -6374,6 +6385,53 @@ class MiniGlobe {
             this.dragSurface.style.cursor = 'grab';
         }
         // Momentum and spring-back handled in animate()
+        
+        // Calculate and broadcast the new center location
+        const centerLatLon = this.getCenterLatLon();
+        if (centerLatLon && this.onLocationChange) {
+            this.onLocationChange(centerLatLon.latitude, centerLatLon.longitude);
+        }
+    }
+    
+    getCenterLatLon() {
+        // ═══════════════════════════════════════════════════════════════════
+        // Calculate what lat/lon is at the CENTER of the visible globe
+        // ═══════════════════════════════════════════════════════════════════
+        // The camera looks at +Z direction
+        // We need to find what geographic point is facing the camera
+        
+        if (!this.lastFinalQuat) return null;
+        
+        // Camera is looking at +Z, so the point facing camera is (0, 0, 1) in world space
+        // We need to find what lat/lon on the unrotated globe this corresponds to
+        // Apply inverse rotation to get the original lat/lon
+        const cameraDir = new THREE.Vector3(0, 0, 1);
+        const invQuat = this.lastFinalQuat.clone().invert();
+        cameraDir.applyQuaternion(invQuat);
+        
+        // Convert Cartesian to lat/lon (reverse of latLonToCartesian)
+        // latLonToCartesian: x = cos(lat) * sin(lon+90), y = sin(lat), z = cos(lat) * cos(lon+90)
+        const x = cameraDir.x;
+        const y = cameraDir.y;
+        const z = cameraDir.z;
+        
+        // Latitude from y component
+        const lat = Math.asin(Math.max(-1, Math.min(1, y))) * 180 / Math.PI;
+        
+        // Longitude from x and z
+        // lon+90 = atan2(x, z)
+        const lonPlus90 = Math.atan2(x, z) * 180 / Math.PI;
+        let lon = lonPlus90 - 90;
+        
+        // Wrap to [-180, 180]
+        if (lon < -180) lon += 360;
+        if (lon > 180) lon -= 360;
+        
+        return { latitude: lat, longitude: lon };
+    }
+    
+    setLocationChangeCallback(callback) {
+        this.onLocationChange = callback;
     }
     
     setLocation(lat, lon) {
@@ -6894,15 +6952,71 @@ class CompassSundial {
             skipDragSelectors: ['.compass-shadow', '.compass-gnomon']
         });
         this.focusedLatLon = { latitude: lat, longitude: lon };
+        
+        // Orientation callback - updates sun/moon positions during rotation
         this.globe.setOrientationCallback(() => {
             this.updateSecretEmojiPositions();
             // Update sun/moon positions in realtime as globe rotates
             this.updateCelestialBodies();
         });
+        
+        // Location change callback - updates weather when globe drag ends
+        this.globe.setLocationChangeCallback((newLat, newLon) => {
+            this.onGlobeLocationChange(newLat, newLon);
+        });
+        
         this.broadcastFocusLocation();
         
         this.globeInitialized = true;
         console.log('%c🌍 Globe initialized at current location', 'color: #64B5F6;');
+    }
+    
+    async onGlobeLocationChange(lat, lon) {
+        // ═══════════════════════════════════════════════════════════════════
+        // Called when user finishes dragging the globe to a new location
+        // Updates focusedLatLon, celestial bodies, and WEATHER
+        // ═══════════════════════════════════════════════════════════════════
+        
+        console.log(`%c🌍 Globe moved to ${lat.toFixed(2)}°, ${lon.toFixed(2)}°`, 'color: #64B5F6;');
+        
+        // Update focused location
+        this.focusedLatLon = { latitude: lat, longitude: lon };
+        
+        // Update celestial bodies for new location
+        this.updateCelestialBodies(lat, lon);
+        
+        // Broadcast location change event
+        this.broadcastFocusLocation();
+        
+        // Fetch weather for the new location!
+        await this.updateWeatherForSpotlitLocation(lat, lon);
+    }
+    
+    async updateWeatherForSpotlitLocation(lat, lon) {
+        // ═══════════════════════════════════════════════════════════════════
+        // Fetch and apply weather for the spotlit globe location
+        // Same pattern as secret codeword weather updates
+        // ═══════════════════════════════════════════════════════════════════
+        
+        if (typeof atmosphere === 'undefined' || !atmosphere.fetchWeather) return;
+        
+        try {
+            // Reverse geocode to get location name (optional, for logging)
+            const locationName = `${lat.toFixed(1)}°, ${lon.toFixed(1)}°`;
+            console.log(`%c🌤️ Fetching weather for ${locationName}...`, 'color: #64B5F6;');
+            
+            // Update atmosphere coordinates
+            atmosphere.latitude = lat;
+            atmosphere.longitude = lon;
+            
+            // Fetch and apply weather
+            await atmosphere.fetchWeather(lat, lon);
+            atmosphere.applyAtmosphere();
+            
+            console.log(`%c✓ Weather updated: ${atmosphere.condition}, ${atmosphere.temperature}°C`, 'color: #4CAF50;');
+        } catch (e) {
+            console.log('%c⚠️ Weather fetch failed', 'color: #FFA726;', e);
+        }
     }
     
     initSecretInfoBar() {
