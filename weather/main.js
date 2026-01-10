@@ -510,9 +510,42 @@ class WeatherAtmosphere {
     }
 
     async fetchWeather(lat, lon) {
-        // Open-Meteo API - free, no key required
-        // Include daily forecast for high/low temperatures
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code,temperature_2m,wind_speed_10m,cloud_cover&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1`;
+        // ═══════════════════════════════════════════════════════════════════
+        // Open-Meteo API — Free, global coverage, no API key required
+        // Enhanced to fetch 7-day forecast with comprehensive weather data
+        // ═══════════════════════════════════════════════════════════════════
+        
+        const url = `https://api.open-meteo.com/v1/forecast?` + new URLSearchParams({
+            latitude: lat,
+            longitude: lon,
+            current: [
+                'weather_code',
+                'temperature_2m',
+                'apparent_temperature',
+                'relative_humidity_2m',
+                'wind_speed_10m',
+                'wind_direction_10m',
+                'cloud_cover',
+                'pressure_msl',
+                'uv_index',
+                'is_day'
+            ].join(','),
+            daily: [
+                'weather_code',
+                'temperature_2m_max',
+                'temperature_2m_min',
+                'apparent_temperature_max',
+                'apparent_temperature_min',
+                'precipitation_probability_max',
+                'precipitation_sum',
+                'sunrise',
+                'sunset',
+                'uv_index_max',
+                'wind_speed_10m_max'
+            ].join(','),
+            timezone: 'auto',
+            forecast_days: 7
+        });
 
         const response = await fetch(url);
         const data = await response.json();
@@ -521,14 +554,53 @@ class WeatherAtmosphere {
             this.condition = WMO_CODES[data.current.weather_code] || 'clear';
             this.cloudCover = data.current.cloud_cover || 0;
             this.windSpeed = data.current.wind_speed_10m || 0;
-            this.temperature = data.current.temperature_2m || 20;
+            this.windDirection = data.current.wind_direction_10m || 0;
+            this.temperature = data.current.temperature_2m ?? 20;
+            this.feelsLike = data.current.apparent_temperature ?? this.temperature;
+            this.humidity = data.current.relative_humidity_2m ?? null;
+            this.pressure = data.current.pressure_msl ?? null;
+            this.uvIndex = data.current.uv_index ?? null;
+            this.isDay = data.current.is_day === 1;
         }
         
-        // Store daily high/low
+        // Store 7-day forecast
         if (data.daily) {
             this.temperatureHigh = data.daily.temperature_2m_max?.[0] ?? null;
             this.temperatureLow = data.daily.temperature_2m_min?.[0] ?? null;
+            
+            // Full forecast array
+            this.forecast = [];
+            const days = data.daily.time?.length || 0;
+            for (let i = 0; i < days; i++) {
+                this.forecast.push({
+                    date: data.daily.time[i],
+                    weatherCode: data.daily.weather_code?.[i],
+                    condition: WMO_CODES[data.daily.weather_code?.[i]] || 'clear',
+                    high: data.daily.temperature_2m_max?.[i],
+                    low: data.daily.temperature_2m_min?.[i],
+                    feelsLikeHigh: data.daily.apparent_temperature_max?.[i],
+                    feelsLikeLow: data.daily.apparent_temperature_min?.[i],
+                    precipProbability: data.daily.precipitation_probability_max?.[i],
+                    precipSum: data.daily.precipitation_sum?.[i],
+                    sunrise: data.daily.sunrise?.[i],
+                    sunset: data.daily.sunset?.[i],
+                    uvMax: data.daily.uv_index_max?.[i],
+                    windMax: data.daily.wind_speed_10m_max?.[i]
+                });
+            }
         }
+        
+        // Store timezone info
+        this.timezone = data.timezone;
+        this.timezoneAbbr = data.timezone_abbreviation;
+        
+        // Dispatch timezone change event for Nixie clock
+        window.dispatchEvent(new CustomEvent('timezone-changed', {
+            detail: {
+                timezone: this.timezone,
+                abbreviation: this.timezoneAbbr
+            }
+        }));
     }
 
     calculateModifiers() {
@@ -6795,6 +6867,237 @@ class MiniGlobe {
 }
 
 // ============================================================================
+// NIXIE TUBE CLOCK — Retro time display for focused location
+// ============================================================================
+
+class NixieClock {
+    constructor() {
+        this.element = document.getElementById('nixie-clock');
+        this.timezoneLabel = document.getElementById('nixie-timezone');
+        this.digits = {};
+        this.timezone = null;  // IANA timezone string (e.g., 'America/Los_Angeles')
+        this.timezoneAbbr = null;
+        this.intervalId = null;
+        this.lastValues = {};
+        
+        if (this.element) {
+            this.init();
+        }
+    }
+    
+    init() {
+        // Cache digit elements
+        const tubes = this.element.querySelectorAll('.nixie-tube');
+        tubes.forEach(tube => {
+            const key = tube.dataset.digit;
+            if (key) {
+                this.digits[key] = tube.querySelector('.nixie-digit');
+            }
+        });
+        
+        // Start clock
+        this.update();
+        this.intervalId = setInterval(() => this.update(), 1000);
+        
+        // Listen for timezone changes from weather updates
+        window.addEventListener('timezone-changed', (e) => {
+            if (e.detail) {
+                this.setTimezone(e.detail.timezone, e.detail.abbreviation);
+            }
+        });
+    }
+    
+    setTimezone(tz, abbr) {
+        this.timezone = tz;
+        this.timezoneAbbr = abbr;
+        
+        if (this.timezoneLabel) {
+            // Show timezone info
+            if (tz) {
+                const displayName = abbr || tz.split('/').pop().replace(/_/g, ' ');
+                this.timezoneLabel.textContent = displayName;
+            } else {
+                this.timezoneLabel.textContent = 'Local Time';
+            }
+        }
+        
+        // Immediate update
+        this.update();
+    }
+    
+    update() {
+        let now;
+        
+        // Use demo time if available, otherwise real time
+        if (window.celestialDemo?.currentTime) {
+            now = window.celestialDemo.currentTime;
+        } else {
+            now = new Date();
+        }
+        
+        // Format time in the target timezone
+        let hours, minutes, seconds;
+        
+        if (this.timezone) {
+            try {
+                const formatter = new Intl.DateTimeFormat('en-US', {
+                    timeZone: this.timezone,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
+                const parts = formatter.formatToParts(now);
+                hours = parts.find(p => p.type === 'hour')?.value || '00';
+                minutes = parts.find(p => p.type === 'minute')?.value || '00';
+                seconds = parts.find(p => p.type === 'second')?.value || '00';
+            } catch (e) {
+                // Fallback to local time
+                hours = String(now.getHours()).padStart(2, '0');
+                minutes = String(now.getMinutes()).padStart(2, '0');
+                seconds = String(now.getSeconds()).padStart(2, '0');
+            }
+        } else {
+            // Local time
+            hours = String(now.getHours()).padStart(2, '0');
+            minutes = String(now.getMinutes()).padStart(2, '0');
+            seconds = String(now.getSeconds()).padStart(2, '0');
+        }
+        
+        // Update each digit with animation on change
+        this.setDigit('hour-tens', hours[0]);
+        this.setDigit('hour-ones', hours[1]);
+        this.setDigit('min-tens', minutes[0]);
+        this.setDigit('min-ones', minutes[1]);
+        this.setDigit('sec-tens', seconds[0]);
+        this.setDigit('sec-ones', seconds[1]);
+    }
+    
+    setDigit(key, value) {
+        const digit = this.digits[key];
+        if (!digit) return;
+        
+        const oldValue = this.lastValues[key];
+        if (oldValue !== value) {
+            // Animate digit change
+            digit.classList.add('changing');
+            digit.textContent = value;
+            this.lastValues[key] = value;
+            
+            setTimeout(() => digit.classList.remove('changing'), 150);
+        }
+    }
+    
+    destroy() {
+        if (this.intervalId) {
+            clearInterval(this.intervalId);
+        }
+    }
+}
+
+// Global nixie clock instance
+let nixieClock = null;
+
+// ============================================================================
+// TOAST STACK MANAGER — Tetris-like stacking toasts
+// ============================================================================
+
+const ToastStack = {
+    toasts: [],
+    container: null,
+    
+    init() {
+        if (this.container) return;
+        
+        this.container = document.createElement('div');
+        this.container.className = 'toast-stack';
+        this.container.setAttribute('aria-live', 'polite');
+        document.body.appendChild(this.container);
+    },
+    
+    show(options) {
+        this.init();
+        
+        const {
+            emoji = '📍',
+            title = '',
+            subtitle = '',
+            meta = '',
+            duration = 4000,
+            type = 'default'  // default, weather, location, celestial
+        } = options;
+        
+        const toast = document.createElement('div');
+        toast.className = `stack-toast stack-toast--${type}`;
+        toast.innerHTML = `
+            <div class="stack-toast__emoji">${emoji}</div>
+            <div class="stack-toast__content">
+                <div class="stack-toast__title">${title}</div>
+                ${subtitle ? `<div class="stack-toast__subtitle">${subtitle}</div>` : ''}
+                ${meta ? `<div class="stack-toast__meta">${meta}</div>` : ''}
+            </div>
+            <button class="stack-toast__close" aria-label="Close">&times;</button>
+        `;
+        
+        // Close button
+        toast.querySelector('.stack-toast__close').addEventListener('click', () => {
+            this.remove(toast);
+        });
+        
+        // Add to stack with Tetris-like entrance
+        this.toasts.push(toast);
+        this.container.appendChild(toast);
+        
+        // Stagger animation based on position
+        const index = this.toasts.length - 1;
+        toast.style.setProperty('--stack-index', index);
+        
+        // Animate in
+        requestAnimationFrame(() => {
+            toast.classList.add('show');
+            this.updatePositions();
+        });
+        
+        // Auto-remove
+        if (duration > 0) {
+            setTimeout(() => this.remove(toast), duration);
+        }
+        
+        return toast;
+    },
+    
+    remove(toast) {
+        if (!toast || !this.toasts.includes(toast)) return;
+        
+        toast.classList.add('removing');
+        toast.classList.remove('show');
+        
+        setTimeout(() => {
+            const index = this.toasts.indexOf(toast);
+            if (index > -1) {
+                this.toasts.splice(index, 1);
+            }
+            toast.remove();
+            this.updatePositions();
+        }, 300);
+    },
+    
+    updatePositions() {
+        // Update stack indices for remaining toasts
+        this.toasts.forEach((toast, i) => {
+            toast.style.setProperty('--stack-index', i);
+            // Tetris-like offset: alternate left/right for visual interest
+            const offsetX = (i % 2 === 0) ? 0 : 10;
+            toast.style.setProperty('--stack-offset-x', `${offsetX}px`);
+        });
+    },
+    
+    clear() {
+        [...this.toasts].forEach(toast => this.remove(toast));
+    }
+};
+
+// ============================================================================
 // COMPASS SUNDIAL — Isometric 3D with device orientation
 // ============================================================================
 
@@ -6804,6 +7107,7 @@ class CompassSundial {
         this.shadow = document.getElementById('compass-shadow');
         this.sunIndicator = document.getElementById('compass-sun-indicator');
         this.moonIndicator = document.getElementById('compass-moon-indicator');
+        this.locationIndicator = null;  // Created dynamically
         this.hint = document.getElementById('compass-hint');
         this.body = this.element?.querySelector('.compass-body');
         this.globeCanvas = document.getElementById('compass-globe');
@@ -6857,6 +7161,9 @@ class CompassSundial {
                 this.moonSpeak();
             });
         }
+        
+        // Create location indicator (follows the 3D marker)
+        this.createLocationIndicator();
         
         // Compass click for orientation
         this.element.addEventListener('click', () => this.requestOrientation());
@@ -6953,11 +7260,13 @@ class CompassSundial {
         });
         this.focusedLatLon = { latitude: lat, longitude: lon };
         
-        // Orientation callback - updates sun/moon positions during rotation
+        // Orientation callback - updates sun/moon/location positions during rotation
         this.globe.setOrientationCallback(() => {
             this.updateSecretEmojiPositions();
             // Update sun/moon positions in realtime as globe rotates
             this.updateCelestialBodies();
+            // Update location indicator position
+            this.updateLocationIndicatorPosition();
         });
         
         // Location change callback - updates weather when globe drag ends
@@ -7013,10 +7322,222 @@ class CompassSundial {
             await atmosphere.fetchWeather(lat, lon);
             atmosphere.applyAtmosphere();
             
-            console.log(`%c✓ Weather updated: ${atmosphere.condition}, ${atmosphere.temperature}°C`, 'color: #4CAF50;');
+            // Update Nixie clock timezone
+            if (atmosphere.timezone) {
+                window.dispatchEvent(new CustomEvent('timezone-changed', {
+                    detail: {
+                        timezone: atmosphere.timezone,
+                        abbreviation: atmosphere.timezoneAbbr
+                    }
+                }));
+            }
+            
+            console.log(`%c✓ Weather updated: ${atmosphere.condition}, ${atmosphere.temperature}°C (${atmosphere.timezone})`, 'color: #4CAF50;');
         } catch (e) {
             console.log('%c⚠️ Weather fetch failed', 'color: #FFA726;', e);
         }
+    }
+    
+    createLocationIndicator() {
+        // ═══════════════════════════════════════════════════════════════════
+        // HTML overlay for location marker — clickable, follows 3D marker
+        // ═══════════════════════════════════════════════════════════════════
+        
+        if (!this.element || this.locationIndicator) return;
+        
+        this.locationIndicator = document.createElement('div');
+        this.locationIndicator.className = 'compass-location';
+        this.locationIndicator.id = 'compass-location-indicator';
+        this.locationIndicator.innerHTML = `
+            <div class="location-glow"></div>
+            <div class="location-dot"></div>
+        `;
+        this.locationIndicator.setAttribute('role', 'button');
+        this.locationIndicator.setAttribute('aria-label', 'Current location - click for details');
+        this.locationIndicator.tabIndex = 0;
+        
+        // Add to compass sundial (same level as sun/moon)
+        this.element.appendChild(this.locationIndicator);
+        
+        // Click handler
+        this.locationIndicator.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.locationSpeak();
+        });
+        
+        // Keyboard support
+        this.locationIndicator.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.locationSpeak();
+            }
+        });
+    }
+    
+    updateLocationIndicatorPosition() {
+        // Update HTML location indicator to follow 3D marker
+        if (!this.locationIndicator || !this.globe || !this.focusedLatLon) return;
+        
+        const { latitude, longitude } = this.focusedLatLon;
+        const projected = this.globe.projectLatLon(latitude, longitude);
+        
+        if (projected && projected.facingFront) {
+            this.locationIndicator.style.left = `${projected.x}%`;
+            this.locationIndicator.style.top = `${projected.y}%`;
+            this.locationIndicator.style.opacity = '1';
+            this.locationIndicator.style.pointerEvents = 'auto';
+        } else {
+            // Hide when on back side of globe
+            this.locationIndicator.style.opacity = '0';
+            this.locationIndicator.style.pointerEvents = 'none';
+        }
+    }
+    
+    locationSpeak() {
+        // ═══════════════════════════════════════════════════════════════════
+        // Show comprehensive location + weather forecast toast
+        // ═══════════════════════════════════════════════════════════════════
+        
+        const loc = this.focusedLatLon || this.getLocation();
+        const weather = this.getWeatherData();
+        
+        // Format coordinates
+        const latDir = loc.latitude >= 0 ? 'N' : 'S';
+        const lonDir = loc.longitude >= 0 ? 'E' : 'W';
+        const latStr = `${Math.abs(loc.latitude).toFixed(2)}°${latDir}`;
+        const lonStr = `${Math.abs(loc.longitude).toFixed(2)}°${lonDir}`;
+        
+        // Get location name if available
+        let locationName = 'Current Location';
+        if (this.activeSecretLocation) {
+            locationName = this.activeSecretLocation.name || this.activeSecretLocation.city || locationName;
+        }
+        
+        // Weather summary
+        const tempStr = weather.current != null ? `${weather.current}${weather.unit}` : '';
+        const conditionIcon = this.getConditionIcon(weather.condition);
+        
+        // Console log
+        console.log(`%c📍 Location`, 'color: #D4AF37; font-size: 16px; font-weight: bold;');
+        console.log(`%c${latStr}, ${lonStr}`, 'color: #FFD700;');
+        if (tempStr) console.log(`%c${conditionIcon} ${weather.condition} • ${tempStr}`, 'color: #888;');
+        
+        // Show comprehensive forecast toast
+        this.showForecastToast(loc, locationName);
+    }
+    
+    showForecastToast(loc, locationName) {
+        // ═══════════════════════════════════════════════════════════════════
+        // Full forecast toast with 7-day outlook
+        // ═══════════════════════════════════════════════════════════════════
+        
+        const weather = this.getWeatherData();
+        const conditionIcon = this.getConditionIcon(weather.condition);
+        
+        // Format coordinates
+        const latDir = loc.latitude >= 0 ? 'N' : 'S';
+        const lonDir = loc.longitude >= 0 ? 'E' : 'W';
+        const coordStr = `${Math.abs(loc.latitude).toFixed(1)}°${latDir}, ${Math.abs(loc.longitude).toFixed(1)}°${lonDir}`;
+        
+        // Build forecast HTML
+        let forecastHTML = '';
+        if (typeof atmosphere !== 'undefined' && atmosphere.forecast && atmosphere.forecast.length > 0) {
+            forecastHTML = '<div class="forecast-days">';
+            const days = atmosphere.forecast.slice(0, 5); // Show 5 days
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            
+            days.forEach((day, i) => {
+                const date = new Date(day.date);
+                const dayName = i === 0 ? 'Today' : dayNames[date.getDay()];
+                const icon = this.getConditionIcon(day.condition);
+                const high = day.high != null ? Math.round(day.high) : '--';
+                const low = day.low != null ? Math.round(day.low) : '--';
+                const precip = day.precipProbability;
+                
+                forecastHTML += `
+                    <div class="forecast-day">
+                        <span class="fd-name">${dayName}</span>
+                        <span class="fd-icon">${icon}</span>
+                        <span class="fd-temps">
+                            <span class="fd-high">${high}°</span>
+                            <span class="fd-low">${low}°</span>
+                        </span>
+                        ${precip > 20 ? `<span class="fd-precip">💧${precip}%</span>` : ''}
+                    </div>
+                `;
+            });
+            forecastHTML += '</div>';
+        }
+        
+        // Current conditions
+        const tempStr = weather.current != null ? `${weather.current}` : '--';
+        const feelsLike = typeof atmosphere !== 'undefined' && atmosphere.feelsLike != null
+            ? Math.round(weather.useCelsius ? atmosphere.feelsLike : (atmosphere.feelsLike * 9/5) + 32)
+            : null;
+        const humidity = typeof atmosphere !== 'undefined' ? atmosphere.humidity : null;
+        const uvIndex = typeof atmosphere !== 'undefined' ? atmosphere.uvIndex : null;
+        const windSpeed = typeof atmosphere !== 'undefined' ? atmosphere.windSpeed : null;
+        
+        // Extra details
+        let detailsHTML = '<div class="weather-details">';
+        if (feelsLike != null) detailsHTML += `<span>Feels ${feelsLike}°</span>`;
+        if (humidity != null) detailsHTML += `<span>💧 ${humidity}%</span>`;
+        if (uvIndex != null) detailsHTML += `<span>☀️ UV ${uvIndex}</span>`;
+        if (windSpeed != null) detailsHTML += `<span>💨 ${Math.round(windSpeed)} km/h</span>`;
+        detailsHTML += '</div>';
+        
+        // Remove existing forecast toast
+        const existing = document.querySelector('.forecast-toast');
+        if (existing) existing.remove();
+        
+        const toast = document.createElement('div');
+        toast.className = 'forecast-toast';
+        toast.innerHTML = `
+            <div class="ft-header">
+                <div class="ft-location">
+                    <span class="ft-icon">📍</span>
+                    <div class="ft-loc-info">
+                        <span class="ft-name">${locationName}</span>
+                        <span class="ft-coords">${coordStr}</span>
+                    </div>
+                </div>
+                <button class="ft-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="ft-current">
+                <div class="ft-condition">
+                    <span class="ft-condition-icon">${conditionIcon}</span>
+                    <span class="ft-condition-name">${weather.condition || 'Unknown'}</span>
+                </div>
+                <div class="ft-temp">
+                    <span class="ft-temp-value">${tempStr}</span>
+                    <span class="ft-temp-unit">${weather.unit}</span>
+                </div>
+                ${weather.high != null ? `<div class="ft-highlow">↑${weather.high}° ↓${weather.low}°</div>` : ''}
+            </div>
+            ${detailsHTML}
+            ${forecastHTML}
+            <div class="ft-footer">
+                ${atmosphere?.timezone ? `<span class="ft-tz">${atmosphere.timezone}</span>` : ''}
+                <span class="ft-updated">Updated ${new Date().toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})}</span>
+            </div>
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // Close button
+        toast.querySelector('.ft-close').addEventListener('click', () => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        });
+        
+        // Animate in
+        requestAnimationFrame(() => toast.classList.add('show'));
+        
+        // Auto-remove after 10 seconds
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 10000);
     }
     
     initSecretInfoBar() {
@@ -7235,30 +7756,49 @@ class CompassSundial {
     }
     
     getWeatherData() {
-        const useCelsius = localStorage.getItem('weather_temp_unit') === 'celsius';
-        const data = { current: null, high: null, low: null, condition: null, unit: useCelsius ? '°C' : '°F' };
+        // Default to Celsius for metric (most of the world)
+        // localStorage can override
+        const storedPref = localStorage.getItem('weather_temp_unit');
+        const useCelsius = storedPref ? storedPref === 'celsius' : true;
+        
+        const data = {
+            current: null,
+            high: null,
+            low: null,
+            feelsLike: null,
+            condition: null,
+            cloudCover: 0,
+            humidity: null,
+            uvIndex: null,
+            windSpeed: null,
+            windDirection: null,
+            unit: useCelsius ? '°C' : '°F',
+            useCelsius
+        };
         
         if (typeof atmosphere === 'undefined') return data;
         
+        // Temperature conversion helper
+        const convert = (temp) => {
+            if (temp == null) return null;
+            return Math.round(useCelsius ? temp : (temp * 9/5) + 32);
+        };
+        
         // Current temperature
-        if (atmosphere.temperature != null) {
-            const temp = useCelsius ? atmosphere.temperature : (atmosphere.temperature * 9/5) + 32;
-            data.current = Math.round(temp);
-        }
+        data.current = convert(atmosphere.temperature);
+        data.feelsLike = convert(atmosphere.feelsLike);
         
         // High/Low
-        if (atmosphere.temperatureHigh != null) {
-            const high = useCelsius ? atmosphere.temperatureHigh : (atmosphere.temperatureHigh * 9/5) + 32;
-            data.high = Math.round(high);
-        }
-        if (atmosphere.temperatureLow != null) {
-            const low = useCelsius ? atmosphere.temperatureLow : (atmosphere.temperatureLow * 9/5) + 32;
-            data.low = Math.round(low);
-        }
+        data.high = convert(atmosphere.temperatureHigh);
+        data.low = convert(atmosphere.temperatureLow);
         
-        // Condition
+        // Condition and other data
         data.condition = atmosphere.condition || 'clear';
         data.cloudCover = atmosphere.cloudCover || 0;
+        data.humidity = atmosphere.humidity;
+        data.uvIndex = atmosphere.uvIndex;
+        data.windSpeed = atmosphere.windSpeed;
+        data.windDirection = atmosphere.windDirection;
         
         return data;
     }
@@ -7349,30 +7889,74 @@ class CompassSundial {
     
     moonSpeak() {
         const now = window.celestialDemo?.currentTime || new Date();
-        const loc = this.getLocation();
+        const loc = this.focusedLatLon || this.getLocation();
         const moon = Ephemeris.moonPosition(loc.latitude, loc.longitude, now);
         
         const moonUp = moon.altitude > 0;
         const phaseEmoji = this.getMoonEmoji(moon.phase);
-        const tempStr = this.getTemperatureString();
         
-        let greeting = moonUp ? `${phaseEmoji} Hello from above!` : `${phaseEmoji} I'm below the horizon...`;
-        if (tempStr) {
-            greeting = moonUp 
-                ? `${phaseEmoji} Hello! ${tempStr} tonight.` 
-                : `${phaseEmoji} It's ${tempStr} while I rest.`;
-        }
+        // Console logging
+        console.log(`%c${phaseEmoji} Moon Report`, 'color: #C0C0C0; font-size: 16px; font-weight: bold;');
+        console.log(`%cPhase: ${moon.phaseName} (${moon.illumination.toFixed(0)}% illuminated)`, 'color: #A0A0A0;');
+        console.log(`%cAltitude: ${moon.altitude.toFixed(1)}° | Direction: ${moon.direction}`, 'color: #888;');
         
-        const status = moonUp
-            ? `I'm ${moon.altitude.toFixed(1)}° up, ${moon.illumination.toFixed(0)}% illuminated.`
-            : `Currently ${Math.abs(moon.altitude).toFixed(1)}° below, ${moon.illumination.toFixed(0)}% illuminated.`;
+        // Show beautiful moon toast with phase visualization
+        this.showMoonToast(moon, moonUp);
+    }
+    
+    showMoonToast(moon, moonUp) {
+        // ═══════════════════════════════════════════════════════════════════
+        // Beautiful moon toast with phase visualization
+        // ═══════════════════════════════════════════════════════════════════
         
-        console.log(`%c${greeting}`, 'color: #C0C0C0; font-size: 16px; font-weight: bold;');
-        console.log(`%c${status}`, 'color: #A0A0A0;');
-        console.log(`%cPhase: ${moon.phaseName}`, 'color: #888;');
+        const phaseEmoji = this.getMoonEmoji(moon.phase);
+        const phasePercent = Math.round(moon.illumination);
         
-        // Show toast
-        this.showToast(`${greeting} ${status}`);
+        // Create SVG moon phase visualization
+        const phaseSVG = this.createMoonPhaseSVG(moon.phase, moon.isWaxing);
+        
+        // Position info
+        const positionStr = moonUp 
+            ? `${moon.altitude.toFixed(1)}° above horizon`
+            : `${Math.abs(moon.altitude).toFixed(1)}° below horizon`;
+        
+        // Next phase info
+        const nextPhase = this.getNextMoonPhase(moon.phase);
+        
+        ToastStack.show({
+            emoji: phaseEmoji,
+            title: moon.phaseName,
+            subtitle: `${phasePercent}% illuminated • ${positionStr}`,
+            meta: `${moon.isWaxing ? '↗ Waxing' : '↘ Waning'} • Next: ${nextPhase}`,
+            type: 'celestial',
+            duration: 6000
+        });
+    }
+    
+    createMoonPhaseSVG(phase, isWaxing) {
+        // Create an SVG representation of the current moon phase
+        // phase: 0 = new, 0.25 = first quarter, 0.5 = full, 0.75 = last quarter
+        const size = 40;
+        const cx = size / 2;
+        const cy = size / 2;
+        const r = size / 2 - 2;
+        
+        // Calculate the terminator position
+        const illumination = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
+        const terminatorX = r * Math.cos(Math.PI * illumination);
+        
+        return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+            <circle cx="${cx}" cy="${cy}" r="${r}" fill="#1a1a2e"/>
+            <circle cx="${cx}" cy="${cy}" r="${r}" fill="#f0f0f0" clip-path="url(#moonClip${phase})"/>
+        </svg>`;
+    }
+    
+    getNextMoonPhase(currentPhase) {
+        if (currentPhase < 0.125) return 'First Quarter in ~7 days';
+        if (currentPhase < 0.375) return 'Full Moon in ~7 days';
+        if (currentPhase < 0.625) return 'Last Quarter in ~7 days';
+        if (currentPhase < 0.875) return 'New Moon in ~7 days';
+        return 'First Quarter in ~7 days';
     }
     
     getMoonEmoji(phase) {
@@ -7610,10 +8194,12 @@ class CompassSundial {
 
 const celestialDemo = new CelestialDemo();
 const compassSundial = new CompassSundial();
+nixieClock = new NixieClock();
 
 // Expose to window for easter egg access
 window.celestialDemo = celestialDemo;
 window.compassSundial = compassSundial;
+window.nixieClock = nixieClock;
 
 // Debug: Log celestial calculations on page load
 (() => {
