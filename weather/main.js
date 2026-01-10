@@ -1012,8 +1012,9 @@ class WeatherAtmosphere {
 
         // Test Open-Meteo
         try {
-            const lat = this.latitude || 47.6;
-            const lon = this.longitude || -122.3;
+            const fallback = getActiveLocation();
+            const lat = this.latitude ?? fallback.latitude;
+            const lon = this.longitude ?? fallback.longitude;
             const start2 = performance.now();
             const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code`;
             const resp = await fetch(url);
@@ -1044,6 +1045,37 @@ class WeatherAtmosphere {
 
 // Global atmosphere instance
 const atmosphere = new WeatherAtmosphere();
+
+/**
+ * Resolve the currently focused location for all live calculations.
+ * Priority:
+ * 1. Secret overrides / focused globe location
+ * 2. Atmospheric live weather location
+ * 3. Celestial demo fallback (if manually set)
+ * 4. HOME constant (static reference location)
+ */
+function getActiveLocation() {
+    if (typeof window !== 'undefined') {
+        const focused = window.compassSundial?.focusedLatLon;
+        if (focused && typeof focused.latitude === 'number' && typeof focused.longitude === 'number') {
+            return { latitude: focused.latitude, longitude: focused.longitude };
+        }
+
+        if (typeof atmosphere !== 'undefined' &&
+            typeof atmosphere.latitude === 'number' &&
+            typeof atmosphere.longitude === 'number') {
+            return { latitude: atmosphere.latitude, longitude: atmosphere.longitude };
+        }
+
+        const demoLat = window.celestialDemo?.latitude;
+        const demoLon = window.celestialDemo?.longitude;
+        if (typeof demoLat === 'number' && typeof demoLon === 'number') {
+            return { latitude: demoLat, longitude: demoLon };
+        }
+    }
+
+    return { latitude: HOME.latitude, longitude: HOME.longitude };
+}
 
 // ============================================================================
 // ============================================================================
@@ -3332,8 +3364,7 @@ class CelestialSky {
         if (!sound.initialized) sound.init();
         sound.playClick();
 
-        const lat = atmosphere.latitude || HOME.latitude;
-        const lon = atmosphere.longitude || HOME.longitude;
+        const { latitude: lat, longitude: lon } = getActiveLocation();
         const sun = Ephemeris.sunPosition(lat, lon);
         const times = Ephemeris.sunTimes(lat, lon);
 
@@ -3353,8 +3384,7 @@ class CelestialSky {
         if (!sound.initialized) sound.init();
         sound.playClick();
 
-        const lat = atmosphere.latitude || HOME.latitude;
-        const lon = atmosphere.longitude || HOME.longitude;
+        const { latitude: lat, longitude: lon } = getActiveLocation();
         const moon = Ephemeris.moonPosition(lat, lon);
 
         console.log('%c\uD83C\uDF19 Moon Position', 'color: #C0C0C0; font-weight: bold; font-size: 14px;');
@@ -3485,7 +3515,7 @@ class CelestialSky {
 
         if (enabled) {
             this.sundialElement.classList.add('orientation-enabled');
-            this.sundialElement.setAttribute('aria-label', 'Compass orientation active - dial is leveled');
+            this.sundialElement.setAttribute('aria-label', i18n.get('compass.orientationActive'));
 
             // Add a small compass indicator
             let indicator = this.sundialElement.querySelector('.orientation-indicator');
@@ -4132,9 +4162,9 @@ class CelestialXR {
                 <circle cx="17" cy="12" r="2"/>
                 <path d="M10 12h4"/>
             </svg>
-            <span>Enter VR</span>
+            <span>${i18n.get('vr.enter')}</span>
         `;
-        this.xrButton.setAttribute('aria-label', 'Enter immersive VR mode to view celestial bodies');
+        this.xrButton.setAttribute('aria-label', i18n.get('vr.enterAria'));
 
         // Style the button
         const style = document.createElement('style');
@@ -4174,17 +4204,24 @@ class CelestialXR {
                 background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.9));
                 box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
             }
-            .vr-enter-btn.active span::after {
-                content: 'Exit VR';
-            }
-            .vr-enter-btn.active span {
-                font-size: 0;
-            }
         `;
         document.head.appendChild(style);
 
         this.xrButton.addEventListener('click', () => this.toggleXR());
+        window.addEventListener('languageChanged', () => this.updateVrButtonText());
+        this.updateVrButtonText();
         heroSection.appendChild(this.xrButton);
+    }
+
+    updateVrButtonText() {
+        if (!this.xrButton) return;
+        const labelKey = this.xrSession ? 'vr.exit' : 'vr.enter';
+        const ariaKey = this.xrSession ? 'vr.exitAria' : 'vr.enterAria';
+        const span = this.xrButton.querySelector('span');
+        if (span) {
+            span.textContent = i18n.get(labelKey);
+        }
+        this.xrButton.setAttribute('aria-label', i18n.get(ariaKey));
     }
 
     async toggleXR() {
@@ -4208,6 +4245,7 @@ class CelestialXR {
             });
 
             this.xrButton.classList.add('active');
+            this.updateVrButtonText();
 
             // Initialize Three.js scene
             this.initThreeScene();
@@ -4237,6 +4275,7 @@ class CelestialXR {
     onXRSessionEnd() {
         this.xrSession = null;
         this.xrButton.classList.remove('active');
+        this.updateVrButtonText();
         if (this.renderer) {
             this.renderer.setAnimationLoop(null);
         }
@@ -4583,8 +4622,9 @@ class CelestialXR {
         if (!this.celestialBodies.sun || !this.celestialBodies.moon) return;
 
         // Get real astronomical positions
-        const sunPos = Ephemeris.sunPosition(HOME.latitude, HOME.longitude, date);
-        const moonPos = Ephemeris.moonPosition(HOME.latitude, HOME.longitude, date);
+        const { latitude, longitude } = getActiveLocation();
+        const sunPos = Ephemeris.sunPosition(latitude, longitude, date);
+        const moonPos = Ephemeris.moonPosition(latitude, longitude, date);
 
         // Position sun
         const sunCartesian = this.celestialToCartesian(sunPos.azimuth, sunPos.altitude, 500);
@@ -4715,6 +4755,11 @@ class CelestialDemo {
         this.setupCelestialXR();
         this.setupDelight();
         this.setupAtmosphere();
+        window.addEventListener('focus-location-changed', (event) => {
+            if (!event?.detail) return;
+            this.latitude = event.detail.latitude;
+            this.longitude = event.detail.longitude;
+        });
         this.update();
         this.startAutoUpdate();
         this.setupConsole();
@@ -4855,6 +4900,13 @@ class CelestialDemo {
                 }
             });
         });
+
+        const scrollIndicator = document.querySelector('.scroll-indicator');
+        if (scrollIndicator) {
+            const updateScrollAria = () => scrollIndicator.setAttribute('aria-label', i18n.get('hero.scrollAria'));
+            updateScrollAria();
+            window.addEventListener('languageChanged', updateScrollAria);
+        }
     }
 
     setupRevealAnimations() {
@@ -5117,15 +5169,17 @@ class CelestialDemo {
         window.compassSundial?.clearSecretLocation?.({ preserveInfo: true });
         window.compassSundial?.showInfoBar?.({
             emoji: '📍',
-            title: 'Back to Your Location',
-            subtitle: 'Weather and globe reset to your coordinates',
+            title: i18n.get('secret.info.revertTitle'),
+            subtitle: i18n.get('secret.info.revertSubtitle'),
             meta: new Date().toLocaleTimeString()
         }, true);
     }
 
     showLocationToast(location, word) {
         const isHome = word === 'home';
-        const title = isHome ? `Welcome Home` : `Teleported to ${location.name}`;
+        const title = isHome
+            ? i18n.get('secret.info.teleportHome')
+            : i18n.get('secret.info.teleportGeneric', { location: location.name });
         const trivia = location.trivia?.length
             ? `“${location.trivia[Math.floor(Math.random() * location.trivia.length)]}”`
             : location.description || '';
@@ -5222,7 +5276,8 @@ class CelestialDemo {
     }
 
     update() {
-        const sun = Ephemeris.sunPosition(HOME.latitude, HOME.longitude, this.currentTime);
+        const { latitude, longitude } = getActiveLocation();
+        const sun = Ephemeris.sunPosition(latitude, longitude, this.currentTime);
 
         if (this.visualization) {
             this.visualization.update(sun.azimuth, sun.altitude);
@@ -5249,7 +5304,9 @@ class CelestialDemo {
         const { timeDisplay, sunAzimuth, sunAltitude, sunDirection, isDay, weatherCondition, cloudCoverage } = this.elements;
         
         if (timeDisplay) {
-            timeDisplay.textContent = this.currentTime.toLocaleTimeString('en-US', {
+            const locale = i18n.getCurrentLang ? i18n.getCurrentLang() : 'en';
+            const localeTag = locale === 'en' ? 'en-US' : locale;
+            timeDisplay.textContent = this.currentTime.toLocaleTimeString(localeTag, {
                 hour: '2-digit',
                 minute: '2-digit',
                 hour12: true
@@ -5260,7 +5317,7 @@ class CelestialDemo {
         if (sunAltitude) sunAltitude.textContent = `${sun.altitude}°`;
         if (sunDirection) sunDirection.textContent = sun.direction;
         if (isDay) {
-            isDay.textContent = sun.isDay ? 'Yes' : 'No';
+            isDay.textContent = sun.isDay ? i18n.get('yes') : i18n.get('no');
             isDay.className = `output-value ${sun.isDay ? 'good' : ''}`;
         }
         
@@ -5332,10 +5389,17 @@ class CelestialDemo {
             home: HOME,
             shades: SHADES,
             demo: this,
-            getSunPosition: () => Ephemeris.sunPosition(HOME.latitude, HOME.longitude),
-            getMoonPosition: () => Ephemeris.moonPosition(HOME.latitude, HOME.longitude),
+            getSunPosition: () => {
+                const { latitude, longitude } = getActiveLocation();
+                return Ephemeris.sunPosition(latitude, longitude);
+            },
+            getMoonPosition: () => {
+                const { latitude, longitude } = getActiveLocation();
+                return Ephemeris.moonPosition(latitude, longitude);
+            },
             getRecommendations: () => {
-                const sun = Ephemeris.sunPosition(HOME.latitude, HOME.longitude);
+                const { latitude, longitude } = getActiveLocation();
+                const sun = Ephemeris.sunPosition(latitude, longitude);
                 return HomeGeometry.getAllRecommendations(sun.azimuth, sun.altitude, sun.isDay);
             },
             getAtmosphere: () => ({
@@ -6078,6 +6142,7 @@ class CompassSundial {
         this.secretEmojiLayer = document.getElementById('secret-emoji-layer');
         this.globe = null;
         this.focusedLatLon = null;
+        this.boundLanguageHandler = () => this.handleLanguageChange();
         
         this.orientationEnabled = false;
         this.tiltX = 55; // Default isometric tilt
@@ -6166,6 +6231,8 @@ class CompassSundial {
         
         // Retry globe init if location becomes available
         setTimeout(() => this.initGlobe(), 1000);
+
+        window.addEventListener('languageChanged', this.boundLanguageHandler);
     }
     
     initGlobe() {
@@ -6188,6 +6255,7 @@ class CompassSundial {
         });
         this.focusedLatLon = { latitude: loc.latitude, longitude: loc.longitude };
         this.globe.setOrientationCallback(() => this.updateSecretEmojiPositions());
+        this.broadcastFocusLocation();
         
         this.globeInitialized = true;
         console.log('%c🌍 Globe initialized', 'color: #64B5F6;');
@@ -6201,14 +6269,16 @@ class CompassSundial {
         this.secretInfoBar = document.createElement('div');
         this.secretInfoBar.className = 'secret-info-bar';
         this.secretInfoBar.setAttribute('role', 'status');
+        const defaultTitle = i18n.get('secret.info.title');
+        const defaultSubtitle = i18n.get('secret.info.subtitle');
         this.secretInfoBar.innerHTML = `
             <div class="sib-emoji">🌍</div>
             <div class="sib-details">
-                <div class="sib-title">Secret Location</div>
-                <div class="sib-subtitle">Unlocked location details</div>
+                <div class="sib-title">${defaultTitle}</div>
+                <div class="sib-subtitle">${defaultSubtitle}</div>
                 <div class="sib-meta"></div>
             </div>
-            <button type="button" aria-label="Close secret info">&times;</button>
+            <button type="button" aria-label="${i18n.get('secret.info.closeLabel')}">&times;</button>
         `;
         container.appendChild(this.secretInfoBar);
         
@@ -6217,6 +6287,8 @@ class CompassSundial {
             event.stopPropagation();
             this.hideSecretInfoBar();
         });
+
+        this.updateDefaultInfoBar();
     }
     
     setSecretLocation(location) {
@@ -6263,7 +6335,16 @@ class CompassSundial {
         }
         if (!options.preserveInfo) {
             this.hideSecretInfoBar();
+            this.updateDefaultInfoBar();
         }
+    }
+    
+    updateDefaultInfoBar() {
+        if (!this.secretInfoBar || this.activeSecretLocation) return;
+        this.secretInfoBar.querySelector('.sib-emoji').textContent = '🌍';
+        this.secretInfoBar.querySelector('.sib-title').textContent = i18n.get('secret.info.title');
+        this.secretInfoBar.querySelector('.sib-subtitle').textContent = i18n.get('secret.info.subtitle');
+        this.secretInfoBar.querySelector('.sib-meta').textContent = '';
     }
     
     updateSecretEmojiPositions() {
@@ -6297,9 +6378,11 @@ class CompassSundial {
         if (!this.secretInfoBar || !content) return;
         clearTimeout(this.infoBarTimeout);
         const { emoji = '✨', title = '', subtitle = '', meta = '' } = content;
+        const fallbackTitle = i18n.get('secret.info.title');
+        const fallbackSubtitle = i18n.get('secret.info.subtitle');
         this.secretInfoBar.querySelector('.sib-emoji').textContent = emoji;
-        this.secretInfoBar.querySelector('.sib-title').textContent = title;
-        this.secretInfoBar.querySelector('.sib-subtitle').textContent = subtitle;
+        this.secretInfoBar.querySelector('.sib-title').textContent = title || fallbackTitle;
+        this.secretInfoBar.querySelector('.sib-subtitle').textContent = subtitle || fallbackSubtitle;
         this.secretInfoBar.querySelector('.sib-meta').textContent = meta;
         this.secretInfoBar.classList.add('show');
         
@@ -6321,7 +6404,36 @@ class CompassSundial {
             this.globe.setLocation(lat, lon);
         } else {
             const focus = this.focusedLatLon || this.getLocation();
-            this.globe.setLocation(focus.latitude, focus.longitude);
+            this.focusedLatLon = { latitude: focus.latitude, longitude: focus.longitude };
+            this.globe.setLocation(this.focusedLatLon.latitude, this.focusedLatLon.longitude);
+        }
+        this.broadcastFocusLocation();
+    }
+    
+    broadcastFocusLocation() {
+        if (!this.focusedLatLon) return;
+        window.dispatchEvent(new CustomEvent('focus-location-changed', {
+            detail: { ...this.focusedLatLon }
+        }));
+    }
+    
+    handleLanguageChange() {
+        if (!this.activeSecretLocation) {
+            this.updateDefaultInfoBar();
+        }
+        const closeBtn = this.secretInfoBar?.querySelector('button');
+        if (closeBtn) {
+            closeBtn.setAttribute('aria-label', i18n.get('secret.info.closeLabel'));
+        }
+        if (!this.orientationEnabled) {
+            this.resetHintCopy();
+        }
+    }
+    
+    resetHintCopy() {
+        const hintText = this.hint?.querySelector('.compass-hint-text');
+        if (hintText) {
+            hintText.textContent = i18n.get('compass.hint');
         }
     }
     
@@ -6418,7 +6530,12 @@ class CompassSundial {
         const sunrise = times.sunrise ? times.sunrise.toLocaleTimeString([], {hour: 'numeric', minute:'2-digit'}) : '--';
         const sunset = times.sunset ? times.sunset.toLocaleTimeString([], {hour: 'numeric', minute:'2-digit'}) : '--';
         const conditionIcon = this.getConditionIcon(weather.condition);
-        const conditionName = weather.condition ? weather.condition.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown';
+        const normalizedCondition = weather.condition ? weather.condition.replace(/-/g, '_') : null;
+        const conditionName = normalizedCondition
+            ? i18n.get(`weather.${normalizedCondition}`)
+            : i18n.get('weather.unknown');
+        const sunriseLabel = i18n.get('weather.sunrise');
+        const sunsetLabel = i18n.get('weather.sunset');
         
         const toast = document.createElement('div');
         toast.className = 'weather-forecast-toast';
@@ -6435,8 +6552,8 @@ class CompassSundial {
                 ${weather.low != null ? `<span class="wft-low">↓ ${weather.low}°</span>` : ''}
             </div>
             <div class="wft-sun-times">
-                <span class="wft-sunrise">🌅 ${sunrise}</span>
-                <span class="wft-sunset">🌇 ${sunset}</span>
+                <span class="wft-sunrise">🌅 ${sunriseLabel}: ${sunrise}</span>
+                <span class="wft-sunset">🌇 ${sunsetLabel}: ${sunset}</span>
             </div>
         `;
         
@@ -6544,8 +6661,13 @@ class CompassSundial {
             
             // Feedback
             if (this.hint) {
-                this.hint.innerHTML = '<span class="compass-hint-icon">✓</span><span>Orientation enabled</span>';
+                const icon = this.hint.querySelector('.compass-hint-icon');
+                if (icon) icon.textContent = '✓';
+                const text = this.hint.querySelector('.compass-hint-text');
+                if (text) text.textContent = i18n.get('compass.hint.enabled');
                 setTimeout(() => {
+                    if (icon) icon.textContent = '📱';
+                    this.resetHintCopy();
                     this.hint.style.opacity = '0';
                 }, 2000);
             }
@@ -6677,9 +6799,10 @@ window.compassSundial = compassSundial;
 // Debug: Log celestial calculations on page load
 (() => {
     const now = new Date();
-    const sun = Ephemeris.sunPosition(HOME.latitude, HOME.longitude, now);
-    const moon = Ephemeris.moonPosition(HOME.latitude, HOME.longitude, now);
-    const times = Ephemeris.sunTimes(HOME.latitude, HOME.longitude, now);
+    const { latitude, longitude } = getActiveLocation();
+    const sun = Ephemeris.sunPosition(latitude, longitude, now);
+    const moon = Ephemeris.moonPosition(latitude, longitude, now);
+    const times = Ephemeris.sunTimes(latitude, longitude, now);
     
     console.group('%c🌌 Celestial Ephemeris', 'color: #FFD700; font-weight: bold; font-size: 14px;');
     console.log('%cAlgorithms: Meeus "Astronomical Algorithms" + IAU 2000/2006', 'color: #666; font-style: italic;');
@@ -6687,8 +6810,7 @@ window.compassSundial = compassSundial;
     console.log('%cValid: 1900-2100 (high), 0-4000 CE (±1°)', 'color: #666; font-style: italic;');
     console.log('');
     console.log(`%c📍 Location`, 'color: #4CAF50; font-weight: bold;');
-    console.log(`   ${HOME.latitude.toFixed(4)}°N, ${Math.abs(HOME.longitude).toFixed(4)}°W`);
-    console.log(`   Green Lake, Seattle, WA`);
+    console.log(`   ${latitude.toFixed(4)}°, ${longitude.toFixed(4)}°`);
     console.log(`   Local: ${now.toLocaleString()}`);
     console.log(`   TZ: UTC${now.getTimezoneOffset() > 0 ? '-' : '+'}${Math.abs(now.getTimezoneOffset() / 60)}`);
     console.log('');
@@ -6722,6 +6844,10 @@ class LocationMap {
         this.marker = null;
         this.mapElement = document.getElementById('location-map');
         this.coordsElement = document.getElementById('map-coords');
+        this.currentLocation = null;
+        this.pulseOverlay = null;
+        this.focusListener = (event) => this.handleFocusChange(event.detail);
+        this.atmoListener = (event) => this.handleFocusChange(event.detail);
         
         if (this.mapElement) {
             this.init();
@@ -6738,7 +6864,9 @@ class LocationMap {
     }
     
     createMap() {
-        const location = { lat: HOME.latitude, lng: HOME.longitude };
+        const active = getActiveLocation();
+        const location = { lat: active.latitude, lng: active.longitude };
+        this.currentLocation = location;
         
         // Dark map style
         const darkStyle = [
@@ -6840,6 +6968,28 @@ class LocationMap {
             this.map.panTo(location);
             this.map.setZoom(15);
         });
+
+        window.addEventListener('focus-location-changed', this.focusListener);
+        window.addEventListener('atmosphere-location-ready', this.atmoListener);
+    }
+    
+    handleFocusChange(detail) {
+        if (!detail || typeof detail.latitude !== 'number' || typeof detail.longitude !== 'number') {
+            return;
+        }
+        this.updateLocation(detail);
+    }
+
+    updateLocation(detail) {
+        if (!this.map || !this.marker) return;
+        const location = { lat: detail.latitude, lng: detail.longitude };
+        this.currentLocation = location;
+        this.marker.setPosition(location);
+        this.map.panTo(location);
+        this.map.setZoom(15);
+        if (this.pulseOverlay && window.google?.maps) {
+            this.pulseOverlay.setPosition(new google.maps.LatLng(location.lat, location.lng));
+        }
     }
     
     addPulsingMarker(location) {
@@ -6870,9 +7020,18 @@ class LocationMap {
             onRemove() {
                 this.div.parentNode.removeChild(this.div);
             }
+            setPosition(position) {
+                this.position = position;
+                this.draw();
+            }
         }
         
-        new PulseOverlay(new google.maps.LatLng(location.lat, location.lng), pulseDiv).setMap(this.map);
+        if (this.pulseOverlay) {
+            this.pulseOverlay.setMap(null);
+            this.pulseOverlay = null;
+        }
+        this.pulseOverlay = new PulseOverlay(new google.maps.LatLng(location.lat, location.lng), pulseDiv);
+        this.pulseOverlay.setMap(this.map);
     }
 }
 
