@@ -89,7 +89,8 @@ const SECRET_LOCATIONS = {
             'Lelit Bianca for morning rituals',
             'Where 41 lights, 11 shades, and 26 audio zones await'
         ],
-        emoji: '🏠'
+        emoji: '🏠',
+        mapEmojis: ['🏠', '🏠']
     },
     monmouth: {
         name: 'Monmouth Coffee Company',
@@ -110,7 +111,8 @@ const SECRET_LOCATIONS = {
             'A cornerstone of London\'s third wave coffee movement',
             'The queue outside is legendary — worth every minute'
         ],
-        emoji: '☕'
+        emoji: '☕',
+        mapEmojis: ['☕', '☕']
     }
 };
 
@@ -4979,6 +4981,7 @@ class CelestialDemo {
                     // Pass the location directly so it updates immediately
                     window.compassSundial.updateGlobeLocation(location.latitude, location.longitude);
                     window.compassSundial.updateCelestialBodies(location.latitude, location.longitude);
+                    window.compassSundial.setSecretLocation?.(location);
                 }
                 
                 // Update location-specific CSS classes
@@ -5048,6 +5051,7 @@ class CelestialDemo {
         if (window.compassSundial) {
             window.compassSundial.updateGlobeLocation(orig.latitude, orig.longitude);
             window.compassSundial.updateCelestialBodies(orig.latitude, orig.longitude);
+            window.compassSundial.clearSecretLocation?.();
         }
         
         // Remove location-specific CSS classes
@@ -5993,6 +5997,7 @@ class CompassSundial {
         this.body = this.element?.querySelector('.compass-body');
         this.globeCanvas = document.getElementById('compass-globe');
         this.globeBg = document.getElementById('compass-globe-bg');
+        this.secretEmojiLayer = document.getElementById('secret-emoji-layer');
         this.globe = null;
         
         this.orientationEnabled = false;
@@ -6000,6 +6005,7 @@ class CompassSundial {
         this.tiltY = 0;
         this.rotation = 0;
         this.globeInitialized = false;
+        this.activeSecretLocation = null;
         
         if (this.element) {
             this.init();
@@ -6051,6 +6057,14 @@ class CompassSundial {
             this.element.classList.add('orientation-active');
         }
         
+        this.initSecretInfoBar();
+        if (this.secretEmojiLayer) {
+            this.secretEmojiLayer.addEventListener('click', (event) => {
+                event.stopPropagation();
+                this.showSecretInfoBar();
+            });
+        }
+        
         // Initialize globe when location is ready
         this.initGlobe();
         
@@ -6096,6 +6110,96 @@ class CompassSundial {
         
         this.globeInitialized = true;
         console.log('%c🌍 Globe initialized', 'color: #64B5F6;');
+    }
+    
+    initSecretInfoBar() {
+        const container = this.element?.parentElement;
+        if (!container || container.querySelector('.secret-info-bar')) return;
+        
+        this.secretInfoBar = document.createElement('div');
+        this.secretInfoBar.className = 'secret-info-bar';
+        this.secretInfoBar.setAttribute('role', 'status');
+        this.secretInfoBar.innerHTML = `
+            <div class="sib-emoji">🌍</div>
+            <div class="sib-details">
+                <div class="sib-title">Secret Location</div>
+                <div class="sib-subtitle">Unlocked location details</div>
+                <div class="sib-meta"></div>
+            </div>
+            <button type="button" aria-label="Close secret info">&times;</button>
+        `;
+        container.appendChild(this.secretInfoBar);
+        
+        const closeBtn = this.secretInfoBar.querySelector('button');
+        closeBtn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.hideSecretInfoBar();
+        });
+    }
+    
+    setSecretLocation(location) {
+        this.activeSecretLocation = location;
+        if (!this.secretEmojiLayer) return;
+        
+        const icons = location.mapEmojis || (location.emoji ? [location.emoji] : []);
+        this.secretEmojiLayer.innerHTML = '';
+        if (!icons.length) {
+            this.secretEmojiLayer.classList.remove('visible');
+            return;
+        }
+        
+        const baseOffsets = [
+            { x: -12, y: -6, scale: 1 },
+            { x: 10, y: 6, scale: 0.92 },
+            { x: 0, y: 14, scale: 0.85 }
+        ];
+        
+        icons.slice(0, 3).forEach((icon, index) => {
+            const span = document.createElement('div');
+            span.className = 'secret-emoji';
+            span.textContent = icon;
+            const offset = baseOffsets[index] || baseOffsets[baseOffsets.length - 1];
+            span.style.left = `calc(50% + ${offset.x}%)`;
+            span.style.top = `calc(50% + ${offset.y}%)`;
+            span.style.transform = `translate(-50%, -50%) scale(${offset.scale})`;
+            span.addEventListener('click', (event) => {
+                event.stopPropagation();
+                this.showSecretInfoBar();
+            });
+            this.secretEmojiLayer.appendChild(span);
+        });
+        
+        this.secretEmojiLayer.classList.add('visible');
+        this.showSecretInfoBar(true);
+    }
+    
+    clearSecretLocation() {
+        this.activeSecretLocation = null;
+        if (this.secretEmojiLayer) {
+            this.secretEmojiLayer.innerHTML = '';
+            this.secretEmojiLayer.classList.remove('visible');
+        }
+        this.hideSecretInfoBar();
+    }
+    
+    showSecretInfoBar(auto = false) {
+        if (!this.secretInfoBar || !this.activeSecretLocation) return;
+        const { name, city, description, emoji, mapEmojis } = this.activeSecretLocation;
+        this.secretInfoBar.querySelector('.sib-emoji').textContent = (mapEmojis?.join('')) || emoji || '✨';
+        this.secretInfoBar.querySelector('.sib-title').textContent = name;
+        this.secretInfoBar.querySelector('.sib-subtitle').textContent = description;
+        this.secretInfoBar.querySelector('.sib-meta').textContent = city;
+        this.secretInfoBar.classList.add('show');
+        
+        if (auto) {
+            clearTimeout(this.infoBarTimeout);
+            this.infoBarTimeout = setTimeout(() => this.hideSecretInfoBar(), 8000);
+        }
+    }
+    
+    hideSecretInfoBar() {
+        clearTimeout(this.infoBarTimeout);
+        this.secretInfoBar?.classList.remove('show');
     }
     
     updateGlobeLocation(lat = null, lon = null) {
