@@ -5459,7 +5459,8 @@ class MiniGlobe {
             opacity: 1
         });
         this.marker = new THREE.Mesh(markerGeometry, markerMaterial);
-        this.scene.add(this.marker);
+        // Add marker as child of globe so it rotates with it
+        this.globe.add(this.marker);
         
         // Marker glow
         const glowGeometry = new THREE.SphereGeometry(0.06, 16, 16);
@@ -5469,7 +5470,7 @@ class MiniGlobe {
             opacity: 0.3
         });
         this.markerGlow = new THREE.Mesh(glowGeometry, glowMaterial);
-        this.scene.add(this.markerGlow);
+        this.globe.add(this.markerGlow);
         
         this.updateMarkerPosition();
     }
@@ -5505,27 +5506,25 @@ class MiniGlobe {
     updateMarkerPosition() {
         if (!this.marker || !this.globe) return;
         
-        // Convert lat/lon to 3D position on sphere surface
-        // phi = colatitude (0 at north pole, PI at south pole)
-        // theta = longitude angle
-        const phi = (90 - this.targetLat) * Math.PI / 180;
-        const theta = this.targetLon * Math.PI / 180;
+        // The marker is now a child of the globe, so we position in local coordinates
+        // The globe rotates to center on target, so marker just needs lat/lon position
         
-        // Spherical to Cartesian (before globe rotation)
-        let x = Math.sin(phi) * Math.cos(theta);
-        let y = Math.cos(phi);
-        let z = Math.sin(phi) * Math.sin(theta);
+        // Convert lat/lon to 3D position on unit sphere
+        // Standard geographic: lat from equator, lon from prime meridian
+        const latRad = this.targetLat * Math.PI / 180;
+        const lonRad = this.targetLon * Math.PI / 180;
         
-        // Apply same rotation as globe
-        const globeRotY = this.globe.rotation.y;
-        const cosR = Math.cos(globeRotY);
-        const sinR = Math.sin(globeRotY);
-        const newX = x * cosR - z * sinR;
-        const newZ = x * sinR + z * cosR;
+        // Spherical to Cartesian (Y-up, Z-forward at lon=0)
+        // x = cos(lat) * sin(lon)
+        // y = sin(lat)  
+        // z = cos(lat) * cos(lon)
+        const x = Math.cos(latRad) * Math.sin(lonRad);
+        const y = Math.sin(latRad);
+        const z = Math.cos(latRad) * Math.cos(lonRad);
         
         // Position marker just above globe surface
-        const r = 1.025;
-        this.marker.position.set(newX * r, y * r, newZ * r);
+        const r = 1.03;
+        this.marker.position.set(x * r, y * r, z * r);
         this.markerGlow.position.copy(this.marker.position);
     }
     
