@@ -5772,8 +5772,15 @@ class CompassSundial {
         }
     }
     
-    // Get viewer's location (from celestialDemo or fallback)
+    // Get viewer's location (from atmosphere which has IP geolocation)
     getLocation() {
+        // Priority: atmosphere (IP geolocation) > celestialDemo > fallback (Seattle)
+        if (typeof atmosphere !== 'undefined' && atmosphere.latitude && atmosphere.longitude) {
+            return {
+                latitude: atmosphere.latitude,
+                longitude: atmosphere.longitude
+            };
+        }
         const demo = window.celestialDemo;
         return {
             latitude: demo?.latitude || 47.6,
@@ -5871,33 +5878,108 @@ class CompassSundial {
         const times = Ephemeris.sunTimes(loc.latitude, loc.longitude, now);
         
         const isDay = sun.altitude > 0;
-        const tempStr = this.getTemperatureString();
-        const highLowStr = this.getHighLowString();
         
-        let greeting = isDay ? "Hello! ☀️" : "Goodnight... 🌅";
-        if (tempStr) {
-            greeting = isDay ? `Hello! ☀️ It's ${tempStr}` : `Goodnight... 🌅 It's ${tempStr}`;
+        // Get weather data
+        const weather = this.getWeatherData();
+        
+        // Console logging
+        console.log(`%c${isDay ? '☀️ Sun Report' : '🌅 Sun Report'}`, 'color: #FFD700; font-size: 16px; font-weight: bold;');
+        console.log(`%cAltitude: ${sun.altitude.toFixed(1)}° | Direction: ${sun.direction}`, 'color: #FFA500;');
+        if (weather.current) console.log(`%cTemperature: ${weather.current}`, 'color: #888;');
+        if (weather.high && weather.low) console.log(`%cHigh: ${weather.high} | Low: ${weather.low}`, 'color: #888;');
+        
+        // Show beautiful forecast toast
+        this.showWeatherToast(weather, times, isDay);
+    }
+    
+    getWeatherData() {
+        const useCelsius = localStorage.getItem('weather_temp_unit') === 'celsius';
+        const data = { current: null, high: null, low: null, condition: null, unit: useCelsius ? '°C' : '°F' };
+        
+        if (typeof atmosphere === 'undefined') return data;
+        
+        // Current temperature
+        if (atmosphere.temperature != null) {
+            const temp = useCelsius ? atmosphere.temperature : (atmosphere.temperature * 9/5) + 32;
+            data.current = Math.round(temp);
         }
         
-        const status = isDay 
-            ? `I'm ${sun.altitude.toFixed(1)}° above the horizon, shining from the ${sun.direction}.`
-            : `I'm ${Math.abs(sun.altitude).toFixed(1)}° below the horizon, resting.`;
-        
-        const sunrise = times.sunrise ? times.sunrise.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A';
-        const sunset = times.sunset ? times.sunset.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A';
-        
-        console.log(`%c${greeting}`, 'color: #FFD700; font-size: 16px; font-weight: bold;');
-        console.log(`%c${status}`, 'color: #FFA500;');
-        console.log(`%cRise: ${sunrise} | Set: ${sunset}`, 'color: #888;');
-        if (highLowStr) {
-            console.log(`%cToday: ${highLowStr}`, 'color: #888;');
+        // High/Low
+        if (atmosphere.temperatureHigh != null) {
+            const high = useCelsius ? atmosphere.temperatureHigh : (atmosphere.temperatureHigh * 9/5) + 32;
+            data.high = Math.round(high);
+        }
+        if (atmosphere.temperatureLow != null) {
+            const low = useCelsius ? atmosphere.temperatureLow : (atmosphere.temperatureLow * 9/5) + 32;
+            data.low = Math.round(low);
         }
         
-        // Show toast with high/low
-        const toastMsg = highLowStr 
-            ? `${greeting} ${status} Today: ${highLowStr}`
-            : `${greeting} ${status}`;
-        this.showToast(toastMsg);
+        // Condition
+        data.condition = atmosphere.condition || 'clear';
+        data.cloudCover = atmosphere.cloudCover || 0;
+        
+        return data;
+    }
+    
+    getConditionIcon(condition) {
+        const icons = {
+            'clear': '☀️',
+            'partly-cloudy': '⛅',
+            'cloudy': '☁️',
+            'overcast': '☁️',
+            'fog': '🌫️',
+            'drizzle': '🌧️',
+            'rain': '🌧️',
+            'heavy-rain': '⛈️',
+            'thunderstorm': '⛈️',
+            'snow': '❄️',
+            'sleet': '🌨️'
+        };
+        return icons[condition] || '🌤️';
+    }
+    
+    showWeatherToast(weather, times, isDay) {
+        // Remove existing toast
+        const existing = document.querySelector('.weather-forecast-toast');
+        if (existing) existing.remove();
+        
+        const sunrise = times.sunrise ? times.sunrise.toLocaleTimeString([], {hour: 'numeric', minute:'2-digit'}) : '--';
+        const sunset = times.sunset ? times.sunset.toLocaleTimeString([], {hour: 'numeric', minute:'2-digit'}) : '--';
+        const conditionIcon = this.getConditionIcon(weather.condition);
+        const conditionName = weather.condition ? weather.condition.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown';
+        
+        const toast = document.createElement('div');
+        toast.className = 'weather-forecast-toast';
+        toast.innerHTML = `
+            <div class="wft-header">
+                <span class="wft-icon">${conditionIcon}</span>
+                <span class="wft-condition">${conditionName}</span>
+            </div>
+            <div class="wft-temp-main">
+                ${weather.current != null ? `<span class="wft-current">${weather.current}</span><span class="wft-unit">${weather.unit}</span>` : '<span class="wft-current">--</span>'}
+            </div>
+            <div class="wft-highlow">
+                ${weather.high != null ? `<span class="wft-high">↑ ${weather.high}°</span>` : ''}
+                ${weather.low != null ? `<span class="wft-low">↓ ${weather.low}°</span>` : ''}
+            </div>
+            <div class="wft-sun-times">
+                <span class="wft-sunrise">🌅 ${sunrise}</span>
+                <span class="wft-sunset">🌇 ${sunset}</span>
+            </div>
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // Animate in
+        requestAnimationFrame(() => {
+            toast.classList.add('show');
+        });
+        
+        // Remove after 5 seconds
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 400);
+        }, 5000);
     }
     
     getHighLowString() {
