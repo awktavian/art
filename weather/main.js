@@ -5238,104 +5238,316 @@ class CelestialDemo {
 }
 
 // ============================================================================
-// MINI GLOBE — 3D Earth visualization centered on location
+// 3D GLOBE — Real WebGL Earth with Three.js
 // ============================================================================
 
 class MiniGlobe {
     constructor(canvas, options = {}) {
         this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
-        this.width = canvas.width;
-        this.height = canvas.height;
-        this.radius = Math.min(this.width, this.height) / 2 - 10;
-        this.centerX = this.width / 2;
-        this.centerY = this.height / 2;
         
         // Location to center on
         this.targetLat = options.latitude || 0;
         this.targetLon = options.longitude || 0;
         
-        // Current view rotation (smoothly animates to target)
-        this.viewLat = this.targetLat;
-        this.viewLon = this.targetLon;
+        // Current rotation (smoothly animates)
+        this.currentLat = this.targetLat;
+        this.currentLon = this.targetLon;
         
-        // Ambient rotation
-        this.rotationSpeed = options.rotationSpeed || 0.0003;
-        this.autoRotate = true;
+        // Auto rotation
+        this.autoRotateSpeed = 0.0002;
         
-        // Visual options
-        this.showGrid = options.showGrid !== false;
-        this.showLocation = options.showLocation !== false;
+        // Three.js components
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        this.globe = null;
+        this.atmosphere = null;
+        this.marker = null;
+        this.markerGlow = null;
+        this.clouds = null;
         
-        // Colors
-        this.colors = {
-            ocean: '#0a1628',
-            land: '#1a3a5c',
-            landHighlight: '#2a5a8c',
-            grid: 'rgba(212, 175, 55, 0.15)',
-            atmosphere: 'rgba(100, 180, 255, 0.1)',
-            marker: '#d4af37',
-            markerGlow: 'rgba(212, 175, 55, 0.6)'
-        };
-        
-        // Simplified continent outlines (lon, lat pairs for major landmasses)
-        this.continents = this.generateContinents();
-        
-        // Animation
         this.animationId = null;
-        this.lastTime = 0;
+        this.lastTime = performance.now();
         
-        this.start();
+        this.init();
     }
     
-    generateContinents() {
-        // Simplified continental outlines as polygons
-        // Each continent is an array of [lon, lat] points
-        return {
-            // North America (simplified)
+    init() {
+        if (typeof THREE === 'undefined') {
+            console.warn('Three.js not loaded, globe disabled');
+            return;
+        }
+        
+        const width = this.canvas.clientWidth || 300;
+        const height = this.canvas.clientHeight || 300;
+        
+        // Scene
+        this.scene = new THREE.Scene();
+        
+        // Camera
+        this.camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+        this.camera.position.z = 2.5;
+        
+        // Renderer
+        this.renderer = new THREE.WebGLRenderer({
+            canvas: this.canvas,
+            alpha: true,
+            antialias: true
+        });
+        this.renderer.setSize(width, height);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.setClearColor(0x000000, 0);
+        
+        // Create globe
+        this.createGlobe();
+        this.createAtmosphere();
+        this.createMarker();
+        this.createLights();
+        
+        // Set initial rotation to face target location
+        this.updateRotation(true);
+        
+        // Start animation
+        this.animate();
+        
+        console.log('%c🌍 3D Globe initialized', 'color: #64B5F6;');
+    }
+    
+    createGlobe() {
+        // Earth sphere with procedural texture
+        const geometry = new THREE.SphereGeometry(1, 64, 64);
+        
+        // Create procedural Earth texture on canvas
+        const textureCanvas = document.createElement('canvas');
+        textureCanvas.width = 1024;
+        textureCanvas.height = 512;
+        const ctx = textureCanvas.getContext('2d');
+        
+        // Ocean base
+        const oceanGradient = ctx.createLinearGradient(0, 0, 0, 512);
+        oceanGradient.addColorStop(0, '#0a1628');
+        oceanGradient.addColorStop(0.3, '#0f2847');
+        oceanGradient.addColorStop(0.7, '#0f2847');
+        oceanGradient.addColorStop(1, '#0a1628');
+        ctx.fillStyle = oceanGradient;
+        ctx.fillRect(0, 0, 1024, 512);
+        
+        // Draw continents (simplified but more detailed)
+        ctx.fillStyle = '#1a4a6c';
+        ctx.strokeStyle = '#2a6a9c';
+        ctx.lineWidth = 1;
+        
+        // Convert lat/lon to canvas coords
+        const toCanvas = (lon, lat) => ({
+            x: ((lon + 180) / 360) * 1024,
+            y: ((90 - lat) / 180) * 512
+        });
+        
+        // Detailed continent shapes
+        const continents = {
             northAmerica: [
-                [-170, 65], [-168, 55], [-155, 60], [-140, 60], [-130, 55],
-                [-125, 50], [-125, 40], [-120, 35], [-115, 30], [-105, 25],
-                [-100, 25], [-95, 20], [-90, 20], [-85, 10], [-80, 8],
-                [-75, 10], [-80, 25], [-75, 35], [-70, 45], [-65, 45],
-                [-60, 50], [-65, 60], [-75, 65], [-95, 70], [-120, 70],
-                [-145, 70], [-165, 65]
+                [-168, 65], [-165, 62], [-155, 58], [-148, 60], [-140, 60], [-130, 55],
+                [-125, 48], [-124, 42], [-117, 32], [-115, 28], [-105, 22], [-97, 18],
+                [-92, 16], [-88, 14], [-84, 9], [-79, 9], [-77, 18], [-81, 25],
+                [-80, 32], [-75, 36], [-70, 42], [-67, 44], [-64, 47], [-52, 47],
+                [-55, 52], [-60, 54], [-65, 60], [-73, 68], [-85, 68], [-95, 72],
+                [-110, 72], [-125, 70], [-140, 70], [-155, 71], [-168, 65]
             ],
-            // South America (simplified)
             southAmerica: [
-                [-80, 10], [-75, 5], [-70, -5], [-75, -15], [-70, -25],
-                [-65, -35], [-70, -50], [-75, -55], [-70, -55], [-65, -40],
-                [-55, -35], [-45, -25], [-35, -10], [-35, -5], [-50, 0],
-                [-60, 5], [-70, 10], [-80, 10]
+                [-81, 8], [-77, 6], [-73, 2], [-70, -4], [-75, -14], [-70, -18],
+                [-68, -24], [-65, -28], [-68, -40], [-72, -48], [-74, -52], [-68, -55],
+                [-64, -55], [-58, -52], [-56, -38], [-52, -34], [-48, -26], [-42, -22],
+                [-38, -12], [-35, -6], [-40, 0], [-52, 2], [-62, 4], [-70, 8], [-81, 8]
             ],
-            // Europe (simplified)
             europe: [
-                [-10, 35], [0, 35], [5, 45], [10, 45], [20, 40],
-                [25, 35], [30, 45], [40, 45], [45, 55], [40, 60],
-                [30, 70], [20, 70], [10, 65], [5, 60], [-5, 55],
-                [-10, 50], [-10, 35]
+                [-10, 36], [-6, 37], [0, 38], [4, 43], [8, 44], [12, 45],
+                [15, 42], [20, 40], [26, 40], [28, 44], [34, 44], [40, 42],
+                [42, 48], [50, 52], [60, 56], [68, 58], [70, 68], [58, 70],
+                [42, 68], [30, 70], [18, 70], [10, 64], [5, 62], [-4, 58],
+                [-8, 54], [-10, 50], [-10, 42], [-10, 36]
             ],
-            // Africa (simplified)
             africa: [
-                [-15, 35], [10, 35], [30, 30], [35, 20], [40, 10],
-                [50, 10], [50, 0], [45, -10], [35, -20], [30, -35],
-                [20, -35], [15, -25], [10, -15], [0, 5], [-10, 5],
-                [-15, 15], [-15, 35]
+                [-17, 15], [-12, 15], [-5, 35], [10, 37], [12, 34], [25, 32],
+                [33, 30], [35, 22], [38, 14], [43, 12], [51, 10], [48, 4],
+                [42, 0], [40, -10], [35, -20], [32, -28], [28, -33], [18, -35],
+                [12, -28], [14, -18], [10, -6], [8, 4], [-5, 5], [-8, 8], [-17, 15]
             ],
-            // Asia (simplified)
             asia: [
-                [30, 45], [45, 55], [60, 55], [75, 70], [100, 75],
-                [140, 70], [170, 65], [170, 60], [145, 45], [140, 35],
-                [125, 35], [120, 25], [110, 20], [100, 10], [95, 5],
-                [80, 10], [70, 25], [60, 25], [50, 30], [40, 40], [30, 45]
+                [40, 42], [50, 45], [60, 42], [65, 38], [70, 38], [76, 35],
+                [82, 28], [88, 24], [92, 20], [98, 16], [104, 10], [108, 14],
+                [115, 22], [120, 22], [122, 30], [128, 38], [132, 34], [138, 36],
+                [142, 44], [145, 46], [152, 54], [163, 60], [175, 65], [180, 68],
+                [180, 75], [160, 72], [140, 70], [110, 72], [90, 68], [70, 68],
+                [60, 56], [50, 52], [42, 48], [40, 42]
             ],
-            // Australia (simplified)
             australia: [
-                [115, -20], [130, -15], [145, -15], [150, -25],
-                [150, -35], [145, -40], [135, -35], [130, -30],
-                [120, -30], [115, -25], [115, -20]
+                [114, -22], [120, -18], [132, -12], [142, -11], [148, -20],
+                [153, -28], [150, -34], [147, -38], [144, -38], [136, -35],
+                [130, -32], [123, -34], [115, -32], [114, -26], [114, -22]
             ]
         };
+        
+        // Draw each continent
+        for (const [name, points] of Object.entries(continents)) {
+            ctx.beginPath();
+            const start = toCanvas(points[0][0], points[0][1]);
+            ctx.moveTo(start.x, start.y);
+            for (let i = 1; i < points.length; i++) {
+                const p = toCanvas(points[i][0], points[i][1]);
+                ctx.lineTo(p.x, p.y);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+        
+        // Add grid lines
+        ctx.strokeStyle = 'rgba(212, 175, 55, 0.12)';
+        ctx.lineWidth = 0.5;
+        
+        // Latitude lines
+        for (let lat = -60; lat <= 60; lat += 30) {
+            const y = ((90 - lat) / 180) * 512;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(1024, y);
+            ctx.stroke();
+        }
+        
+        // Longitude lines
+        for (let lon = -180; lon < 180; lon += 30) {
+            const x = ((lon + 180) / 360) * 1024;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, 512);
+            ctx.stroke();
+        }
+        
+        const texture = new THREE.CanvasTexture(textureCanvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        
+        const material = new THREE.MeshPhongMaterial({
+            map: texture,
+            specular: new THREE.Color(0x333333),
+            shininess: 5,
+            transparent: true,
+            opacity: 0.95
+        });
+        
+        this.globe = new THREE.Mesh(geometry, material);
+        this.scene.add(this.globe);
+        
+        // Add cloud layer
+        const cloudGeometry = new THREE.SphereGeometry(1.02, 48, 48);
+        const cloudCanvas = document.createElement('canvas');
+        cloudCanvas.width = 512;
+        cloudCanvas.height = 256;
+        const cloudCtx = cloudCanvas.getContext('2d');
+        
+        // Procedural clouds
+        cloudCtx.fillStyle = 'rgba(0,0,0,0)';
+        cloudCtx.fillRect(0, 0, 512, 256);
+        cloudCtx.fillStyle = 'rgba(255,255,255,0.15)';
+        
+        for (let i = 0; i < 200; i++) {
+            const x = Math.random() * 512;
+            const y = 40 + Math.random() * 176; // More in temperate zones
+            const r = 5 + Math.random() * 30;
+            cloudCtx.beginPath();
+            cloudCtx.arc(x, y, r, 0, Math.PI * 2);
+            cloudCtx.fill();
+        }
+        
+        const cloudTexture = new THREE.CanvasTexture(cloudCanvas);
+        cloudTexture.wrapS = THREE.RepeatWrapping;
+        
+        const cloudMaterial = new THREE.MeshPhongMaterial({
+            map: cloudTexture,
+            transparent: true,
+            opacity: 0.4,
+            depthWrite: false
+        });
+        
+        this.clouds = new THREE.Mesh(cloudGeometry, cloudMaterial);
+        this.scene.add(this.clouds);
+    }
+    
+    createAtmosphere() {
+        // Atmospheric glow (fresnel effect simulation)
+        const atmosGeometry = new THREE.SphereGeometry(1.15, 32, 32);
+        const atmosMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                glowColor: { value: new THREE.Color(0x4488ff) }
+            },
+            vertexShader: `
+                varying vec3 vNormal;
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform vec3 glowColor;
+                varying vec3 vNormal;
+                void main() {
+                    float intensity = pow(0.65 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+                    gl_FragColor = vec4(glowColor, intensity * 0.4);
+                }
+            `,
+            side: THREE.BackSide,
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            depthWrite: false
+        });
+        
+        this.atmosphere = new THREE.Mesh(atmosGeometry, atmosMaterial);
+        this.scene.add(this.atmosphere);
+    }
+    
+    createMarker() {
+        // Location marker as a glowing point
+        const markerGeometry = new THREE.SphereGeometry(0.03, 16, 16);
+        const markerMaterial = new THREE.MeshBasicMaterial({
+            color: 0xd4af37,
+            transparent: true,
+            opacity: 1
+        });
+        this.marker = new THREE.Mesh(markerGeometry, markerMaterial);
+        this.scene.add(this.marker);
+        
+        // Marker glow
+        const glowGeometry = new THREE.SphereGeometry(0.06, 16, 16);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: 0xd4af37,
+            transparent: true,
+            opacity: 0.3
+        });
+        this.markerGlow = new THREE.Mesh(glowGeometry, glowMaterial);
+        this.scene.add(this.markerGlow);
+        
+        this.updateMarkerPosition();
+    }
+    
+    createLights() {
+        // Ambient light
+        const ambient = new THREE.AmbientLight(0x404040, 0.5);
+        this.scene.add(ambient);
+        
+        // Main light (simulates sun)
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1);
+        mainLight.position.set(5, 3, 5);
+        this.scene.add(mainLight);
+        
+        // Fill light
+        const fillLight = new THREE.DirectionalLight(0x4488ff, 0.3);
+        fillLight.position.set(-5, -2, 2);
+        this.scene.add(fillLight);
+        
+        // Rim light for atmosphere
+        const rimLight = new THREE.DirectionalLight(0x88aaff, 0.2);
+        rimLight.position.set(0, 0, -5);
+        this.scene.add(rimLight);
     }
     
     setLocation(lat, lon) {
@@ -5343,9 +5555,72 @@ class MiniGlobe {
         this.targetLon = lon;
     }
     
-    start() {
-        this.lastTime = performance.now();
-        this.animate();
+    updateMarkerPosition() {
+        if (!this.marker) return;
+        
+        // Convert lat/lon to 3D position on sphere
+        const phi = (90 - this.targetLat) * Math.PI / 180;
+        const theta = (this.targetLon + 180) * Math.PI / 180;
+        
+        const x = -Math.sin(phi) * Math.cos(theta);
+        const y = Math.cos(phi);
+        const z = Math.sin(phi) * Math.sin(theta);
+        
+        this.marker.position.set(x * 1.01, y * 1.01, z * 1.01);
+        this.markerGlow.position.copy(this.marker.position);
+    }
+    
+    updateRotation(immediate = false) {
+        if (!this.globe) return;
+        
+        // Smoothly interpolate to target
+        const smoothing = immediate ? 1 : 0.03;
+        this.currentLat += (this.targetLat - this.currentLat) * smoothing;
+        this.currentLon += (this.targetLon - this.currentLon) * smoothing;
+        
+        // Rotate globe to center on location
+        // Y rotation = longitude, X rotation = latitude tilt
+        this.globe.rotation.y = -this.currentLon * Math.PI / 180 - Math.PI / 2;
+        this.globe.rotation.x = 0; // Keep upright for clarity
+        
+        if (this.clouds) {
+            this.clouds.rotation.y = this.globe.rotation.y;
+        }
+        
+        // Tilt camera slightly based on latitude for perspective
+        this.camera.position.y = Math.sin(this.currentLat * Math.PI / 180) * 0.3;
+    }
+    
+    animate() {
+        const now = performance.now();
+        const delta = now - this.lastTime;
+        this.lastTime = now;
+        
+        // Slow auto-rotation
+        this.targetLon += this.autoRotateSpeed * delta;
+        if (this.targetLon > 180) this.targetLon -= 360;
+        
+        // Update rotation
+        this.updateRotation();
+        this.updateMarkerPosition();
+        
+        // Rotate clouds slightly faster
+        if (this.clouds) {
+            this.clouds.rotation.y += 0.0001 * delta;
+        }
+        
+        // Pulse marker
+        if (this.markerGlow) {
+            const pulse = 1 + 0.3 * Math.sin(now / 400);
+            this.markerGlow.scale.setScalar(pulse);
+        }
+        
+        // Render
+        if (this.renderer && this.scene && this.camera) {
+            this.renderer.render(this.scene, this.camera);
+        }
+        
+        this.animationId = requestAnimationFrame(() => this.animate());
     }
     
     stop() {
@@ -5354,225 +5629,11 @@ class MiniGlobe {
         }
     }
     
-    animate() {
-        const now = performance.now();
-        const delta = now - this.lastTime;
-        this.lastTime = now;
-        
-        // Smooth rotation toward target with ambient drift
-        const smoothing = 0.02;
-        this.viewLat += (this.targetLat - this.viewLat) * smoothing;
-        
-        // Add slow ambient rotation
-        if (this.autoRotate) {
-            this.targetLon -= this.rotationSpeed * delta;
-            if (this.targetLon < -180) this.targetLon += 360;
+    dispose() {
+        this.stop();
+        if (this.renderer) {
+            this.renderer.dispose();
         }
-        this.viewLon += (this.targetLon - this.viewLon) * smoothing;
-        
-        this.render();
-        this.animationId = requestAnimationFrame(() => this.animate());
-    }
-    
-    // Convert lat/lon to 3D coordinates, then project to 2D
-    project(lat, lon) {
-        const latRad = lat * Math.PI / 180;
-        const lonRad = (lon - this.viewLon) * Math.PI / 180;
-        const viewLatRad = this.viewLat * Math.PI / 180;
-        
-        // Spherical to Cartesian
-        const x = Math.cos(latRad) * Math.sin(lonRad);
-        const y = Math.sin(latRad) * Math.cos(viewLatRad) - 
-                  Math.cos(latRad) * Math.cos(lonRad) * Math.sin(viewLatRad);
-        const z = Math.sin(latRad) * Math.sin(viewLatRad) + 
-                  Math.cos(latRad) * Math.cos(lonRad) * Math.cos(viewLatRad);
-        
-        // Only draw if on visible hemisphere
-        if (z < 0) return null;
-        
-        return {
-            x: this.centerX + x * this.radius,
-            y: this.centerY - y * this.radius,
-            z: z
-        };
-    }
-    
-    render() {
-        const ctx = this.ctx;
-        ctx.clearRect(0, 0, this.width, this.height);
-        
-        // Ocean base (dark sphere)
-        const oceanGradient = ctx.createRadialGradient(
-            this.centerX - this.radius * 0.3, 
-            this.centerY - this.radius * 0.3, 
-            0,
-            this.centerX, 
-            this.centerY, 
-            this.radius
-        );
-        oceanGradient.addColorStop(0, '#0f2847');
-        oceanGradient.addColorStop(0.5, '#0a1628');
-        oceanGradient.addColorStop(1, '#050d18');
-        
-        ctx.beginPath();
-        ctx.arc(this.centerX, this.centerY, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = oceanGradient;
-        ctx.fill();
-        
-        // Draw continents
-        this.drawContinents(ctx);
-        
-        // Draw grid
-        if (this.showGrid) {
-            this.drawGrid(ctx);
-        }
-        
-        // Draw location marker
-        if (this.showLocation) {
-            this.drawLocationMarker(ctx);
-        }
-        
-        // Atmospheric glow (edge lighting)
-        const atmosGradient = ctx.createRadialGradient(
-            this.centerX, this.centerY, this.radius * 0.85,
-            this.centerX, this.centerY, this.radius * 1.05
-        );
-        atmosGradient.addColorStop(0, 'transparent');
-        atmosGradient.addColorStop(0.5, 'rgba(100, 180, 255, 0.08)');
-        atmosGradient.addColorStop(1, 'transparent');
-        
-        ctx.beginPath();
-        ctx.arc(this.centerX, this.centerY, this.radius * 1.05, 0, Math.PI * 2);
-        ctx.fillStyle = atmosGradient;
-        ctx.fill();
-        
-        // Specular highlight
-        const highlightGradient = ctx.createRadialGradient(
-            this.centerX - this.radius * 0.4,
-            this.centerY - this.radius * 0.4,
-            0,
-            this.centerX - this.radius * 0.2,
-            this.centerY - this.radius * 0.2,
-            this.radius * 0.6
-        );
-        highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
-        highlightGradient.addColorStop(1, 'transparent');
-        
-        ctx.beginPath();
-        ctx.arc(this.centerX, this.centerY, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = highlightGradient;
-        ctx.fill();
-    }
-    
-    drawContinents(ctx) {
-        ctx.fillStyle = this.colors.land;
-        ctx.strokeStyle = this.colors.landHighlight;
-        ctx.lineWidth = 0.5;
-        
-        for (const [name, points] of Object.entries(this.continents)) {
-            ctx.beginPath();
-            let started = false;
-            let prevPoint = null;
-            
-            for (const [lon, lat] of points) {
-                const projected = this.project(lat, lon);
-                if (projected) {
-                    if (!started) {
-                        ctx.moveTo(projected.x, projected.y);
-                        started = true;
-                    } else {
-                        ctx.lineTo(projected.x, projected.y);
-                    }
-                    prevPoint = projected;
-                }
-            }
-            
-            if (started) {
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-            }
-        }
-    }
-    
-    drawGrid(ctx) {
-        ctx.strokeStyle = this.colors.grid;
-        ctx.lineWidth = 0.5;
-        
-        // Longitude lines (meridians)
-        for (let lon = -180; lon < 180; lon += 30) {
-            ctx.beginPath();
-            let started = false;
-            
-            for (let lat = -90; lat <= 90; lat += 5) {
-                const projected = this.project(lat, lon);
-                if (projected) {
-                    if (!started) {
-                        ctx.moveTo(projected.x, projected.y);
-                        started = true;
-                    } else {
-                        ctx.lineTo(projected.x, projected.y);
-                    }
-                } else {
-                    started = false;
-                }
-            }
-            ctx.stroke();
-        }
-        
-        // Latitude lines (parallels)
-        for (let lat = -60; lat <= 60; lat += 30) {
-            ctx.beginPath();
-            let started = false;
-            
-            for (let lon = -180; lon <= 180; lon += 5) {
-                const projected = this.project(lat, lon);
-                if (projected) {
-                    if (!started) {
-                        ctx.moveTo(projected.x, projected.y);
-                        started = true;
-                    } else {
-                        ctx.lineTo(projected.x, projected.y);
-                    }
-                } else {
-                    started = false;
-                }
-            }
-            ctx.stroke();
-        }
-    }
-    
-    drawLocationMarker(ctx) {
-        const projected = this.project(this.targetLat, this.targetLon);
-        if (!projected) return;
-        
-        const pulseScale = 1 + 0.2 * Math.sin(performance.now() / 500);
-        
-        // Outer glow
-        const glowGradient = ctx.createRadialGradient(
-            projected.x, projected.y, 0,
-            projected.x, projected.y, 20 * pulseScale
-        );
-        glowGradient.addColorStop(0, this.colors.markerGlow);
-        glowGradient.addColorStop(1, 'transparent');
-        
-        ctx.beginPath();
-        ctx.arc(projected.x, projected.y, 20 * pulseScale, 0, Math.PI * 2);
-        ctx.fillStyle = glowGradient;
-        ctx.fill();
-        
-        // Inner marker
-        ctx.beginPath();
-        ctx.arc(projected.x, projected.y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = this.colors.marker;
-        ctx.fill();
-        
-        // Ring
-        ctx.beginPath();
-        ctx.arc(projected.x, projected.y, 8 * pulseScale, 0, Math.PI * 2);
-        ctx.strokeStyle = this.colors.marker;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
     }
 }
 
@@ -5677,6 +5738,23 @@ class CompassSundial {
         this.globe.setLocation(loc.latitude, loc.longitude);
     }
     
+    getTemperatureString() {
+        // Get current temperature from atmosphere if available
+        const atmos = window.celestialDemo?.atmosphere;
+        if (atmos && atmos.weather) {
+            const temp = atmos.weather.temperature;
+            const unitIsCelsius = localStorage.getItem('temperatureUnit') === 'C';
+            
+            if (unitIsCelsius) {
+                return `${temp.toFixed(0)}°C`;
+            } else {
+                const fahrenheit = (temp * 9/5) + 32;
+                return `${fahrenheit.toFixed(0)}°F`;
+            }
+        }
+        return null;
+    }
+    
     sunSpeak() {
         const now = window.celestialDemo?.currentTime || new Date();
         const loc = this.getLocation();
@@ -5684,7 +5762,13 @@ class CompassSundial {
         const times = Ephemeris.sunTimes(loc.latitude, loc.longitude, now);
         
         const isDay = sun.altitude > 0;
-        const greeting = isDay ? "Hello! ☀️" : "Goodnight... 🌅";
+        const tempStr = this.getTemperatureString();
+        
+        let greeting = isDay ? "Hello! ☀️" : "Goodnight... 🌅";
+        if (tempStr) {
+            greeting = isDay ? `Hello! ☀️ It's ${tempStr}` : `Goodnight... 🌅 It's ${tempStr}`;
+        }
+        
         const status = isDay 
             ? `I'm ${sun.altitude.toFixed(1)}° above the horizon, shining from the ${sun.direction}.`
             : `I'm ${Math.abs(sun.altitude).toFixed(1)}° below the horizon, resting.`;
@@ -5707,7 +5791,15 @@ class CompassSundial {
         
         const moonUp = moon.altitude > 0;
         const phaseEmoji = this.getMoonEmoji(moon.phase);
-        const greeting = moonUp ? `${phaseEmoji} Hello from above!` : `${phaseEmoji} I'm below the horizon...`;
+        const tempStr = this.getTemperatureString();
+        
+        let greeting = moonUp ? `${phaseEmoji} Hello from above!` : `${phaseEmoji} I'm below the horizon...`;
+        if (tempStr) {
+            greeting = moonUp 
+                ? `${phaseEmoji} Hello! ${tempStr} tonight.` 
+                : `${phaseEmoji} It's ${tempStr} while I rest.`;
+        }
+        
         const status = moonUp
             ? `I'm ${moon.altitude.toFixed(1)}° up, ${moon.illumination.toFixed(0)}% illuminated.`
             : `Currently ${Math.abs(moon.altitude).toFixed(1)}° below, ${moon.illumination.toFixed(0)}% illuminated.`;
