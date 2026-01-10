@@ -4941,10 +4941,9 @@ class CelestialDemo {
                 // Show fancy toast
                 this.showLocationToast(location, word);
                 
-                // Force compass to reload map and update celestial positions
+                // Force compass to update globe and celestial positions
                 if (window.compassSundial) {
-                    window.compassSundial.mapLoaded = false;
-                    window.compassSundial.loadMap();
+                    window.compassSundial.updateGlobeLocation();
                     window.compassSundial.updateCelestialBodies();
                 }
                 
@@ -5239,6 +5238,345 @@ class CelestialDemo {
 }
 
 // ============================================================================
+// MINI GLOBE — 3D Earth visualization centered on location
+// ============================================================================
+
+class MiniGlobe {
+    constructor(canvas, options = {}) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.width = canvas.width;
+        this.height = canvas.height;
+        this.radius = Math.min(this.width, this.height) / 2 - 10;
+        this.centerX = this.width / 2;
+        this.centerY = this.height / 2;
+        
+        // Location to center on
+        this.targetLat = options.latitude || 0;
+        this.targetLon = options.longitude || 0;
+        
+        // Current view rotation (smoothly animates to target)
+        this.viewLat = this.targetLat;
+        this.viewLon = this.targetLon;
+        
+        // Ambient rotation
+        this.rotationSpeed = options.rotationSpeed || 0.0003;
+        this.autoRotate = true;
+        
+        // Visual options
+        this.showGrid = options.showGrid !== false;
+        this.showLocation = options.showLocation !== false;
+        
+        // Colors
+        this.colors = {
+            ocean: '#0a1628',
+            land: '#1a3a5c',
+            landHighlight: '#2a5a8c',
+            grid: 'rgba(212, 175, 55, 0.15)',
+            atmosphere: 'rgba(100, 180, 255, 0.1)',
+            marker: '#d4af37',
+            markerGlow: 'rgba(212, 175, 55, 0.6)'
+        };
+        
+        // Simplified continent outlines (lon, lat pairs for major landmasses)
+        this.continents = this.generateContinents();
+        
+        // Animation
+        this.animationId = null;
+        this.lastTime = 0;
+        
+        this.start();
+    }
+    
+    generateContinents() {
+        // Simplified continental outlines as polygons
+        // Each continent is an array of [lon, lat] points
+        return {
+            // North America (simplified)
+            northAmerica: [
+                [-170, 65], [-168, 55], [-155, 60], [-140, 60], [-130, 55],
+                [-125, 50], [-125, 40], [-120, 35], [-115, 30], [-105, 25],
+                [-100, 25], [-95, 20], [-90, 20], [-85, 10], [-80, 8],
+                [-75, 10], [-80, 25], [-75, 35], [-70, 45], [-65, 45],
+                [-60, 50], [-65, 60], [-75, 65], [-95, 70], [-120, 70],
+                [-145, 70], [-165, 65]
+            ],
+            // South America (simplified)
+            southAmerica: [
+                [-80, 10], [-75, 5], [-70, -5], [-75, -15], [-70, -25],
+                [-65, -35], [-70, -50], [-75, -55], [-70, -55], [-65, -40],
+                [-55, -35], [-45, -25], [-35, -10], [-35, -5], [-50, 0],
+                [-60, 5], [-70, 10], [-80, 10]
+            ],
+            // Europe (simplified)
+            europe: [
+                [-10, 35], [0, 35], [5, 45], [10, 45], [20, 40],
+                [25, 35], [30, 45], [40, 45], [45, 55], [40, 60],
+                [30, 70], [20, 70], [10, 65], [5, 60], [-5, 55],
+                [-10, 50], [-10, 35]
+            ],
+            // Africa (simplified)
+            africa: [
+                [-15, 35], [10, 35], [30, 30], [35, 20], [40, 10],
+                [50, 10], [50, 0], [45, -10], [35, -20], [30, -35],
+                [20, -35], [15, -25], [10, -15], [0, 5], [-10, 5],
+                [-15, 15], [-15, 35]
+            ],
+            // Asia (simplified)
+            asia: [
+                [30, 45], [45, 55], [60, 55], [75, 70], [100, 75],
+                [140, 70], [170, 65], [170, 60], [145, 45], [140, 35],
+                [125, 35], [120, 25], [110, 20], [100, 10], [95, 5],
+                [80, 10], [70, 25], [60, 25], [50, 30], [40, 40], [30, 45]
+            ],
+            // Australia (simplified)
+            australia: [
+                [115, -20], [130, -15], [145, -15], [150, -25],
+                [150, -35], [145, -40], [135, -35], [130, -30],
+                [120, -30], [115, -25], [115, -20]
+            ]
+        };
+    }
+    
+    setLocation(lat, lon) {
+        this.targetLat = lat;
+        this.targetLon = lon;
+    }
+    
+    start() {
+        this.lastTime = performance.now();
+        this.animate();
+    }
+    
+    stop() {
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+        }
+    }
+    
+    animate() {
+        const now = performance.now();
+        const delta = now - this.lastTime;
+        this.lastTime = now;
+        
+        // Smooth rotation toward target with ambient drift
+        const smoothing = 0.02;
+        this.viewLat += (this.targetLat - this.viewLat) * smoothing;
+        
+        // Add slow ambient rotation
+        if (this.autoRotate) {
+            this.targetLon -= this.rotationSpeed * delta;
+            if (this.targetLon < -180) this.targetLon += 360;
+        }
+        this.viewLon += (this.targetLon - this.viewLon) * smoothing;
+        
+        this.render();
+        this.animationId = requestAnimationFrame(() => this.animate());
+    }
+    
+    // Convert lat/lon to 3D coordinates, then project to 2D
+    project(lat, lon) {
+        const latRad = lat * Math.PI / 180;
+        const lonRad = (lon - this.viewLon) * Math.PI / 180;
+        const viewLatRad = this.viewLat * Math.PI / 180;
+        
+        // Spherical to Cartesian
+        const x = Math.cos(latRad) * Math.sin(lonRad);
+        const y = Math.sin(latRad) * Math.cos(viewLatRad) - 
+                  Math.cos(latRad) * Math.cos(lonRad) * Math.sin(viewLatRad);
+        const z = Math.sin(latRad) * Math.sin(viewLatRad) + 
+                  Math.cos(latRad) * Math.cos(lonRad) * Math.cos(viewLatRad);
+        
+        // Only draw if on visible hemisphere
+        if (z < 0) return null;
+        
+        return {
+            x: this.centerX + x * this.radius,
+            y: this.centerY - y * this.radius,
+            z: z
+        };
+    }
+    
+    render() {
+        const ctx = this.ctx;
+        ctx.clearRect(0, 0, this.width, this.height);
+        
+        // Ocean base (dark sphere)
+        const oceanGradient = ctx.createRadialGradient(
+            this.centerX - this.radius * 0.3, 
+            this.centerY - this.radius * 0.3, 
+            0,
+            this.centerX, 
+            this.centerY, 
+            this.radius
+        );
+        oceanGradient.addColorStop(0, '#0f2847');
+        oceanGradient.addColorStop(0.5, '#0a1628');
+        oceanGradient.addColorStop(1, '#050d18');
+        
+        ctx.beginPath();
+        ctx.arc(this.centerX, this.centerY, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = oceanGradient;
+        ctx.fill();
+        
+        // Draw continents
+        this.drawContinents(ctx);
+        
+        // Draw grid
+        if (this.showGrid) {
+            this.drawGrid(ctx);
+        }
+        
+        // Draw location marker
+        if (this.showLocation) {
+            this.drawLocationMarker(ctx);
+        }
+        
+        // Atmospheric glow (edge lighting)
+        const atmosGradient = ctx.createRadialGradient(
+            this.centerX, this.centerY, this.radius * 0.85,
+            this.centerX, this.centerY, this.radius * 1.05
+        );
+        atmosGradient.addColorStop(0, 'transparent');
+        atmosGradient.addColorStop(0.5, 'rgba(100, 180, 255, 0.08)');
+        atmosGradient.addColorStop(1, 'transparent');
+        
+        ctx.beginPath();
+        ctx.arc(this.centerX, this.centerY, this.radius * 1.05, 0, Math.PI * 2);
+        ctx.fillStyle = atmosGradient;
+        ctx.fill();
+        
+        // Specular highlight
+        const highlightGradient = ctx.createRadialGradient(
+            this.centerX - this.radius * 0.4,
+            this.centerY - this.radius * 0.4,
+            0,
+            this.centerX - this.radius * 0.2,
+            this.centerY - this.radius * 0.2,
+            this.radius * 0.6
+        );
+        highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
+        highlightGradient.addColorStop(1, 'transparent');
+        
+        ctx.beginPath();
+        ctx.arc(this.centerX, this.centerY, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = highlightGradient;
+        ctx.fill();
+    }
+    
+    drawContinents(ctx) {
+        ctx.fillStyle = this.colors.land;
+        ctx.strokeStyle = this.colors.landHighlight;
+        ctx.lineWidth = 0.5;
+        
+        for (const [name, points] of Object.entries(this.continents)) {
+            ctx.beginPath();
+            let started = false;
+            let prevPoint = null;
+            
+            for (const [lon, lat] of points) {
+                const projected = this.project(lat, lon);
+                if (projected) {
+                    if (!started) {
+                        ctx.moveTo(projected.x, projected.y);
+                        started = true;
+                    } else {
+                        ctx.lineTo(projected.x, projected.y);
+                    }
+                    prevPoint = projected;
+                }
+            }
+            
+            if (started) {
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
+        }
+    }
+    
+    drawGrid(ctx) {
+        ctx.strokeStyle = this.colors.grid;
+        ctx.lineWidth = 0.5;
+        
+        // Longitude lines (meridians)
+        for (let lon = -180; lon < 180; lon += 30) {
+            ctx.beginPath();
+            let started = false;
+            
+            for (let lat = -90; lat <= 90; lat += 5) {
+                const projected = this.project(lat, lon);
+                if (projected) {
+                    if (!started) {
+                        ctx.moveTo(projected.x, projected.y);
+                        started = true;
+                    } else {
+                        ctx.lineTo(projected.x, projected.y);
+                    }
+                } else {
+                    started = false;
+                }
+            }
+            ctx.stroke();
+        }
+        
+        // Latitude lines (parallels)
+        for (let lat = -60; lat <= 60; lat += 30) {
+            ctx.beginPath();
+            let started = false;
+            
+            for (let lon = -180; lon <= 180; lon += 5) {
+                const projected = this.project(lat, lon);
+                if (projected) {
+                    if (!started) {
+                        ctx.moveTo(projected.x, projected.y);
+                        started = true;
+                    } else {
+                        ctx.lineTo(projected.x, projected.y);
+                    }
+                } else {
+                    started = false;
+                }
+            }
+            ctx.stroke();
+        }
+    }
+    
+    drawLocationMarker(ctx) {
+        const projected = this.project(this.targetLat, this.targetLon);
+        if (!projected) return;
+        
+        const pulseScale = 1 + 0.2 * Math.sin(performance.now() / 500);
+        
+        // Outer glow
+        const glowGradient = ctx.createRadialGradient(
+            projected.x, projected.y, 0,
+            projected.x, projected.y, 20 * pulseScale
+        );
+        glowGradient.addColorStop(0, this.colors.markerGlow);
+        glowGradient.addColorStop(1, 'transparent');
+        
+        ctx.beginPath();
+        ctx.arc(projected.x, projected.y, 20 * pulseScale, 0, Math.PI * 2);
+        ctx.fillStyle = glowGradient;
+        ctx.fill();
+        
+        // Inner marker
+        ctx.beginPath();
+        ctx.arc(projected.x, projected.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = this.colors.marker;
+        ctx.fill();
+        
+        // Ring
+        ctx.beginPath();
+        ctx.arc(projected.x, projected.y, 8 * pulseScale, 0, Math.PI * 2);
+        ctx.strokeStyle = this.colors.marker;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    }
+}
+
+// ============================================================================
 // COMPASS SUNDIAL — Isometric 3D with device orientation
 // ============================================================================
 
@@ -5250,14 +5588,15 @@ class CompassSundial {
         this.moonIndicator = document.getElementById('compass-moon-indicator');
         this.hint = document.getElementById('compass-hint');
         this.body = this.element?.querySelector('.compass-body');
-        this.mapImg = document.getElementById('compass-map-img');
-        this.mapBg = document.getElementById('compass-map-bg');
+        this.globeCanvas = document.getElementById('compass-globe');
+        this.globeBg = document.getElementById('compass-globe-bg');
+        this.globe = null;
         
         this.orientationEnabled = false;
         this.tiltX = 55; // Default isometric tilt
         this.tiltY = 0;
         this.rotation = 0;
-        this.mapLoaded = false;
+        this.globeInitialized = false;
         
         if (this.element) {
             this.init();
@@ -5301,8 +5640,8 @@ class CompassSundial {
             this.element.classList.add('orientation-active');
         }
         
-        // Load map when location is ready
-        this.loadMap();
+        // Initialize globe when location is ready
+        this.initGlobe();
         
         // Initial update
         this.updateCelestialBodies();
@@ -5310,63 +5649,32 @@ class CompassSundial {
         // Update every 30 seconds
         setInterval(() => this.updateCelestialBodies(), 30000);
         
-        // Retry map loading if location updates
-        setTimeout(() => this.loadMap(), 2000);
+        // Retry globe init if location updates
+        setTimeout(() => this.initGlobe(), 2000);
     }
     
-    loadMap() {
-        if (this.mapLoaded || !this.mapImg) return;
+    initGlobe() {
+        if (this.globeInitialized || !this.globeCanvas) return;
         
         const loc = this.getLocation();
         if (!loc.latitude || !loc.longitude) return;
         
-        const zoom = 14;
-        const lat = loc.latitude;
-        const lon = loc.longitude;
+        this.globe = new MiniGlobe(this.globeCanvas, {
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            rotationSpeed: 0.0003,
+            showGrid: true,
+            showLocation: true
+        });
         
-        // Calculate tile coordinates from lat/lon (Web Mercator)
-        const n = Math.pow(2, zoom);
-        const x = Math.floor((lon + 180) / 360 * n);
-        const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n);
-        
-        // Set crossorigin for CORS
-        this.mapImg.crossOrigin = 'anonymous';
-        
-        // Try multiple tile sources in order of preference (no API key required)
-        const tileSources = [
-            // CartoDB dark (free, no auth, dark theme)
-            `https://a.basemaps.cartocdn.com/dark_all/${zoom}/${x}/${y}@2x.png`,
-            // CartoDB dark (alternate server)
-            `https://b.basemaps.cartocdn.com/dark_all/${zoom}/${x}/${y}@2x.png`,
-            // OSM standard (fallback, light theme)
-            `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`
-        ];
-        
-        let sourceIndex = 0;
-        
-        const tryNextSource = () => {
-            if (sourceIndex >= tileSources.length) {
-                // All sources failed - hide map
-                if (this.mapBg) this.mapBg.style.display = 'none';
-                return;
-            }
-            
-            this.mapImg.src = tileSources[sourceIndex];
-            sourceIndex++;
-        };
-        
-        this.mapImg.onload = () => {
-            this.mapLoaded = true;
-            console.log('%c🗺️ Map loaded', 'color: #d4af37;');
-        };
-        
-        this.mapImg.onerror = () => {
-            console.log(`Map source ${sourceIndex} failed, trying next...`);
-            tryNextSource();
-        };
-        
-        // Start loading
-        tryNextSource();
+        this.globeInitialized = true;
+        console.log('%c🌍 Globe initialized', 'color: #64B5F6;');
+    }
+    
+    updateGlobeLocation() {
+        if (!this.globe) return;
+        const loc = this.getLocation();
+        this.globe.setLocation(loc.latitude, loc.longitude);
     }
     
     sunSpeak() {
