@@ -5537,11 +5537,12 @@ class MiniGlobe {
         this.currentLon += (this.targetLon - this.currentLon) * smoothing;
         
         // Calculate globe rotation to center target location facing camera
-        // Three.js SphereGeometry: rotation.y = 0 shows lon 0° (Prime Meridian)
-        // Positive rotation.y = counter-clockwise = shows eastern longitudes
-        // To show Seattle at -122°, rotate by +122° to bring it to front
-        // Formula: rotation = -longitude (negating brings target to front)
-        const lonRotation = (-this.currentLon + this.autoRotateOffset) * Math.PI / 180;
+        // Blue Marble texture: 0° longitude at center of image
+        // Three.js SphereGeometry: texture center maps to front (+Z) when rotation.y=0
+        // So rotation.y=0 shows London (0°), rotation.y=-122° shows Seattle (-122°)
+        // Positive rotation.y = counter-clockwise = Eastern longitudes to front
+        // Negative rotation.y = clockwise = Western longitudes to front
+        const lonRotation = (this.currentLon + this.autoRotateOffset) * Math.PI / 180;
         
         this.globe.rotation.y = lonRotation;
         this.globe.rotation.x = 0;
