@@ -6297,16 +6297,17 @@ class MiniGlobe {
     
     createMarker() {
         // ═══════════════════════════════════════════════════════════════════
-        // ELEGANT LOCATION MARKER — Subtle, refined, professional
+        // LOCATION MARKER — Hidden in 3D, HTML overlay handles interaction
         // ═══════════════════════════════════════════════════════════════════
-        // Small white/gold dot with soft halo - not garish
+        // The HTML .compass-location overlay provides the visual + interaction
+        // We keep the 3D marker for projection calculations but make it invisible
         
-        // Core pin - small, crisp, elegant gold
-        const markerGeometry = new THREE.SphereGeometry(0.04, 16, 16);
+        // Invisible marker - used only for lat/lon → screen position projection
+        const markerGeometry = new THREE.SphereGeometry(0.01, 8, 8);
         const markerMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffd700,  // Gold
+            color: 0xffffff,
             transparent: true,
-            opacity: 0.95,
+            opacity: 0,  // Invisible - HTML overlay handles visual
             depthTest: false,
             depthWrite: false
         });
@@ -6314,19 +6315,8 @@ class MiniGlobe {
         this.marker.renderOrder = 999;
         this.scene.add(this.marker);
         
-        // Soft halo - subtle white glow
-        const glowGeometry = new THREE.SphereGeometry(0.08, 16, 16);
-        const glowMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.25,
-            depthTest: false,
-            depthWrite: false,
-            blending: THREE.AdditiveBlending
-        });
-        this.markerGlow = new THREE.Mesh(glowGeometry, glowMaterial);
-        this.markerGlow.renderOrder = 998;
-        this.scene.add(this.markerGlow);
+        // No glow needed - HTML overlay handles it
+        this.markerGlow = null;
         
         this.updateMarkerPosition();
     }
@@ -6817,11 +6807,7 @@ class MiniGlobe {
             this.onOrientationChange(this);
         }
         
-        // Pulse marker
-        if (this.markerGlow) {
-            const pulse = 1 + 0.3 * Math.sin(now / 400);
-            this.markerGlow.scale.setScalar(pulse);
-        }
+        // Marker glow removed - HTML overlay handles visuals
         
         // Update shader time uniform (for any animated effects)
         if (this.globeMaterial) {
