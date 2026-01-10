@@ -5846,19 +5846,20 @@ class CompassSundial {
     
     getTemperatureString() {
         // Get current temperature from atmosphere if available
-        const atmos = window.celestialDemo?.atmosphere;
-        if (atmos && atmos.weather) {
-            const temp = atmos.weather.temperature;
-            const unitIsCelsius = localStorage.getItem('temperatureUnit') === 'C';
-            
-            if (unitIsCelsius) {
-                return `${temp.toFixed(0)}°C`;
-            } else {
-                const fahrenheit = (temp * 9/5) + 32;
-                return `${fahrenheit.toFixed(0)}°F`;
-            }
+        // atmosphere is the global WeatherAtmosphere instance
+        if (typeof atmosphere === 'undefined' || !atmosphere.temperature) {
+            return null;
         }
-        return null;
+        
+        const temp = atmosphere.temperature;
+        const useCelsius = localStorage.getItem('weather_temp_unit') === 'celsius';
+        
+        if (useCelsius) {
+            return `${temp.toFixed(0)}°C`;
+        } else {
+            const fahrenheit = (temp * 9/5) + 32;
+            return `${fahrenheit.toFixed(0)}°F`;
+        }
     }
     
     sunSpeak() {
@@ -5898,10 +5899,11 @@ class CompassSundial {
     }
     
     getHighLowString() {
-        const atmos = window.atmosphere;
-        if (!atmos || atmos.temperatureHigh === null || atmos.temperatureLow === null) {
+        // atmosphere is the global WeatherAtmosphere instance
+        if (typeof atmosphere === 'undefined' || atmosphere.temperatureHigh === null || atmosphere.temperatureLow === null) {
             return null;
         }
+        const atmos = atmosphere;
         
         const useCelsius = localStorage.getItem('weather_temp_unit') === 'celsius';
         
