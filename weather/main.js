@@ -8084,10 +8084,14 @@ class CompassSundial {
             this.sunIndicator.style.left = `${x}%`;
             this.sunIndicator.style.top = `${y}%`;
             
-            // Scale and opacity — keep subtle, no altitude bonus
-            const scale = onGlobe ? 1.0 : 0.9;
+            // Scale based on position — slightly larger when on globe for visibility
+            const scale = onGlobe ? 1.0 : 0.85;
             
-            this.sunIndicator.style.opacity = isDay ? '1' : '0.3';
+            // Always visible — sun is a celestial body, not a weather indicator
+            // Daytime: full brightness, nighttime: dimmed but clearly visible
+            const opacity = isDay ? 1.0 : 0.5;
+            
+            this.sunIndicator.style.opacity = String(opacity);
             this.sunIndicator.style.transform = `translate(-50%, -50%) scale(${scale})`;
             
             // Add/remove class for on-globe vs on-bezel styling
@@ -8124,10 +8128,13 @@ class CompassSundial {
             this.moonIndicator.style.left = `${x}%`;
             this.moonIndicator.style.top = `${y}%`;
             
-            // Scale and opacity — keep subtle, no altitude bonus
-            const scale = onGlobe ? 1.0 : 0.85;
+            // Scale based on position
+            const scale = onGlobe ? 1.0 : 0.8;
             
-            this.moonIndicator.style.opacity = moonUp ? '1' : '0.25';
+            // Moon always visible — above horizon: bright, below: dimmed but visible
+            const opacity = moonUp ? 1.0 : 0.45;
+            
+            this.moonIndicator.style.opacity = String(opacity);
             this.moonIndicator.style.transform = `translate(-50%, -50%) scale(${scale})`;
             
             // Add/remove class for styling
