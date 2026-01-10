@@ -1113,6 +1113,48 @@ class Ephemeris {
     }
 
     /**
+     * Wrap longitude to [-180, 180)
+     */
+    static wrapLongitude(angle) {
+        return ((angle + 180) % 360 + 360) % 360 - 180;
+    }
+
+    /**
+     * Convert latitude/longitude to Cartesian coordinates aligned with globe texture
+     */
+    static latLonToCartesian(lat, lon) {
+        const latRad = lat * this.DEG_TO_RAD;
+        const lonRad = (lon + 90) * this.DEG_TO_RAD;
+        const cosLat = Math.cos(latRad);
+        return {
+            x: cosLat * Math.sin(lonRad),
+            y: Math.sin(latRad),
+            z: cosLat * Math.cos(lonRad)
+        };
+    }
+
+    /**
+     * Wrap longitude into [-180, 180) range
+     */
+    static wrapLongitude(angle) {
+        return ((angle + 180) % 360 + 360) % 360 - 180;
+    }
+
+    /**
+     * Convert latitude/longitude to Cartesian coordinates aligned with globe texture
+     */
+    static latLonToCartesian(lat, lon) {
+        const latRad = lat * this.DEG_TO_RAD;
+        const lonRad = (lon + 90) * this.DEG_TO_RAD;
+        const cosLat = Math.cos(latRad);
+        return {
+            x: cosLat * Math.sin(lonRad),
+            y: Math.sin(latRad),
+            z: cosLat * Math.cos(lonRad)
+        };
+    }
+
+    /**
      * Calculate sun position (azimuth and altitude)
      * Algorithm: Low-precision solar coordinates from Astronomical Almanac
      * Accuracy: ±0.01° (sufficient for civil purposes)
@@ -1168,12 +1210,19 @@ class Ephemeris {
         ) * this.RAD_TO_DEG;
         
         azimuth = this.normalizeAngle(azimuth);
+        const alphaDeg = this.normalizeAngle(alpha * this.RAD_TO_DEG);
+        const subSolarLon = this.wrapLongitude(alphaDeg - gmst);
+        const subSolarLat = delta * this.RAD_TO_DEG;
+        const vector = this.latLonToCartesian(subSolarLat, subSolarLon);
         
         return {
             altitude: Math.round(altitude * 10) / 10,
             azimuth: Math.round(azimuth * 10) / 10,
             isDay: altitude > -0.833,  // Account for refraction at horizon
             direction: this.azimuthToDirection(azimuth),
+            subsolarLatitude: subSolarLat,
+            subsolarLongitude: subSolarLon,
+            vector,
             // Debug info
             _sunLon: Math.round(sunLon * 10) / 10,
             _declination: Math.round(delta * this.RAD_TO_DEG * 10) / 10
@@ -5051,7 +5100,6 @@ class CelestialDemo {
         if (window.compassSundial) {
             window.compassSundial.updateGlobeLocation(orig.latitude, orig.longitude);
             window.compassSundial.updateCelestialBodies(orig.latitude, orig.longitude);
-            window.compassSundial.clearSecretLocation?.();
         }
         
         // Remove location-specific CSS classes
@@ -5066,67 +5114,28 @@ class CelestialDemo {
     }
     
     showRevertToast() {
-        // Remove existing toasts
-        const existing = document.querySelector('.secret-toast');
-        if (existing) existing.remove();
-        
-        const toast = document.createElement('div');
-        toast.className = 'secret-toast revert-toast';
-        toast.innerHTML = `
-            <div class="toast-emoji">📍</div>
-            <div class="toast-content">
-                <div class="toast-title">Back to Your Location</div>
-                <div class="toast-subtitle">Weather and globe updated</div>
-            </div>
-        `;
-        document.body.appendChild(toast);
-        
-        // Animate in
-        requestAnimationFrame(() => {
-            toast.classList.add('show');
-        });
-        
-        // Remove after 3 seconds
-        setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 500);
-        }, 3000);
+        window.compassSundial?.clearSecretLocation?.({ preserveInfo: true });
+        window.compassSundial?.showInfoBar?.({
+            emoji: '📍',
+            title: 'Back to Your Location',
+            subtitle: 'Weather and globe reset to your coordinates',
+            meta: new Date().toLocaleTimeString()
+        }, true);
     }
 
     showLocationToast(location, word) {
-        // Remove existing toast
-        const existing = document.querySelector('.secret-toast');
-        if (existing) existing.remove();
-
         const isHome = word === 'home';
         const title = isHome ? `Welcome Home` : `Teleported to ${location.name}`;
-        const foundedLine = location.founded 
-            ? `<div class="toast-founded">Est. ${location.founded}</div>` 
-            : '';
+        const trivia = location.trivia?.length
+            ? `“${location.trivia[Math.floor(Math.random() * location.trivia.length)]}”`
+            : location.description || '';
 
-        const toast = document.createElement('div');
-        toast.className = `secret-toast ${word}-toast`;
-        toast.innerHTML = `
-            <div class="toast-emoji">${location.emoji}</div>
-            <div class="toast-content">
-                <div class="toast-title">${title}</div>
-                <div class="toast-subtitle">${location.address}, ${location.city}</div>
-                <div class="toast-trivia">"${location.trivia[Math.floor(Math.random() * location.trivia.length)]}"</div>
-                ${foundedLine}
-            </div>
-        `;
-        document.body.appendChild(toast);
-
-        // Animate in
-        requestAnimationFrame(() => {
-            toast.classList.add('show');
-        });
-
-        // Remove after 6 seconds
-        setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 400);
-        }, 6000);
+        window.compassSundial?.showInfoBar?.({
+            emoji: (location.mapEmojis?.join('')) || location.emoji || '✨',
+            title,
+            subtitle: `${location.address}, ${location.city}`,
+            meta: trivia
+        }, true);
     }
 
     updateLocationDisplays(location) {
@@ -5394,6 +5403,7 @@ class MiniGlobe {
         this.dragQuat = null;      // Quaternion for user drag interaction
         this.currentQuat = null;   // Current interpolated orientation
         this.dragVelocity = null;  // Angular velocity for momentum
+        this.onOrientationChange = null;
         
         // Auto rotation (gentle drift around Y axis)
         this.autoRotateAngle = 0;
@@ -5415,6 +5425,12 @@ class MiniGlobe {
         this.markerGlow = null;
         this.clouds = null;
         this.nightLights = null;
+        this.ambientLight = null;
+        this.fillLight = null;
+        this.sunLight = null;
+        this.sunLightTarget = null;
+        this.sunBaseVector = null;
+        this.lastFinalQuat = new THREE.Quaternion();
         
         this.animationId = null;
         this.lastTime = performance.now();
@@ -5504,9 +5520,8 @@ class MiniGlobe {
         // Longitude rotation: rotY = -90° - lon
         const rotY = (-90 - lon) * Math.PI / 180;
         
-        // Latitude tilt: ~50% of latitude for "looking at" perspective
-        // Positive lat (northern) → tilt top toward viewer
-        const rotX = lat * 0.5 * Math.PI / 180;
+        // Latitude tilt: swap vertical axis so northern hemisphere leans toward viewer
+        const rotX = -lat * 0.5 * Math.PI / 180;
         
         // Build quaternions
         const qY = new THREE.Quaternion();
@@ -5533,6 +5548,7 @@ class MiniGlobe {
         // (auto-rotation is in world space, applied first)
         const finalQuat = new THREE.Quaternion();
         finalQuat.multiplyQuaternions(qAuto, this.currentQuat);
+        this.lastFinalQuat.copy(finalQuat);
         
         // Apply to globe and all layers
         this.globe.quaternion.copy(finalQuat);
@@ -5706,23 +5722,29 @@ class MiniGlobe {
     
     createLights() {
         // Ambient light
-        const ambient = new THREE.AmbientLight(0x404040, 0.5);
-        this.scene.add(ambient);
+        this.ambientLight = new THREE.AmbientLight(0x3c3c4a, 0.35);
+        this.scene.add(this.ambientLight);
         
-        // Main light (simulates sun)
-        const mainLight = new THREE.DirectionalLight(0xffffff, 1);
-        mainLight.position.set(5, 3, 5);
-        this.scene.add(mainLight);
+        // Main light (sun) with target
+        this.sunLightTarget = new THREE.Object3D();
+        this.scene.add(this.sunLightTarget);
         
-        // Fill light
-        const fillLight = new THREE.DirectionalLight(0x4488ff, 0.3);
-        fillLight.position.set(-5, -2, 2);
-        this.scene.add(fillLight);
+        this.sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        this.sunLight.position.set(5, 3, 5);
+        this.sunLight.target = this.sunLightTarget;
+        this.scene.add(this.sunLight);
+        
+        // Fill light (sky bounce)
+        this.fillLight = new THREE.DirectionalLight(0x4466aa, 0.25);
+        this.fillLight.position.set(-5, -2, 2);
+        this.scene.add(this.fillLight);
         
         // Rim light for atmosphere
-        const rimLight = new THREE.DirectionalLight(0x88aaff, 0.2);
+        const rimLight = new THREE.DirectionalLight(0x88aaff, 0.18);
         rimLight.position.set(0, 0, -5);
         this.scene.add(rimLight);
+
+        this.sunBaseVector = new THREE.Vector3(1, 0, 0);
     }
     
     setupDragInteraction() {
@@ -5898,6 +5920,46 @@ class MiniGlobe {
         
         // Apply to globe
         this.applyQuaternion();
+        if (this.onOrientationChange) {
+            this.onOrientationChange(this);
+        }
+    }
+
+    updateSunLighting(sunData) {
+        if (!this.sunLight || !sunData) return;
+        this.currentSunData = sunData;
+        
+        if (sunData.vector) {
+            const { x, y, z } = sunData.vector;
+            this.sunBaseVector.set(x, y, z);
+            const sunPos = this.sunBaseVector.clone().multiplyScalar(5);
+            this.sunLight.position.copy(sunPos);
+            this.sunLightTarget.position.set(0, 0, 0);
+            this.sunLight.lookAt(this.sunLightTarget.position);
+            
+            // Fill light opposite side for soft bounce
+            this.fillLight.position.copy(this.sunBaseVector.clone().multiplyScalar(-4));
+            this.fillLight.lookAt(0, 0, 0);
+        }
+        
+        const altitude = sunData.altitude ?? 0;
+        const isDay = altitude > 0;
+        const twilight = altitude > -6 && altitude <= 0;
+        const darkness = altitude <= -6;
+        
+        this.sunLight.intensity = isDay ? 1.2 : twilight ? 0.6 : 0.15;
+        this.fillLight.intensity = isDay ? 0.25 : 0.15;
+        this.ambientLight.intensity = isDay ? 0.4 : 0.18;
+        
+        // Warmth shift based on altitude
+        const hue = isDay ? 0.12 - Math.min(0.08, altitude / 600) : 0.08;
+        const saturation = isDay ? 0.4 : 0.25;
+        const lightness = isDay ? 0.95 : 0.6;
+        this.sunLight.color.setHSL(hue, saturation, lightness);
+        
+        if (this.nightLights && this.nightLights.material) {
+            this.nightLights.material.opacity = darkness ? 0.65 : twilight ? 0.35 : 0.1;
+        }
     }
     
     springBackDrag() {
@@ -5981,6 +6043,22 @@ class MiniGlobe {
             this.renderer.dispose();
         }
     }
+
+    setOrientationCallback(callback) {
+        this.onOrientationChange = callback;
+    }
+
+    projectLatLon(lat, lon) {
+        if (lat == null || lon == null || !this.camera) return null;
+        const coords = Ephemeris.latLonToCartesian(lat, lon);
+        const vec = new THREE.Vector3(coords.x, coords.y, coords.z);
+        vec.applyQuaternion(this.lastFinalQuat);
+        const facingFront = vec.z > 0;
+        const projected = vec.clone().project(this.camera);
+        const x = (projected.x + 1) / 2 * 100;
+        const y = (1 - (projected.y + 1) / 2) * 100;
+        return { x, y, facingFront };
+    }
 }
 
 // ============================================================================
@@ -5999,6 +6077,7 @@ class CompassSundial {
         this.globeBg = document.getElementById('compass-globe-bg');
         this.secretEmojiLayer = document.getElementById('secret-emoji-layer');
         this.globe = null;
+        this.focusedLatLon = null;
         
         this.orientationEnabled = false;
         this.tiltX = 55; // Default isometric tilt
@@ -6071,8 +6150,8 @@ class CompassSundial {
         // Initial update
         this.updateCelestialBodies();
         
-        // Update every 30 seconds
-        setInterval(() => this.updateCelestialBodies(), 30000);
+        // Update every 5 seconds for smooth motion
+        this.celestialInterval = setInterval(() => this.updateCelestialBodies(), 5000);
         
         // Listen for atmosphere location ready event
         window.addEventListener('atmosphere-location-ready', (e) => {
@@ -6107,6 +6186,8 @@ class CompassSundial {
             dragSurface: this.element,
             skipDragSelectors: ['.compass-shadow', '.compass-gnomon']
         });
+        this.focusedLatLon = { latitude: loc.latitude, longitude: loc.longitude };
+        this.globe.setOrientationCallback(() => this.updateSecretEmojiPositions());
         
         this.globeInitialized = true;
         console.log('%c🌍 Globe initialized', 'color: #64B5F6;');
@@ -6116,6 +6197,7 @@ class CompassSundial {
         const container = this.element?.parentElement;
         if (!container || container.querySelector('.secret-info-bar')) return;
         
+        container.style.position = container.style.position || 'relative';
         this.secretInfoBar = document.createElement('div');
         this.secretInfoBar.className = 'secret-info-bar';
         this.secretInfoBar.setAttribute('role', 'status');
@@ -6149,9 +6231,9 @@ class CompassSundial {
         }
         
         const baseOffsets = [
-            { x: -12, y: -6, scale: 1 },
-            { x: 10, y: 6, scale: 0.92 },
-            { x: 0, y: 14, scale: 0.85 }
+            { x: -16, y: -10, scale: 1 },
+            { x: 12, y: 8, scale: 0.92 },
+            { x: 0, y: 18, scale: 0.85 }
         ];
         
         icons.slice(0, 3).forEach((icon, index) => {
@@ -6159,9 +6241,9 @@ class CompassSundial {
             span.className = 'secret-emoji';
             span.textContent = icon;
             const offset = baseOffsets[index] || baseOffsets[baseOffsets.length - 1];
-            span.style.left = `calc(50% + ${offset.x}%)`;
-            span.style.top = `calc(50% + ${offset.y}%)`;
-            span.style.transform = `translate(-50%, -50%) scale(${offset.scale})`;
+            span.style.setProperty('--offset-x', `${offset.x}px`);
+            span.style.setProperty('--offset-y', `${offset.y}px`);
+            span.style.setProperty('--emoji-scale', offset.scale);
             span.addEventListener('click', (event) => {
                 event.stopPropagation();
                 this.showSecretInfoBar();
@@ -6170,29 +6252,58 @@ class CompassSundial {
         });
         
         this.secretEmojiLayer.classList.add('visible');
-        this.showSecretInfoBar(true);
+        this.updateSecretEmojiPositions();
     }
     
-    clearSecretLocation() {
+    clearSecretLocation(options = {}) {
         this.activeSecretLocation = null;
         if (this.secretEmojiLayer) {
             this.secretEmojiLayer.innerHTML = '';
             this.secretEmojiLayer.classList.remove('visible');
         }
-        this.hideSecretInfoBar();
+        if (!options.preserveInfo) {
+            this.hideSecretInfoBar();
+        }
+    }
+    
+    updateSecretEmojiPositions() {
+        if (!this.secretEmojiLayer || !this.activeSecretLocation || !this.globe) return;
+        const { latitude, longitude } = this.activeSecretLocation;
+        const projection = this.globe.projectLatLon(latitude, longitude);
+        const emojis = this.secretEmojiLayer.querySelectorAll('.secret-emoji');
+        if (!projection) {
+            emojis.forEach(el => el.style.opacity = '0');
+            return;
+        }
+        emojis.forEach(el => {
+            el.style.left = `${projection.x}%`;
+            el.style.top = `${projection.y}%`;
+            el.style.opacity = projection.facingFront ? '1' : '0';
+        });
     }
     
     showSecretInfoBar(auto = false) {
-        if (!this.secretInfoBar || !this.activeSecretLocation) return;
-        const { name, city, description, emoji, mapEmojis } = this.activeSecretLocation;
-        this.secretInfoBar.querySelector('.sib-emoji').textContent = (mapEmojis?.join('')) || emoji || '✨';
-        this.secretInfoBar.querySelector('.sib-title').textContent = name;
-        this.secretInfoBar.querySelector('.sib-subtitle').textContent = description;
-        this.secretInfoBar.querySelector('.sib-meta').textContent = city;
+        if (!this.activeSecretLocation) return;
+        const { name, city, description, emoji, mapEmojis, address } = this.activeSecretLocation;
+        this.showInfoBar({
+            emoji: (mapEmojis?.join('')) || emoji || '✨',
+            title: name,
+            subtitle: address ? `${address}, ${city}` : city,
+            meta: description
+        }, auto);
+    }
+    
+    showInfoBar(content, auto = false) {
+        if (!this.secretInfoBar || !content) return;
+        clearTimeout(this.infoBarTimeout);
+        const { emoji = '✨', title = '', subtitle = '', meta = '' } = content;
+        this.secretInfoBar.querySelector('.sib-emoji').textContent = emoji;
+        this.secretInfoBar.querySelector('.sib-title').textContent = title;
+        this.secretInfoBar.querySelector('.sib-subtitle').textContent = subtitle;
+        this.secretInfoBar.querySelector('.sib-meta').textContent = meta;
         this.secretInfoBar.classList.add('show');
         
         if (auto) {
-            clearTimeout(this.infoBarTimeout);
             this.infoBarTimeout = setTimeout(() => this.hideSecretInfoBar(), 8000);
         }
     }
@@ -6206,10 +6317,11 @@ class CompassSundial {
         if (!this.globe) return;
         // Use provided coordinates or fall back to getLocation()
         if (lat !== null && lon !== null) {
+            this.focusedLatLon = { latitude: lat, longitude: lon };
             this.globe.setLocation(lat, lon);
         } else {
-            const loc = this.getLocation();
-            this.globe.setLocation(loc.latitude, loc.longitude);
+            const focus = this.focusedLatLon || this.getLocation();
+            this.globe.setLocation(focus.latitude, focus.longitude);
         }
     }
     
@@ -6485,6 +6597,10 @@ class CompassSundial {
         
         const sun = Ephemeris.sunPosition(useLat, useLon, now);
         const moon = Ephemeris.moonPosition(useLat, useLon, now);
+        
+        if (this.globe && sun.vector) {
+            this.globe.updateSunLighting(sun);
+        }
         
         // Update sun position - radius 38 keeps it inside the face
         if (this.sunIndicator) {
