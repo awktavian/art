@@ -5332,13 +5332,13 @@ class CompassSundial {
         // Set crossorigin for CORS
         this.mapImg.crossOrigin = 'anonymous';
         
-        // Try multiple tile sources in order of preference
+        // Try multiple tile sources in order of preference (no API key required)
         const tileSources = [
-            // Stamen Toner (dark, artistic)
-            `https://tiles.stadiamaps.com/tiles/stamen_toner/${zoom}/${x}/${y}@2x.png`,
-            // CartoDB dark
+            // CartoDB dark (free, no auth, dark theme)
             `https://a.basemaps.cartocdn.com/dark_all/${zoom}/${x}/${y}@2x.png`,
-            // OSM standard (fallback)
+            // CartoDB dark (alternate server)
+            `https://b.basemaps.cartocdn.com/dark_all/${zoom}/${x}/${y}@2x.png`,
+            // OSM standard (fallback, light theme)
             `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`
         ];
         
