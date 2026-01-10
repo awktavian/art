@@ -2857,6 +2857,7 @@ class SunVisualization {
     constructor(container) {
         this.container = container;
         this.sun = null;
+        this.windows = {};  // Store window elements for shade updates
         this.init();
     }
 
@@ -2881,25 +2882,113 @@ class SunVisualization {
         `;
         this.container.appendChild(arc);
         
-        // Create direction labels
+        // Create window frames with louvers at each cardinal direction
         const positions = [
-            { dir: 'S', x: '50%', y: 'calc(100% - 20px)', transform: 'translateX(-50%)' },
-            { dir: 'W', x: '10px', y: '50%', transform: 'translateY(-50%)' },
-            { dir: 'N', x: '50%', y: '20px', transform: 'translateX(-50%)' },
-            { dir: 'E', x: 'calc(100% - 10px)', y: '50%', transform: 'translate(-100%, -50%)' }
+            { dir: 'S', x: '50%', y: 'calc(100% - 10px)', transform: 'translateX(-50%)' },
+            { dir: 'W', x: '5px', y: '50%', transform: 'translateY(-50%)' },
+            { dir: 'N', x: '50%', y: '5px', transform: 'translateX(-50%)' },
+            { dir: 'E', x: 'calc(100% - 5px)', y: '50%', transform: 'translate(-100%, -50%)' }
         ];
         
         positions.forEach(({ dir, x, y, transform }) => {
-            const label = document.createElement('span');
-            label.className = `direction-label direction-${dir.toLowerCase()}`;
-            label.textContent = dir;
-            label.style.cssText = `
+            // Window container
+            const windowEl = document.createElement('div');
+            windowEl.className = `window-frame window-${dir.toLowerCase()}`;
+            windowEl.style.cssText = `
                 position: absolute;
                 left: ${x};
                 top: ${y};
                 transform: ${transform};
+                width: 48px;
+                height: 36px;
+                background: linear-gradient(180deg, rgba(30, 40, 60, 0.9) 0%, rgba(20, 25, 40, 0.95) 100%);
+                border: 2px solid rgba(212, 175, 55, 0.4);
+                border-radius: 4px;
+                overflow: hidden;
+                box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
             `;
-            this.container.appendChild(label);
+            
+            // Glass background (sky gradient)
+            const glass = document.createElement('div');
+            glass.className = 'window-glass';
+            glass.style.cssText = `
+                position: absolute;
+                inset: 2px;
+                background: linear-gradient(180deg, 
+                    rgba(135, 206, 235, 0.3) 0%, 
+                    rgba(255, 200, 100, 0.2) 100%);
+                border-radius: 2px;
+            `;
+            windowEl.appendChild(glass);
+            
+            // Louver container
+            const louverContainer = document.createElement('div');
+            louverContainer.className = 'louver-container';
+            louverContainer.style.cssText = `
+                position: absolute;
+                inset: 2px;
+                display: flex;
+                flex-direction: column;
+                gap: 1px;
+                transition: opacity 0.3s ease;
+            `;
+            
+            // Create 5 louver slats
+            for (let i = 0; i < 5; i++) {
+                const louver = document.createElement('div');
+                louver.className = 'louver-slat';
+                louver.style.cssText = `
+                    flex: 1;
+                    background: linear-gradient(180deg, 
+                        rgba(180, 180, 180, 0.95) 0%, 
+                        rgba(140, 140, 140, 0.9) 50%,
+                        rgba(100, 100, 100, 0.85) 100%);
+                    transform-origin: top center;
+                    transform: rotateX(85deg);
+                    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+                `;
+                louverContainer.appendChild(louver);
+            }
+            windowEl.appendChild(louverContainer);
+            
+            // Direction label
+            const label = document.createElement('span');
+            label.className = 'window-label';
+            label.textContent = dir;
+            label.style.cssText = `
+                position: absolute;
+                bottom: -18px;
+                left: 50%;
+                transform: translateX(-50%);
+                font-family: var(--font-mono);
+                font-size: 11px;
+                font-weight: 600;
+                color: var(--gold);
+                text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+            `;
+            windowEl.appendChild(label);
+            
+            // Glare indicator (shows sun intensity)
+            const glare = document.createElement('div');
+            glare.className = 'window-glare';
+            glare.style.cssText = `
+                position: absolute;
+                inset: 0;
+                background: radial-gradient(ellipse at 30% 30%, 
+                    rgba(255, 220, 100, 0) 0%, 
+                    rgba(255, 220, 100, 0) 100%);
+                pointer-events: none;
+                transition: background 0.3s ease;
+            `;
+            windowEl.appendChild(glare);
+            
+            this.container.appendChild(windowEl);
+            this.windows[dir] = { 
+                element: windowEl, 
+                louvers: louverContainer,
+                glare: glare 
+            };
         });
         
         // Create horizon line
@@ -2944,6 +3033,65 @@ class SunVisualization {
         
         // Opacity based on day/night
         this.sun.style.opacity = altitude > 0 ? 1 : 0.3;
+    }
+    
+    /**
+     * Update window shades based on recommendations
+     * @param {Array} recommendations - Array of shade recommendations from HomeGeometry
+     */
+    updateShades(recommendations) {
+        // Map recommendations to cardinal directions
+        // Group by direction and find highest intensity for each
+        const directionIntensity = { N: 0, S: 0, E: 0, W: 0 };
+        const directionLevel = { N: 100, S: 100, E: 100, W: 100 };
+        
+        recommendations.forEach(rec => {
+            const dir = rec.facing;
+            if (directionIntensity[dir] !== undefined) {
+                // Track max intensity and min level (most closed)
+                directionIntensity[dir] = Math.max(directionIntensity[dir], rec.intensity || 0);
+                directionLevel[dir] = Math.min(directionLevel[dir], rec.level);
+            }
+        });
+        
+        // Update each window's louvers
+        Object.entries(this.windows).forEach(([dir, window]) => {
+            const intensity = directionIntensity[dir];
+            const level = directionLevel[dir];
+            
+            // Level 100 = open (louvers flat), Level 0 = closed (louvers angled)
+            // rotateX(85deg) = open, rotateX(0deg) = closed
+            const openAngle = 85;
+            const closedAngle = 0;
+            const louverAngle = openAngle - (openAngle - closedAngle) * (1 - level / 100);
+            
+            // Apply to all louver slats
+            const slats = window.louvers.querySelectorAll('.louver-slat');
+            slats.forEach((slat, i) => {
+                // Slight stagger for more realistic animation
+                const delay = i * 30;
+                slat.style.transitionDelay = `${delay}ms`;
+                slat.style.transform = `rotateX(${louverAngle}deg)`;
+            });
+            
+            // Update glare indicator based on sun intensity
+            if (intensity > 0.3) {
+                const glareOpacity = intensity * 0.6;
+                window.glare.style.background = `radial-gradient(ellipse at 30% 30%, 
+                    rgba(255, 220, 100, ${glareOpacity}) 0%, 
+                    rgba(255, 180, 50, ${glareOpacity * 0.3}) 50%,
+                    transparent 70%)`;
+            } else {
+                window.glare.style.background = 'none';
+            }
+            
+            // Update border color based on state
+            if (level < 50) {
+                window.element.style.borderColor = 'rgba(255, 150, 50, 0.6)';  // Warning - shades closing
+            } else {
+                window.element.style.borderColor = 'rgba(212, 175, 55, 0.4)';  // Normal
+            }
+        });
     }
 }
 
@@ -5723,6 +5871,11 @@ class CelestialDemo {
 
         if (this.shadeTable) {
             this.shadeTable.update(recommendations);
+        }
+        
+        // Update window louvers in visualization
+        if (this.visualization) {
+            this.visualization.updateShades(recommendations);
         }
 
         this.updateDisplays(sun);
