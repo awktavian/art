@@ -1,6 +1,6 @@
 /**
  * Internationalization (i18n) System for What About the Weather?
- * Lightweight translation support with auto-detection and manual switching.
+ * Comprehensive translation support with 8 languages.
  */
 
 'use strict';
@@ -60,25 +60,27 @@ class I18n {
                 'label.isDay': 'Is Day',
                 'label.weather': 'Weather',
                 'label.cloudCoverage': 'Cloud Coverage',
-                'label.timeOfDay': 'Time of Day',
-                'label.includeWeather': 'Include Weather',
-                'label.simulateClouds': 'Simulate clouds',
-                'label.sunPosition': 'Sun Position',
-                'label.shadeRecommendations': 'Shade Recommendations',
+
+                // Demo labels
+                'demo.timeOfDay': 'Time of Day',
+                'demo.includeWeather': 'Include Weather',
+                'demo.simulateClouds': 'Simulate clouds',
+                'demo.sunPosition': 'Sun Position',
+                'demo.shadeRecommendations': 'Shade Recommendations',
 
                 // Timeline
-                'timeline.sunrise': 'Sunrise',
+                'timeline.sunrise.time': 'Sunrise',
                 'timeline.sunrise.title': 'Morning Optimization',
-                'timeline.sunrise.desc': 'East-facing windows get adjusted first. Living Room East (237) may close to 60% as morning sun streams in. Other shades stay open.',
-                'timeline.noon': 'Solar Noon',
+                'timeline.sunrise.description': 'East-facing windows get adjusted first. Living Room East (237) may close to 60% as morning sun streams in. Other shades stay open.',
+                'timeline.noon.time': 'Solar Noon',
                 'timeline.noon.title': 'Peak Sun',
-                'timeline.noon.desc': 'South-facing windows see maximum exposure. Living South (235), Dining South (243), Entry (229) adjust based on altitude. High sun = less glare.',
-                'timeline.afternoon': 'Afternoon',
+                'timeline.noon.description': 'South-facing windows see maximum exposure. Living South (235), Dining South (243), Entry (229) adjust based on altitude. High sun = less glare.',
+                'timeline.afternoon.time': 'Afternoon',
                 'timeline.afternoon.title': 'West Exposure',
-                'timeline.afternoon.desc': 'Sun moves west. Primary West (68) and Bed 4 shades (359, 361) begin adjusting. Late afternoon sun is low and intense—maximum glare potential.',
-                'timeline.dusk': 'Civil Dusk',
+                'timeline.afternoon.description': 'Sun moves west. Primary West (68) and Bed 4 shades (359, 361) begin adjusting. Late afternoon sun is low and intense—maximum glare potential.',
+                'timeline.dusk.time': 'Civil Dusk',
                 'timeline.dusk.title': 'Evening Opening',
-                'timeline.dusk.desc': 'Sun drops below horizon. All shades open to 100%. Enjoy the evening light. Prepare for sunset views.',
+                'timeline.dusk.description': 'Sun drops below horizon. All shades open to 100%. Enjoy the evening light. Prepare for sunset views.',
 
                 // Weather conditions
                 'weather.clear': 'Clear',
@@ -102,8 +104,14 @@ class I18n {
                 'table.glare': 'Glare',
                 'table.level': 'Level',
                 'table.reason': 'Reason',
+                'table.direction': 'Direction',
+                'table.whatFacesIt': 'What Faces It',
+                'table.sunTimes': 'Sun Times',
+                'table.condition': 'Condition',
+                'table.action': 'Action',
+                'table.why': 'Why',
 
-                // Cards
+                // Cards - Ephemeris
                 'card.azimuth.title': 'Azimuth',
                 'card.azimuth.subtitle': '0° = North',
                 'card.azimuth.body': "The sun's compass bearing. 0° is North, 90° is East, 180° is South, 270° is West. Tells us which direction the sun is shining.",
@@ -114,47 +122,37 @@ class I18n {
                 'card.isDay.subtitle': 'altitude > 0',
                 'card.isDay.body': "Simple boolean—is the sun above the horizon? If not, we don't need to worry about glare. Open all shades for nighttime views.",
 
+                // Cards - Architecture
+                'card.interval.title': 'Every 30 Minutes',
+                'card.interval.subtitle': 'Re-optimization interval',
+                'card.interval.body': "The sun moves ~7.5° every 30 minutes. That's enough to shift glare from one window orientation to another. Too frequent = motor wear. Too infrequent = stale recommendations.",
+                'card.cbfProtected.title': 'CBF Protected',
+                'card.cbfProtected.subtitle': 'Safety constraint',
+                'card.cbfProtected.body': "Control Barrier Functions ensure <code>h(x) ≥ 0</code>. If you manually adjust a shade, the system won't override you. Your explicit intent is protected for 30 minutes.",
+                'card.portable.title': 'Portable',
+                'card.portable.subtitle': 'Location-agnostic',
+                'card.portable.body': "Home coordinates come from <code>config/location.yaml</code> or environment variables. Move houses? Just update the config. The algorithms don't change.",
+
                 // Callouts
-                'callout.api.title': 'The Problem with APIs',
-                'callout.api.content': "Weather APIs tell you <em>when</em> the sun rises. They don't tell you <em>where</em> it is at 2:47 PM or which direction it's shining. For that, I need to do the math myself. And honestly? It's beautiful math.",
-                'callout.north.title': 'North-Facing = Always Open',
-                'callout.north.content': "At Seattle's latitude (47.7°N), north-facing windows never get direct sun. So I leave those shades alone—let that soft, even light pour in.",
+                'callout.problemApis.title': 'The Problem with APIs',
+                'callout.problemApis.content': "Weather APIs tell you <em>when</em> the sun rises. They don't tell you <em>where</em> it is at 2:47 PM or which direction it's shining. For that, I need to do the math myself. And honestly? It's beautiful math.",
+                'callout.northFacing.title': 'North-Facing = Always Open',
+                'callout.northFacing.content': "At Seattle's latitude (47.7°N), north-facing windows never get direct sun. So I leave those shades alone—let that soft, even light pour in.",
                 'callout.seattle.title': 'Seattle Reality',
                 'callout.seattle.content': "Seattle averages 226 cloudy days per year. So yes—the weather override isn't an edge case. It's the <em>common</em> case. But those 139 sunny days? They're worth getting right.",
                 'callout.cbf.title': 'CBF Safety: I Respect Your Choices',
                 'callout.cbf.content': "If you close a shade yourself, I won't fight you. The <code>ResidentOverrideCBF</code> (Control Barrier Function) protects your explicit intent for 30 minutes. Your judgment matters more than my algorithm.",
 
+                // Formula
+                'formula.julian.title': 'Julian Date Calculation',
+                'formula.julian.description': 'The foundation of all astronomical calculations. Converts calendar date to continuous day count since 4713 BCE.',
+
+                // Diagram
+                'diagram.dataFlow': 'Data Flow',
+
                 // Footer
+                'footer.title': 'What About the Weather?',
                 'footer.subtitle': 'Where astronomy meets home comfort — built with care by Kagami',
-
-                // Why Calculate
-                'whyCalculate.title': 'Why Calculate?',
-                'whyCalculate.content': "Weather APIs give you sunrise/sunset times—but that's not enough. We need the sun's <strong>exact position</strong> (azimuth and altitude) at any moment to know which windows have glare.",
-
-                // Intensity Function
-                'intensity.title': 'The Intensity Function',
-                'intensity.content': 'Not all sun exposure is equal. We calculate <strong>glare intensity</strong> based on how directly the sun hits each window and the sun\'s altitude.',
-
-                // Direction Constants
-                'directions.title': 'Direction Constants',
-
-                // Override Logic
-                'override.title': 'The Override Logic',
-                'override.content': "When it's cloudy or raining, there's no glare to block. Weather data from OpenWeatherMap One Call API 3.0 can override celestial calculations.",
-
-                // Weather Conditions table
-                'weather.conditions.title': 'Weather Conditions',
-
-                // Architecture cards
-                'arch.interval.title': 'Every 30 Minutes',
-                'arch.interval.subtitle': 'Re-optimization interval',
-                'arch.interval.body': "The sun moves ~7.5° every 30 minutes. That's enough to shift glare from one window orientation to another. Too frequent = motor wear. Too infrequent = stale recommendations.",
-                'arch.cbf.title': 'CBF Protected',
-                'arch.cbf.subtitle': 'Safety constraint',
-                'arch.cbf.body': "Control Barrier Functions ensure <code>h(x) ≥ 0</code>. If you manually adjust a shade, the system won't override you. Your explicit intent is protected for 30 minutes.",
-                'arch.portable.title': 'Portable',
-                'arch.portable.subtitle': 'Location-agnostic',
-                'arch.portable.body': "Home coordinates come from <code>config/location.yaml</code> or environment variables. Move houses? Just update the config. The algorithms don't change.",
 
                 // Misc
                 'yes': 'Yes',
@@ -185,17 +183,25 @@ class I18n {
 
                 // Section titles
                 'section.ephemeris.title': 'Las <em>Efemérides</em>',
-                'section.ephemeris.desc': '¿Dónde está el sol ahora mismo? No desde una API meteorológica—calculado desde mecánica orbital.',
+                'section.ephemeris.description': '¿Dónde está el sol ahora mismo? No desde una API meteorológica—calculado desde mecánica orbital.',
+                'section.ephemeris.whyCalculate': '¿Por Qué Calcular?',
+                'section.ephemeris.whyCalculateDesc': 'Las APIs meteorológicas te dan horas de amanecer/atardecer—pero eso no es suficiente. Necesitamos la <strong>posición exacta</strong> del sol (azimut y altitud) en cualquier momento.',
                 'section.geometry.title': 'Geometría de <em>Ventanas</em>',
-                'section.geometry.desc': 'Una casa con vista. 11 persianas. 4 orientaciones cardinales. ¿Qué ventanas reciben sol y cuándo?',
+                'section.geometry.description': 'Una casa con vista. 11 persianas. 4 orientaciones cardinales. ¿Qué ventanas reciben sol y cuándo?',
+                'section.geometry.intensityFunction': 'La Función de Intensidad',
+                'section.geometry.intensityFunctionDesc': 'No toda la exposición solar es igual. Calculamos la <strong>intensidad del deslumbramiento</strong> basándonos en cuán directamente el sol golpea cada ventana.',
+                'section.geometry.directionConstants': 'Constantes de Dirección',
                 'section.weather.title': 'Integración <em>Climática</em>',
-                'section.weather.desc': 'Los cálculos celestes asumen cielos despejados. Las nubes lo cambian todo.',
+                'section.weather.description': 'Los cálculos celestes asumen cielos despejados. Las nubes lo cambian todo.',
+                'section.weather.overrideLogic': 'La Lógica de Anulación',
+                'section.weather.overrideLogicDesc': 'Cuando está nublado o lloviendo, no hay deslumbramiento que bloquear. Los datos meteorológicos pueden anular los cálculos celestes.',
+                'section.weather.conditions': 'Condiciones Climáticas',
                 'section.triggers.title': 'Disparadores <em>Celestes</em>',
-                'section.triggers.desc': 'Automatización basada en eventos. El sistema no consulta—observa eventos astronómicos.',
+                'section.triggers.description': 'Automatización basada en eventos. El sistema no consulta—observa eventos astronómicos.',
                 'section.demo.title': 'Demo <em>en Vivo</em>',
-                'section.demo.desc': 'Simulación interactiva. Arrastra el control de tiempo para ver cómo cambian las recomendaciones de persianas durante el día.',
+                'section.demo.description': 'Simulación interactiva. Arrastra el control de tiempo para ver cómo cambian las recomendaciones durante el día.',
                 'section.architecture.title': 'La <em>Arquitectura</em>',
-                'section.architecture.desc': 'Cómo todo encaja. Desde mecánica orbital hasta comandos de motor—aquí es donde la astronomía se encuentra con el confort del hogar.',
+                'section.architecture.description': 'Cómo todo encaja. Desde mecánica orbital hasta comandos de motor—donde la astronomía se encuentra con el confort.',
 
                 // Labels
                 'label.azimuth': 'Azimut',
@@ -204,25 +210,27 @@ class I18n {
                 'label.isDay': 'Es de Día',
                 'label.weather': 'Clima',
                 'label.cloudCoverage': 'Cobertura de Nubes',
-                'label.timeOfDay': 'Hora del Día',
-                'label.includeWeather': 'Incluir Clima',
-                'label.simulateClouds': 'Simular nubes',
-                'label.sunPosition': 'Posición del Sol',
-                'label.shadeRecommendations': 'Recomendaciones de Persianas',
+
+                // Demo labels
+                'demo.timeOfDay': 'Hora del Día',
+                'demo.includeWeather': 'Incluir Clima',
+                'demo.simulateClouds': 'Simular nubes',
+                'demo.sunPosition': 'Posición del Sol',
+                'demo.shadeRecommendations': 'Recomendaciones de Persianas',
 
                 // Timeline
-                'timeline.sunrise': 'Amanecer',
+                'timeline.sunrise.time': 'Amanecer',
                 'timeline.sunrise.title': 'Optimización Matutina',
-                'timeline.sunrise.desc': 'Las ventanas orientadas al este se ajustan primero. Living Room East (237) puede cerrar al 60% cuando entra el sol de la mañana.',
-                'timeline.noon': 'Mediodía Solar',
+                'timeline.sunrise.description': 'Las ventanas orientadas al este se ajustan primero. Living Room East (237) puede cerrar al 60% cuando entra el sol de la mañana.',
+                'timeline.noon.time': 'Mediodía Solar',
                 'timeline.noon.title': 'Sol Máximo',
-                'timeline.noon.desc': 'Las ventanas orientadas al sur ven máxima exposición. Living South (235), Dining South (243), Entry (229) se ajustan según la altitud.',
-                'timeline.afternoon': 'Tarde',
+                'timeline.noon.description': 'Las ventanas orientadas al sur ven máxima exposición. Living South (235), Dining South (243), Entry (229) se ajustan según la altitud.',
+                'timeline.afternoon.time': 'Tarde',
                 'timeline.afternoon.title': 'Exposición Oeste',
-                'timeline.afternoon.desc': 'El sol se mueve al oeste. Primary West (68) y las persianas de Bed 4 (359, 361) comienzan a ajustarse.',
-                'timeline.dusk': 'Crepúsculo Civil',
+                'timeline.afternoon.description': 'El sol se mueve al oeste. Primary West (68) y las persianas de Bed 4 (359, 361) comienzan a ajustarse.',
+                'timeline.dusk.time': 'Crepúsculo Civil',
                 'timeline.dusk.title': 'Apertura Vespertina',
-                'timeline.dusk.desc': 'El sol cae bajo el horizonte. Todas las persianas se abren al 100%. Disfruta de la luz del atardecer.',
+                'timeline.dusk.description': 'El sol cae bajo el horizonte. Todas las persianas se abren al 100%. Disfruta de la luz del atardecer.',
 
                 // Weather conditions
                 'weather.clear': 'Despejado',
@@ -246,59 +254,55 @@ class I18n {
                 'table.glare': 'Deslumbramiento',
                 'table.level': 'Nivel',
                 'table.reason': 'Razón',
+                'table.direction': 'Dirección',
+                'table.whatFacesIt': 'Qué Da a',
+                'table.sunTimes': 'Horas de Sol',
+                'table.condition': 'Condición',
+                'table.action': 'Acción',
+                'table.why': 'Por Qué',
 
-                // Cards
+                // Cards - Ephemeris
                 'card.azimuth.title': 'Azimut',
                 'card.azimuth.subtitle': '0° = Norte',
-                'card.azimuth.body': 'La orientación de brújula del sol. 0° es Norte, 90° es Este, 180° es Sur, 270° es Oeste. Indica la dirección del sol.',
+                'card.azimuth.body': 'La orientación de brújula del sol. 0° es Norte, 90° es Este, 180° es Sur, 270° es Oeste.',
                 'card.altitude.title': 'Altitud',
                 'card.altitude.subtitle': '0° = Horizonte',
-                'card.altitude.body': 'La altura del sol sobre el horizonte. 0° es amanecer/atardecer, 90° es directamente arriba. Sol más bajo = sombras más largas = más deslumbramiento.',
+                'card.altitude.body': 'La altura del sol sobre el horizonte. 0° es amanecer/atardecer, 90° es directamente arriba.',
                 'card.isDay.title': 'Es de Día',
                 'card.isDay.subtitle': 'altitud > 0',
-                'card.isDay.body': 'Booleano simple—¿está el sol sobre el horizonte? Si no, no hay que preocuparse por el deslumbramiento. Abrir todas las persianas para vistas nocturnas.',
+                'card.isDay.body': 'Booleano simple—¿está el sol sobre el horizonte? Si no, abrir todas las persianas para vistas nocturnas.',
+
+                // Cards - Architecture
+                'card.interval.title': 'Cada 30 Minutos',
+                'card.interval.subtitle': 'Intervalo de re-optimización',
+                'card.interval.body': 'El sol se mueve ~7.5° cada 30 minutos. Suficiente para cambiar el deslumbramiento de una ventana a otra.',
+                'card.cbfProtected.title': 'Protegido por CBF',
+                'card.cbfProtected.subtitle': 'Restricción de seguridad',
+                'card.cbfProtected.body': 'Las Funciones de Barrera de Control aseguran <code>h(x) ≥ 0</code>. Si ajustas manualmente una persiana, el sistema no te anulará.',
+                'card.portable.title': 'Portátil',
+                'card.portable.subtitle': 'Agnóstico de ubicación',
+                'card.portable.body': 'Las coordenadas de la casa vienen de <code>config/location.yaml</code>. ¿Te mudas? Solo actualiza la configuración.',
 
                 // Callouts
-                'callout.api.title': 'El Problema con las APIs',
-                'callout.api.content': 'Las APIs meteorológicas te dicen <em>cuándo</em> sale el sol. No te dicen <em>dónde</em> está a las 2:47 PM o en qué dirección brilla. Para eso, necesito hacer las matemáticas yo mismo.',
-                'callout.north.title': 'Norte = Siempre Abierto',
-                'callout.north.content': 'En la latitud de Seattle (47.7°N), las ventanas orientadas al norte nunca reciben sol directo. Así que dejo esas persianas tranquilas—que entre esa luz suave y uniforme.',
+                'callout.problemApis.title': 'El Problema con las APIs',
+                'callout.problemApis.content': 'Las APIs meteorológicas te dicen <em>cuándo</em> sale el sol. No te dicen <em>dónde</em> está a las 2:47 PM o en qué dirección brilla.',
+                'callout.northFacing.title': 'Norte = Siempre Abierto',
+                'callout.northFacing.content': 'En la latitud de Seattle (47.7°N), las ventanas orientadas al norte nunca reciben sol directo.',
                 'callout.seattle.title': 'La Realidad de Seattle',
-                'callout.seattle.content': 'Seattle promedia 226 días nublados al año. Así que sí—la anulación por clima no es un caso extremo. Es el caso <em>común</em>. Pero esos 139 días soleados? Vale la pena hacerlos bien.',
-                'callout.cbf.title': 'Seguridad CBF: Respeto Tus Decisiones',
-                'callout.cbf.content': 'Si cierras una persiana tú mismo, no voy a contradecirte. El <code>ResidentOverrideCBF</code> (Función de Barrera de Control) protege tu intención explícita por 30 minutos.',
+                'callout.seattle.content': 'Seattle promedia 226 días nublados al año. El override por clima es el caso <em>común</em>.',
+                'callout.cbf.title': 'Seguridad CBF',
+                'callout.cbf.content': 'Si cierras una persiana tú mismo, no voy a contradecirte. El <code>ResidentOverrideCBF</code> protege tu intención.',
+
+                // Formula
+                'formula.julian.title': 'Cálculo de Fecha Juliana',
+                'formula.julian.description': 'La base de todos los cálculos astronómicos. Convierte fecha calendario a conteo continuo de días.',
+
+                // Diagram
+                'diagram.dataFlow': 'Flujo de Datos',
 
                 // Footer
+                'footer.title': '¿Y el Clima?',
                 'footer.subtitle': 'Donde la astronomía se encuentra con el confort del hogar — construido con cuidado por Kagami',
-
-                // Why Calculate
-                'whyCalculate.title': '¿Por Qué Calcular?',
-                'whyCalculate.content': 'Las APIs meteorológicas te dan horas de amanecer/atardecer—pero eso no es suficiente. Necesitamos la <strong>posición exacta</strong> del sol (azimut y altitud) en cualquier momento para saber qué ventanas tienen deslumbramiento.',
-
-                // Intensity Function
-                'intensity.title': 'La Función de Intensidad',
-                'intensity.content': 'No toda la exposición solar es igual. Calculamos la <strong>intensidad del deslumbramiento</strong> basándonos en cuán directamente el sol golpea cada ventana y la altitud del sol.',
-
-                // Direction Constants
-                'directions.title': 'Constantes de Dirección',
-
-                // Override Logic
-                'override.title': 'La Lógica de Anulación',
-                'override.content': 'Cuando está nublado o lloviendo, no hay deslumbramiento que bloquear. Los datos meteorológicos de OpenWeatherMap One Call API 3.0 pueden anular los cálculos celestes.',
-
-                // Weather Conditions table
-                'weather.conditions.title': 'Condiciones Climáticas',
-
-                // Architecture cards
-                'arch.interval.title': 'Cada 30 Minutos',
-                'arch.interval.subtitle': 'Intervalo de re-optimización',
-                'arch.interval.body': 'El sol se mueve ~7.5° cada 30 minutos. Eso es suficiente para cambiar el deslumbramiento de una orientación de ventana a otra.',
-                'arch.cbf.title': 'Protegido por CBF',
-                'arch.cbf.subtitle': 'Restricción de seguridad',
-                'arch.cbf.body': 'Las Funciones de Barrera de Control aseguran <code>h(x) ≥ 0</code>. Si ajustas manualmente una persiana, el sistema no te anulará.',
-                'arch.portable.title': 'Portátil',
-                'arch.portable.subtitle': 'Agnóstico de ubicación',
-                'arch.portable.body': 'Las coordenadas de la casa vienen de <code>config/location.yaml</code> o variables de entorno. ¿Te mudas? Solo actualiza la configuración.',
 
                 // Misc
                 'yes': 'Sí',
@@ -317,8 +321,8 @@ class I18n {
                 // Hero
                 'hero.badge': '技術的深掘り',
                 'hero.title': '<em>天気</em>は<br>どうなの？',
-                'hero.subtitle': '天文計算、窓の形状、気象データを組み合わせて、インテリジェントなシェード自動化を実現する方法。',
-                'hero.subtitle.emphasis': '家は太陽から守るべき時と、嵐を迎え入れるべき時を知っているべきだから。',
+                'hero.subtitle': '天文計算、窓の形状、気象データを組み合わせて、インテリジェントなシェード自動化を実現。',
+                'hero.subtitle.emphasis': '家は太陽から守るべき時と、嵐を迎え入れるべき時を知っているべき。',
                 'hero.scroll': '太陽の軌跡をたどる',
 
                 // Hero stats
@@ -329,17 +333,25 @@ class I18n {
 
                 // Section titles
                 'section.ephemeris.title': '<em>天体暦</em>',
-                'section.ephemeris.desc': '太陽は今どこにある？天気APIからではなく—軌道力学から計算。',
+                'section.ephemeris.description': '太陽は今どこにある？天気APIからではなく—軌道力学から計算。',
+                'section.ephemeris.whyCalculate': 'なぜ計算するのか？',
+                'section.ephemeris.whyCalculateDesc': '天気APIは日の出/日没時刻を提供する—でもそれだけでは足りない。<strong>正確な位置</strong>が必要。',
                 'section.geometry.title': '窓の<em>形状</em>',
-                'section.geometry.desc': '眺めの良い家。11枚のシェード。4つの方位。どの窓がいつ日光を受ける？',
+                'section.geometry.description': '眺めの良い家。11枚のシェード。4つの方位。どの窓がいつ日光を受ける？',
+                'section.geometry.intensityFunction': '強度関数',
+                'section.geometry.intensityFunctionDesc': 'すべての日光露出が等しいわけではない。<strong>まぶしさの強度</strong>を計算。',
+                'section.geometry.directionConstants': '方向定数',
                 'section.weather.title': '天気<em>統合</em>',
-                'section.weather.desc': '天体計算は晴天を前提としている。雲がすべてを変える。',
+                'section.weather.description': '天体計算は晴天を前提としている。雲がすべてを変える。',
+                'section.weather.overrideLogic': 'オーバーライドロジック',
+                'section.weather.overrideLogicDesc': '曇りや雨の時、遮るべきまぶしさはない。気象データが天体計算をオーバーライドできる。',
+                'section.weather.conditions': '天気条件',
                 'section.triggers.title': '天体<em>トリガー</em>',
-                'section.triggers.desc': 'イベント駆動の自動化。システムはポーリングしない—天文イベントを監視する。',
+                'section.triggers.description': 'イベント駆動の自動化。システムはポーリングしない—天文イベントを監視。',
                 'section.demo.title': 'ライブ<em>デモ</em>',
-                'section.demo.desc': 'インタラクティブなシミュレーション。時間スライダーをドラッグして、一日を通してシェードの推奨がどう変化するか確認。',
+                'section.demo.description': 'インタラクティブなシミュレーション。時間スライダーをドラッグして変化を確認。',
                 'section.architecture.title': '<em>アーキテクチャ</em>',
-                'section.architecture.desc': 'すべてがどう組み合わさるか。軌道力学からモーターコマンドまで—天文学と家庭の快適さが出会う場所。',
+                'section.architecture.description': 'すべてがどう組み合わさるか。軌道力学からモーターコマンドまで。',
 
                 // Labels
                 'label.azimuth': '方位角',
@@ -348,25 +360,27 @@ class I18n {
                 'label.isDay': '昼間か',
                 'label.weather': '天気',
                 'label.cloudCoverage': '雲量',
-                'label.timeOfDay': '時刻',
-                'label.includeWeather': '天気を含める',
-                'label.simulateClouds': '雲をシミュレート',
-                'label.sunPosition': '太陽の位置',
-                'label.shadeRecommendations': 'シェード推奨',
+
+                // Demo labels
+                'demo.timeOfDay': '時刻',
+                'demo.includeWeather': '天気を含める',
+                'demo.simulateClouds': '雲をシミュレート',
+                'demo.sunPosition': '太陽の位置',
+                'demo.shadeRecommendations': 'シェード推奨',
 
                 // Timeline
-                'timeline.sunrise': '日の出',
+                'timeline.sunrise.time': '日の出',
                 'timeline.sunrise.title': '朝の最適化',
-                'timeline.sunrise.desc': '東向きの窓が最初に調整される。リビング東(237)は朝日が差し込むと60%まで閉じることがある。',
-                'timeline.noon': '太陽の南中',
+                'timeline.sunrise.description': '東向きの窓が最初に調整される。リビング東(237)は朝日が差し込むと60%まで閉じることがある。',
+                'timeline.noon.time': '太陽の南中',
                 'timeline.noon.title': 'ピーク時の太陽',
-                'timeline.noon.desc': '南向きの窓は最大露出を受ける。リビング南(235)、ダイニング南(243)、エントリー(229)が高度に基づいて調整。',
-                'timeline.afternoon': '午後',
+                'timeline.noon.description': '南向きの窓は最大露出を受ける。高度に基づいて調整。',
+                'timeline.afternoon.time': '午後',
                 'timeline.afternoon.title': '西向き露出',
-                'timeline.afternoon.desc': '太陽が西に移動。プライマリ西(68)とベッド4のシェード(359, 361)が調整を開始。',
-                'timeline.dusk': '市民薄暮',
+                'timeline.afternoon.description': '太陽が西に移動。プライマリ西(68)とベッド4のシェードが調整を開始。',
+                'timeline.dusk.time': '市民薄暮',
                 'timeline.dusk.title': '夕方の開放',
-                'timeline.dusk.desc': '太陽が地平線の下に沈む。すべてのシェードが100%開放。夕方の光を楽しむ。',
+                'timeline.dusk.description': '太陽が地平線の下に沈む。すべてのシェードが100%開放。',
 
                 // Weather conditions
                 'weather.clear': '晴れ',
@@ -390,59 +404,55 @@ class I18n {
                 'table.glare': 'まぶしさ',
                 'table.level': 'レベル',
                 'table.reason': '理由',
+                'table.direction': '方向',
+                'table.whatFacesIt': '面している部屋',
+                'table.sunTimes': '日照時間',
+                'table.condition': '条件',
+                'table.action': 'アクション',
+                'table.why': '理由',
 
-                // Cards
+                // Cards - Ephemeris
                 'card.azimuth.title': '方位角',
                 'card.azimuth.subtitle': '0° = 北',
-                'card.azimuth.body': '太陽のコンパス方位。0°は北、90°は東、180°は南、270°は西。太陽がどの方向から照らしているかを示す。',
+                'card.azimuth.body': '太陽のコンパス方位。0°は北、90°は東、180°は南、270°は西。',
                 'card.altitude.title': '高度',
                 'card.altitude.subtitle': '0° = 地平線',
-                'card.altitude.body': '地平線上の太陽の高さ。0°は日の出/日没、90°は真上。太陽が低い = 影が長い = まぶしさが増す。',
+                'card.altitude.body': '地平線上の太陽の高さ。太陽が低い = 影が長い = まぶしさが増す。',
                 'card.isDay.title': '昼間か',
                 'card.isDay.subtitle': '高度 > 0',
-                'card.isDay.body': 'シンプルなブール値—太陽は地平線の上にある？なければ、まぶしさを心配する必要はない。夜景のためにすべてのシェードを開ける。',
+                'card.isDay.body': '太陽は地平線の上にある？なければ、すべてのシェードを開ける。',
+
+                // Cards - Architecture
+                'card.interval.title': '30分ごと',
+                'card.interval.subtitle': '再最適化間隔',
+                'card.interval.body': '太陽は30分で約7.5°移動する。これは窓の向きによるまぶしさを変えるのに十分。',
+                'card.cbfProtected.title': 'CBF保護',
+                'card.cbfProtected.subtitle': '安全制約',
+                'card.cbfProtected.body': '制御バリア関数が<code>h(x) ≥ 0</code>を保証する。手動で調整した場合、システムはオーバーライドしない。',
+                'card.portable.title': 'ポータブル',
+                'card.portable.subtitle': '場所に依存しない',
+                'card.portable.body': '家の座標は<code>config/location.yaml</code>から取得。引っ越し？設定を更新するだけ。',
 
                 // Callouts
-                'callout.api.title': 'APIの問題点',
-                'callout.api.content': '天気APIは太陽が<em>いつ</em>昇るか教えてくれる。午後2:47に<em>どこ</em>にあるか、どの方向に照らしているかは教えてくれない。それには自分で計算が必要。',
-                'callout.north.title': '北向き = 常に開放',
-                'callout.north.content': 'シアトルの緯度(47.7°N)では、北向きの窓は直射日光を受けない。だからそれらのシェードはそのまま—柔らかく均一な光を入れる。',
+                'callout.problemApis.title': 'APIの問題点',
+                'callout.problemApis.content': '天気APIは太陽が<em>いつ</em>昇るか教えてくれる。<em>どこ</em>にあるかは教えてくれない。',
+                'callout.northFacing.title': '北向き = 常に開放',
+                'callout.northFacing.content': 'シアトルの緯度(47.7°N)では、北向きの窓は直射日光を受けない。',
                 'callout.seattle.title': 'シアトルの現実',
-                'callout.seattle.content': 'シアトルは年間平均226日が曇り。そう—天気オーバーライドはエッジケースではない。<em>一般的な</em>ケースだ。',
-                'callout.cbf.title': 'CBF安全性：あなたの選択を尊重',
-                'callout.cbf.content': '自分でシェードを閉じたら、私は逆らわない。<code>ResidentOverrideCBF</code>があなたの明示的な意図を30分間保護する。',
+                'callout.seattle.content': 'シアトルは年間平均226日が曇り。天気オーバーライドは<em>一般的な</em>ケース。',
+                'callout.cbf.title': 'CBF安全性',
+                'callout.cbf.content': '自分でシェードを閉じたら、私は逆らわない。<code>ResidentOverrideCBF</code>が意図を保護。',
+
+                // Formula
+                'formula.julian.title': 'ユリウス日計算',
+                'formula.julian.description': 'すべての天文計算の基礎。カレンダー日付を紀元前4713年からの連続日数に変換。',
+
+                // Diagram
+                'diagram.dataFlow': 'データフロー',
 
                 // Footer
+                'footer.title': '天気はどうなの？',
                 'footer.subtitle': '天文学と家庭の快適さが出会う場所 — Kagamiが心を込めて構築',
-
-                // Why Calculate
-                'whyCalculate.title': 'なぜ計算するのか？',
-                'whyCalculate.content': '天気APIは日の出/日没時刻を提供する—でもそれだけでは足りない。どの窓がまぶしいか知るには、任意の瞬間の太陽の<strong>正確な位置</strong>（方位角と高度）が必要。',
-
-                // Intensity Function
-                'intensity.title': '強度関数',
-                'intensity.content': 'すべての日光露出が等しいわけではない。太陽が各窓にどれだけ直接当たるかと太陽の高度に基づいて<strong>まぶしさの強度</strong>を計算する。',
-
-                // Direction Constants
-                'directions.title': '方向定数',
-
-                // Override Logic
-                'override.title': 'オーバーライドロジック',
-                'override.content': '曇りや雨の時、遮るべきまぶしさはない。OpenWeatherMap One Call API 3.0の気象データが天体計算をオーバーライドできる。',
-
-                // Weather Conditions table
-                'weather.conditions.title': '天気条件',
-
-                // Architecture cards
-                'arch.interval.title': '30分ごと',
-                'arch.interval.subtitle': '再最適化間隔',
-                'arch.interval.body': '太陽は30分で約7.5°移動する。これは窓の向きによるまぶしさを変えるのに十分。',
-                'arch.cbf.title': 'CBF保護',
-                'arch.cbf.subtitle': '安全制約',
-                'arch.cbf.body': '制御バリア関数が<code>h(x) ≥ 0</code>を保証する。手動でシェードを調整した場合、システムはオーバーライドしない。',
-                'arch.portable.title': 'ポータブル',
-                'arch.portable.subtitle': '場所に依存しない',
-                'arch.portable.body': '家の座標は<code>config/location.yaml</code>または環境変数から取得。引っ越し？設定を更新するだけ。',
 
                 // Misc
                 'yes': 'はい',
@@ -456,13 +466,13 @@ class I18n {
                 'nav.geometry': 'Géométrie',
                 'nav.weather': 'Météo',
                 'nav.triggers': 'Déclencheurs',
-                'nav.demo': 'Démo en Direct',
+                'nav.demo': 'Démo',
 
                 // Hero
                 'hero.badge': 'Plongée Technique',
                 'hero.title': 'Et la <em>Météo ?</em>',
-                'hero.subtitle': "Comment les calculs astronomiques, la géométrie des fenêtres et les données météo se combinent pour créer une automatisation intelligente des stores.",
-                'hero.subtitle.emphasis': 'Parce que votre maison devrait savoir quand vous protéger du soleil — et quand laisser entrer la tempête.',
+                'hero.subtitle': "Comment les calculs astronomiques, la géométrie des fenêtres et les données météo créent une automatisation intelligente.",
+                'hero.subtitle.emphasis': 'Parce que votre maison devrait savoir quand vous protéger du soleil.',
                 'hero.scroll': 'Suivez le chemin du soleil',
 
                 // Hero stats
@@ -473,17 +483,25 @@ class I18n {
 
                 // Section titles
                 'section.ephemeris.title': "L'<em>Éphéméride</em>",
-                'section.ephemeris.desc': "Où est le soleil en ce moment ? Pas depuis une API météo—calculé à partir de la mécanique orbitale.",
+                'section.ephemeris.description': "Où est le soleil ? Calculé à partir de la mécanique orbitale.",
+                'section.ephemeris.whyCalculate': 'Pourquoi Calculer ?',
+                'section.ephemeris.whyCalculateDesc': "Les APIs météo donnent les heures de lever/coucher—insuffisant. Nous avons besoin de la <strong>position exacte</strong>.",
                 'section.geometry.title': 'Géométrie des <em>Fenêtres</em>',
-                'section.geometry.desc': 'Une maison avec vue. 11 stores. 4 orientations cardinales. Quelles fenêtres reçoivent le soleil et quand ?',
+                'section.geometry.description': 'Une maison avec vue. 11 stores. 4 orientations. Quelles fenêtres reçoivent le soleil ?',
+                'section.geometry.intensityFunction': "Fonction d'Intensité",
+                'section.geometry.intensityFunctionDesc': "Toute exposition n'est pas égale. Nous calculons <strong>l'intensité de l'éblouissement</strong>.",
+                'section.geometry.directionConstants': 'Constantes de Direction',
                 'section.weather.title': 'Intégration <em>Météo</em>',
-                'section.weather.desc': 'Les calculs célestes supposent un ciel dégagé. Les nuages changent tout.',
+                'section.weather.description': 'Les calculs célestes supposent un ciel dégagé. Les nuages changent tout.',
+                'section.weather.overrideLogic': 'Logique de Remplacement',
+                'section.weather.overrideLogicDesc': "Quand c'est nuageux, pas d'éblouissement à bloquer. Les données météo peuvent remplacer les calculs.",
+                'section.weather.conditions': 'Conditions Météo',
                 'section.triggers.title': 'Déclencheurs <em>Célestes</em>',
-                'section.triggers.desc': "Automatisation événementielle. Le système n'interroge pas—il surveille les événements astronomiques.",
+                'section.triggers.description': "Automatisation événementielle. Le système surveille les événements astronomiques.",
                 'section.demo.title': 'Démo <em>en Direct</em>',
-                'section.demo.desc': 'Simulation interactive. Faites glisser le curseur de temps pour voir comment les recommandations de stores changent au cours de la journée.',
+                'section.demo.description': 'Simulation interactive. Faites glisser le curseur pour voir les recommandations changer.',
                 'section.architecture.title': "L'<em>Architecture</em>",
-                'section.architecture.desc': "Comment tout s'assemble. De la mécanique orbitale aux commandes moteur—là où l'astronomie rencontre le confort domestique.",
+                'section.architecture.description': "Comment tout s'assemble. De la mécanique orbitale aux commandes moteur.",
 
                 // Labels
                 'label.azimuth': 'Azimut',
@@ -492,25 +510,27 @@ class I18n {
                 'label.isDay': 'Est-ce Jour',
                 'label.weather': 'Météo',
                 'label.cloudCoverage': 'Couverture Nuageuse',
-                'label.timeOfDay': 'Heure du Jour',
-                'label.includeWeather': 'Inclure la Météo',
-                'label.simulateClouds': 'Simuler les nuages',
-                'label.sunPosition': 'Position du Soleil',
-                'label.shadeRecommendations': 'Recommandations de Stores',
+
+                // Demo labels
+                'demo.timeOfDay': 'Heure du Jour',
+                'demo.includeWeather': 'Inclure la Météo',
+                'demo.simulateClouds': 'Simuler les nuages',
+                'demo.sunPosition': 'Position du Soleil',
+                'demo.shadeRecommendations': 'Recommandations de Stores',
 
                 // Timeline
-                'timeline.sunrise': 'Lever du Soleil',
+                'timeline.sunrise.time': 'Lever du Soleil',
                 'timeline.sunrise.title': 'Optimisation Matinale',
-                'timeline.sunrise.desc': "Les fenêtres orientées à l'est sont ajustées en premier. Living Room East (237) peut se fermer à 60% lorsque le soleil du matin entre.",
-                'timeline.noon': 'Midi Solaire',
+                'timeline.sunrise.description': "Les fenêtres est sont ajustées en premier. Living Room East peut se fermer à 60%.",
+                'timeline.noon.time': 'Midi Solaire',
                 'timeline.noon.title': 'Soleil Maximum',
-                'timeline.noon.desc': "Les fenêtres orientées au sud voient une exposition maximale. Living South (235), Dining South (243), Entry (229) s'ajustent selon l'altitude.",
-                'timeline.afternoon': 'Après-midi',
+                'timeline.noon.description': "Les fenêtres sud voient une exposition maximale. Ajustement selon l'altitude.",
+                'timeline.afternoon.time': 'Après-midi',
                 'timeline.afternoon.title': "Exposition à l'Ouest",
-                'timeline.afternoon.desc': "Le soleil se déplace vers l'ouest. Primary West (68) et les stores de Bed 4 (359, 361) commencent à s'ajuster.",
-                'timeline.dusk': 'Crépuscule Civil',
+                'timeline.afternoon.description': "Le soleil se déplace vers l'ouest. Les stores ouest s'ajustent.",
+                'timeline.dusk.time': 'Crépuscule Civil',
                 'timeline.dusk.title': 'Ouverture du Soir',
-                'timeline.dusk.desc': "Le soleil passe sous l'horizon. Tous les stores s'ouvrent à 100%. Profitez de la lumière du soir.",
+                'timeline.dusk.description': "Le soleil passe sous l'horizon. Tous les stores s'ouvrent à 100%.",
 
                 // Weather conditions
                 'weather.clear': 'Dégagé',
@@ -534,66 +554,669 @@ class I18n {
                 'table.glare': 'Éblouissement',
                 'table.level': 'Niveau',
                 'table.reason': 'Raison',
+                'table.direction': 'Direction',
+                'table.whatFacesIt': 'Ce qui y Fait Face',
+                'table.sunTimes': 'Heures de Soleil',
+                'table.condition': 'Condition',
+                'table.action': 'Action',
+                'table.why': 'Pourquoi',
 
-                // Cards
+                // Cards - Ephemeris
                 'card.azimuth.title': 'Azimut',
                 'card.azimuth.subtitle': '0° = Nord',
-                'card.azimuth.body': "Le cap de boussole du soleil. 0° est Nord, 90° est Est, 180° est Sud, 270° est Ouest.",
+                'card.azimuth.body': "Le cap de boussole du soleil. 0° est Nord, 90° est Est, 180° est Sud.",
                 'card.altitude.title': 'Altitude',
                 'card.altitude.subtitle': "0° = Horizon",
-                'card.altitude.body': "La hauteur du soleil au-dessus de l'horizon. 0° est lever/coucher, 90° est directement au-dessus.",
+                'card.altitude.body': "La hauteur du soleil au-dessus de l'horizon. Soleil bas = plus d'éblouissement.",
                 'card.isDay.title': 'Est-ce Jour',
                 'card.isDay.subtitle': 'altitude > 0',
-                'card.isDay.body': "Simple booléen—le soleil est-il au-dessus de l'horizon ? Sinon, pas besoin de s'inquiéter de l'éblouissement.",
+                'card.isDay.body': "Le soleil est-il au-dessus de l'horizon ? Sinon, ouvrir tous les stores.",
+
+                // Cards - Architecture
+                'card.interval.title': 'Toutes les 30 Minutes',
+                'card.interval.subtitle': 'Intervalle de ré-optimisation',
+                'card.interval.body': 'Le soleil se déplace de ~7.5° toutes les 30 minutes. Suffisant pour changer le store à ajuster.',
+                'card.cbfProtected.title': 'Protégé par CBF',
+                'card.cbfProtected.subtitle': 'Contrainte de sécurité',
+                'card.cbfProtected.body': "Les Fonctions de Barrière de Contrôle assurent <code>h(x) ≥ 0</code>. Le système ne vous contredira pas.",
+                'card.portable.title': 'Portable',
+                'card.portable.subtitle': 'Agnostique de lieu',
+                'card.portable.body': "Les coordonnées viennent de <code>config/location.yaml</code>. Vous déménagez ? Mettez à jour la config.",
 
                 // Callouts
-                'callout.api.title': 'Le Problème avec les APIs',
-                'callout.api.content': "Les APIs météo vous disent <em>quand</em> le soleil se lève. Elles ne vous disent pas <em>où</em> il est à 14h47.",
-                'callout.north.title': 'Nord = Toujours Ouvert',
-                'callout.north.content': "À la latitude de Seattle (47.7°N), les fenêtres orientées au nord ne reçoivent jamais de soleil direct.",
+                'callout.problemApis.title': 'Le Problème avec les APIs',
+                'callout.problemApis.content': "Les APIs météo vous disent <em>quand</em> le soleil se lève. Pas <em>où</em> il est à 14h47.",
+                'callout.northFacing.title': 'Nord = Toujours Ouvert',
+                'callout.northFacing.content': "À la latitude de Seattle (47.7°N), les fenêtres nord ne reçoivent jamais de soleil direct.",
                 'callout.seattle.title': 'La Réalité de Seattle',
-                'callout.seattle.content': "Seattle compte en moyenne 226 jours nuageux par an. Le remplacement météo n'est pas un cas limite.",
-                'callout.cbf.title': 'Sécurité CBF : Je Respecte Vos Choix',
-                'callout.cbf.content': "Si vous fermez un store vous-même, je ne vous contredis pas. Le <code>ResidentOverrideCBF</code> protège votre intention explicite.",
+                'callout.seattle.content': "Seattle compte 226 jours nuageux par an. Le remplacement météo est le cas <em>commun</em>.",
+                'callout.cbf.title': 'Sécurité CBF',
+                'callout.cbf.content': "Si vous fermez un store vous-même, je ne vous contredis pas. Le <code>ResidentOverrideCBF</code> protège votre intention.",
+
+                // Formula
+                'formula.julian.title': 'Calcul de Date Julienne',
+                'formula.julian.description': 'La base de tous les calculs astronomiques. Convertit la date en jour continu.',
+
+                // Diagram
+                'diagram.dataFlow': 'Flux de Données',
 
                 // Footer
-                'footer.subtitle': "Où l'astronomie rencontre le confort domestique — construit avec soin par Kagami",
-
-                // Why Calculate
-                'whyCalculate.title': 'Pourquoi Calculer ?',
-                'whyCalculate.content': "Les APIs météo vous donnent les heures de lever/coucher—mais ce n'est pas suffisant. Nous avons besoin de la <strong>position exacte</strong> du soleil à tout moment.",
-
-                // Intensity Function
-                'intensity.title': "La Fonction d'Intensité",
-                'intensity.content': "Toute exposition au soleil n'est pas égale. Nous calculons <strong>l'intensité de l'éblouissement</strong> basée sur l'angle d'incidence.",
-
-                // Direction Constants
-                'directions.title': 'Constantes de Direction',
-
-                // Override Logic
-                'override.title': 'La Logique de Remplacement',
-                'override.content': "Quand c'est nuageux ou pluvieux, il n'y a pas d'éblouissement à bloquer. Les données météo peuvent remplacer les calculs célestes.",
-
-                // Weather Conditions table
-                'weather.conditions.title': 'Conditions Météo',
-
-                // Architecture cards
-                'arch.interval.title': 'Toutes les 30 Minutes',
-                'arch.interval.subtitle': 'Intervalle de ré-optimisation',
-                'arch.interval.body': 'Le soleil se déplace de ~7.5° toutes les 30 minutes. Suffisant pour changer quel fenêtre est éblouie.',
-                'arch.cbf.title': 'Protégé par CBF',
-                'arch.cbf.subtitle': 'Contrainte de sécurité',
-                'arch.cbf.body': "Les Fonctions de Barrière de Contrôle assurent <code>h(x) ≥ 0</code>. Le système ne vous contredira pas.",
-                'arch.portable.title': 'Portable',
-                'arch.portable.subtitle': 'Agnostique de lieu',
-                'arch.portable.body': "Les coordonnées de la maison viennent de <code>config/location.yaml</code>. Vous déménagez ? Mettez à jour la config.",
+                'footer.title': 'Et la Météo ?',
+                'footer.subtitle': "Où l'astronomie rencontre le confort domestique — construit par Kagami",
 
                 // Misc
                 'yes': 'Oui',
                 'no': 'Non',
                 'night': 'Nuit — ouvert pour la vue',
                 'noSunOn': 'Pas de soleil sur'
+            },
+            de: {
+                // Navigation
+                'nav.ephemeris': 'Ephemeride',
+                'nav.geometry': 'Geometrie',
+                'nav.weather': 'Wetter',
+                'nav.triggers': 'Auslöser',
+                'nav.demo': 'Live-Demo',
+
+                // Hero
+                'hero.badge': 'Technischer Tiefgang',
+                'hero.title': 'Was ist mit<br>dem <em>Wetter?</em>',
+                'hero.subtitle': 'Wie astronomische Berechnungen, Fenstergeometrie und Wetterdaten intelligente Jalousienautomatisierung ermöglichen.',
+                'hero.subtitle.emphasis': 'Weil Ihr Zuhause wissen sollte, wann es Sie vor der Sonne schützen muss.',
+                'hero.scroll': 'Folge dem Sonnenpfad',
+
+                // Hero stats
+                'stat.shades': 'Jalousien',
+                'stat.orientations': 'Ausrichtungen',
+                'stat.degrees': 'Grad',
+                'stat.interval': 'Min Intervall',
+
+                // Section titles
+                'section.ephemeris.title': 'Die <em>Ephemeride</em>',
+                'section.ephemeris.description': 'Wo ist die Sonne? Berechnet aus der Orbitalmechanik.',
+                'section.ephemeris.whyCalculate': 'Warum Berechnen?',
+                'section.ephemeris.whyCalculateDesc': 'Wetter-APIs liefern Sonnenauf-/untergangszeiten—aber das reicht nicht. Wir brauchen die <strong>genaue Position</strong>.',
+                'section.geometry.title': 'Fenster<em>geometrie</em>',
+                'section.geometry.description': 'Ein Haus mit Aussicht. 11 Jalousien. 4 Himmelsrichtungen. Welche Fenster bekommen wann Sonne?',
+                'section.geometry.intensityFunction': 'Die Intensitätsfunktion',
+                'section.geometry.intensityFunctionDesc': 'Nicht jede Sonneneinstrahlung ist gleich. Wir berechnen die <strong>Blendungsintensität</strong>.',
+                'section.geometry.directionConstants': 'Richtungskonstanten',
+                'section.weather.title': 'Wetter<em>integration</em>',
+                'section.weather.description': 'Himmelsberechnungen setzen klaren Himmel voraus. Wolken ändern alles.',
+                'section.weather.overrideLogic': 'Die Überschreibungslogik',
+                'section.weather.overrideLogicDesc': 'Bei Bewölkung oder Regen gibt es keine Blendung zu blockieren.',
+                'section.weather.conditions': 'Wetterbedingungen',
+                'section.triggers.title': 'Himmlische <em>Auslöser</em>',
+                'section.triggers.description': 'Ereignisgesteuerte Automatisierung. Das System überwacht astronomische Ereignisse.',
+                'section.demo.title': 'Live-<em>Demo</em>',
+                'section.demo.description': 'Interaktive Simulation. Ziehen Sie den Zeitregler, um zu sehen, wie sich Empfehlungen ändern.',
+                'section.architecture.title': 'Die <em>Architektur</em>',
+                'section.architecture.description': 'Wie alles zusammenpasst. Von Orbitalmechanik bis Motorbefehle.',
+
+                // Labels
+                'label.azimuth': 'Azimut',
+                'label.altitude': 'Höhe',
+                'label.direction': 'Richtung',
+                'label.isDay': 'Ist Tag',
+                'label.weather': 'Wetter',
+                'label.cloudCoverage': 'Wolkendecke',
+
+                // Demo labels
+                'demo.timeOfDay': 'Tageszeit',
+                'demo.includeWeather': 'Wetter einbeziehen',
+                'demo.simulateClouds': 'Wolken simulieren',
+                'demo.sunPosition': 'Sonnenposition',
+                'demo.shadeRecommendations': 'Jalousienempfehlungen',
+
+                // Timeline
+                'timeline.sunrise.time': 'Sonnenaufgang',
+                'timeline.sunrise.title': 'Morgenoptimierung',
+                'timeline.sunrise.description': 'Ostfenster werden zuerst angepasst. Living Room East kann auf 60% schließen.',
+                'timeline.noon.time': 'Sonnenhöchststand',
+                'timeline.noon.title': 'Maximale Sonne',
+                'timeline.noon.description': 'Südfenster sehen maximale Exposition. Anpassung basierend auf Höhe.',
+                'timeline.afternoon.time': 'Nachmittag',
+                'timeline.afternoon.title': 'Westexposition',
+                'timeline.afternoon.description': 'Die Sonne wandert nach Westen. Westjalousien beginnen sich anzupassen.',
+                'timeline.dusk.time': 'Bürgerliche Dämmerung',
+                'timeline.dusk.title': 'Abendöffnung',
+                'timeline.dusk.description': 'Die Sonne sinkt unter den Horizont. Alle Jalousien öffnen auf 100%.',
+
+                // Weather conditions
+                'weather.clear': 'Klar',
+                'weather.mostly_clear': 'Meist Klar',
+                'weather.partly_cloudy': 'Teilweise Bewölkt',
+                'weather.overcast': 'Bedeckt',
+                'weather.cloudy': 'Bewölkt',
+                'weather.fog': 'Nebel',
+                'weather.drizzle': 'Nieselregen',
+                'weather.rain': 'Regen',
+                'weather.heavy_rain': 'Starker Regen',
+                'weather.showers': 'Schauer',
+                'weather.thunderstorm': 'Gewitter',
+                'weather.snow': 'Schnee',
+                'weather.heavy_snow': 'Starker Schneefall',
+
+                // Table headers
+                'table.shade': 'Jalousie',
+                'table.room': 'Raum',
+                'table.facing': 'Ausrichtung',
+                'table.glare': 'Blendung',
+                'table.level': 'Stufe',
+                'table.reason': 'Grund',
+                'table.direction': 'Richtung',
+                'table.whatFacesIt': 'Was es Zugewandt',
+                'table.sunTimes': 'Sonnenzeiten',
+                'table.condition': 'Bedingung',
+                'table.action': 'Aktion',
+                'table.why': 'Warum',
+
+                // Cards - Ephemeris
+                'card.azimuth.title': 'Azimut',
+                'card.azimuth.subtitle': '0° = Nord',
+                'card.azimuth.body': 'Die Kompassrichtung der Sonne. 0° ist Nord, 90° ist Ost, 180° ist Süd.',
+                'card.altitude.title': 'Höhe',
+                'card.altitude.subtitle': '0° = Horizont',
+                'card.altitude.body': 'Die Höhe der Sonne über dem Horizont. Niedrigere Sonne = mehr Blendung.',
+                'card.isDay.title': 'Ist Tag',
+                'card.isDay.subtitle': 'Höhe > 0',
+                'card.isDay.body': 'Ist die Sonne über dem Horizont? Falls nicht, alle Jalousien öffnen.',
+
+                // Cards - Architecture
+                'card.interval.title': 'Alle 30 Minuten',
+                'card.interval.subtitle': 'Re-Optimierungsintervall',
+                'card.interval.body': 'Die Sonne bewegt sich ~7,5° alle 30 Minuten. Genug, um die Blendung zu ändern.',
+                'card.cbfProtected.title': 'CBF Geschützt',
+                'card.cbfProtected.subtitle': 'Sicherheitsbeschränkung',
+                'card.cbfProtected.body': 'Kontrollbarrierefunktionen stellen sicher <code>h(x) ≥ 0</code>. Das System überschreibt Sie nicht.',
+                'card.portable.title': 'Portabel',
+                'card.portable.subtitle': 'Ortsunabhängig',
+                'card.portable.body': 'Hauskoordinaten kommen aus <code>config/location.yaml</code>. Umzug? Einfach aktualisieren.',
+
+                // Callouts
+                'callout.problemApis.title': 'Das Problem mit APIs',
+                'callout.problemApis.content': 'Wetter-APIs sagen Ihnen <em>wann</em> die Sonne aufgeht. Nicht <em>wo</em> sie um 14:47 steht.',
+                'callout.northFacing.title': 'Nord = Immer Offen',
+                'callout.northFacing.content': 'Auf Seattles Breitengrad (47,7°N) bekommen Nordfenster nie direkte Sonne.',
+                'callout.seattle.title': 'Seattle Realität',
+                'callout.seattle.content': 'Seattle hat durchschnittlich 226 bewölkte Tage pro Jahr. Wetterüberschreibung ist der <em>Normalfall</em>.',
+                'callout.cbf.title': 'CBF Sicherheit',
+                'callout.cbf.content': 'Wenn Sie eine Jalousie selbst schließen, widerspreche ich nicht. <code>ResidentOverrideCBF</code> schützt Ihre Absicht.',
+
+                // Formula
+                'formula.julian.title': 'Julianisches Datum',
+                'formula.julian.description': 'Die Grundlage aller astronomischen Berechnungen.',
+
+                // Diagram
+                'diagram.dataFlow': 'Datenfluss',
+
+                // Footer
+                'footer.title': 'Was ist mit dem Wetter?',
+                'footer.subtitle': 'Wo Astronomie auf Wohnkomfort trifft — mit Sorgfalt gebaut von Kagami',
+
+                // Misc
+                'yes': 'Ja',
+                'no': 'Nein',
+                'night': 'Nacht — offen für die Aussicht',
+                'noSunOn': 'Keine Sonne auf'
+            },
+            zh: {
+                // Navigation
+                'nav.ephemeris': '天文历',
+                'nav.geometry': '几何',
+                'nav.weather': '天气',
+                'nav.triggers': '触发器',
+                'nav.demo': '实时演示',
+
+                // Hero
+                'hero.badge': '技术深度',
+                'hero.title': '<em>天气</em><br>怎么样？',
+                'hero.subtitle': '天文计算、窗户几何和天气数据如何结合创建智能窗帘自动化。',
+                'hero.subtitle.emphasis': '因为您的家应该知道何时遮阳——何时让风暴进来。',
+                'hero.scroll': '跟随太阳的轨迹',
+
+                // Hero stats
+                'stat.shades': '窗帘',
+                'stat.orientations': '朝向',
+                'stat.degrees': '度',
+                'stat.interval': '最小间隔',
+
+                // Section titles
+                'section.ephemeris.title': '<em>天文历</em>',
+                'section.ephemeris.description': '太阳现在在哪里？不是从天气API获取——而是从轨道力学计算。',
+                'section.ephemeris.whyCalculate': '为什么要计算？',
+                'section.ephemeris.whyCalculateDesc': '天气API提供日出/日落时间——但这还不够。我们需要<strong>精确位置</strong>。',
+                'section.geometry.title': '窗户<em>几何</em>',
+                'section.geometry.description': '有景观的房子。11个窗帘。4个主要方向。哪些窗户何时有阳光？',
+                'section.geometry.intensityFunction': '强度函数',
+                'section.geometry.intensityFunctionDesc': '并非所有阳光照射都相同。我们计算<strong>眩光强度</strong>。',
+                'section.geometry.directionConstants': '方向常数',
+                'section.weather.title': '天气<em>集成</em>',
+                'section.weather.description': '天体计算假设晴朗的天空。云彩改变一切。',
+                'section.weather.overrideLogic': '覆盖逻辑',
+                'section.weather.overrideLogicDesc': '多云或下雨时，没有眩光需要阻挡。天气数据可以覆盖天体计算。',
+                'section.weather.conditions': '天气状况',
+                'section.triggers.title': '天体<em>触发器</em>',
+                'section.triggers.description': '事件驱动自动化。系统监视天文事件，不轮询。',
+                'section.demo.title': '实时<em>演示</em>',
+                'section.demo.description': '交互式模拟。拖动时间滑块查看建议如何变化。',
+                'section.architecture.title': '<em>架构</em>',
+                'section.architecture.description': '一切如何组合在一起。从轨道力学到电机命令。',
+
+                // Labels
+                'label.azimuth': '方位角',
+                'label.altitude': '高度',
+                'label.direction': '方向',
+                'label.isDay': '是白天',
+                'label.weather': '天气',
+                'label.cloudCoverage': '云量',
+
+                // Demo labels
+                'demo.timeOfDay': '时间',
+                'demo.includeWeather': '包含天气',
+                'demo.simulateClouds': '模拟云',
+                'demo.sunPosition': '太阳位置',
+                'demo.shadeRecommendations': '窗帘建议',
+
+                // Timeline
+                'timeline.sunrise.time': '日出',
+                'timeline.sunrise.title': '早晨优化',
+                'timeline.sunrise.description': '朝东的窗户首先调整。Living Room East 可能关闭到60%。',
+                'timeline.noon.time': '正午',
+                'timeline.noon.title': '太阳最高点',
+                'timeline.noon.description': '朝南的窗户接受最大曝光。根据高度调整。',
+                'timeline.afternoon.time': '下午',
+                'timeline.afternoon.title': '西面曝光',
+                'timeline.afternoon.description': '太阳向西移动。西面窗帘开始调整。',
+                'timeline.dusk.time': '民用黄昏',
+                'timeline.dusk.title': '傍晚开放',
+                'timeline.dusk.description': '太阳落到地平线以下。所有窗帘打开到100%。',
+
+                // Weather conditions
+                'weather.clear': '晴朗',
+                'weather.mostly_clear': '大部分晴朗',
+                'weather.partly_cloudy': '局部多云',
+                'weather.overcast': '阴天',
+                'weather.cloudy': '多云',
+                'weather.fog': '雾',
+                'weather.drizzle': '毛毛雨',
+                'weather.rain': '雨',
+                'weather.heavy_rain': '大雨',
+                'weather.showers': '阵雨',
+                'weather.thunderstorm': '雷暴',
+                'weather.snow': '雪',
+                'weather.heavy_snow': '大雪',
+
+                // Table headers
+                'table.shade': '窗帘',
+                'table.room': '房间',
+                'table.facing': '朝向',
+                'table.glare': '眩光',
+                'table.level': '级别',
+                'table.reason': '原因',
+                'table.direction': '方向',
+                'table.whatFacesIt': '面对什么',
+                'table.sunTimes': '日照时间',
+                'table.condition': '条件',
+                'table.action': '操作',
+                'table.why': '原因',
+
+                // Cards - Ephemeris
+                'card.azimuth.title': '方位角',
+                'card.azimuth.subtitle': '0° = 北',
+                'card.azimuth.body': '太阳的罗盘方位。0°是北，90°是东，180°是南，270°是西。',
+                'card.altitude.title': '高度',
+                'card.altitude.subtitle': '0° = 地平线',
+                'card.altitude.body': '太阳在地平线上的高度。太阳越低 = 影子越长 = 眩光越多。',
+                'card.isDay.title': '是白天',
+                'card.isDay.subtitle': '高度 > 0',
+                'card.isDay.body': '太阳在地平线上吗？如果不是，打开所有窗帘欣赏夜景。',
+
+                // Cards - Architecture
+                'card.interval.title': '每30分钟',
+                'card.interval.subtitle': '重新优化间隔',
+                'card.interval.body': '太阳每30分钟移动约7.5°。足以改变哪个窗户受到眩光影响。',
+                'card.cbfProtected.title': 'CBF保护',
+                'card.cbfProtected.subtitle': '安全约束',
+                'card.cbfProtected.body': '控制屏障函数确保<code>h(x) ≥ 0</code>。如果您手动调整，系统不会覆盖您。',
+                'card.portable.title': '可移植',
+                'card.portable.subtitle': '位置无关',
+                'card.portable.body': '房屋坐标来自<code>config/location.yaml</code>。搬家？只需更新配置。',
+
+                // Callouts
+                'callout.problemApis.title': 'API的问题',
+                'callout.problemApis.content': '天气API告诉您太阳<em>何时</em>升起。不告诉您下午2:47它在<em>哪里</em>。',
+                'callout.northFacing.title': '北向 = 始终打开',
+                'callout.northFacing.content': '在西雅图的纬度(47.7°N)，北向窗户从不接收直射阳光。',
+                'callout.seattle.title': '西雅图现实',
+                'callout.seattle.content': '西雅图平均每年226天多云。天气覆盖是<em>常见</em>情况。',
+                'callout.cbf.title': 'CBF安全',
+                'callout.cbf.content': '如果您自己关闭窗帘，我不会反对。<code>ResidentOverrideCBF</code>保护您的意图。',
+
+                // Formula
+                'formula.julian.title': '儒略日计算',
+                'formula.julian.description': '所有天文计算的基础。将日历日期转换为连续天数。',
+
+                // Diagram
+                'diagram.dataFlow': '数据流',
+
+                // Footer
+                'footer.title': '天气怎么样？',
+                'footer.subtitle': '天文学与家居舒适相遇——由Kagami用心打造',
+
+                // Misc
+                'yes': '是',
+                'no': '否',
+                'night': '夜间——打开欣赏景色',
+                'noSunOn': '没有阳光在'
+            },
+            it: {
+                // Navigation
+                'nav.ephemeris': 'Effemeridi',
+                'nav.geometry': 'Geometria',
+                'nav.weather': 'Meteo',
+                'nav.triggers': 'Trigger',
+                'nav.demo': 'Demo Live',
+
+                // Hero
+                'hero.badge': 'Approfondimento Tecnico',
+                'hero.title': 'E il <em>Meteo?</em>',
+                'hero.subtitle': 'Come i calcoli astronomici, la geometria delle finestre e i dati meteo creano automazione intelligente delle tapparelle.',
+                'hero.subtitle.emphasis': 'Perché la tua casa dovrebbe sapere quando proteggerti dal sole.',
+                'hero.scroll': 'Segui il percorso del sole',
+
+                // Hero stats
+                'stat.shades': 'Tapparelle',
+                'stat.orientations': 'Orientamenti',
+                'stat.degrees': 'Gradi',
+                'stat.interval': 'Intervallo Min',
+
+                // Section titles
+                'section.ephemeris.title': "Le <em>Effemeridi</em>",
+                'section.ephemeris.description': "Dov'è il sole adesso? Calcolato dalla meccanica orbitale.",
+                'section.ephemeris.whyCalculate': 'Perché Calcolare?',
+                'section.ephemeris.whyCalculateDesc': "Le API meteo danno gli orari alba/tramonto—non basta. Serve la <strong>posizione esatta</strong>.",
+                'section.geometry.title': 'Geometria delle <em>Finestre</em>',
+                'section.geometry.description': 'Una casa con vista. 11 tapparelle. 4 orientamenti. Quali finestre ricevono sole e quando?',
+                'section.geometry.intensityFunction': "Funzione d'Intensità",
+                'section.geometry.intensityFunctionDesc': "Non tutta l'esposizione solare è uguale. Calcoliamo <strong>l'intensità dell'abbagliamento</strong>.",
+                'section.geometry.directionConstants': 'Costanti di Direzione',
+                'section.weather.title': 'Integrazione <em>Meteo</em>',
+                'section.weather.description': 'I calcoli celesti assumono cieli sereni. Le nuvole cambiano tutto.',
+                'section.weather.overrideLogic': 'Logica di Override',
+                'section.weather.overrideLogicDesc': "Quando è nuvoloso, non c'è abbagliamento da bloccare. I dati meteo possono sovrascrivere i calcoli.",
+                'section.weather.conditions': 'Condizioni Meteo',
+                'section.triggers.title': 'Trigger <em>Celesti</em>',
+                'section.triggers.description': 'Automazione basata su eventi. Il sistema monitora gli eventi astronomici.',
+                'section.demo.title': 'Demo <em>Live</em>',
+                'section.demo.description': 'Simulazione interattiva. Trascina il cursore del tempo per vedere come cambiano le raccomandazioni.',
+                'section.architecture.title': "L'<em>Architettura</em>",
+                'section.architecture.description': 'Come si incastra tutto. Dalla meccanica orbitale ai comandi motore.',
+
+                // Labels
+                'label.azimuth': 'Azimut',
+                'label.altitude': 'Altitudine',
+                'label.direction': 'Direzione',
+                'label.isDay': 'È Giorno',
+                'label.weather': 'Meteo',
+                'label.cloudCoverage': 'Copertura Nuvolosa',
+
+                // Demo labels
+                'demo.timeOfDay': 'Ora del Giorno',
+                'demo.includeWeather': 'Includi Meteo',
+                'demo.simulateClouds': 'Simula nuvole',
+                'demo.sunPosition': 'Posizione del Sole',
+                'demo.shadeRecommendations': 'Raccomandazioni Tapparelle',
+
+                // Timeline
+                'timeline.sunrise.time': 'Alba',
+                'timeline.sunrise.title': 'Ottimizzazione Mattutina',
+                'timeline.sunrise.description': 'Le finestre est vengono regolate per prime. Living Room East può chiudersi al 60%.',
+                'timeline.noon.time': 'Mezzogiorno Solare',
+                'timeline.noon.title': 'Sole Massimo',
+                'timeline.noon.description': "Le finestre sud vedono l'esposizione massima. Regolazione in base all'altitudine.",
+                'timeline.afternoon.time': 'Pomeriggio',
+                'timeline.afternoon.title': 'Esposizione Ovest',
+                'timeline.afternoon.description': 'Il sole si sposta a ovest. Le tapparelle ovest iniziano a regolarsi.',
+                'timeline.dusk.time': 'Crepuscolo Civile',
+                'timeline.dusk.title': 'Apertura Serale',
+                'timeline.dusk.description': "Il sole scende sotto l'orizzonte. Tutte le tapparelle si aprono al 100%.",
+
+                // Weather conditions
+                'weather.clear': 'Sereno',
+                'weather.mostly_clear': 'Prevalentemente Sereno',
+                'weather.partly_cloudy': 'Parzialmente Nuvoloso',
+                'weather.overcast': 'Coperto',
+                'weather.cloudy': 'Nuvoloso',
+                'weather.fog': 'Nebbia',
+                'weather.drizzle': 'Pioggerella',
+                'weather.rain': 'Pioggia',
+                'weather.heavy_rain': 'Pioggia Forte',
+                'weather.showers': 'Rovesci',
+                'weather.thunderstorm': 'Temporale',
+                'weather.snow': 'Neve',
+                'weather.heavy_snow': 'Forte Nevicata',
+
+                // Table headers
+                'table.shade': 'Tapparella',
+                'table.room': 'Stanza',
+                'table.facing': 'Orientamento',
+                'table.glare': 'Abbagliamento',
+                'table.level': 'Livello',
+                'table.reason': 'Motivo',
+                'table.direction': 'Direzione',
+                'table.whatFacesIt': 'Cosa Guarda',
+                'table.sunTimes': 'Orari Sole',
+                'table.condition': 'Condizione',
+                'table.action': 'Azione',
+                'table.why': 'Perché',
+
+                // Cards
+                'card.azimuth.title': 'Azimut',
+                'card.azimuth.subtitle': '0° = Nord',
+                'card.azimuth.body': 'La direzione bussola del sole. 0° è Nord, 90° è Est, 180° è Sud.',
+                'card.altitude.title': 'Altitudine',
+                'card.altitude.subtitle': "0° = Orizzonte",
+                'card.altitude.body': "L'altezza del sole sopra l'orizzonte. Sole basso = più abbagliamento.",
+                'card.isDay.title': 'È Giorno',
+                'card.isDay.subtitle': 'altitudine > 0',
+                'card.isDay.body': "Il sole è sopra l'orizzonte? Altrimenti, aprire tutte le tapparelle.",
+                'card.interval.title': 'Ogni 30 Minuti',
+                'card.interval.subtitle': 'Intervallo di ri-ottimizzazione',
+                'card.interval.body': 'Il sole si muove di ~7.5° ogni 30 minuti. Abbastanza per cambiare quale finestra è abbagliata.',
+                'card.cbfProtected.title': 'Protetto da CBF',
+                'card.cbfProtected.subtitle': 'Vincolo di sicurezza',
+                'card.cbfProtected.body': 'Le Funzioni Barriera di Controllo assicurano <code>h(x) ≥ 0</code>. Il sistema non ti contraddirà.',
+                'card.portable.title': 'Portatile',
+                'card.portable.subtitle': 'Indipendente dalla posizione',
+                'card.portable.body': 'Le coordinate della casa vengono da <code>config/location.yaml</code>. Ti trasferisci? Aggiorna la config.',
+
+                // Callouts
+                'callout.problemApis.title': 'Il Problema con le API',
+                'callout.problemApis.content': "Le API meteo ti dicono <em>quando</em> sorge il sole. Non <em>dove</em> si trova alle 14:47.",
+                'callout.northFacing.title': 'Nord = Sempre Aperto',
+                'callout.northFacing.content': 'Alla latitudine di Seattle (47.7°N), le finestre nord non ricevono mai sole diretto.',
+                'callout.seattle.title': 'La Realtà di Seattle',
+                'callout.seattle.content': "Seattle ha in media 226 giorni nuvolosi all'anno. L'override meteo è il caso <em>comune</em>.",
+                'callout.cbf.title': 'Sicurezza CBF',
+                'callout.cbf.content': 'Se chiudi una tapparella tu stesso, non ti contraddico. <code>ResidentOverrideCBF</code> protegge la tua intenzione.',
+
+                // Formula
+                'formula.julian.title': 'Calcolo Data Giuliana',
+                'formula.julian.description': 'La base di tutti i calcoli astronomici.',
+
+                // Diagram
+                'diagram.dataFlow': 'Flusso Dati',
+
+                // Footer
+                'footer.title': 'E il Meteo?',
+                'footer.subtitle': "Dove l'astronomia incontra il comfort domestico — costruito con cura da Kagami",
+
+                // Misc
+                'yes': 'Sì',
+                'no': 'No',
+                'night': 'Notte — aperto per la vista',
+                'noSunOn': 'Nessun sole su'
+            },
+            pt: {
+                // Navigation
+                'nav.ephemeris': 'Efemérides',
+                'nav.geometry': 'Geometria',
+                'nav.weather': 'Clima',
+                'nav.triggers': 'Gatilhos',
+                'nav.demo': 'Demo ao Vivo',
+
+                // Hero
+                'hero.badge': 'Aprofundamento Técnico',
+                'hero.title': 'E o <em>Clima?</em>',
+                'hero.subtitle': 'Como cálculos astronômicos, geometria de janelas e dados climáticos criam automação inteligente de persianas.',
+                'hero.subtitle.emphasis': 'Porque sua casa deve saber quando te proteger do sol.',
+                'hero.scroll': 'Siga o caminho do sol',
+
+                // Hero stats
+                'stat.shades': 'Persianas',
+                'stat.orientations': 'Orientações',
+                'stat.degrees': 'Graus',
+                'stat.interval': 'Intervalo Min',
+
+                // Section titles
+                'section.ephemeris.title': 'As <em>Efemérides</em>',
+                'section.ephemeris.description': 'Onde está o sol agora? Calculado da mecânica orbital.',
+                'section.ephemeris.whyCalculate': 'Por Que Calcular?',
+                'section.ephemeris.whyCalculateDesc': 'APIs de clima dão horários de nascer/pôr do sol—mas não basta. Precisamos da <strong>posição exata</strong>.',
+                'section.geometry.title': 'Geometria das <em>Janelas</em>',
+                'section.geometry.description': 'Uma casa com vista. 11 persianas. 4 orientações. Quais janelas recebem sol e quando?',
+                'section.geometry.intensityFunction': 'Função de Intensidade',
+                'section.geometry.intensityFunctionDesc': 'Nem toda exposição solar é igual. Calculamos a <strong>intensidade do ofuscamento</strong>.',
+                'section.geometry.directionConstants': 'Constantes de Direção',
+                'section.weather.title': 'Integração <em>Climática</em>',
+                'section.weather.description': 'Cálculos celestes assumem céus claros. Nuvens mudam tudo.',
+                'section.weather.overrideLogic': 'Lógica de Substituição',
+                'section.weather.overrideLogicDesc': 'Quando está nublado, não há ofuscamento para bloquear. Dados climáticos podem substituir os cálculos.',
+                'section.weather.conditions': 'Condições Climáticas',
+                'section.triggers.title': 'Gatilhos <em>Celestes</em>',
+                'section.triggers.description': 'Automação baseada em eventos. O sistema monitora eventos astronômicos.',
+                'section.demo.title': 'Demo <em>ao Vivo</em>',
+                'section.demo.description': 'Simulação interativa. Arraste o controle de tempo para ver as recomendações mudarem.',
+                'section.architecture.title': 'A <em>Arquitetura</em>',
+                'section.architecture.description': 'Como tudo se encaixa. Da mecânica orbital aos comandos de motor.',
+
+                // Labels
+                'label.azimuth': 'Azimute',
+                'label.altitude': 'Altitude',
+                'label.direction': 'Direção',
+                'label.isDay': 'É Dia',
+                'label.weather': 'Clima',
+                'label.cloudCoverage': 'Cobertura de Nuvens',
+
+                // Demo labels
+                'demo.timeOfDay': 'Hora do Dia',
+                'demo.includeWeather': 'Incluir Clima',
+                'demo.simulateClouds': 'Simular nuvens',
+                'demo.sunPosition': 'Posição do Sol',
+                'demo.shadeRecommendations': 'Recomendações de Persianas',
+
+                // Timeline
+                'timeline.sunrise.time': 'Nascer do Sol',
+                'timeline.sunrise.title': 'Otimização Matinal',
+                'timeline.sunrise.description': 'Janelas leste são ajustadas primeiro. Living Room East pode fechar para 60%.',
+                'timeline.noon.time': 'Meio-dia Solar',
+                'timeline.noon.title': 'Sol Máximo',
+                'timeline.noon.description': 'Janelas sul veem exposição máxima. Ajuste baseado na altitude.',
+                'timeline.afternoon.time': 'Tarde',
+                'timeline.afternoon.title': 'Exposição Oeste',
+                'timeline.afternoon.description': 'O sol se move para oeste. Persianas oeste começam a ajustar.',
+                'timeline.dusk.time': 'Crepúsculo Civil',
+                'timeline.dusk.title': 'Abertura Noturna',
+                'timeline.dusk.description': 'O sol desce abaixo do horizonte. Todas as persianas abrem para 100%.',
+
+                // Weather conditions
+                'weather.clear': 'Limpo',
+                'weather.mostly_clear': 'Maiormente Limpo',
+                'weather.partly_cloudy': 'Parcialmente Nublado',
+                'weather.overcast': 'Encoberto',
+                'weather.cloudy': 'Nublado',
+                'weather.fog': 'Neblina',
+                'weather.drizzle': 'Garoa',
+                'weather.rain': 'Chuva',
+                'weather.heavy_rain': 'Chuva Forte',
+                'weather.showers': 'Pancadas',
+                'weather.thunderstorm': 'Tempestade',
+                'weather.snow': 'Neve',
+                'weather.heavy_snow': 'Neve Forte',
+
+                // Table headers
+                'table.shade': 'Persiana',
+                'table.room': 'Sala',
+                'table.facing': 'Orientação',
+                'table.glare': 'Ofuscamento',
+                'table.level': 'Nível',
+                'table.reason': 'Motivo',
+                'table.direction': 'Direção',
+                'table.whatFacesIt': 'O Que Enfrenta',
+                'table.sunTimes': 'Horários de Sol',
+                'table.condition': 'Condição',
+                'table.action': 'Ação',
+                'table.why': 'Por Que',
+
+                // Cards
+                'card.azimuth.title': 'Azimute',
+                'card.azimuth.subtitle': '0° = Norte',
+                'card.azimuth.body': 'A direção da bússola do sol. 0° é Norte, 90° é Leste, 180° é Sul.',
+                'card.altitude.title': 'Altitude',
+                'card.altitude.subtitle': '0° = Horizonte',
+                'card.altitude.body': 'A altura do sol acima do horizonte. Sol baixo = mais ofuscamento.',
+                'card.isDay.title': 'É Dia',
+                'card.isDay.subtitle': 'altitude > 0',
+                'card.isDay.body': 'O sol está acima do horizonte? Senão, abrir todas as persianas.',
+                'card.interval.title': 'A Cada 30 Minutos',
+                'card.interval.subtitle': 'Intervalo de re-otimização',
+                'card.interval.body': 'O sol se move ~7.5° a cada 30 minutos. Suficiente para mudar qual janela está ofuscada.',
+                'card.cbfProtected.title': 'Protegido por CBF',
+                'card.cbfProtected.subtitle': 'Restrição de segurança',
+                'card.cbfProtected.body': 'Funções de Barreira de Controle garantem <code>h(x) ≥ 0</code>. O sistema não vai contradizê-lo.',
+                'card.portable.title': 'Portátil',
+                'card.portable.subtitle': 'Independente de localização',
+                'card.portable.body': 'Coordenadas da casa vêm de <code>config/location.yaml</code>. Mudou? Atualize a config.',
+
+                // Callouts
+                'callout.problemApis.title': 'O Problema com APIs',
+                'callout.problemApis.content': 'APIs de clima dizem <em>quando</em> o sol nasce. Não <em>onde</em> ele está às 14:47.',
+                'callout.northFacing.title': 'Norte = Sempre Aberto',
+                'callout.northFacing.content': 'Na latitude de Seattle (47.7°N), janelas norte nunca recebem sol direto.',
+                'callout.seattle.title': 'Realidade de Seattle',
+                'callout.seattle.content': 'Seattle tem média de 226 dias nublados por ano. Substituição por clima é o caso <em>comum</em>.',
+                'callout.cbf.title': 'Segurança CBF',
+                'callout.cbf.content': 'Se você fechar uma persiana, não vou contradizê-lo. <code>ResidentOverrideCBF</code> protege sua intenção.',
+
+                // Formula
+                'formula.julian.title': 'Cálculo de Data Juliana',
+                'formula.julian.description': 'A base de todos os cálculos astronômicos.',
+
+                // Diagram
+                'diagram.dataFlow': 'Fluxo de Dados',
+
+                // Footer
+                'footer.title': 'E o Clima?',
+                'footer.subtitle': 'Onde astronomia encontra conforto doméstico — construído com cuidado por Kagami',
+
+                // Misc
+                'yes': 'Sim',
+                'no': 'Não',
+                'night': 'Noite — aberto para a vista',
+                'noSunOn': 'Sem sol em'
             }
+        };
+
+        this.langNames = {
+            en: { name: 'English', native: 'English', flag: '🇺🇸' },
+            es: { name: 'Spanish', native: 'Español', flag: '🇪🇸' },
+            ja: { name: 'Japanese', native: '日本語', flag: '🇯🇵' },
+            fr: { name: 'French', native: 'Français', flag: '🇫🇷' },
+            de: { name: 'German', native: 'Deutsch', flag: '🇩🇪' },
+            zh: { name: 'Chinese', native: '中文', flag: '🇨🇳' },
+            it: { name: 'Italian', native: 'Italiano', flag: '🇮🇹' },
+            pt: { name: 'Portuguese', native: 'Português', flag: '🇧🇷' }
         };
 
         this.detectLanguage();
@@ -623,16 +1246,12 @@ class I18n {
 
     /**
      * Get translated string by key
-     * @param {string} key - Translation key (e.g., 'nav.ephemeris')
-     * @param {object} params - Optional parameters for interpolation
-     * @returns {string} Translated string or key if not found
      */
     get(key, params = {}) {
         let translation = this.translations[this.currentLang]?.[key]
             || this.translations[this.fallbackLang]?.[key]
             || key;
 
-        // Simple interpolation: replace {key} with params.key
         Object.keys(params).forEach(param => {
             translation = translation.replace(new RegExp(`{${param}}`, 'g'), params[param]);
         });
@@ -642,54 +1261,40 @@ class I18n {
 
     /**
      * Set current language
-     * @param {string} lang - Language code (en, es, ja, fr)
      */
     setLang(lang) {
         if (!this.translations[lang]) {
-            console.warn(`Language '${lang}' not supported. Available: ${this.getAvailableLangs().join(', ')}`);
+            console.warn(`Language '${lang}' not supported.`);
             return false;
         }
 
         this.currentLang = lang;
         localStorage.setItem('preferredLanguage', lang);
         this.applyTranslations();
-
-        // Update HTML lang attribute
         document.documentElement.lang = lang;
-
-        // Dispatch event for other components
         window.dispatchEvent(new CustomEvent('languageChanged', { detail: { lang } }));
 
-        console.log(`%c Language set to: ${lang}`, 'color: #6366f1;');
+        // Update selector UI
+        this.updateSelectorUI();
+
         return true;
     }
 
-    /**
-     * Get current language code
-     * @returns {string} Current language code
-     */
     getCurrentLang() {
         return this.currentLang;
     }
 
-    /**
-     * Get list of available languages
-     * @returns {string[]} Array of language codes
-     */
     getAvailableLangs() {
         return Object.keys(this.translations);
     }
 
     /**
-     * Apply translations to all elements with data-i18n attribute
+     * Apply translations to all elements
      */
     applyTranslations() {
-        // Translate elements with data-i18n attribute
         document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
             const translation = this.get(key);
-
-            // Check if translation contains HTML
             if (translation.includes('<')) {
                 el.innerHTML = translation;
             } else {
@@ -697,77 +1302,126 @@ class I18n {
             }
         });
 
-        // Translate elements with data-i18n-placeholder attribute
         document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-            const key = el.getAttribute('data-i18n-placeholder');
-            el.placeholder = this.get(key);
+            el.placeholder = this.get(el.getAttribute('data-i18n-placeholder'));
         });
 
-        // Translate elements with data-i18n-title attribute
         document.querySelectorAll('[data-i18n-title]').forEach(el => {
-            const key = el.getAttribute('data-i18n-title');
-            el.title = this.get(key);
+            el.title = this.get(el.getAttribute('data-i18n-title'));
         });
 
-        // Translate elements with data-i18n-aria-label attribute
         document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
-            const key = el.getAttribute('data-i18n-aria-label');
-            el.setAttribute('aria-label', this.get(key));
+            el.setAttribute('aria-label', this.get(el.getAttribute('data-i18n-aria-label')));
         });
+    }
 
-        // Update language selector active state
-        document.querySelectorAll('.lang-option').forEach(btn => {
+    /**
+     * Update the selector UI to reflect current language
+     */
+    updateSelectorUI() {
+        const selector = document.querySelector('.lang-selector');
+        if (!selector) return;
+
+        const currentBtn = selector.querySelector('.lang-selector-current');
+        if (currentBtn) {
+            const info = this.langNames[this.currentLang];
+            currentBtn.innerHTML = `<span class="lang-flag">${info.flag}</span><span class="lang-code">${this.currentLang.toUpperCase()}</span>`;
+        }
+
+        // Update active state in dropdown
+        selector.querySelectorAll('.lang-option').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.lang === this.currentLang);
         });
     }
 
     /**
-     * Create language selector UI
-     * @returns {HTMLElement} Language selector element
+     * Create elegant language selector dropdown
      */
     createSelector() {
         const selector = document.createElement('div');
         selector.className = 'lang-selector';
-        selector.setAttribute('role', 'group');
+        selector.setAttribute('role', 'combobox');
         selector.setAttribute('aria-label', 'Select language');
+        selector.setAttribute('aria-expanded', 'false');
+        selector.setAttribute('aria-haspopup', 'listbox');
 
-        const langs = [
-            { code: 'en', label: 'EN', name: 'English' },
-            { code: 'es', label: 'ES', name: 'Español' },
-            { code: 'ja', label: 'JA', name: '日本語' },
-            { code: 'fr', label: 'FR', name: 'Français' }
-        ];
+        const currentInfo = this.langNames[this.currentLang];
 
-        langs.forEach(lang => {
-            const btn = document.createElement('button');
-            btn.className = `lang-option ${lang.code === this.currentLang ? 'active' : ''}`;
-            btn.dataset.lang = lang.code;
-            btn.setAttribute('title', lang.name);
-            btn.setAttribute('aria-label', `Switch to ${lang.name}`);
-            btn.textContent = lang.label;
+        // Current language button
+        const currentBtn = document.createElement('button');
+        currentBtn.className = 'lang-selector-current';
+        currentBtn.setAttribute('aria-label', `Current language: ${currentInfo.name}. Click to change.`);
+        currentBtn.innerHTML = `
+            <span class="lang-flag">${currentInfo.flag}</span>
+            <span class="lang-code">${this.currentLang.toUpperCase()}</span>
+            <svg class="lang-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        `;
 
-            btn.addEventListener('click', () => {
-                this.setLang(lang.code);
-                // Play sound if available
+        // Dropdown menu
+        const dropdown = document.createElement('div');
+        dropdown.className = 'lang-dropdown';
+        dropdown.setAttribute('role', 'listbox');
+
+        const langs = Object.entries(this.langNames);
+        langs.forEach(([code, info]) => {
+            const option = document.createElement('button');
+            option.className = `lang-option ${code === this.currentLang ? 'active' : ''}`;
+            option.dataset.lang = code;
+            option.setAttribute('role', 'option');
+            option.setAttribute('aria-selected', code === this.currentLang);
+            option.innerHTML = `
+                <span class="lang-flag">${info.flag}</span>
+                <span class="lang-native">${info.native}</span>
+                <span class="lang-name">${info.name}</span>
+            `;
+
+            option.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.setLang(code);
+                selector.classList.remove('open');
+                selector.setAttribute('aria-expanded', 'false');
                 if (typeof sound !== 'undefined' && sound.enabled) {
                     sound.playClick();
                 }
             });
 
-            selector.appendChild(btn);
+            dropdown.appendChild(option);
+        });
+
+        selector.appendChild(currentBtn);
+        selector.appendChild(dropdown);
+
+        // Toggle dropdown
+        currentBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = selector.classList.toggle('open');
+            selector.setAttribute('aria-expanded', isOpen);
+        });
+
+        // Close on click outside
+        document.addEventListener('click', () => {
+            selector.classList.remove('open');
+            selector.setAttribute('aria-expanded', 'false');
+        });
+
+        // Close on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                selector.classList.remove('open');
+                selector.setAttribute('aria-expanded', 'false');
+            }
         });
 
         return selector;
     }
 
     /**
-     * Initialize i18n - call after DOM is loaded
+     * Initialize i18n
      */
     init() {
-        // Set initial HTML lang attribute
         document.documentElement.lang = this.currentLang;
-
-        // Apply initial translations
         this.applyTranslations();
 
         // Add language selector to nav
@@ -779,7 +1433,7 @@ class I18n {
     }
 }
 
-// Create global i18n instance
+// Create global instance
 const i18n = new I18n();
 
 // Initialize when DOM is ready
