@@ -346,7 +346,7 @@ class WeatherAtmosphere {
         // Note: Won't work on file:// protocol due to CORS
         if (window.location.protocol === 'file:') {
             // Default to Seattle for local testing
-            return { latitude: 47.6062, longitude: -122.3321 };
+            return { latitude: HOME.latitude, longitude: HOME.longitude };
         }
 
         const response = await fetch('https://ipapi.co/json/', { cache: 'force-cache' });
@@ -1211,40 +1211,101 @@ class Ephemeris {
     }
 
     /**
-     * Calculate sunrise/sunset times (simplified)
+     * Calculate sunrise/sunset times using NOAA algorithm
+     * More accurate than simplified method
      */
     static sunTimes(lat, lon, date = new Date()) {
-        const jd = this.julianDate(date);
-        const n = Math.floor(jd - 2451545.0 + 0.0008);
+        // Get local date components
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
         
-        const jStar = n - lon / 360;
-        const M = (357.5291 + 0.98560028 * jStar) % 360;
-        const C = 1.9148 * Math.sin(M * Math.PI / 180) + 
-                  0.02 * Math.sin(2 * M * Math.PI / 180);
-        const lambda = (M + C + 180 + 102.9372) % 360;
+        // Calculate day of year
+        const N1 = Math.floor(275 * month / 9);
+        const N2 = Math.floor((month + 9) / 12);
+        const N3 = (1 + Math.floor((year - 4 * Math.floor(year / 4) + 2) / 3));
+        const dayOfYear = N1 - (N2 * N3) + day - 30;
         
-        const delta = Math.asin(Math.sin(lambda * Math.PI / 180) * Math.sin(23.44 * Math.PI / 180));
+        // Calculate fractional year (gamma) in radians
+        const gamma = (2 * Math.PI / 365) * (dayOfYear - 1);
         
-        const cosOmega = (Math.sin(-0.83 * Math.PI / 180) - Math.sin(lat * Math.PI / 180) * Math.sin(delta)) /
-                         (Math.cos(lat * Math.PI / 180) * Math.cos(delta));
+        // Equation of time (minutes)
+        const eqTime = 229.18 * (
+            0.000075 + 
+            0.001868 * Math.cos(gamma) - 
+            0.032077 * Math.sin(gamma) - 
+            0.014615 * Math.cos(2 * gamma) - 
+            0.040849 * Math.sin(2 * gamma)
+        );
         
-        if (cosOmega > 1) return { sunrise: null, sunset: null, polarNight: true };
-        if (cosOmega < -1) return { sunrise: null, sunset: null, midnightSun: true };
+        // Solar declination (radians)
+        const decl = 0.006918 - 
+            0.399912 * Math.cos(gamma) + 
+            0.070257 * Math.sin(gamma) - 
+            0.006758 * Math.cos(2 * gamma) + 
+            0.000907 * Math.sin(2 * gamma) - 
+            0.002697 * Math.cos(3 * gamma) + 
+            0.00148 * Math.sin(3 * gamma);
         
-        const omega = Math.acos(cosOmega) * 180 / Math.PI;
+        // Hour angle for sunrise/sunset
+        const latRad = lat * Math.PI / 180;
+        const zenith = 90.833 * Math.PI / 180; // Official sunrise/sunset
         
-        const noon = 12 - lon / 15;
-        const rise = noon - omega / 15;
-        const set = noon + omega / 15;
+        const cosHA = (Math.cos(zenith) / (Math.cos(latRad) * Math.cos(decl))) - 
+                      (Math.tan(latRad) * Math.tan(decl));
         
-        const baseDate = new Date(date);
-        baseDate.setUTCHours(0, 0, 0, 0);
+        // Check for polar day/night
+        if (cosHA > 1) return { sunrise: null, sunset: null, polarNight: true };
+        if (cosHA < -1) return { sunrise: null, sunset: null, midnightSun: true };
+        
+        const HA = Math.acos(cosHA) * 180 / Math.PI;
+        
+        // Calculate sunrise/sunset in minutes from midnight UTC
+        const sunriseUTC = 720 - 4 * (lon + HA) - eqTime;
+        const sunsetUTC = 720 - 4 * (lon - HA) - eqTime;
+        const solarNoonUTC = 720 - 4 * lon - eqTime;
+        
+        // Get timezone offset in minutes
+        const tzOffset = date.getTimezoneOffset();
+        
+        // Convert to local time (minutes from local midnight)
+        const sunriseLocal = sunriseUTC - tzOffset;
+        const sunsetLocal = sunsetUTC - tzOffset;
+        const solarNoonLocal = solarNoonUTC - tzOffset;
+        
+        // Create date objects for today
+        const baseDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+        
+        // Helper to create time from minutes
+        const minutesToDate = (mins) => {
+            let m = mins;
+            if (m < 0) m += 1440; // Handle previous day
+            if (m >= 1440) m -= 1440; // Handle next day
+            return new Date(baseDate.getTime() + m * 60000);
+        };
         
         return {
-            sunrise: new Date(baseDate.getTime() + rise * 3600000),
-            sunset: new Date(baseDate.getTime() + set * 3600000),
-            solarNoon: new Date(baseDate.getTime() + noon * 3600000)
+            sunrise: minutesToDate(sunriseLocal),
+            sunset: minutesToDate(sunsetLocal),
+            solarNoon: minutesToDate(solarNoonLocal),
+            // Additional useful info
+            dayLength: (sunsetUTC - sunriseUTC) / 60, // hours
+            eqTime: Math.round(eqTime * 10) / 10 // equation of time in minutes
         };
+    }
+    
+    /**
+     * Format time as HH:MM with optional seconds
+     */
+    static formatTime(date, includeSeconds = false) {
+        if (!date) return '--:--';
+        const h = date.getHours().toString().padStart(2, '0');
+        const m = date.getMinutes().toString().padStart(2, '0');
+        if (includeSeconds) {
+            const s = date.getSeconds().toString().padStart(2, '0');
+            return `${h}:${m}:${s}`;
+        }
+        return `${h}:${m}`;
     }
 }
 
@@ -5063,6 +5124,34 @@ class CompassSundial {
 
 const celestialDemo = new CelestialDemo();
 const compassSundial = new CompassSundial();
+
+// Debug: Log celestial calculations on page load
+(() => {
+    const now = new Date();
+    const sun = Ephemeris.sunPosition(HOME.latitude, HOME.longitude, now);
+    const moon = Ephemeris.moonPosition(HOME.latitude, HOME.longitude, now);
+    const times = Ephemeris.sunTimes(HOME.latitude, HOME.longitude, now);
+    
+    console.group('%c☀️ Celestial Debug', 'color: #FFD700; font-weight: bold; font-size: 14px;');
+    console.log(`%cLocation: ${HOME.latitude.toFixed(4)}°N, ${Math.abs(HOME.longitude).toFixed(4)}°W (Green Lake, Seattle)`, 'color: #888;');
+    console.log(`%cLocal Time: ${now.toLocaleString()}`, 'color: #888;');
+    console.log(`%cTimezone: UTC${now.getTimezoneOffset() > 0 ? '-' : '+'}${Math.abs(now.getTimezoneOffset() / 60)}`, 'color: #888;');
+    console.log('');
+    console.log(`%c☀️ Sun Position`, 'color: #FFA500; font-weight: bold;');
+    console.log(`   Altitude: ${sun.altitude}° ${sun.altitude > 0 ? '(above horizon)' : '(below horizon)'}`);
+    console.log(`   Azimuth: ${sun.azimuth}° (${sun.direction})`);
+    console.log(`   Sunrise: ${Ephemeris.formatTime(times.sunrise)}`);
+    console.log(`   Solar Noon: ${Ephemeris.formatTime(times.solarNoon)}`);
+    console.log(`   Sunset: ${Ephemeris.formatTime(times.sunset)}`);
+    console.log(`   Day Length: ${times.dayLength?.toFixed(2)} hours`);
+    console.log('');
+    console.log(`%c🌙 Moon Position`, 'color: #C0C0FF; font-weight: bold;');
+    console.log(`   Altitude: ${moon.altitude}° ${moon.altitude > 0 ? '(above horizon)' : '(below horizon)'}`);
+    console.log(`   Azimuth: ${moon.azimuth}°`);
+    console.log(`   Phase: ${moon.phaseName} ${moon.phaseEmoji}`);
+    console.log(`   Illumination: ${moon.illumination}%`);
+    console.groupEnd();
+})();
 
 // ============================================================================
 // LOCATION MAP — Google Maps with dark styling
