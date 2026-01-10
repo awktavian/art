@@ -5057,8 +5057,8 @@ class CompassSundial {
     
     updateTransform() {
         if (!this.body) return;
-        
-        this.body.style.transform = `rotateX(${this.tiltX}deg) rotateY(${this.tiltY}deg) rotateZ(${this.rotation}deg)`;
+        // Flat compass - only rotate, no tilt (keeps sun/moon clickable)
+        this.body.style.transform = `rotate(${this.rotation}deg)`;
     }
     
     updateCelestialBodies() {
@@ -5066,9 +5066,9 @@ class CompassSundial {
         const sun = Ephemeris.sunPosition(HOME.latitude, HOME.longitude, now);
         const moon = Ephemeris.moonPosition(HOME.latitude, HOME.longitude, now);
         
-        // Update sun position - radius 35 keeps it well inside compass
+        // Update sun position - radius 38 keeps it inside the face
         if (this.sunIndicator) {
-            const radius = 35;
+            const radius = 38;
             const angleRad = (sun.azimuth - 90) * Math.PI / 180;
             const x = 50 + radius * Math.cos(angleRad);
             const y = 50 + radius * Math.sin(angleRad);
@@ -5077,15 +5077,14 @@ class CompassSundial {
             this.sunIndicator.style.top = `${y}%`;
             
             const isDay = sun.altitude > 0;
-            const scale = isDay ? 1 + (sun.altitude / 200) : 0.7;
-            this.sunIndicator.style.opacity = isDay ? '1' : '0.5';
-            // Keep translateZ for 3D positioning
-            this.sunIndicator.style.transform = `translate(-50%, -50%) translateZ(20px) scale(${scale})`;
+            const scale = isDay ? 1 + (sun.altitude / 150) : 0.75;
+            this.sunIndicator.style.opacity = isDay ? '1' : '0.4';
+            this.sunIndicator.style.transform = `translate(-50%, -50%) scale(${scale})`;
         }
         
         // Update moon position
         if (this.moonIndicator && moon) {
-            const radius = 35;
+            const radius = 38;
             const angleRad = (moon.azimuth - 90) * Math.PI / 180;
             const x = 50 + radius * Math.cos(angleRad);
             const y = 50 + radius * Math.sin(angleRad);
@@ -5094,10 +5093,9 @@ class CompassSundial {
             this.moonIndicator.style.top = `${y}%`;
             
             const moonUp = moon.altitude > 0;
-            const scale = moonUp ? 0.9 + (moon.altitude / 200) : 0.6;
-            this.moonIndicator.style.opacity = moonUp ? '1' : '0.4';
-            // Keep translateZ for 3D positioning
-            this.moonIndicator.style.transform = `translate(-50%, -50%) translateZ(20px) scale(${scale})`;
+            const scale = moonUp ? 0.9 + (moon.altitude / 150) : 0.65;
+            this.moonIndicator.style.opacity = moonUp ? '1' : '0.35';
+            this.moonIndicator.style.transform = `translate(-50%, -50%) scale(${scale})`;
         }
         
         // Update shadow
@@ -5107,9 +5105,9 @@ class CompassSundial {
             this.shadow.style.setProperty('--shadow-angle', `${shadowAngle}deg`);
             
             if (isDay) {
-                const shadowLength = Math.max(20, 45 - sun.altitude * 0.4);
+                const shadowLength = Math.max(15, 40 - sun.altitude * 0.4);
                 this.shadow.style.height = `${shadowLength}%`;
-                this.shadow.style.opacity = '0.6';
+                this.shadow.style.opacity = '0.5';
             } else {
                 this.shadow.style.height = '0%';
                 this.shadow.style.opacity = '0';
