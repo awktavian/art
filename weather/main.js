@@ -5467,33 +5467,35 @@ class MiniGlobe {
     }
     
     // ═══════════════════════════════════════════════════════════════════════
-    // QUATERNION MATH — Empirically calibrated for Blue Marble texture
+    // QUATERNION MATH — Three.js SphereGeometry coordinate mapping
     // ═══════════════════════════════════════════════════════════════════════
     //
-    // EMPIRICAL CALIBRATION (tested via Puppeteer screenshots):
-    //   - rotY = 0°   → shows Pacific Ocean (center at ~lon -150°)
-    //   - rotY = -90° → shows South America (center at ~lon -60°)
+    // THREE.JS SPHERE UV MAPPING (verified via screenshots):
+    //   - U coordinate wraps around Y axis (longitude)
+    //   - At rotation.y = 0°, camera sees lon ≈ -90° (Central America)
+    //   - Equirectangular textures have lon=0° at center (U=0.5)
     //   
-    // Derived formula: lon_visible = -150° - rotY
-    // Therefore:       rotY = -150° - lon
+    // DERIVED FORMULA:
+    //   visible_longitude = -90° - rotation_y
+    //   Therefore: rotation_y = -90° - target_longitude
     //
-    // Examples:
-    //   - Seattle (lon=-122°): rotY = -150 - (-122) = -28°
-    //   - London  (lon=0°):    rotY = -150 - 0 = -150°
-    //   - Tokyo   (lon=+140°): rotY = -150 - 140 = -290° = +70°
+    // VERIFICATION:
+    //   - Seattle (lon=-122°): rotY = -90 - (-122) = +32° ✓
+    //   - London  (lon=0°):    rotY = -90 - 0 = -90° ✓
+    //   - Tokyo   (lon=+140°): rotY = -90 - 140 = -230° = +130° ✓
     //
-    // For latitude: tilt the globe to show the location at a pleasing angle
+    // For latitude: tilt globe to bring target latitude into pleasing view
     // ═══════════════════════════════════════════════════════════════════════
     
     computeHomeQuaternion() {
         const lat = this.targetLat || 0;
         const lon = this.targetLon || 0;
         
-        // Longitude rotation (empirically calibrated)
-        const rotY = (-150 - lon) * Math.PI / 180;
+        // Longitude rotation: rotY = -90° - lon
+        const rotY = (-90 - lon) * Math.PI / 180;
         
-        // Latitude tilt - use ~50% of latitude for pleasing "looking at" angle
-        // Positive lat (northern hemisphere) → tilt top toward viewer
+        // Latitude tilt: ~50% of latitude for "looking at" perspective
+        // Positive lat (northern) → tilt top toward viewer
         const rotX = lat * 0.5 * Math.PI / 180;
         
         // Build quaternions
@@ -5506,7 +5508,7 @@ class MiniGlobe {
         // Compose: qX * qY means apply qY (longitude) first, then qX (tilt)
         this.homeQuat.multiplyQuaternions(qX, qY);
         
-        console.log(`%c🌍 Globe centered: lat=${lat.toFixed(2)}°, lon=${lon.toFixed(2)}° → rotY=${(rotY*180/Math.PI).toFixed(1)}°`, 'color: #64B5F6;');
+        console.log(`%c🌍 Globe: lat=${lat.toFixed(2)}°, lon=${lon.toFixed(2)}° → rotY=${(rotY*180/Math.PI).toFixed(1)}°`, 'color: #64B5F6;');
     }
     
     applyQuaternion() {
