@@ -4933,10 +4933,140 @@ class CelestialDemo {
 }
 
 // ============================================================================
+// COMPASS SUNDIAL — Isometric 3D with device orientation
+// ============================================================================
+
+class CompassSundial {
+    constructor() {
+        this.element = document.getElementById('compass-sundial');
+        this.shadow = document.getElementById('compass-shadow');
+        this.sunIndicator = document.getElementById('compass-sun-indicator');
+        this.hint = document.getElementById('compass-hint');
+        this.body = this.element?.querySelector('.compass-body');
+        
+        this.orientationEnabled = false;
+        this.tiltX = 55; // Default isometric tilt
+        this.tiltY = 0;
+        this.rotation = 0;
+        
+        if (this.element) {
+            this.init();
+        }
+    }
+    
+    init() {
+        // Click to enable orientation
+        this.element.addEventListener('click', () => this.requestOrientation());
+        this.element.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.requestOrientation();
+            }
+        });
+        
+        // Listen for orientation updates
+        deviceOrientation.addListener((data) => this.handleOrientation(data));
+        
+        // Check if already enabled
+        if (deviceOrientation.hasPermission) {
+            this.orientationEnabled = true;
+            this.element.classList.add('orientation-active');
+        }
+        
+        // Initial update
+        this.updateSunPosition();
+        
+        // Update every minute
+        setInterval(() => this.updateSunPosition(), 60000);
+    }
+    
+    async requestOrientation() {
+        if (this.orientationEnabled) return;
+        
+        const granted = await deviceOrientation.requestPermission();
+        if (granted) {
+            this.orientationEnabled = true;
+            this.element.classList.add('orientation-active');
+            
+            // Feedback
+            if (this.hint) {
+                this.hint.innerHTML = '<span class="compass-hint-icon">✓</span><span>Orientation enabled</span>';
+                setTimeout(() => {
+                    this.hint.style.opacity = '0';
+                }, 2000);
+            }
+        }
+    }
+    
+    handleOrientation(data) {
+        if (!this.orientationEnabled || !this.body) return;
+        
+        // Use device tilt to control compass perspective
+        // Beta: front-back tilt (-180 to 180)
+        // Gamma: left-right tilt (-90 to 90)
+        
+        const beta = data.beta || 0;
+        const gamma = data.gamma || 0;
+        const heading = data.compassHeading || data.alpha || 0;
+        
+        // Map device tilt to compass tilt
+        // When device is flat (beta ~0), show more top-down
+        // When device is tilted toward user (beta ~45), show more isometric
+        this.tiltX = Math.max(30, Math.min(70, 55 + (beta - 45) * 0.5));
+        this.tiltY = Math.max(-20, Math.min(20, gamma * 0.4));
+        
+        // Use compass heading to rotate the dial
+        this.rotation = -heading;
+        
+        this.updateTransform();
+    }
+    
+    updateTransform() {
+        if (!this.body) return;
+        
+        this.body.style.transform = `rotateX(${this.tiltX}deg) rotateY(${this.tiltY}deg) rotateZ(${this.rotation}deg)`;
+    }
+    
+    updateSunPosition() {
+        const now = window.celestialDemo?.currentTime || new Date();
+        const sun = Ephemeris.sunPosition(HOME.latitude, HOME.longitude, now);
+        
+        if (!this.sunIndicator || !this.shadow) return;
+        
+        // Position sun on compass face based on azimuth
+        // Compass face radius is roughly 40% of container
+        const radius = 35; // percentage from center
+        const azimuthRad = (sun.azimuth - 90) * Math.PI / 180; // Adjust for compass orientation
+        
+        const x = 50 + radius * Math.cos(azimuthRad);
+        const y = 50 + radius * Math.sin(azimuthRad);
+        
+        this.sunIndicator.style.left = `${x}%`;
+        this.sunIndicator.style.top = `${y}%`;
+        
+        // Adjust sun visibility based on altitude
+        const isDay = sun.altitude > 0;
+        this.sunIndicator.style.opacity = isDay ? 1 : 0.3;
+        this.sunIndicator.style.transform = `translate(-50%, -50%) scale(${isDay ? 1 : 0.7})`;
+        
+        // Update shadow angle (opposite to sun direction)
+        // Shadow points away from sun
+        const shadowAngle = sun.azimuth + 180;
+        this.shadow.style.setProperty('--shadow-angle', `${shadowAngle}deg`);
+        
+        // Shadow length based on sun altitude (longer when sun is low)
+        const shadowLength = isDay ? Math.max(20, 50 - sun.altitude * 0.4) : 0;
+        this.shadow.style.height = `${shadowLength}%`;
+        this.shadow.style.opacity = isDay ? Math.min(0.6, (90 - sun.altitude) / 100) : 0;
+    }
+}
+
+// ============================================================================
 // INITIALIZE
 // ============================================================================
 
 const celestialDemo = new CelestialDemo();
+const compassSundial = new CompassSundial();
 
 // Expose for XR time sync
 window.celestialDemo = celestialDemo;
