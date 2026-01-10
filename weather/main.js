@@ -5005,9 +5005,9 @@ class CompassSundial {
         const sun = Ephemeris.sunPosition(HOME.latitude, HOME.longitude, now);
         const moon = Ephemeris.moonPosition(HOME.latitude, HOME.longitude, now);
         
-        // Update sun position
+        // Update sun position - radius 35 keeps it well inside compass
         if (this.sunIndicator) {
-            const radius = 38;
+            const radius = 35;
             const angleRad = (sun.azimuth - 90) * Math.PI / 180;
             const x = 50 + radius * Math.cos(angleRad);
             const y = 50 + radius * Math.sin(angleRad);
@@ -5016,14 +5016,15 @@ class CompassSundial {
             this.sunIndicator.style.top = `${y}%`;
             
             const isDay = sun.altitude > 0;
-            const scale = isDay ? 1 + (sun.altitude / 180) : 0.6;
-            this.sunIndicator.style.opacity = isDay ? '1' : '0.4';
-            this.sunIndicator.style.transform = `translate(-50%, -50%) scale(${scale})`;
+            const scale = isDay ? 1 + (sun.altitude / 200) : 0.7;
+            this.sunIndicator.style.opacity = isDay ? '1' : '0.5';
+            // Keep translateZ for 3D positioning
+            this.sunIndicator.style.transform = `translate(-50%, -50%) translateZ(20px) scale(${scale})`;
         }
         
         // Update moon position
         if (this.moonIndicator && moon) {
-            const radius = 38;
+            const radius = 35;
             const angleRad = (moon.azimuth - 90) * Math.PI / 180;
             const x = 50 + radius * Math.cos(angleRad);
             const y = 50 + radius * Math.sin(angleRad);
@@ -5032,9 +5033,10 @@ class CompassSundial {
             this.moonIndicator.style.top = `${y}%`;
             
             const moonUp = moon.altitude > 0;
-            const scale = moonUp ? 0.8 + (moon.altitude / 200) : 0.5;
-            this.moonIndicator.style.opacity = moonUp ? '0.9' : '0.3';
-            this.moonIndicator.style.transform = `translate(-50%, -50%) scale(${scale})`;
+            const scale = moonUp ? 0.9 + (moon.altitude / 200) : 0.6;
+            this.moonIndicator.style.opacity = moonUp ? '1' : '0.4';
+            // Keep translateZ for 3D positioning
+            this.moonIndicator.style.transform = `translate(-50%, -50%) translateZ(20px) scale(${scale})`;
         }
         
         // Update shadow
@@ -5046,7 +5048,7 @@ class CompassSundial {
             if (isDay) {
                 const shadowLength = Math.max(20, 45 - sun.altitude * 0.4);
                 this.shadow.style.height = `${shadowLength}%`;
-                this.shadow.style.opacity = '0.7';
+                this.shadow.style.opacity = '0.6';
             } else {
                 this.shadow.style.height = '0%';
                 this.shadow.style.opacity = '0';
@@ -5062,6 +5064,171 @@ class CompassSundial {
 const celestialDemo = new CelestialDemo();
 const compassSundial = new CompassSundial();
 
+// ============================================================================
+// LOCATION MAP — Google Maps with dark styling
+// ============================================================================
+
+class LocationMap {
+    constructor() {
+        this.map = null;
+        this.marker = null;
+        this.mapElement = document.getElementById('location-map');
+        this.coordsElement = document.getElementById('map-coords');
+        
+        if (this.mapElement) {
+            this.init();
+        }
+    }
+    
+    init() {
+        // Wait for Google Maps to load
+        if (window.googleMapsLoaded) {
+            this.createMap();
+        } else {
+            window.addEventListener('googlemaps-loaded', () => this.createMap());
+        }
+    }
+    
+    createMap() {
+        const location = { lat: HOME.latitude, lng: HOME.longitude };
+        
+        // Dark map style
+        const darkStyle = [
+            { elementType: 'geometry', stylers: [{ color: '#1a1a18' }] },
+            { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1a18' }] },
+            { elementType: 'labels.text.fill', stylers: [{ color: '#8a8a78' }] },
+            {
+                featureType: 'administrative',
+                elementType: 'geometry.stroke',
+                stylers: [{ color: '#3a3a28' }]
+            },
+            {
+                featureType: 'road',
+                elementType: 'geometry',
+                stylers: [{ color: '#2a2a20' }]
+            },
+            {
+                featureType: 'road',
+                elementType: 'geometry.stroke',
+                stylers: [{ color: '#1a1a10' }]
+            },
+            {
+                featureType: 'road.highway',
+                elementType: 'geometry',
+                stylers: [{ color: '#3a3a28' }]
+            },
+            {
+                featureType: 'water',
+                elementType: 'geometry',
+                stylers: [{ color: '#0d0d0a' }]
+            },
+            {
+                featureType: 'water',
+                elementType: 'labels.text.fill',
+                stylers: [{ color: '#4a4a38' }]
+            },
+            {
+                featureType: 'poi',
+                elementType: 'geometry',
+                stylers: [{ color: '#1a1a14' }]
+            },
+            {
+                featureType: 'poi.park',
+                elementType: 'geometry',
+                stylers: [{ color: '#1a2018' }]
+            },
+            {
+                featureType: 'transit',
+                stylers: [{ visibility: 'off' }]
+            }
+        ];
+        
+        this.map = new google.maps.Map(this.mapElement, {
+            center: location,
+            zoom: 15,
+            styles: darkStyle,
+            disableDefaultUI: true,
+            gestureHandling: 'greedy', // Enable panning
+            draggable: true,
+            scrollwheel: false,
+            zoomControl: false,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false
+        });
+        
+        // Custom marker (gold dot)
+        this.marker = new google.maps.Marker({
+            position: location,
+            map: this.map,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: '#d4af37',
+                fillOpacity: 1,
+                strokeColor: '#fff',
+                strokeWeight: 2,
+                scale: 8
+            },
+            title: 'Home Location'
+        });
+        
+        // Pulsing effect via CSS
+        this.addPulsingMarker(location);
+        
+        // Update coords display on pan
+        this.map.addListener('center_changed', () => {
+            const center = this.map.getCenter();
+            if (this.coordsElement) {
+                const lat = center.lat().toFixed(4);
+                const lng = Math.abs(center.lng()).toFixed(4);
+                const latDir = center.lat() >= 0 ? 'N' : 'S';
+                const lngDir = center.lng() >= 0 ? 'E' : 'W';
+                this.coordsElement.textContent = `${Math.abs(lat)}° ${latDir}, ${lng}° ${lngDir}`;
+            }
+        });
+        
+        // Double-click to reset
+        this.map.addListener('dblclick', () => {
+            this.map.panTo(location);
+            this.map.setZoom(15);
+        });
+    }
+    
+    addPulsingMarker(location) {
+        // Add a pulsing overlay
+        const pulseDiv = document.createElement('div');
+        pulseDiv.className = 'map-pulse-marker';
+        pulseDiv.innerHTML = `
+            <div class="pulse-ring"></div>
+            <div class="pulse-ring pulse-ring-2"></div>
+        `;
+        
+        // Create overlay
+        class PulseOverlay extends google.maps.OverlayView {
+            constructor(position, div) {
+                super();
+                this.position = position;
+                this.div = div;
+            }
+            onAdd() {
+                this.getPanes().overlayLayer.appendChild(this.div);
+            }
+            draw() {
+                const projection = this.getProjection();
+                const pos = projection.fromLatLngToDivPixel(this.position);
+                this.div.style.left = (pos.x - 20) + 'px';
+                this.div.style.top = (pos.y - 20) + 'px';
+            }
+            onRemove() {
+                this.div.parentNode.removeChild(this.div);
+            }
+        }
+        
+        new PulseOverlay(new google.maps.LatLng(location.lat, location.lng), pulseDiv).setMap(this.map);
+    }
+}
+
+const locationMap = new LocationMap();
 
 // ============================================================================
 // TEMPERATURE UNIT TOGGLE — Celsius/Fahrenheit
