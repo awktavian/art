@@ -22,6 +22,104 @@
 'use strict';
 
 // ============================================================================
+// WIDGET MODE DETECTION — Watches, Glasses, Widgets
+// ============================================================================
+
+const WidgetMode = {
+    isWidget: false,
+    isGlance: false,
+    deviceType: 'unknown', // 'watch', 'glasses', 'widget', 'phone', 'desktop'
+    
+    detect() {
+        const params = new URLSearchParams(window.location.search);
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        
+        // Force widget mode via URL params
+        if (params.has('widget') || params.has('glance') || params.has('watch') || params.has('glasses')) {
+            this.isWidget = true;
+            this.isGlance = params.has('glance');
+            document.body.classList.add('widget-mode');
+            if (this.isGlance) document.body.classList.add('glance-mode');
+        }
+        
+        // Auto-detect based on viewport size
+        if (vw <= 320 || vh <= 320) {
+            this.isWidget = true;
+            document.body.classList.add('widget-mode');
+        }
+        
+        // Detect device type
+        this.deviceType = this.detectDeviceType(vw, vh);
+        document.body.setAttribute('data-device', this.deviceType);
+        
+        // Log detection
+        if (this.isWidget) {
+            console.log(`%c⌚ Widget Mode: ${this.deviceType}`, 'color: #D4AF37; font-size: 14px;');
+            console.log(`%c   Viewport: ${vw}×${vh}px`, 'color: #888;');
+        }
+        
+        return this;
+    },
+    
+    detectDeviceType(vw, vh) {
+        // Meta Ray-Ban Display: ~600×600
+        if (vw >= 580 && vw <= 620 && vh >= 580 && vh <= 620) {
+            return 'glasses';
+        }
+        // Apple Watch Ultra: 422×514
+        if (vw >= 400 && vw <= 440 && vh >= 490 && vh <= 530) {
+            return 'watch-ultra';
+        }
+        // Apple Watch: ~396×484
+        if (vw >= 380 && vw <= 420 && vh >= 460 && vh <= 500) {
+            return 'watch';
+        }
+        // Small widget (< 200px)
+        if (vw <= 200 || vh <= 200) {
+            return 'widget-small';
+        }
+        // Medium widget (< 320px)
+        if (vw <= 320 || vh <= 320) {
+            return 'widget';
+        }
+        // Phone
+        if (vw <= 768) {
+            return 'phone';
+        }
+        // Tablet
+        if (vw <= 1024) {
+            return 'tablet';
+        }
+        return 'desktop';
+    },
+    
+    // Get optimal compass size for current device
+    getCompassSize() {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const min = Math.min(vw, vh);
+        
+        switch (this.deviceType) {
+            case 'glasses': return Math.min(520, min * 0.87);
+            case 'watch-ultra': return Math.min(340, min * 0.85);
+            case 'watch': return Math.min(300, min * 0.85);
+            case 'widget-small': return min * 0.95;
+            case 'widget': return min * 0.90;
+            default: return null; // Use CSS default
+        }
+    }
+};
+
+// Initialize widget detection immediately
+WidgetMode.detect();
+
+// Re-check on resize (orientation changes, etc.)
+window.addEventListener('resize', () => {
+    WidgetMode.detect();
+});
+
+// ============================================================================
 // CONSTANTS
 // ============================================================================
 
