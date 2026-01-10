@@ -1205,19 +1205,110 @@ class I18n {
                 'no': 'Não',
                 'night': 'Noite — aberto para a vista',
                 'noSunOn': 'Sem sol em'
+            },
+
+            // Arabic (RTL)
+            ar: {
+                'nav.ephemeris': 'التقويم الفلكي',
+                'nav.geometry': 'الهندسة',
+                'nav.weather': 'الطقس',
+                'nav.triggers': 'المحفزات',
+                'nav.demo': 'عرض مباشر',
+                'hero.badge': 'دراسة تقنية معمقة',
+                'hero.title': 'ماذا عن <em>الطقس؟</em>',
+                'hero.subtitle': 'كيف تجتمع الحسابات الفلكية وهندسة النوافذ وبيانات الطقس لإنشاء أتمتة ذكية للستائر.',
+                'hero.scroll': 'تتبع مسار الشمس',
+                'stat.shades': 'الستائر',
+                'stat.orientations': 'الاتجاهات',
+                'stat.degrees': 'الدرجات',
+                'stat.interval': 'الفاصل',
+                'section.ephemeris.title': '<em>التقويم</em> الفلكي',
+                'section.ephemeris.description': 'أين الشمس الآن؟ محسوبة من ميكانيكا المدارات.',
+                'section.geometry.title': 'هندسة <em>النوافذ</em>',
+                'section.geometry.description': 'منزل بإطلالة. ١١ ستارة. ٤ اتجاهات.',
+                'section.weather.title': 'تكامل <em>الطقس</em>',
+                'section.weather.description': 'الحسابات الفلكية تفترض سماء صافية. الغيوم تغير كل شيء.',
+                'section.triggers.title': 'المحفزات <em>الفلكية</em>',
+                'section.triggers.description': 'أتمتة قائمة على الأحداث.',
+                'section.demo.title': 'عرض <em>مباشر</em>',
+                'section.demo.description': 'محاكاة تفاعلية. اسحب منزلق الوقت.',
+                'section.architecture.title': '<em>البنية</em>',
+                'section.architecture.description': 'كيف يتكامل كل شيء.',
+                'label.azimuth': 'السمت',
+                'label.altitude': 'الارتفاع',
+                'label.direction': 'الاتجاه',
+                'label.isDay': 'نهار',
+                'label.weather': 'الطقس',
+                'label.cloudCoverage': 'تغطية الغيوم',
+                'demo.timeOfDay': 'وقت اليوم',
+                'demo.includeWeather': 'تضمين الطقس',
+                'demo.sunPosition': 'موقع الشمس',
+                'demo.shadeRecommendations': 'توصيات الستائر',
+                'footer.title': 'ماذا عن الطقس؟',
+                'footer.subtitle': 'حيث يلتقي علم الفلك براحة المنزل',
+                'yes': 'نعم',
+                'no': 'لا'
+            },
+
+            // Hebrew (RTL)
+            he: {
+                'nav.ephemeris': 'אפמריס',
+                'nav.geometry': 'גאומטריה',
+                'nav.weather': 'מזג אוויר',
+                'nav.triggers': 'טריגרים',
+                'nav.demo': 'הדגמה חיה',
+                'hero.badge': 'צלילה טכנית מעמיקה',
+                'hero.title': 'מה עם <em>מזג האוויר?</em>',
+                'hero.subtitle': 'כיצד חישובים אסטרונומיים וגאומטריית חלונות יוצרים אוטומציה חכמה.',
+                'hero.scroll': 'עקוב אחר נתיב השמש',
+                'stat.shades': 'תריסים',
+                'stat.orientations': 'כיוונים',
+                'stat.degrees': 'מעלות',
+                'stat.interval': 'מרווח',
+                'section.ephemeris.title': 'ה<em>אפמריס</em>',
+                'section.ephemeris.description': 'איפה השמש עכשיו? מחושב ממכניקה מסלולית.',
+                'section.geometry.title': 'גאומטריית <em>חלונות</em>',
+                'section.geometry.description': 'בית עם נוף. 11 תריסים. 4 כיוונים.',
+                'section.weather.title': 'אינטגרציית <em>מזג אוויר</em>',
+                'section.weather.description': 'חישובים שמימיים מניחים שמיים בהירים.',
+                'section.triggers.title': 'טריגרים <em>שמימיים</em>',
+                'section.triggers.description': 'אוטומציה מונעת אירועים.',
+                'section.demo.title': 'הדגמה <em>חיה</em>',
+                'section.demo.description': 'סימולציה אינטראקטיבית.',
+                'section.architecture.title': 'ה<em>ארכיטקטורה</em>',
+                'section.architecture.description': 'איך הכל מתחבר.',
+                'label.azimuth': 'אזימוט',
+                'label.altitude': 'גובה',
+                'label.direction': 'כיוון',
+                'label.isDay': 'יום',
+                'label.weather': 'מזג אוויר',
+                'label.cloudCoverage': 'כיסוי עננים',
+                'demo.timeOfDay': 'שעה ביום',
+                'demo.includeWeather': 'כלול מזג אוויר',
+                'demo.sunPosition': 'מיקום השמש',
+                'demo.shadeRecommendations': 'המלצות תריסים',
+                'footer.title': 'מה עם מזג האוויר?',
+                'footer.subtitle': 'היכן אסטרונומיה פוגשת נוחות ביתית',
+                'yes': 'כן',
+                'no': 'לא'
             }
         };
 
         this.langNames = {
-            en: { name: 'English', native: 'English', flag: '🇺🇸' },
-            es: { name: 'Spanish', native: 'Español', flag: '🇪🇸' },
-            ja: { name: 'Japanese', native: '日本語', flag: '🇯🇵' },
-            fr: { name: 'French', native: 'Français', flag: '🇫🇷' },
-            de: { name: 'German', native: 'Deutsch', flag: '🇩🇪' },
-            zh: { name: 'Chinese', native: '中文', flag: '🇨🇳' },
-            it: { name: 'Italian', native: 'Italiano', flag: '🇮🇹' },
-            pt: { name: 'Portuguese', native: 'Português', flag: '🇧🇷' }
+            en: { name: 'English', native: 'English', flag: '🇺🇸', dir: 'ltr' },
+            es: { name: 'Spanish', native: 'Español', flag: '🇪🇸', dir: 'ltr' },
+            ja: { name: 'Japanese', native: '日本語', flag: '🇯🇵', dir: 'ltr' },
+            fr: { name: 'French', native: 'Français', flag: '🇫🇷', dir: 'ltr' },
+            de: { name: 'German', native: 'Deutsch', flag: '🇩🇪', dir: 'ltr' },
+            zh: { name: 'Chinese', native: '中文', flag: '🇨🇳', dir: 'ltr' },
+            it: { name: 'Italian', native: 'Italiano', flag: '🇮🇹', dir: 'ltr' },
+            pt: { name: 'Portuguese', native: 'Português', flag: '🇧🇷', dir: 'ltr' },
+            ar: { name: 'Arabic', native: 'العربية', flag: '🇸🇦', dir: 'rtl' },
+            he: { name: 'Hebrew', native: 'עברית', flag: '🇮🇱', dir: 'rtl' }
         };
+
+        // RTL languages
+        this.rtlLanguages = ['ar', 'he'];
 
         this.detectLanguage();
     }
@@ -1271,8 +1362,15 @@ class I18n {
         this.currentLang = lang;
         localStorage.setItem('preferredLanguage', lang);
         this.applyTranslations();
+        
+        // Set language and direction on document
         document.documentElement.lang = lang;
-        window.dispatchEvent(new CustomEvent('languageChanged', { detail: { lang } }));
+        const langInfo = this.langNames[lang];
+        const dir = langInfo?.dir || 'ltr';
+        document.documentElement.dir = dir;
+        document.body.classList.toggle('rtl', dir === 'rtl');
+        
+        window.dispatchEvent(new CustomEvent('languageChanged', { detail: { lang, dir } }));
 
         // Update selector UI
         this.updateSelectorUI();
