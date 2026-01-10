@@ -72,6 +72,25 @@ const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'Ar
 // ============================================================================
 
 const SECRET_LOCATIONS = {
+    home: {
+        name: 'Green Lake',
+        address: '7331 W Green Lake Dr N',
+        city: 'Seattle',
+        postcode: '98103',
+        country: 'USA',
+        latitude: 47.6799,
+        longitude: -122.3410,
+        timezone: 'America/Los_Angeles',
+        description: 'Home. Where the heart is. Where the smart home knows your name.',
+        trivia: [
+            'Green Lake: 2.8 miles around, perfect for morning runs',
+            'The Crescent Collection — Farmhouse Elevation',
+            'KEF Reference speakers because you hear the difference',
+            'Lelit Bianca for morning rituals',
+            'Where 41 lights, 11 shades, and 26 audio zones await'
+        ],
+        emoji: '🏠'
+    },
     monmouth: {
         name: 'Monmouth Coffee Company',
         address: '27 Monmouth Street, Covent Garden',
@@ -4892,13 +4911,18 @@ class CelestialDemo {
             }, 500);
         });
 
-        // Secret word: "monmouth" — Teleport to Monmouth Coffee Co
-        new SecretWord(['monmouth'], (word) => {
+        // Secret words: "monmouth" and "home" — Teleport to secret locations
+        new SecretWord(['monmouth', 'home'], (word) => {
             const location = SECRET_LOCATIONS[word];
             if (!location) return;
 
-            console.log(`%c${location.emoji} SECRET LOCATION UNLOCKED!`, 'font-size: 24px; color: #8B4513;');
-            console.log(`%c${location.name}`, 'font-size: 16px; color: #D2691E; font-weight: bold;');
+            // Style based on location
+            const isHome = word === 'home';
+            const titleColor = isHome ? '#22c55e' : '#8B4513';
+            const nameColor = isHome ? '#4ade80' : '#D2691E';
+
+            console.log(`%c${location.emoji} ${isHome ? 'WELCOME HOME!' : 'SECRET LOCATION UNLOCKED!'}`, `font-size: 24px; color: ${titleColor};`);
+            console.log(`%c${location.name}`, `font-size: 16px; color: ${nameColor}; font-weight: bold;`);
             console.log(`%c${location.address}, ${location.city}`, 'color: #888;');
             console.log(`%c${location.description}`, 'color: #666; font-style: italic;');
             
@@ -4915,7 +4939,7 @@ class CelestialDemo {
                 window.celestialDemo.longitude = location.longitude;
                 
                 // Show fancy toast
-                this.showMonmouthToast(location);
+                this.showLocationToast(location, word);
                 
                 // Force compass to reload map and update celestial positions
                 if (window.compassSundial) {
@@ -4924,29 +4948,57 @@ class CelestialDemo {
                     window.compassSundial.updateCelestialBodies();
                 }
                 
-                // Add coffee-themed class for potential CSS effects
-                document.body.classList.add('monmouth-mode');
+                // Update location-specific CSS classes
+                document.body.classList.remove('monmouth-mode', 'home-mode');
+                document.body.classList.add(`${word}-mode`);
                 
                 // Update any location displays
                 this.updateLocationDisplays(location);
+                
+                // FETCH NEW WEATHER for the location!
+                this.updateWeatherForLocation(location);
             }
         });
     }
+    
+    async updateWeatherForLocation(location) {
+        // Update atmosphere with new location's weather
+        if (typeof atmosphere !== 'undefined' && atmosphere.fetchWeather) {
+            console.log(`%c🌤️ Fetching weather for ${location.city}...`, 'color: #64B5F6;');
+            
+            try {
+                atmosphere.latitude = location.latitude;
+                atmosphere.longitude = location.longitude;
+                await atmosphere.fetchWeather(location.latitude, location.longitude);
+                atmosphere.applyAtmosphere();
+                
+                console.log(`%c✓ Weather updated: ${atmosphere.condition}, ${atmosphere.temperature}°C`, 'color: #4CAF50;');
+            } catch (e) {
+                console.log('%c⚠️ Weather fetch failed', 'color: #FFA726;', e);
+            }
+        }
+    }
 
-    showMonmouthToast(location) {
+    showLocationToast(location, word) {
         // Remove existing toast
         const existing = document.querySelector('.secret-toast');
         if (existing) existing.remove();
 
+        const isHome = word === 'home';
+        const title = isHome ? `Welcome Home` : `Teleported to ${location.name}`;
+        const foundedLine = location.founded 
+            ? `<div class="toast-founded">Est. ${location.founded}</div>` 
+            : '';
+
         const toast = document.createElement('div');
-        toast.className = 'secret-toast monmouth-toast';
+        toast.className = `secret-toast ${word}-toast`;
         toast.innerHTML = `
             <div class="toast-emoji">${location.emoji}</div>
             <div class="toast-content">
-                <div class="toast-title">Teleported to ${location.name}</div>
+                <div class="toast-title">${title}</div>
                 <div class="toast-subtitle">${location.address}, ${location.city}</div>
                 <div class="toast-trivia">"${location.trivia[Math.floor(Math.random() * location.trivia.length)]}"</div>
-                <div class="toast-founded">Est. ${location.founded}</div>
+                ${foundedLine}
             </div>
         `;
         document.body.appendChild(toast);
