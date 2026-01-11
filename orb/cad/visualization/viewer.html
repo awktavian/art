@@ -3,12 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kagami Orb — 3D Part Viewer</title>
+    <title>Kagami Orb — Complete 3D Assembly Viewer</title>
     <style>
         :root {
             --void: #0a0a0f;
             --gold: #D4AF37;
             --text: #f0ede6;
+            --copper: #B87333;
+            --steel: #71797E;
         }
         
         * {
@@ -37,35 +39,41 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
         }
         
         .panel {
-            background: rgba(10, 10, 15, 0.9);
+            background: rgba(10, 10, 15, 0.95);
             border: 1px solid rgba(212, 175, 55, 0.3);
             border-radius: 8px;
             padding: 15px;
             backdrop-filter: blur(10px);
+            min-width: 200px;
         }
         
         .panel h2 {
-            font-size: 14px;
+            font-size: 12px;
             color: var(--gold);
             margin-bottom: 10px;
-            font-weight: 500;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .btn {
             background: rgba(212, 175, 55, 0.1);
             border: 1px solid rgba(212, 175, 55, 0.3);
             color: var(--text);
-            padding: 8px 16px;
+            padding: 8px 12px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
             transition: all 0.2s;
             display: block;
             width: 100%;
             margin-bottom: 5px;
+            text-align: left;
         }
         
         .btn:hover {
@@ -81,43 +89,94 @@
         .part-list {
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: 3px;
         }
         
         .part-item {
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 5px;
+            padding: 5px 8px;
             border-radius: 4px;
             cursor: pointer;
             transition: background 0.2s;
+            font-size: 10px;
         }
         
         .part-item:hover {
             background: rgba(212, 175, 55, 0.1);
         }
         
+        .part-item.highlighted {
+            background: rgba(212, 175, 55, 0.3);
+        }
+        
         .part-color {
-            width: 12px;
-            height: 12px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
+            flex-shrink: 0;
         }
         
         .part-name {
-            font-size: 11px;
+            flex: 1;
+        }
+        
+        .part-dims {
+            color: rgba(240, 237, 230, 0.5);
+            font-size: 9px;
+        }
+        
+        .category-header {
+            font-size: 10px;
+            color: rgba(212, 175, 55, 0.7);
+            margin-top: 8px;
+            margin-bottom: 4px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.2);
         }
         
         #info {
             position: fixed;
             bottom: 20px;
             left: 20px;
-            background: rgba(10, 10, 15, 0.9);
+            background: rgba(10, 10, 15, 0.95);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 10px;
+            max-width: 280px;
+        }
+        
+        #part-info {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(10, 10, 15, 0.95);
             border: 1px solid rgba(212, 175, 55, 0.3);
             border-radius: 8px;
             padding: 15px;
             font-size: 11px;
-            max-width: 300px;
+            width: 250px;
+            display: none;
+        }
+        
+        #part-info h3 {
+            color: var(--gold);
+            margin-bottom: 10px;
+        }
+        
+        #part-info table {
+            width: 100%;
+            font-size: 10px;
+        }
+        
+        #part-info td {
+            padding: 3px 0;
+        }
+        
+        #part-info td:first-child {
+            color: rgba(240, 237, 230, 0.6);
         }
         
         #vr-button {
@@ -127,16 +186,12 @@
             background: var(--gold);
             color: var(--void);
             border: none;
-            padding: 15px 30px;
+            padding: 12px 24px;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 600;
             cursor: pointer;
             display: none;
-        }
-        
-        #vr-button:hover {
-            transform: scale(1.05);
         }
         
         .loading {
@@ -160,6 +215,26 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        
+        .heat-legend {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-top: 8px;
+        }
+        
+        .heat-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 9px;
+        }
+        
+        .heat-bar {
+            width: 30px;
+            height: 8px;
+            border-radius: 2px;
+        }
     </style>
 </head>
 <body>
@@ -167,16 +242,45 @@
     
     <div id="ui">
         <div class="panel">
-            <h2>鏡 KAGAMI ORB</h2>
-            <button class="btn" id="explode-btn">Explode View</button>
-            <button class="btn" id="reset-btn">Reset View</button>
-            <button class="btn" id="wireframe-btn">Wireframe</button>
+            <h2>鏡 Kagami Orb Assembly</h2>
+            <button class="btn" id="explode-btn">💥 Explode View</button>
+            <button class="btn" id="reset-btn">🔄 Reset View</button>
+            <button class="btn" id="wireframe-btn">◻️ Wireframe</button>
+            <button class="btn" id="heat-btn">🌡️ Heat Map</button>
+            <button class="btn" id="canopy-btn">☂️ Toggle Canopy</button>
         </div>
         
         <div class="panel">
-            <h2>PARTS</h2>
+            <h2>Components</h2>
             <div class="part-list" id="part-list"></div>
         </div>
+        
+        <div class="panel">
+            <h2>Heat Sources</h2>
+            <div class="heat-legend">
+                <div class="heat-item">
+                    <div class="heat-bar" style="background: linear-gradient(90deg, #ff0000, #ff4400)"></div>
+                    <span>CM4 SoC (6W peak)</span>
+                </div>
+                <div class="heat-item">
+                    <div class="heat-bar" style="background: linear-gradient(90deg, #ff6600, #ff8800)"></div>
+                    <span>RX Coil (4W charging)</span>
+                </div>
+                <div class="heat-item">
+                    <div class="heat-bar" style="background: linear-gradient(90deg, #ffaa00, #ffcc00)"></div>
+                    <span>LED Ring (3.5W peak)</span>
+                </div>
+                <div class="heat-item">
+                    <div class="heat-bar" style="background: linear-gradient(90deg, #00aa00, #00cc00)"></div>
+                    <span>Battery (monitor only)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="part-info">
+        <h3 id="part-info-title">Part Info</h3>
+        <table id="part-info-table"></table>
     </div>
     
     <div id="info">
@@ -184,96 +288,338 @@
         • Drag to rotate<br>
         • Scroll to zoom<br>
         • Right-drag to pan<br>
-        • Click part to highlight
+        • Click part to select<br>
+        <br>
+        <strong>Assembly:</strong> 14 printed parts + 4 canopy parts
     </div>
     
     <button id="vr-button">Enter VR</button>
     
     <div class="loading" id="loading">
         <div class="loading-spinner"></div>
-        <div>Loading 3D Models...</div>
+        <div>Loading 3D Assembly...</div>
     </div>
 
-    <!-- Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/webxr/VRButton.js"></script>
     
     <script>
-        // Part definitions with colors and positions
+        // Complete part definitions with accurate dimensions from OpenSCAD specs
         const PARTS = [
-            { name: 'Internal Frame', color: 0x4a4a4a, y: 0, scale: 1 },
-            { name: 'LED Mount Ring', color: 0x808080, y: 30, scale: 1 },
-            { name: 'Battery Cradle', color: 0x5a5a5a, y: -25, scale: 1 },
-            { name: 'CM4 Bracket', color: 0x606060, y: 15, scale: 1 },
-            { name: 'Diffuser Ring', color: 0xffffff, y: 30, scale: 1 },
-            { name: 'Resonant Coil Mount', color: 0x3a3a3a, y: -35, scale: 1 },
-            { name: 'Outer Shell', color: 0x88ccff, y: 0, scale: 1.2 },
-            { name: 'Base Enclosure', color: 0x8b4513, y: -60, scale: 1 },
+            // === INDOOR ORB COMPONENTS ===
+            { 
+                name: 'Internal Frame', 
+                category: 'Structure',
+                color: 0x4a4a4a, 
+                y: 0, 
+                dims: '95×60mm',
+                material: 'Tough 2000',
+                print: 'SLA 50μm',
+                heat: 0,
+                geometry: 'cylinder',
+                params: { r: 47.5, h: 60 }
+            },
+            { 
+                name: 'CM4 Bracket', 
+                category: 'Structure',
+                color: 0x606060, 
+                y: 12, 
+                dims: '55×45×8mm',
+                material: 'Grey Pro',
+                print: 'SLA 50μm',
+                heat: 0,
+                geometry: 'box',
+                params: { w: 55, h: 8, d: 45 }
+            },
+            { 
+                name: 'Battery Cradle', 
+                category: 'Structure',
+                color: 0x5a5a5a, 
+                y: -22, 
+                dims: '106×66×24mm',
+                material: 'Tough 2000',
+                print: 'SLA 50μm',
+                heat: 0,
+                geometry: 'box',
+                params: { w: 53, h: 12, d: 33 }
+            },
+            { 
+                name: 'Resonant Coil Mount', 
+                category: 'Structure',
+                color: 0x3a3a3a, 
+                y: -32, 
+                dims: '85×5mm',
+                material: 'Tough 2000',
+                print: 'SLA 50μm',
+                heat: 0.7,
+                geometry: 'cylinder',
+                params: { r: 42.5, h: 5 }
+            },
+            { 
+                name: 'LED Mount Ring', 
+                category: 'LED System',
+                color: 0x707070, 
+                y: 0, 
+                dims: '85×75×8mm',
+                material: 'Grey Pro',
+                print: 'SLA 25μm',
+                heat: 0.5,
+                geometry: 'torus',
+                params: { r: 40, tube: 5 }
+            },
+            { 
+                name: 'Diffuser Ring', 
+                category: 'LED System',
+                color: 0xffffff, 
+                y: 2, 
+                dims: '80×70×3mm',
+                material: 'White Resin',
+                print: 'SLA 50μm',
+                heat: 0,
+                geometry: 'torus',
+                params: { r: 37.5, tube: 2.5 }
+            },
+            
+            // === ELECTRONICS (Representative) ===
+            { 
+                name: 'CM4 Module', 
+                category: 'Electronics',
+                color: 0x2d5016, 
+                y: 18, 
+                dims: '55×40×5mm',
+                material: 'PCB',
+                print: 'N/A',
+                heat: 1.0,
+                geometry: 'box',
+                params: { w: 55, h: 5, d: 40 }
+            },
+            { 
+                name: 'Heatsink (Copper)', 
+                category: 'Thermal',
+                color: 0xB87333, 
+                y: 24, 
+                dims: '40×40×10mm',
+                material: 'Copper',
+                print: 'Buy',
+                heat: 0.9,
+                geometry: 'box',
+                params: { w: 40, h: 10, d: 40 }
+            },
+            { 
+                name: 'Battery Pack', 
+                category: 'Power',
+                color: 0x1a1a2e, 
+                y: -18, 
+                dims: '100×60×20mm',
+                material: 'Li-Po 10Ah',
+                print: 'Buy',
+                heat: 0.3,
+                geometry: 'box',
+                params: { w: 50, h: 10, d: 30 }
+            },
+            { 
+                name: 'RX Coil (Litz)', 
+                category: 'Power',
+                color: 0xCD7F32, 
+                y: -35, 
+                dims: '80mm dia',
+                material: 'Litz Wire',
+                print: 'Wind',
+                heat: 0.8,
+                geometry: 'torus',
+                params: { r: 35, tube: 3 }
+            },
+            { 
+                name: 'SK6812 LED Ring', 
+                category: 'LED System',
+                color: 0x00ff88, 
+                y: 0, 
+                dims: '74mm dia, 24 LED',
+                material: 'PCB + LEDs',
+                print: 'Buy/JLCPCB',
+                heat: 0.6,
+                geometry: 'torus',
+                params: { r: 34, tube: 2.5 }
+            },
+            
+            // === SHELLS ===
+            { 
+                name: 'Inner Mirror Shell', 
+                category: 'Enclosure',
+                color: 0xc0c0c0, 
+                y: 0, 
+                dims: '100mm hemisphere',
+                material: 'Chrome Acrylic',
+                print: 'Buy',
+                heat: 0,
+                geometry: 'sphere',
+                params: { r: 50, transparent: false, opacity: 0.7 }
+            },
+            { 
+                name: 'Outer Shell (2-way)', 
+                category: 'Enclosure',
+                color: 0x88ccff, 
+                y: 0, 
+                dims: '120mm sphere',
+                material: '2-way Mirror Acrylic',
+                print: 'Buy TAP Plastics',
+                heat: 0,
+                geometry: 'sphere',
+                params: { r: 60, transparent: true, opacity: 0.25 }
+            },
+            
+            // === BASE ===
+            { 
+                name: 'Base Enclosure', 
+                category: 'Base',
+                color: 0x5D4037, 
+                y: -85, 
+                dims: '180×180×25mm',
+                material: 'Walnut',
+                print: 'CNC',
+                heat: 0,
+                geometry: 'hexprism',
+                params: { r: 80, h: 25 }
+            },
+            { 
+                name: 'Maglev Module', 
+                category: 'Base',
+                color: 0x333333, 
+                y: -72, 
+                dims: 'HCNT 200g',
+                material: 'Electronics',
+                print: 'Buy HCNT',
+                heat: 0.2,
+                geometry: 'cylinder',
+                params: { r: 40, h: 15 }
+            },
+            { 
+                name: 'TX Coil (Litz)', 
+                category: 'Base',
+                color: 0xCD7F32, 
+                y: -68, 
+                dims: '80mm dia',
+                material: 'Litz Wire',
+                print: 'Wind',
+                heat: 0.4,
+                geometry: 'torus',
+                params: { r: 35, tube: 3 }
+            },
+            
+            // === OUTDOOR CANOPY (ADDON) ===
+            { 
+                name: 'Canopy Dome', 
+                category: 'Canopy',
+                color: 0xB87333, 
+                y: 180, 
+                dims: '300mm dia',
+                material: 'Copper 1.5mm',
+                print: 'Metal Spinning',
+                heat: 0,
+                geometry: 'canopy',
+                params: { r: 150, h: 30 },
+                canopy: true
+            },
+            { 
+                name: 'Canopy Support Arm ×3', 
+                category: 'Canopy',
+                color: 0x71797E, 
+                y: 80, 
+                dims: '250×15×3mm',
+                material: '304 Stainless',
+                print: 'Laser Cut',
+                heat: 0,
+                geometry: 'arms',
+                params: { h: 200, w: 15 },
+                canopy: true
+            },
+            { 
+                name: 'Canopy Mount Ring', 
+                category: 'Canopy',
+                color: 0x5D4037, 
+                y: -60, 
+                dims: '200×10mm',
+                material: 'Walnut',
+                print: 'CNC',
+                heat: 0,
+                geometry: 'ring',
+                params: { ro: 100, ri: 80, h: 10 },
+                canopy: true
+            },
         ];
 
         let scene, camera, renderer, controls;
         let parts = [];
         let isExploded = false;
         let isWireframe = false;
+        let isHeatMap = false;
+        let showCanopy = true;
         let selectedPart = null;
 
         function init() {
-            // Scene
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0a0a0f);
             
-            // Camera
             camera = new THREE.PerspectiveCamera(
-                50, 
+                45, 
                 window.innerWidth / window.innerHeight, 
                 0.1, 
-                1000
+                2000
             );
-            camera.position.set(150, 100, 150);
+            camera.position.set(250, 180, 250);
             
-            // Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.xr.enabled = true;
             document.getElementById('container').appendChild(renderer.domElement);
             
-            // Controls
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
-            controls.minDistance = 50;
-            controls.maxDistance = 400;
+            controls.minDistance = 80;
+            controls.maxDistance = 600;
+            controls.target.set(0, 20, 0);
             
             // Lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
             
             const keyLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            keyLight.position.set(100, 100, 100);
+            keyLight.position.set(150, 200, 100);
+            keyLight.castShadow = true;
             scene.add(keyLight);
             
-            const fillLight = new THREE.DirectionalLight(0xd4af37, 0.3);
-            fillLight.position.set(-100, 50, -100);
+            const fillLight = new THREE.DirectionalLight(0xd4af37, 0.4);
+            fillLight.position.set(-100, 100, -100);
             scene.add(fillLight);
             
-            const rimLight = new THREE.DirectionalLight(0xffffff, 0.2);
+            const rimLight = new THREE.PointLight(0xffffff, 0.3);
             rimLight.position.set(0, -100, 0);
             scene.add(rimLight);
             
             // Grid
-            const gridHelper = new THREE.GridHelper(200, 20, 0xd4af37, 0x333333);
-            gridHelper.position.y = -70;
+            const gridHelper = new THREE.GridHelper(400, 40, 0xd4af37, 0x222222);
+            gridHelper.position.y = -110;
             scene.add(gridHelper);
             
-            // Create parts
-            createParts();
+            // 15mm levitation gap indicator
+            const gapGeom = new THREE.RingGeometry(55, 65, 32);
+            const gapMat = new THREE.MeshBasicMaterial({ 
+                color: 0xd4af37, 
+                transparent: true, 
+                opacity: 0.3,
+                side: THREE.DoubleSide
+            });
+            const gapMesh = new THREE.Mesh(gapGeom, gapMat);
+            gapMesh.rotation.x = -Math.PI / 2;
+            gapMesh.position.y = -52;
+            scene.add(gapMesh);
             
-            // Create part list UI
+            createParts();
             createPartList();
             
-            // Check for WebXR
+            // WebXR check
             if (navigator.xr) {
                 navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
                     if (supported) {
@@ -283,69 +629,133 @@
                 });
             }
             
-            // Event listeners
             window.addEventListener('resize', onWindowResize);
             document.getElementById('explode-btn').addEventListener('click', toggleExplode);
             document.getElementById('reset-btn').addEventListener('click', resetView);
             document.getElementById('wireframe-btn').addEventListener('click', toggleWireframe);
+            document.getElementById('heat-btn').addEventListener('click', toggleHeatMap);
+            document.getElementById('canopy-btn').addEventListener('click', toggleCanopy);
             renderer.domElement.addEventListener('click', onPartClick);
             
-            // Hide loading
             document.getElementById('loading').style.display = 'none';
-            
-            // Animate
             animate();
+        }
+
+        function createGeometry(partDef) {
+            const p = partDef.params;
+            switch(partDef.geometry) {
+                case 'cylinder':
+                    return new THREE.CylinderGeometry(p.r, p.r, p.h, 32);
+                case 'box':
+                    return new THREE.BoxGeometry(p.w, p.h, p.d);
+                case 'torus':
+                    return new THREE.TorusGeometry(p.r, p.tube, 16, 64);
+                case 'sphere':
+                    return new THREE.SphereGeometry(p.r, 32, 32);
+                case 'hexprism':
+                    return new THREE.CylinderGeometry(p.r, p.r * 1.05, p.h, 6);
+                case 'ring':
+                    const shape = new THREE.Shape();
+                    shape.absarc(0, 0, p.ro, 0, Math.PI * 2);
+                    const hole = new THREE.Path();
+                    hole.absarc(0, 0, p.ri, 0, Math.PI * 2);
+                    shape.holes.push(hole);
+                    return new THREE.ExtrudeGeometry(shape, { depth: p.h, bevelEnabled: false });
+                case 'canopy':
+                    // Shallow dome shape
+                    const canopyGeom = new THREE.SphereGeometry(p.r, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.15);
+                    return canopyGeom;
+                case 'arms':
+                    // 3 support arms
+                    const armGroup = new THREE.Group();
+                    for (let i = 0; i < 3; i++) {
+                        const armGeom = new THREE.BoxGeometry(p.w, p.h, 3);
+                        const armMesh = new THREE.Mesh(armGeom);
+                        armMesh.position.set(70, 0, 0);
+                        armMesh.rotation.y = (i * Math.PI * 2) / 3;
+                        armGroup.add(armMesh);
+                    }
+                    return null; // Special case
+                default:
+                    return new THREE.BoxGeometry(20, 20, 20);
+            }
         }
 
         function createParts() {
             PARTS.forEach((partDef, index) => {
-                let geometry;
+                let mesh;
                 
-                // Create geometry based on part type
-                switch(partDef.name) {
-                    case 'Internal Frame':
-                        geometry = new THREE.CylinderGeometry(47.5, 47.5, 60, 32);
-                        break;
-                    case 'LED Mount Ring':
-                        geometry = new THREE.TorusGeometry(40, 5, 8, 32);
-                        break;
-                    case 'Battery Cradle':
-                        geometry = new THREE.BoxGeometry(50, 15, 30);
-                        break;
-                    case 'CM4 Bracket':
-                        geometry = new THREE.BoxGeometry(55, 8, 45);
-                        break;
-                    case 'Diffuser Ring':
-                        geometry = new THREE.TorusGeometry(37.5, 2.5, 8, 64);
-                        break;
-                    case 'Resonant Coil Mount':
-                        geometry = new THREE.CylinderGeometry(42.5, 42.5, 5, 32);
-                        break;
-                    case 'Outer Shell':
-                        geometry = new THREE.SphereGeometry(60, 32, 32);
-                        break;
-                    case 'Base Enclosure':
-                        geometry = new THREE.CylinderGeometry(80, 85, 25, 6);
-                        break;
-                    default:
-                        geometry = new THREE.BoxGeometry(20, 20, 20);
+                if (partDef.geometry === 'arms') {
+                    // Special: 3 support arms
+                    const group = new THREE.Group();
+                    for (let i = 0; i < 3; i++) {
+                        const armGeom = new THREE.BoxGeometry(partDef.params.w, partDef.params.h, 3);
+                        const armMat = new THREE.MeshStandardMaterial({
+                            color: partDef.color,
+                            metalness: 0.8,
+                            roughness: 0.3,
+                        });
+                        const arm = new THREE.Mesh(armGeom, armMat);
+                        const angle = (i * Math.PI * 2) / 3;
+                        arm.position.x = Math.cos(angle) * 70;
+                        arm.position.z = Math.sin(angle) * 70;
+                        arm.rotation.y = angle;
+                        group.add(arm);
+                    }
+                    mesh = group;
+                    mesh.position.y = partDef.y;
+                } else if (partDef.geometry === 'ring') {
+                    const geom = createGeometry(partDef);
+                    const mat = new THREE.MeshStandardMaterial({
+                        color: partDef.color,
+                        metalness: 0.2,
+                        roughness: 0.8,
+                    });
+                    mesh = new THREE.Mesh(geom, mat);
+                    mesh.rotation.x = Math.PI / 2;
+                    mesh.position.y = partDef.y;
+                } else {
+                    const geometry = createGeometry(partDef);
+                    const isTransparent = partDef.params && partDef.params.transparent;
+                    const opacity = partDef.params && partDef.params.opacity ? partDef.params.opacity : 1;
+                    
+                    const material = new THREE.MeshStandardMaterial({
+                        color: partDef.color,
+                        metalness: partDef.material === 'Copper' ? 0.9 : 
+                                   partDef.material === '304 Stainless' ? 0.8 : 0.3,
+                        roughness: partDef.material === 'Copper' ? 0.3 : 
+                                   partDef.material === '304 Stainless' ? 0.4 : 0.7,
+                        transparent: isTransparent,
+                        opacity: opacity,
+                    });
+                    
+                    mesh = new THREE.Mesh(geometry, material);
+                    
+                    // Rotate torus to horizontal
+                    if (partDef.geometry === 'torus') {
+                        mesh.rotation.x = Math.PI / 2;
+                    }
+                    
+                    // Flip canopy dome
+                    if (partDef.geometry === 'canopy') {
+                        mesh.rotation.x = Math.PI;
+                    }
+                    
+                    mesh.position.y = partDef.y;
                 }
                 
-                const material = new THREE.MeshStandardMaterial({
-                    color: partDef.color,
-                    metalness: 0.3,
-                    roughness: 0.7,
-                    transparent: partDef.name === 'Outer Shell',
-                    opacity: partDef.name === 'Outer Shell' ? 0.3 : 1,
-                });
-                
-                const mesh = new THREE.Mesh(geometry, material);
-                mesh.position.y = partDef.y;
                 mesh.userData = { 
                     name: partDef.name, 
                     originalY: partDef.y,
-                    index: index 
+                    index: index,
+                    partDef: partDef,
+                    originalColor: partDef.color,
+                    heat: partDef.heat
                 };
+                
+                if (partDef.canopy) {
+                    mesh.userData.isCanopy = true;
+                }
                 
                 scene.add(mesh);
                 parts.push(mesh);
@@ -354,13 +764,24 @@
 
         function createPartList() {
             const listEl = document.getElementById('part-list');
+            let currentCategory = '';
             
             PARTS.forEach((part, index) => {
+                if (part.category !== currentCategory) {
+                    currentCategory = part.category;
+                    const header = document.createElement('div');
+                    header.className = 'category-header';
+                    header.textContent = currentCategory;
+                    listEl.appendChild(header);
+                }
+                
                 const item = document.createElement('div');
                 item.className = 'part-item';
+                item.id = `part-item-${index}`;
                 item.innerHTML = `
                     <div class="part-color" style="background: #${part.color.toString(16).padStart(6, '0')}"></div>
                     <span class="part-name">${part.name}</span>
+                    <span class="part-dims">${part.dims}</span>
                 `;
                 item.addEventListener('click', () => highlightPart(index));
                 listEl.appendChild(item);
@@ -368,48 +789,128 @@
         }
 
         function highlightPart(index) {
-            // Reset all parts
-            parts.forEach(part => {
-                part.material.emissive.setHex(0x000000);
+            // Reset all
+            parts.forEach((part, i) => {
+                if (part.material) {
+                    part.material.emissive.setHex(0x000000);
+                } else if (part.children) {
+                    part.children.forEach(c => c.material.emissive.setHex(0x000000));
+                }
+                document.getElementById(`part-item-${i}`)?.classList.remove('highlighted');
             });
             
-            // Highlight selected
             if (selectedPart !== index) {
-                parts[index].material.emissive.setHex(0xd4af37);
-                parts[index].material.emissiveIntensity = 0.3;
+                const mesh = parts[index];
+                if (mesh.material) {
+                    mesh.material.emissive.setHex(0xd4af37);
+                    mesh.material.emissiveIntensity = 0.4;
+                } else if (mesh.children) {
+                    mesh.children.forEach(c => {
+                        c.material.emissive.setHex(0xd4af37);
+                        c.material.emissiveIntensity = 0.4;
+                    });
+                }
+                document.getElementById(`part-item-${index}`)?.classList.add('highlighted');
                 selectedPart = index;
+                showPartInfo(PARTS[index]);
             } else {
                 selectedPart = null;
+                document.getElementById('part-info').style.display = 'none';
             }
+        }
+
+        function showPartInfo(partDef) {
+            const infoEl = document.getElementById('part-info');
+            const titleEl = document.getElementById('part-info-title');
+            const tableEl = document.getElementById('part-info-table');
+            
+            titleEl.textContent = partDef.name;
+            tableEl.innerHTML = `
+                <tr><td>Dimensions</td><td>${partDef.dims}</td></tr>
+                <tr><td>Material</td><td>${partDef.material}</td></tr>
+                <tr><td>Fabrication</td><td>${partDef.print}</td></tr>
+                <tr><td>Heat Load</td><td>${partDef.heat > 0 ? (partDef.heat * 100).toFixed(0) + '%' : 'None'}</td></tr>
+                <tr><td>Category</td><td>${partDef.category}</td></tr>
+            `;
+            infoEl.style.display = 'block';
         }
 
         function toggleExplode() {
             isExploded = !isExploded;
-            const btn = document.getElementById('explode-btn');
-            btn.classList.toggle('active', isExploded);
+            document.getElementById('explode-btn').classList.toggle('active', isExploded);
             
             parts.forEach((part, index) => {
-                const targetY = isExploded 
-                    ? part.userData.originalY + (index - 3) * 30 
-                    : part.userData.originalY;
+                const baseY = part.userData.originalY;
+                let targetY;
                 
-                animateTo(part.position, 'y', targetY, 500);
+                if (isExploded) {
+                    // Spread parts vertically based on position
+                    if (baseY > 100) targetY = baseY + 60; // Canopy
+                    else if (baseY > 50) targetY = baseY + 40;
+                    else if (baseY > 0) targetY = baseY + 25;
+                    else if (baseY > -30) targetY = baseY;
+                    else if (baseY > -60) targetY = baseY - 20;
+                    else targetY = baseY - 40;
+                } else {
+                    targetY = baseY;
+                }
+                
+                animateTo(part.position, 'y', targetY, 600);
             });
         }
 
         function toggleWireframe() {
             isWireframe = !isWireframe;
-            const btn = document.getElementById('wireframe-btn');
-            btn.classList.toggle('active', isWireframe);
+            document.getElementById('wireframe-btn').classList.toggle('active', isWireframe);
             
             parts.forEach(part => {
-                part.material.wireframe = isWireframe;
+                if (part.material) {
+                    part.material.wireframe = isWireframe;
+                } else if (part.children) {
+                    part.children.forEach(c => c.material.wireframe = isWireframe);
+                }
+            });
+        }
+
+        function toggleHeatMap() {
+            isHeatMap = !isHeatMap;
+            document.getElementById('heat-btn').classList.toggle('active', isHeatMap);
+            
+            parts.forEach(part => {
+                const heat = part.userData.heat || 0;
+                const setColor = (mat) => {
+                    if (isHeatMap && heat > 0) {
+                        const r = Math.min(1, heat * 2);
+                        const g = Math.max(0, 1 - heat);
+                        const b = 0;
+                        mat.color.setRGB(r, g, b);
+                    } else {
+                        mat.color.setHex(part.userData.originalColor);
+                    }
+                };
+                
+                if (part.material) {
+                    setColor(part.material);
+                } else if (part.children) {
+                    part.children.forEach(c => setColor(c.material));
+                }
+            });
+        }
+
+        function toggleCanopy() {
+            showCanopy = !showCanopy;
+            document.getElementById('canopy-btn').classList.toggle('active', !showCanopy);
+            
+            parts.forEach(part => {
+                if (part.userData.isCanopy) {
+                    part.visible = showCanopy;
+                }
             });
         }
 
         function resetView() {
-            camera.position.set(150, 100, 150);
-            controls.target.set(0, 0, 0);
+            camera.position.set(250, 180, 250);
+            controls.target.set(0, 20, 0);
             controls.update();
         }
 
@@ -420,15 +921,10 @@
             function update() {
                 const elapsed = Date.now() - startTime;
                 const progress = Math.min(elapsed / duration, 1);
-                const eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
-                
+                const eased = 1 - Math.pow(1 - progress, 3);
                 obj[prop] = start + (target - start) * eased;
-                
-                if (progress < 1) {
-                    requestAnimationFrame(update);
-                }
+                if (progress < 1) requestAnimationFrame(update);
             }
-            
             update();
         }
 
@@ -442,9 +938,16 @@
             const raycaster = new THREE.Raycaster();
             raycaster.setFromCamera(mouse, camera);
             
-            const intersects = raycaster.intersectObjects(parts);
+            const intersects = raycaster.intersectObjects(parts, true);
             if (intersects.length > 0) {
-                highlightPart(intersects[0].object.userData.index);
+                let targetMesh = intersects[0].object;
+                // Find parent if it's a group child
+                while (targetMesh.parent && !targetMesh.userData.index && targetMesh.userData.index !== 0) {
+                    targetMesh = targetMesh.parent;
+                }
+                if (targetMesh.userData.index !== undefined) {
+                    highlightPart(targetMesh.userData.index);
+                }
             }
         }
 
@@ -467,7 +970,6 @@
             });
         }
 
-        // Initialize
         init();
     </script>
 </body>

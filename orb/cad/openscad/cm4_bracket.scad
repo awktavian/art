@@ -13,9 +13,10 @@ heatsink_size = 40;           // Heatsink contact area
 heatsink_cutout_depth = 1;    // Thermal pad recess
 
 /* [Mounting Holes] */
-// CM4 mounting pattern: 58mm x 45mm
-hole_spacing_x = 58;
-hole_spacing_y = 45;
+// CM4 Lite actual mounting pattern: 58mm x 45mm (board is 55x40mm)
+// Note: Mounting holes are OUTSIDE the board edge
+hole_spacing_x = 58;  // Measured from CM4 datasheet
+hole_spacing_y = 45;  // Measured from CM4 datasheet
 hole_diameter = 2.7;          // M2.5 clearance
 standoff_height = 5;          // Standoff height
 standoff_diameter = 6;        // Standoff OD
