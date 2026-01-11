@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>DRY Mesh Protocol | Don't Repeat Yourself (Or Your Packets)</title>
+    <meta name="description" content="A technical deep dive into Kagami's mesh protocol. Ed25519 identity, X25519 key exchange, XChaCha20-Poly1305 encryption, CRDTs, and Vector Clocks. Because redundancy is only good in cryptography.">
+    <meta name="author" content="Kagami">
+    <meta name="keywords" content="mesh protocol, CRDT, Ed25519, X25519, XChaCha20-Poly1305, distributed systems, UniFFI">
+
+    <meta name="theme-color" content="#0a0a0f">
+
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="DRY Mesh Protocol | Don't Repeat Yourself">
+    <meta property="og:description" content="Kagami's ambient operating system eliminates redundancy across devices. One protocol. Every platform.">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="../accessibility.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9741;</text></svg>">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body class="loading">
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <div class="background-layer" aria-hidden="true"></div>
+    <canvas class="mesh-canvas" id="mesh-canvas" aria-hidden="true"></canvas>
+    <div class="grain-overlay" aria-hidden="true"></div>
+
+    <!-- Live region for screen reader announcements -->
+    <div id="live-announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+
+    <nav class="nav" aria-label="Main navigation">
+        <div class="nav-content container">
+            <a href="#hero" class="nav-logo" aria-label="DRY Mesh - Home">
+                <span class="nav-logo-icon" aria-hidden="true">&#9741;</span>
+                <span class="nav-logo-text">DRY<span class="nav-logo-highlight">Mesh</span></span>
+            </a>
+            <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle navigation menu" aria-expanded="false">
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+            </button>
+            <div class="nav-links" id="nav-links">
+                <a href="#identity" class="nav-link">Identity</a>
+                <a href="#encryption" class="nav-link">Encryption</a>
+                <a href="#sync" class="nav-link">Sync</a>
+                <a href="#topology" class="nav-link">Topology</a>
+                <a href="#demo" class="nav-link">Demo</a>
+            </div>
+            <div class="nav-tools">
+                <button class="nav-tool-btn" id="font-toggle-btn" aria-label="Toggle larger text" title="Toggle larger text">
+                    <span aria-hidden="true">Aa</span>
+                </button>
+                <button class="nav-tool-btn" id="sound-toggle-btn" aria-label="Toggle sound effects" title="Toggle sound effects">
+                    <span aria-hidden="true">🔊</span>
+                </button>
+                <div class="discovery-counter" id="discovery-counter" role="status" aria-label="Easter eggs found">
+                    <span class="discovery-icon" aria-hidden="true">🔍</span>
+                    <span class="discovery-count">0/8</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <header class="hero" id="hero">
+        <div class="hero-content container">
+            <div class="hero-badge">
+                <span class="hero-badge-icon" aria-hidden="true">&#128274;</span>
+                <span>Kagami Mesh SDK v1.0</span>
+            </div>
+
+            <h1 class="hero-title">
+                <span class="hero-title-line">Don't Repeat</span>
+                <span class="hero-title-line hero-title-accent">Yourself</span>
+            </h1>
+
+            <p class="hero-subtitle">
+                <em>Or your packets. Or your keys. Or your state.</em>
+            </p>
+
+            <p class="hero-description">
+                The mesh protocol that eliminates redundancy across every device in your home.
+                One identity. One truth. Zero conflicts.
+            </p>
+
+            <div class="hero-stats" role="list" aria-label="Protocol statistics">
+                <div class="stat-item" role="listitem">
+                    <span class="stat-value" data-count="6" aria-label="6 platforms">0</span>
+                    <span class="stat-label">Platforms</span>
+                </div>
+                <div class="stat-item" role="listitem">
+                    <span class="stat-value" data-count="256" aria-label="256-bit keys">0</span>
+                    <span class="stat-label">Bit Keys</span>
+                </div>
+                <div class="stat-item" role="listitem">
+                    <span class="stat-value" data-count="0" aria-label="Zero conflicts">0</span>
+                    <span class="stat-label">Conflicts</span>
+                </div>
+                <div class="stat-item" role="listitem">
+                    <span class="stat-value formula" aria-label="Safety constraint: h of x is greater than or equal to zero">h(x)&ge;0</span>
+                    <span class="stat-label">Always</span>
+                </div>
+            </div>
+
+            <div class="hero-tagline">
+                <code>write once, sync everywhere</code>
+            </div>
+        </div>
+
+        <div class="scroll-indicator" role="button" tabindex="0" aria-label="Scroll to learn more">
+            <span>Explore</span>
+            <svg class="scroll-arrow" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+    </header>
+
+    <main id="main-content">
+
+        <!-- Section 1: Identity (Ed25519) -->
+        <section class="section" id="identity" aria-labelledby="identity-title">
+            <div class="container">
+                <header class="section-header" data-reveal>
+                    <span class="section-number">01</span>
+                    <h2 class="section-title" id="identity-title">Cryptographic <em>Identity</em></h2>
+                    <p class="section-description">
+                        Every device gets one key. Just one. Because if you need two, you're doing it wrong.
+                    </p>
+                </header>
+
+                <div class="grid-2">
+                    <div data-reveal data-reveal-delay="1">
+                        <h3 class="subsection-title">Ed25519: One Key to Rule Them All</h3>
+                        <p class="subsection-text">
+                            Ed25519 gives you a 256-bit identity that's mathematically unique.
+                            The odds of collision? About the same as guessing a specific atom in the observable universe.
+                            <strong>Twice.</strong>
+                        </p>
+
+                        <div class="callout dry-humor" role="note">
+                            <div class="callout-title">
+                                <span aria-hidden="true">&#128161;</span>
+                                DRY Principle Applied
+                            </div>
+                            <div class="callout-content">
+                                Your identity is computed from a single 32-byte seed.
+                                The public key? Derived. The peer ID? Derived.
+                                We don't store what we can calculate.
+                                <em>That's DRY.</em>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div data-reveal data-reveal-delay="2">
+                        <div class="code-block" role="figure" aria-label="Ed25519 identity code example">
+                            <div class="code-header">
+                                <span class="code-dot" aria-hidden="true"></span>
+                                <span class="code-dot" aria-hidden="true"></span>
+                                <span class="code-dot" aria-hidden="true"></span>
+                                <span class="code-title">ed25519.rs</span>
+                            </div>
+                            <div class="code-content">
+<pre><code><span class="code-comment">/// Generate a new random identity.</span>
+<span class="code-keyword">pub fn</span> <span class="code-function">generate</span>() -> <span class="code-type">Self</span> {
+    <span class="code-keyword">let</span> signing_key = SigningKey::<span class="code-function">generate</span>(&amp;<span class="code-keyword">mut</span> OsRng);
+    <span class="code-type">Self</span> { inner: signing_key }
+}
+
+<span class="code-comment">/// Sign a message. 64 bytes of proof.</span>
+<span class="code-keyword">pub fn</span> <span class="code-function">sign</span>(&amp;<span class="code-keyword">self</span>, message: &amp;[<span class="code-type">u8</span>]) -> <span class="code-type">Signature</span> {
+    <span class="code-keyword">self</span>.inner.<span class="code-function">sign</span>(message)
+}
+
+<span class="code-comment">/// Verify: Is this really from who they claim?</span>
+<span class="code-keyword">pub fn</span> <span class="code-function">verify</span>(
+    &amp;<span class="code-keyword">self</span>,
+    message: &amp;[<span class="code-type">u8</span>],
+    signature: &amp;<span class="code-type">Signature</span>
+) -> <span class="code-type">Result</span>&lt;(), <span class="code-type">IdentityError</span>&gt; {
+    <span class="code-keyword">self</span>.public_key.<span class="code-function">verify</span>(message, signature)
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="identity-visual" data-reveal data-reveal-delay="3">
+                    <div class="identity-card">
+                        <div class="identity-card-header">
+                            <span class="identity-icon" aria-hidden="true">&#128273;</span>
+                            <span class="identity-label">Device Identity</span>
+                        </div>
+                        <div class="identity-key" id="demo-identity">
+                            <span class="key-label">Peer ID:</span>
+                            <code class="key-value" id="peer-id-display">Click to generate...</code>
+                            <button class="copy-btn" id="copy-peer-id" aria-label="Copy peer ID to clipboard" title="Copy to clipboard">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <button class="identity-generate-btn" id="generate-identity-btn">
+                            Generate New Identity
+                        </button>
+                    </div>
+                </div>
+
+                <div class="formula-box" data-reveal>
+                    <div class="formula-title">Identity Derivation</div>
+                    <div class="formula-content">
+                        <code>seed (32 bytes) &rarr; SecretKey &rarr; PublicKey &rarr; hex(PublicKey) = PeerID</code>
+                    </div>
+                    <div class="formula-note">
+                        One seed. Everything else is derived. <span class="dry-tag">DRY</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Encryption (X25519 + XChaCha20-Poly1305) -->
+        <section class="section section-alt" id="encryption" aria-labelledby="encryption-title">
+            <div class="container">
+                <header class="section-header" data-reveal>
+                    <span class="section-number">02</span>
+                    <h2 class="section-title" id="encryption-title">End-to-End <em>Encryption</em></h2>
+                    <p class="section-description">
+                        X25519 for the handshake. XChaCha20-Poly1305 for everything after.
+                        Because repeating the key exchange for every message would be... wet.
+                    </p>
+                </header>
+
+                <div class="encryption-flow" data-reveal role="list" aria-label="Encryption flow steps">
+                    <div class="flow-step" role="listitem">
+                        <div class="flow-step-number">1</div>
+                        <div class="flow-step-content">
+                            <h4>Key Exchange</h4>
+                            <p>X25519 Diffie-Hellman</p>
+                            <code>alice.dh(bob.pub) == bob.dh(alice.pub)</code>
+                        </div>
+                    </div>
+                    <div class="flow-arrow" aria-hidden="true">&rarr;</div>
+                    <div class="flow-step" role="listitem">
+                        <div class="flow-step-number">2</div>
+                        <div class="flow-step-content">
+                            <h4>Key Derivation</h4>
+                            <p>HKDF-SHA256</p>
+                            <code>shared &rarr; cipher_key (32 bytes)</code>
+                        </div>
+                    </div>
+                    <div class="flow-arrow" aria-hidden="true">&rarr;</div>
+                    <div class="flow-step" role="listitem">
+                        <div class="flow-step-number">3</div>
+                        <div class="flow-step-content">
+                            <h4>Encrypt</h4>
+                            <p>XChaCha20-Poly1305</p>
+                            <code>nonce || ciphertext || tag</code>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="margin-top: var(--space-8);">
+                    <div data-reveal data-reveal-delay="1">
+                        <div class="code-block" role="figure" aria-label="X25519 key exchange code example">
+                            <div class="code-header">
+                                <span class="code-dot" aria-hidden="true"></span>
+                                <span class="code-dot" aria-hidden="true"></span>
+                                <span class="code-dot" aria-hidden="true"></span>
+                                <span class="code-title">x25519.rs</span>
+                            </div>
+                            <div class="code-content">
+<pre><code><span class="code-comment">/// Diffie-Hellman: Same result, different inputs</span>
+<span class="code-keyword">pub fn</span> <span class="code-function">diffie_hellman</span>(
+    &amp;<span class="code-keyword">self</span>,
+    peer_public: &amp;<span class="code-type">X25519PublicKey</span>
+) -> <span class="code-type">SharedSecret</span> {
+    <span class="code-keyword">let</span> shared = <span class="code-keyword">self</span>.inner
+        .<span class="code-function">diffie_hellman</span>(&amp;peer_public.<span class="code-function">to_dalek</span>());
+    <span class="code-type">SharedSecret</span> {
+        bytes: shared.<span class="code-function">to_bytes</span>()
+    }
+}
+
+<span class="code-comment">/// Derive encryption key from shared secret</span>
+<span class="code-keyword">pub fn</span> <span class="code-function">to_cipher_key</span>(&amp;<span class="code-keyword">self</span>) -> <span class="code-type">SecretKey</span> {
+    <span class="code-keyword">let</span> key_bytes = <span class="code-keyword">self</span>.<span class="code-function">derive_key</span>(
+        <span class="code-string">b"kagami-mesh-xchacha"</span>,
+        <span class="code-number">32</span>
+    );
+    <span class="code-type">SecretKey</span>::<span class="code-function">from_bytes</span>(&amp;key_bytes)
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div data-reveal data-reveal-delay="2">
+                        <div class="code-block" role="figure" aria-label="XChaCha20-Poly1305 encryption code example">
+                            <div class="code-header">
+                                <span class="code-dot" aria-hidden="true"></span>
+                                <span class="code-dot" aria-hidden="true"></span>
+                                <span class="code-dot" aria-hidden="true"></span>
+                                <span class="code-title">xchacha.rs</span>
+                            </div>
+                            <div class="code-content">
+<pre><code><span class="code-comment">/// 192-bit nonce = never repeats</span>
+<span class="code-keyword">pub const</span> <span class="code-const">NONCE_SIZE</span>: <span class="code-type">usize</span> = <span class="code-number">24</span>;
+
+<span class="code-comment">/// Encrypt with random nonce prepended</span>
+<span class="code-keyword">pub fn</span> <span class="code-function">encrypt</span>(
+    key: &amp;<span class="code-type">SecretKey</span>,
+    plaintext: &amp;[<span class="code-type">u8</span>]
+) -> <span class="code-type">Result</span>&lt;<span class="code-type">Vec</span>&lt;<span class="code-type">u8</span>&gt;&gt; {
+    <span class="code-keyword">let</span> nonce = <span class="code-type">Nonce</span>::<span class="code-function">generate</span>();
+    <span class="code-keyword">let</span> ciphertext = cipher
+        .<span class="code-function">encrypt</span>(&amp;nonce, plaintext)?;
+
+    <span class="code-comment">// nonce || ciphertext || tag</span>
+    <span class="code-keyword">let</span> <span class="code-keyword">mut</span> result = <span class="code-type">Vec</span>::<span class="code-function">new</span>();
+    result.<span class="code-function">extend</span>(&amp;nonce.bytes);
+    result.<span class="code-function">extend</span>(&amp;ciphertext);
+    <span class="code-type">Ok</span>(result)
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="callout security" data-reveal role="note">
+                    <div class="callout-title">
+                        <span aria-hidden="true">&#128274;</span>
+                        Why XChaCha20-Poly1305?
+                    </div>
+                    <div class="callout-content">
+                        <ul class="security-list" role="list">
+                            <li><strong>192-bit nonce:</strong> Random nonces without collision risk (unlike AES-GCM's 96-bit)</li>
+                            <li><strong>Poly1305 MAC:</strong> Authentication tag detects any tampering</li>
+                            <li><strong>Constant-time:</strong> No timing side-channels to exploit</li>
+                            <li><strong>No padding:</strong> Stream cipher = no padding oracle attacks</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="encryption-demo" data-reveal aria-labelledby="encryption-demo-title">
+                    <h3 class="demo-title" id="encryption-demo-title">
+                        <span aria-hidden="true">&#128272;</span>
+                        Live Encryption Demo
+                    </h3>
+                    <div class="demo-grid">
+                        <div class="demo-input-group">
+                            <label for="plaintext-input">Plaintext Message</label>
+                            <textarea id="plaintext-input" placeholder="Type a secret message...">Hello, Mesh!</textarea>
+                        </div>
+                        <div class="demo-output-group">
+                            <label id="ciphertext-label">Encrypted (hex)</label>
+                            <code class="demo-output" id="ciphertext-output" aria-labelledby="ciphertext-label" role="status">Generate keys first...</code>
+                        </div>
+                    </div>
+                    <div class="demo-actions">
+                        <button class="demo-btn" id="encrypt-btn">Encrypt</button>
+                        <button class="demo-btn secondary" id="decrypt-btn">Decrypt</button>
+                    </div>
+                    <div class="demo-key-display">
+                        <span class="key-label">Shared Key:</span>
+                        <code id="shared-key-display">Not generated</code>
+                        <button class="copy-btn" id="copy-shared-key" aria-label="Copy shared key to clipboard" title="Copy to clipboard">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Synchronization (Vector Clocks + CRDTs) -->
+        <section class="section" id="sync" aria-labelledby="sync-title">
+            <div class="container">
+                <header class="section-header" data-reveal>
+                    <span class="section-number">03</span>
+                    <h2 class="section-title" id="sync-title">Conflict-Free <em>Synchronization</em></h2>
+                    <p class="section-description">
+                        Vector Clocks track causality. CRDTs resolve conflicts automatically.
+                        Because "last write wins" is a terrible strategy when you have 6 devices.
+                    </p>
+                </header>
+
+                <div class="crdt-showcase" data-reveal role="list" aria-label="CRDT types">
+                    <div class="crdt-card" role="listitem">
+                        <div class="crdt-icon" aria-hidden="true">&#128338;</div>
+                        <h4>Vector Clock</h4>
+                        <p>Happens-before ordering without synchronized clocks</p>
+                        <code>{ "hub": 5, "phone": 3, "watch": 2 }</code>
+                    </div>
+                    <div class="crdt-card" role="listitem">
+                        <div class="crdt-icon" aria-hidden="true">&#128202;</div>
+                        <h4>G-Counter</h4>
+                        <p>Distributed counting that only grows</p>
+                        <code>sum(all_nodes) = total</code>
+                    </div>
+                    <div class="crdt-card" role="listitem">
+                        <div class="crdt-icon" aria-hidden="true">&#128221;</div>
+                        <h4>LWW-Register</h4>
+                        <p>Last-writer-wins with timestamps</p>
+                        <code>max(timestamp) = winner</code>
+                    </div>
+                    <div class="crdt-card" role="listitem">
+                        <div class="crdt-icon" aria-hidden="true">&#128230;</div>
+                        <h4>OR-Set</h4>
+                        <p>Add and remove without conflicts</p>
+                        <code>unique_tags = no conflicts</code>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="margin-top: var(--space-8);">
+                    <div data-reveal data-reveal-delay="1">
+                        <h3 class="subsection-title">Vector Clock: Time Without Time</h3>
+                        <p class="subsection-text">
+                            Wall clocks lie. Network delays exist. But Vector Clocks don't care.
+                            They track <em>causality</em>, not <em>time</em>.
+                        </p>
+
+                        <div class="code-block" role="figure" aria-label="Vector clock code example">
+                            <div class="code-header">
+                                <span class="code-dot" aria-hidden="true"></span>
+                                <span class="code-dot" aria-hidden="true"></span>
+                                <span class="code-dot" aria-hidden="true"></span>
+                                <span class="code-title">vector_clock.rs</span>
+                            </div>
+                            <div class="code-content">
+<pre><code><span class="code-comment">/// Compare: Who happened first?</span>
+<span class="code-keyword">pub fn</span> <span class="code-function">compare</span>(&amp;<span class="code-keyword">self</span>, other: &amp;<span class="code-type">VectorClock</span>)
+    -> <span class="code-type">VectorClockOrdering</span>
+{
+    <span class="code-keyword">match</span> (self_less, other_less) {
+        (<span class="code-keyword">false</span>, <span class="code-keyword">false</span>) => <span class="code-type">Equal</span>,
+        (<span class="code-keyword">true</span>, <span class="code-keyword">false</span>) => <span class="code-type">HappensBefore</span>,
+        (<span class="code-keyword">false</span>, <span class="code-keyword">true</span>) => <span class="code-type">HappensAfter</span>,
+        (<span class="code-keyword">true</span>, <span class="code-keyword">true</span>) => <span class="code-type">Concurrent</span>,
+    }
+}
+
+<span class="code-comment">/// Merge: Take max of each node</span>
+<span class="code-keyword">pub fn</span> <span class="code-function">merge</span>(&amp;<span class="code-keyword">mut</span> <span class="code-keyword">self</span>, other: &amp;<span class="code-type">VectorClock</span>) {
+    <span class="code-keyword">for</span> (node_id, &amp;value) <span class="code-keyword">in</span> &amp;other.clocks {
+        <span class="code-keyword">self</span>.clocks
+            .<span class="code-function">entry</span>(node_id)
+            .<span class="code-function">and_modify</span>(|v| *v = <span class="code-function">max</span>(*v, value))
+            .<span class="code-function">or_insert</span>(value);
+    }
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div data-reveal data-reveal-delay="2">
+                        <h3 class="subsection-title">CRDTs: Math Beats Coordination</h3>
+                        <p class="subsection-text">
+                            Why have a leader resolve conflicts when math can do it?
+                            CRDTs merge deterministically. Same inputs = same result.
+                            <em>Every. Single. Time.</em>
+                        </p>
+
+                        <div class="code-block" role="figure" aria-label="CRDT OR-Set code example">
+                            <div class="code-header">
+                                <span class="code-dot" aria-hidden="true"></span>
+                                <span class="code-dot" aria-hidden="true"></span>
+                                <span class="code-dot" aria-hidden="true"></span>
+                                <span class="code-title">crdt.rs</span>
+                            </div>
+                            <div class="code-content">
+<pre><code><span class="code-comment">/// OR-Set: Add with unique tag</span>
+<span class="code-keyword">pub fn</span> <span class="code-function">add</span>(&amp;<span class="code-keyword">mut</span> <span class="code-keyword">self</span>, value: <span class="code-type">T</span>, node_id: &amp;<span class="code-type">str</span>) {
+    <span class="code-keyword">let</span> tag = <span class="code-keyword">self</span>.<span class="code-function">generate_tag</span>(node_id);
+    <span class="code-keyword">self</span>.elements.<span class="code-function">insert</span>(<span class="code-type">OrSetElement</span> {
+        value,
+        tag  <span class="code-comment">// "node1:42" - unique!</span>
+    });
+}
+
+<span class="code-comment">/// Remove: Only removes YOUR adds</span>
+<span class="code-keyword">pub fn</span> <span class="code-function">remove</span>(&amp;<span class="code-keyword">mut</span> <span class="code-keyword">self</span>, value: &amp;<span class="code-type">T</span>) {
+    <span class="code-keyword">let</span> tags: <span class="code-type">Vec</span>&lt;<span class="code-type">String</span>&gt; = <span class="code-keyword">self</span>.elements
+        .<span class="code-function">iter</span>()
+        .<span class="code-function">filter</span>(|e| &amp;e.value == value)
+        .<span class="code-function">map</span>(|e| e.tag.<span class="code-function">clone</span>())
+        .<span class="code-function">collect</span>();
+
+    <span class="code-keyword">for</span> tag <span class="code-keyword">in</span> tags {
+        <span class="code-keyword">self</span>.tombstones.<span class="code-function">insert</span>(tag);
+    }
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="callout dry-humor" data-reveal role="note">
+                    <div class="callout-title">
+                        <span aria-hidden="true">&#128161;</span>
+                        DRY Principle Applied
+                    </div>
+                    <div class="callout-content">
+                        Traditional sync: Write logic for every conflict scenario.<br>
+                        CRDT sync: <code>a.merge(b)</code>.<br>
+                        <br>
+                        We wrote the merge logic <em>once</em>. It handles all conflicts.
+                        <span class="dry-tag">DRY</span>
+                    </div>
+                </div>
+
+                <div class="sync-visualization" data-reveal aria-labelledby="sync-demo-title">
+                    <h3 class="demo-title" id="sync-demo-title">
+                        <span aria-hidden="true">&#128260;</span>
+                        Live Sync Demo
+                    </h3>
+                    <div class="sync-demo-container">
+                        <div class="sync-node" id="sync-node-1">
+                            <div class="sync-node-header">
+                                <span class="node-icon" aria-hidden="true">&#128241;</span>
+                                <span>Phone</span>
+                            </div>
+                            <div class="sync-node-clock">
+                                <code>{ "phone": <span id="phone-clock">0</span> }</code>
+                            </div>
+                            <button class="sync-btn" data-node="phone" aria-label="Increment phone clock">Increment</button>
+                        </div>
+                        <div class="sync-arrow-container" aria-hidden="true">
+                            <div class="sync-arrow" id="sync-arrow">&harr;</div>
+                            <div class="sync-status" id="sync-status" role="status">Synced</div>
+                        </div>
+                        <div class="sync-node" id="sync-node-2">
+                            <div class="sync-node-header">
+                                <span class="node-icon" aria-hidden="true">&#128187;</span>
+                                <span>Hub</span>
+                            </div>
+                            <div class="sync-node-clock">
+                                <code>{ "hub": <span id="hub-clock">0</span> }</code>
+                            </div>
+                            <button class="sync-btn" data-node="hub" aria-label="Increment hub clock">Increment</button>
+                        </div>
+                    </div>
+                    <div class="sync-merged">
+                        <span class="merged-label">Merged Clock:</span>
+                        <code id="merged-clock" role="status">{ "phone": 0, "hub": 0 }</code>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 4: Network Topology -->
+        <section class="section section-alt" id="topology" aria-labelledby="topology-title">
+            <div class="container">
+                <header class="section-header" data-reveal>
+                    <span class="section-number">04</span>
+                    <h2 class="section-title" id="topology-title">Mesh <em>Topology</em></h2>
+                    <p class="section-description">
+                        Hub as coordinator. Mobile as nodes. Desktop as workstation.
+                        All speaking the same protocol via UniFFI bindings.
+                    </p>
+                </header>
+
+                <div class="topology-diagram" data-reveal role="img" aria-label="Mesh network topology diagram showing Hub at center connected to iOS, Android, Desktop, watchOS, and visionOS nodes">
+                    <div class="topology-node topology-hub" id="topo-hub">
+                        <div class="topology-node-icon" aria-hidden="true">&#127968;</div>
+                        <div class="topology-node-label">Hub</div>
+                        <div class="topology-node-role">Coordinator</div>
+                        <div class="topology-node-tech">Raspberry Pi + Rust</div>
+                    </div>
+
+                    <div class="topology-connections" aria-hidden="true">
+                        <div class="topology-line" id="line-ios"></div>
+                        <div class="topology-line" id="line-android"></div>
+                        <div class="topology-line" id="line-desktop"></div>
+                        <div class="topology-line" id="line-watch"></div>
+                        <div class="topology-line" id="line-vision"></div>
+                    </div>
+
+                    <div class="topology-node topology-ios" id="topo-ios">
+                        <div class="topology-node-icon" aria-hidden="true">&#128241;</div>
+                        <div class="topology-node-label">iOS</div>
+                        <div class="topology-node-role">Mobile Node</div>
+                        <div class="topology-node-tech">Swift + UniFFI</div>
+                    </div>
+
+                    <div class="topology-node topology-android" id="topo-android">
+                        <div class="topology-node-icon" aria-hidden="true">&#128242;</div>
+                        <div class="topology-node-label">Android</div>
+                        <div class="topology-node-role">Mobile Node</div>
+                        <div class="topology-node-tech">Kotlin + UniFFI</div>
+                    </div>
+
+                    <div class="topology-node topology-desktop" id="topo-desktop">
+                        <div class="topology-node-icon" aria-hidden="true">&#128187;</div>
+                        <div class="topology-node-label">Desktop</div>
+                        <div class="topology-node-role">Workstation</div>
+                        <div class="topology-node-tech">Tauri + Rust</div>
+                    </div>
+
+                    <div class="topology-node topology-watch" id="topo-watch">
+                        <div class="topology-node-icon" aria-hidden="true">&#8986;</div>
+                        <div class="topology-node-label">watchOS</div>
+                        <div class="topology-node-role">Peripheral</div>
+                        <div class="topology-node-tech">Swift + UniFFI</div>
+                    </div>
+
+                    <div class="topology-node topology-vision" id="topo-vision">
+                        <div class="topology-node-icon" aria-hidden="true">&#128083;</div>
+                        <div class="topology-node-label">visionOS</div>
+                        <div class="topology-node-role">Spatial Node</div>
+                        <div class="topology-node-tech">Swift + UniFFI</div>
+                    </div>
+                </div>
+
+                <div class="uniffi-box" data-reveal>
+                    <h3 class="uniffi-title">
+                        <span aria-hidden="true">&#128279;</span>
+                        UniFFI: Write Once, Bind Everywhere
+                    </h3>
+                    <p class="uniffi-description">
+                        The Rust SDK compiles to native binaries. UniFFI generates bindings.
+                        iOS, Android, Desktop - all using the <em>same</em> cryptographic code.
+                    </p>
+                    <div class="uniffi-flow" role="list" aria-label="UniFFI binding generation flow">
+                        <code class="uniffi-step" role="listitem">kagami-mesh-sdk (Rust)</code>
+                        <span class="uniffi-arrow" aria-hidden="true">&rarr;</span>
+                        <code class="uniffi-step" role="listitem">uniffi::setup_scaffolding!()</code>
+                        <span class="uniffi-arrow" aria-hidden="true">&rarr;</span>
+                        <div class="uniffi-outputs" role="listitem">
+                            <code aria-label="Swift bindings">.swift</code>
+                            <code aria-label="Kotlin bindings">.kt</code>
+                            <code aria-label="Rust library">.rs</code>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="callout dry-humor" data-reveal role="note">
+                    <div class="callout-title">
+                        <span aria-hidden="true">&#128161;</span>
+                        DRY Principle Applied
+                    </div>
+                    <div class="callout-content">
+                        Without UniFFI: Write Ed25519 in Swift. Write Ed25519 in Kotlin. Write Ed25519 in Rust. Debug three implementations.<br>
+                        With UniFFI: Write Ed25519 in Rust. Generate the rest. Sleep well at night.<br>
+                        <br>
+                        Same cryptographic guarantees. One implementation. Zero bugs duplicated.
+                        <span class="dry-tag">DRY</span>
+                    </div>
+                </div>
+
+                <div class="grid-3" style="margin-top: var(--space-8);">
+                    <div class="capability-card" data-reveal data-reveal-delay="1">
+                        <div class="capability-icon" aria-hidden="true">&#127908;</div>
+                        <h4>Voice Processing</h4>
+                        <p>Speech recognition written once. Running everywhere. <em>That's the whole point.</em></p>
+                        <code>500ms. Not 500ms × 6.</code>
+                    </div>
+
+                    <div class="capability-card" data-reveal data-reveal-delay="2">
+                        <div class="capability-icon" aria-hidden="true">&#127760;</div>
+                        <h4>Context Sync</h4>
+                        <p>State duplicated automatically, so you don't have to. Merge logic: written once.</p>
+                        <code>∞ devices, 1 truth</code>
+                    </div>
+
+                    <div class="capability-card" data-reveal data-reveal-delay="3">
+                        <div class="capability-icon" aria-hidden="true">&#128268;</div>
+                        <h4>Offline-First</h4>
+                        <p>Your network code, written once. Your users' frustration, eliminated everywhere.</p>
+                        <code>1 pattern, 0 cascades</code>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Circuit Breaker -->
+        <section class="section" id="circuit-breaker" aria-labelledby="circuit-breaker-title">
+            <div class="container">
+                <header class="section-header" data-reveal>
+                    <span class="section-number">05</span>
+                    <h2 class="section-title" id="circuit-breaker-title">Circuit <em>Breaker</em></h2>
+                    <p class="section-description">
+                        Networks fail. The question is: do you fail gracefully or hammer a dead server?
+                    </p>
+                </header>
+
+                <div class="circuit-diagram" data-reveal role="img" aria-label="Circuit breaker state machine: Closed state transitions to Open after 3 failures, Open transitions to Half-Open after 30 second timeout, Half-Open returns to Closed on success or back to Open on failure">
+                    <div class="circuit-state circuit-closed" id="circuit-closed">
+                        <div class="circuit-state-icon" aria-hidden="true">&#9989;</div>
+                        <div class="circuit-state-label">CLOSED</div>
+                        <div class="circuit-state-desc">Normal operation</div>
+                    </div>
+                    <div class="circuit-transition" id="trans-1" aria-hidden="true">
+                        <span>failures &ge; 3</span>
+                        <div class="circuit-arrow">&rarr;</div>
+                    </div>
+                    <div class="circuit-state circuit-open" id="circuit-open">
+                        <div class="circuit-state-icon" aria-hidden="true">&#9940;</div>
+                        <div class="circuit-state-label">OPEN</div>
+                        <div class="circuit-state-desc">Fail fast</div>
+                    </div>
+                    <div class="circuit-transition" id="trans-2" aria-hidden="true">
+                        <span>30s timeout</span>
+                        <div class="circuit-arrow">&rarr;</div>
+                    </div>
+                    <div class="circuit-state circuit-half-open" id="circuit-half">
+                        <div class="circuit-state-icon" aria-hidden="true">&#9898;</div>
+                        <div class="circuit-state-label">HALF-OPEN</div>
+                        <div class="circuit-state-desc">Testing recovery</div>
+                    </div>
+                    <div class="circuit-recovery" aria-hidden="true">
+                        <div class="recovery-success">
+                            <span>success</span>
+                            <div class="circuit-arrow">&#8634;</div>
+                        </div>
+                        <div class="recovery-failure">
+                            <span>failure</span>
+                            <div class="circuit-arrow">&#8635;</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="code-block" data-reveal role="figure" aria-label="Circuit breaker implementation code">
+                    <div class="code-header">
+                        <span class="code-dot" aria-hidden="true"></span>
+                        <span class="code-dot" aria-hidden="true"></span>
+                        <span class="code-dot" aria-hidden="true"></span>
+                        <span class="code-title">circuit_breaker.rs</span>
+                    </div>
+                    <div class="code-content">
+<pre><code><span class="code-comment">/// Check if a request should be allowed</span>
+<span class="code-keyword">pub fn</span> <span class="code-function">allow_request</span>(&amp;<span class="code-keyword">self</span>) -> <span class="code-type">bool</span> {
+    <span class="code-keyword">match</span> <span class="code-keyword">self</span>.<span class="code-function">state</span>() {
+        <span class="code-type">CircuitState</span>::Closed => <span class="code-keyword">true</span>,
+        <span class="code-type">CircuitState</span>::Open => {
+            <span class="code-comment">// Check if reset timeout has elapsed</span>
+            <span class="code-keyword">if</span> time_since_failure > <span class="code-const">RESET_TIMEOUT</span> {
+                <span class="code-keyword">self</span>.<span class="code-function">set_state</span>(<span class="code-type">HalfOpen</span>);
+                <span class="code-keyword">true</span>
+            } <span class="code-keyword">else</span> {
+                <span class="code-keyword">false</span>  <span class="code-comment">// Fail fast!</span>
+            }
+        }
+        <span class="code-type">CircuitState</span>::HalfOpen => <span class="code-keyword">true</span>,
+    }
+}
+
+<span class="code-comment">/// Pattern: Closed &rarr; Open &rarr; HalfOpen &rarr; Closed</span>
+<span class="code-comment">/// h(x) >= 0. Always.</span></code></pre>
+                    </div>
+                </div>
+
+                <div class="callout dry-humor" data-reveal role="note">
+                    <div class="callout-title">
+                        <span aria-hidden="true">&#128161;</span>
+                        DRY Principle Applied
+                    </div>
+                    <div class="callout-content">
+                        Every platform needs resilient networking. Every platform needs the same pattern.<br>
+                        We wrote <code>CircuitBreaker</code> once in Rust.<br>
+                        iOS, Android, Desktop, watchOS, visionOS - all use the same implementation.<br>
+                        <br>
+                        One circuit breaker. Six platforms. Zero repeated bugs.
+                        <span class="dry-tag">DRY</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 6: Interactive Demo -->
+        <section class="section section-alt" id="demo" aria-labelledby="demo-title">
+            <div class="container">
+                <header class="section-header" data-reveal>
+                    <span class="section-number">06</span>
+                    <h2 class="section-title" id="demo-title">Live <em>Demo</em></h2>
+                    <p class="section-description">
+                        Watch the mesh in action. Every node. Every message. Every sync.
+                    </p>
+                </header>
+
+                <div class="live-mesh-demo" data-reveal aria-labelledby="live-demo-label">
+                    <span id="live-demo-label" class="visually-hidden">Interactive mesh network demonstration</span>
+                    <canvas class="demo-canvas" id="demo-mesh-canvas" aria-hidden="true"></canvas>
+                    <div class="demo-controls" role="toolbar" aria-label="Mesh demo controls">
+                        <button class="demo-control-btn" id="add-node-btn" aria-describedby="add-node-desc">
+                            <span class="btn-icon" aria-hidden="true">&#10133;</span>
+                            Add Node
+                        </button>
+                        <span id="add-node-desc" class="visually-hidden">Add a new device to the mesh network</span>
+
+                        <button class="demo-control-btn" id="send-message-btn" aria-describedby="send-msg-desc">
+                            <span class="btn-icon" aria-hidden="true">&#128172;</span>
+                            Send Message
+                        </button>
+                        <span id="send-msg-desc" class="visually-hidden">Send an encrypted message between nodes</span>
+
+                        <button class="demo-control-btn" id="simulate-failure-btn" aria-describedby="fail-desc">
+                            <span class="btn-icon" aria-hidden="true">&#9889;</span>
+                            Simulate Failure
+                        </button>
+                        <span id="fail-desc" class="visually-hidden">Simulate a network failure to demonstrate circuit breaker</span>
+
+                        <button class="demo-control-btn danger" id="reset-mesh-btn" aria-describedby="reset-desc">
+                            <span class="btn-icon" aria-hidden="true">&#128260;</span>
+                            Reset
+                        </button>
+                        <span id="reset-desc" class="visually-hidden">Reset the mesh to its initial state</span>
+                    </div>
+                    <div class="demo-log" id="demo-log" role="log" aria-label="Mesh activity log" aria-live="polite">
+                        <div class="log-entry">
+                            <span class="log-time">00:00:00</span>
+                            <span class="log-message">Mesh initialized. Hub online.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="protocol-summary" data-reveal>
+                    <h3>Protocol Stack Summary</h3>
+                    <table class="protocol-table" role="table" aria-label="Protocol stack summary">
+                        <thead>
+                            <tr>
+                                <th scope="col">Layer</th>
+                                <th scope="col">Technology</th>
+                                <th scope="col">Purpose</th>
+                                <th scope="col">DRY Factor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Identity</td>
+                                <td><code>Ed25519</code></td>
+                                <td>Sign &amp; verify</td>
+                                <td>1 seed &rarr; all keys</td>
+                            </tr>
+                            <tr>
+                                <td>Key Exchange</td>
+                                <td><code>X25519</code></td>
+                                <td>Shared secret</td>
+                                <td>1 exchange &rarr; all messages</td>
+                            </tr>
+                            <tr>
+                                <td>Encryption</td>
+                                <td><code>XChaCha20-Poly1305</code></td>
+                                <td>Confidentiality</td>
+                                <td>1 impl &rarr; 6 platforms</td>
+                            </tr>
+                            <tr>
+                                <td>Causality</td>
+                                <td><code>VectorClock</code></td>
+                                <td>Ordering</td>
+                                <td>1 merge &rarr; &infin; nodes</td>
+                            </tr>
+                            <tr>
+                                <td>State</td>
+                                <td><code>CRDTs</code></td>
+                                <td>Consistency</td>
+                                <td>1 merge &rarr; 0 conflicts</td>
+                            </tr>
+                            <tr>
+                                <td>Resilience</td>
+                                <td><code>CircuitBreaker</code></td>
+                                <td>Graceful degradation</td>
+                                <td>1 pattern &rarr; 0 cascades</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="footer" role="contentinfo">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">
+                    <span class="footer-kanji" aria-hidden="true">&#37857;</span>
+                    <span class="footer-name">Kagami Mesh SDK</span>
+                </div>
+                <div class="footer-tagline">
+                    Don't Repeat Yourself. Or your packets. Or your bugs.
+                </div>
+                <div class="footer-quote">
+                    <blockquote>
+                        "The best code is no code. The second best is code you only write once."
+                    </blockquote>
+                </div>
+                <div class="footer-meta">
+                    <span>h(x) &ge; 0. Always.</span>
+                    <span aria-hidden="true">&bull;</span>
+                    <span>January 2026</span>
+                    <span aria-hidden="true">&bull;</span>
+                    <span><a href="https://github.com/kagami" class="footer-link">GitHub</a></span>
+                </div>
+            </div>
+            <div class="footer-credits">
+                <code>write once, sync everywhere&trade;</code>
+            </div>
+            <div class="footer-easter-egg" aria-hidden="true" title="You found the easter egg! Press 'k' for a surprise.">
+                <span class="easter-egg-hint">&#x1F5DD;</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../accessibility.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
