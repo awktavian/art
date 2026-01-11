@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kagami Orb — <em>Firmware</em> Architecture — Kagami Orb</title>
+    <meta name="description" content="The Orb firmware runs on Raspberry Pi CM4 using Rust with the Tokio async runtime (NOT Embassy — Embassy is for bare-metal MCUs, CM4 runs Linux). This provides:">
+    <meta name="theme-color" content="#0A0A0C">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Kagami Orb — <em>Firmware</em> Architecture — Kagami Orb">
+    <meta property="og:description" content="The Orb firmware runs on Raspberry Pi CM4 using Rust with the Tokio async runtime (NOT Embassy — Embassy is for bare-metal MCUs, CM4 runs Linux). This provides:">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://storage.googleapis.com/kagami-media-public/orb/firmware.html">
+    <meta name="twitter:card" content="summary">
+
+    <!-- Fonts: Cormorant Garamond (display) + IBM Plex (body/mono) + Noto Sans JP (kanji) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@300;400;500&family=Noto+Sans+JP:wght@100;200;300&display=swap" rel="stylesheet">
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           KAGAMI ORB DOCUMENTATION — DESIGN SYSTEM v4.0
+           Unified with ~/projects/art/ design language
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :root {
+            /* Core palette — matched to art projects */
+            --void: #0A0A0C;
+            --void-deep: #05050A;
+            --void-elevated: #0f0e14;
+            --void-surface: #16141f;
+            --void-hover: #1d1b26;
+            
+            /* Gold spectrum */
+            --gold: #D4AF37;
+            --gold-bright: #E5C158;
+            --gold-dim: rgba(212, 175, 55, 0.6);
+            --gold-faint: rgba(212, 175, 55, 0.3);
+            --gold-glow: rgba(212, 175, 55, 0.15);
+            --gold-whisper: rgba(212, 175, 55, 0.06);
+            
+            /* Accent colors */
+            --cyan: #3dd6d0;
+            --cyan-dim: rgba(61, 214, 208, 0.4);
+            --success: #4ECB71;
+            --warning: #FF9F40;
+            --error: #FF6B6B;
+            
+            /* Text hierarchy — WCAG AA compliant */
+            --text: #F4F1EA;
+            --text-secondary: rgba(244, 241, 234, 0.75);
+            --text-tertiary: rgba(244, 241, 234, 0.55);
+            --text-ghost: rgba(244, 241, 234, 0.35);
+            --text-muted: rgba(244, 241, 234, 0.2);
+            
+            /* Borders & surfaces */
+            --border: rgba(255, 255, 255, 0.06);
+            --border-subtle: rgba(255, 255, 255, 0.03);
+            --border-focus: rgba(212, 175, 55, 0.4);
+            
+            /* Typography scale (Major Third 1.25) */
+            --text-xs: clamp(0.688rem, 0.65rem + 0.15vw, 0.75rem);
+            --text-sm: clamp(0.813rem, 0.77rem + 0.17vw, 0.875rem);
+            --text-base: clamp(1rem, 0.95rem + 0.2vw, 1.063rem);
+            --text-lg: clamp(1.125rem, 1.05rem + 0.3vw, 1.25rem);
+            --text-xl: clamp(1.424rem, 1.25rem + 0.7vw, 1.953rem);
+            --text-2xl: clamp(1.802rem, 1.5rem + 1.2vw, 2.441rem);
+            --text-3xl: clamp(2.281rem, 1.8rem + 2vw, 3.052rem);
+            --text-4xl: clamp(2.887rem, 2.2rem + 3vw, 3.815rem);
+            
+            /* Spacing (8px grid) */
+            --space-1: 0.5rem;
+            --space-2: 1rem;
+            --space-3: 1.5rem;
+            --space-4: 2rem;
+            --space-5: 2.5rem;
+            --space-6: 3rem;
+            --space-8: 4rem;
+            --space-10: 5rem;
+            
+            /* Animation */
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --duration-fast: 150ms;
+            --duration-normal: 300ms;
+            --duration-slow: 500ms;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESET & BASE
+           ═══════════════════════════════════════════════════════════════════ */
+
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        ::selection {
+            background: var(--gold);
+            color: var(--void);
+        }
+
+        html {
+            scroll-behavior: smooth;
+            font-size: 17px;
+            scroll-padding-top: 5rem;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--void);
+            color: var(--text);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            min-height: 100vh;
+        }
+
+        /* Film grain overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.015;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+
+        /* Subtle gradient background */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse 80% 50% at 50% -20%, var(--gold-whisper), transparent),
+                radial-gradient(ellipse 60% 40% at 100% 100%, rgba(61, 214, 208, 0.02), transparent);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           NAVIGATION
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .top-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: linear-gradient(to bottom, 
+                rgba(10, 10, 12, 0.95), 
+                rgba(10, 10, 12, 0.85));
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-bottom: 1px solid var(--border);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 var(--space-6);
+        }
+
+        .nav-brand {
+            font-family: 'Noto Sans JP', sans-serif;
+            font-weight: 200;
+            font-size: var(--text-xl);
+            color: var(--gold);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .nav-brand:hover {
+            color: var(--gold-bright);
+            text-shadow: 0 0 30px var(--gold-glow);
+        }
+
+        .nav-brand .kanji {
+            font-size: 1.8rem;
+            transition: transform var(--duration-slow) var(--ease-out-expo);
+        }
+
+        .nav-brand:hover .kanji {
+            transform: scale(1.1);
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .nav-links a,
+        .nav-dropdown-btn {
+            color: var(--text-tertiary);
+            text-decoration: none;
+            font-size: var(--text-sm);
+            font-weight: 400;
+            padding: var(--space-1) var(--space-2);
+            border-radius: 6px;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .nav-links a:hover,
+        .nav-dropdown-btn:hover {
+            color: var(--text);
+            background: var(--gold-whisper);
+        }
+
+        .nav-links a.active {
+            color: var(--gold);
+            background: var(--gold-whisper);
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: calc(100% + var(--space-1));
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            min-width: 200px;
+            box-shadow: 
+                0 4px 6px -1px rgba(0, 0, 0, 0.3),
+                0 20px 40px -8px rgba(0, 0, 0, 0.5);
+            z-index: 1001;
+            padding: var(--space-1);
+            opacity: 0;
+            transform: translateY(-8px);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-content,
+        .nav-dropdown:focus-within .nav-dropdown-content {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-content a {
+            display: flex;
+            align-items: center;
+            padding: var(--space-1) var(--space-2);
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: var(--text-sm);
+            border-radius: 8px;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        .nav-dropdown-content a:hover {
+            background: var(--gold-whisper);
+            color: var(--gold);
+            padding-left: var(--space-3);
+        }
+
+        .nav-dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: var(--space-1) var(--space-2);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           MAIN CONTENT
+           ═══════════════════════════════════════════════════════════════════ */
+
+        main {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: calc(64px + var(--space-8)) var(--space-6) var(--space-8);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           DOCUMENT HEADER — Signature Title Treatment
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .doc-header {
+            margin-bottom: var(--space-8);
+            padding-bottom: var(--space-6);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            text-align: center;
+        }
+
+        /* Gold accent line */
+        .doc-header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        }
+
+        /* Display title — Cormorant Garamond */
+        .doc-header h1 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-4xl);
+            font-weight: 300;
+            color: var(--text);
+            margin-bottom: var(--space-3);
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+        }
+
+        /* Accent words in titles */
+        .doc-header h1 em {
+            font-style: italic;
+            color: var(--gold);
+            font-weight: 400;
+        }
+
+        .doc-meta {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: var(--space-4);
+            font-size: var(--text-sm);
+            color: var(--text-ghost);
+            font-family: 'IBM Plex Mono', monospace;
+            letter-spacing: 0.05em;
+        }
+
+        .doc-meta span {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           TYPOGRAPHY
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .content > *:first-child {
+            margin-top: 0;
+        }
+
+        h2 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-2xl);
+            font-weight: 400;
+            color: var(--text);
+            margin-top: var(--space-8);
+            margin-bottom: var(--space-4);
+            padding-bottom: var(--space-2);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            letter-spacing: -0.01em;
+        }
+
+        h2::before {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 60px;
+            height: 2px;
+            background: var(--gold-dim);
+        }
+
+        /* Accent words in H2 */
+        h2 em {
+            font-style: italic;
+            color: var(--gold);
+        }
+
+        h3 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-xl);
+            font-weight: 500;
+            color: var(--gold);
+            margin-top: var(--space-6);
+            margin-bottom: var(--space-3);
+            letter-spacing: -0.01em;
+        }
+
+        h4 {
+            font-size: var(--text-lg);
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-top: var(--space-5);
+            margin-bottom: var(--space-2);
+        }
+
+        p {
+            margin-bottom: var(--space-3);
+            color: var(--text-secondary);
+        }
+
+        strong {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           LINKS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        a {
+            color: var(--cyan);
+            text-decoration: none;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        a:hover {
+            color: var(--gold);
+        }
+
+        .content a {
+            background: linear-gradient(to right, var(--gold-dim), var(--gold-dim)) no-repeat right bottom;
+            background-size: 0% 1px;
+            transition: background-size var(--duration-normal) var(--ease-out-expo), color var(--duration-fast);
+        }
+
+        .content a:hover {
+            background-size: 100% 1px;
+            background-position: left bottom;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           LISTS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        ul, ol {
+            margin-bottom: var(--space-3);
+            padding-left: var(--space-5);
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: var(--space-1);
+        }
+
+        li::marker {
+            color: var(--gold-dim);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           TABLES
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin: var(--space-5) 0;
+            border-radius: 12px;
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            box-shadow: 
+                0 1px 3px rgba(0, 0, 0, 0.2),
+                0 8px 24px -4px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 var(--border-subtle);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--text-sm);
+        }
+
+        thead {
+            background: linear-gradient(to bottom, var(--void-surface), var(--void-elevated));
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        th {
+            padding: var(--space-3) var(--space-3);
+            text-align: left;
+            font-weight: 500;
+            color: var(--gold);
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        td {
+            padding: var(--space-2) var(--space-3);
+            border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr {
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        tbody tr:hover {
+            background: var(--gold-whisper);
+        }
+
+        tbody tr:hover td {
+            color: var(--text);
+        }
+
+        /* Code in tables */
+        td code, th code {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.9em;
+        }
+
+        /* Status badges */
+        .status-validated { color: var(--success); }
+        .status-warning { color: var(--warning); }
+        .status-deprecated { 
+            color: var(--error); 
+            text-decoration: line-through;
+            opacity: 0.7;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           CODE BLOCKS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        pre {
+            background: var(--void-deep);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: var(--space-4);
+            overflow-x: auto;
+            margin: var(--space-5) 0;
+            font-size: var(--text-sm);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        code {
+            font-family: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+            font-size: 0.9em;
+        }
+
+        :not(pre) > code {
+            background: var(--void-surface);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: var(--cyan);
+            border: 1px solid var(--border-subtle);
+        }
+
+        pre code {
+            color: var(--text-secondary);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           BLOCKQUOTES & ALERTS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        blockquote {
+            border-left: 3px solid var(--gold);
+            padding: var(--space-3) var(--space-4);
+            margin: var(--space-5) 0;
+            background: var(--gold-whisper);
+            border-radius: 0 12px 12px 0;
+            color: var(--text-secondary);
+            font-style: italic;
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-lg);
+        }
+
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, var(--border), var(--border-subtle), transparent);
+            margin: var(--space-8) 0;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           FOOTER
+           ═══════════════════════════════════════════════════════════════════ */
+
+        footer {
+            margin-top: var(--space-10);
+            padding: var(--space-6) 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+
+        footer .kanji {
+            font-family: 'Noto Sans JP', sans-serif;
+            font-size: 2.5rem;
+            color: var(--gold-dim);
+            margin-bottom: var(--space-2);
+            opacity: 0.5;
+            animation: breathe 5s ease-in-out infinite;
+        }
+
+        @keyframes breathe {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.6; }
+        }
+
+        footer p {
+            color: var(--text-ghost);
+            font-size: var(--text-sm);
+            margin-bottom: 0;
+            font-family: 'IBM Plex Mono', monospace;
+            letter-spacing: 0.05em;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           BACK TO TOP
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .back-to-top {
+            position: fixed;
+            bottom: var(--space-6);
+            right: var(--space-6);
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            font-family: 'IBM Plex Sans', sans-serif;
+        }
+
+        .back-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .back-to-top:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+            background: var(--void-surface);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 0 30px var(--gold-glow);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           PRINT STYLES
+           ═══════════════════════════════════════════════════════════════════ */
+
+        @media print {
+            .top-nav, .back-to-top { display: none; }
+            body { background: white; color: black; }
+            body::before, body::after { display: none; }
+            main { padding: 0; max-width: 100%; }
+            a { color: inherit; }
+            table, th, td { border: 1px solid #ddd; }
+            .table-wrapper { box-shadow: none; }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESPONSIVE
+           ═══════════════════════════════════════════════════════════════════ */
+
+        @media (max-width: 768px) {
+            .top-nav {
+                padding: 0 var(--space-3);
+            }
+
+            .nav-links a:not(:first-child):not(:last-child) {
+                display: none;
+            }
+
+            main {
+                padding: calc(64px + var(--space-5)) var(--space-3) var(--space-5);
+            }
+
+            .doc-header h1 {
+                font-size: var(--text-3xl);
+            }
+
+            h2 { font-size: var(--text-xl); }
+            h3 { font-size: var(--text-lg); }
+
+            .table-wrapper {
+                margin-left: calc(-1 * var(--space-3));
+                margin-right: calc(-1 * var(--space-3));
+                border-radius: 0;
+                border-left: none;
+                border-right: none;
+            }
+
+            table { font-size: var(--text-xs); }
+            th, td { padding: var(--space-1) var(--space-2); }
+
+            .doc-meta { gap: var(--space-2); }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           SCROLLBAR
+           ═══════════════════════════════════════════════════════════════════ */
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--void);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--text-muted);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-ghost);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           ACCESSIBILITY
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :focus-visible {
+            outline: 2px solid var(--gold);
+            outline-offset: 2px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        :target {
+            scroll-margin-top: calc(64px + var(--space-5));
+        }
+    </style>
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="index.html" class="nav-brand">
+            <span class="kanji">鏡</span>
+            <span>Kagami Orb</span>
+        </a>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="bom.html">BOM</a>
+            <a href="buy.html">Buy</a>
+            <a href="assembly.html">Assembly</a>
+            <a href="spec.html">Spec</a>
+            <div class="nav-dropdown">
+                <button class="nav-dropdown-btn">More ▾</button>
+                <div class="nav-dropdown-content">
+                    <a href="alternatives.html">Alternatives</a>
+                    <a href="custom-pcb.html">Custom PCB</a>
+                    <a href="thermal.html">Thermal Analysis</a>
+                    <a href="fmea.html">FMEA</a>
+                    <a href="firmware.html">Firmware</a>
+                    <a href="system.html">System Design</a>
+                    <a href="validation.html">Validation Plan</a>
+                    <div class="nav-dropdown-divider"></div>
+                    <a href="hardware/kagami_orb_bom.csv" download>📥 Download CSV</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <article class="doc-header">
+            <h1>Kagami Orb — <em>Firmware</em> Architecture</h1>
+            <div class="doc-meta">
+                <span>January 11, 2026</span>
+                <span>v2.0</span>
+            </div>
+        </article>
+
+        <div class="content">
+            <h2 id="overview">Overview</h2>
+<p>The Orb firmware runs on Raspberry Pi CM4 using <strong>Rust</strong> with the <strong>Tokio</strong> async runtime (NOT Embassy — Embassy is for bare-metal MCUs, CM4 runs Linux). This provides:<br />
+- Zero-cost async/await for real-time responsiveness<br />
+- Memory safety without garbage collection<br />
+- Predictable latency for audio and LED control<br />
+- Cross-platform development (same code runs on dev machine)</p>
+<hr />
+<h2 id="technology-stack">Technology Stack</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                            FIRMWARE STACK                                        │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  APPLICATION LAYER                                                               │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐                   │
+│  │   Voice    │ │    LED     │ │   Power    │ │    API     │                   │
+│  │  Pipeline  │ │  Animator  │ │  Manager   │ │   Client   │                   │
+│  └─────┬──────┘ └─────┬──────┘ └─────┬──────┘ └─────┬──────┘                   │
+│        │              │              │              │                           │
+│  ──────┴──────────────┴──────────────┴──────────────┴──────────────             │
+│                                                                                  │
+│  SERVICE LAYER                                                                   │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐                   │
+│  │   State    │ │   Event    │ │  Config    │ │   Logger   │                   │
+│  │  Machine   │ │    Bus     │ │  Manager   │ │            │                   │
+│  └─────┬──────┘ └─────┬──────┘ └─────┬──────┘ └─────┬──────┘                   │
+│        │              │              │              │                           │
+│  ──────┴──────────────┴──────────────┴──────────────┴──────────────             │
+│                                                                                  │
+│  HAL LAYER (Hardware Abstraction)                                                │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐                   │
+│  │    I2S     │ │    SPI     │ │    I2C     │ │   GPIO     │                   │
+│  │   Audio    │ │    LEDs    │ │   Sensors  │ │   Control  │                   │
+│  └─────┬──────┘ └─────┬──────┘ └─────┬──────┘ └─────┬──────┘                   │
+│        │              │              │              │                           │
+│  ──────┴──────────────┴──────────────┴──────────────┴──────────────             │
+│                                                                                  │
+│  TOKIO RUNTIME (Linux userspace)                                                │
+│  ┌────────────────────────────────────────────────────────────────────────┐    │
+│  │  Async executor  │  Timer  │  Channels    │  I/O  │  Networking        │    │
+│  └────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                  │
+│  LINUX KERNEL (Raspberry Pi OS Lite)                                            │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr />
+<h2 id="directory-structure">Directory Structure</h2>
+<pre><code>apps/hub/kagami-orb/firmware/orb/
+├── Cargo.toml
+├── Cargo.lock
+├── build.rs
+├── memory.x                      # Memory layout
+├── config/
+│   ├── default.toml              # Default configuration
+│   └── production.toml           # Production settings
+├── src/
+│   ├── main.rs                   # Entry point
+│   ├── lib.rs                    # Library root
+│   │
+│   ├── state/                    # State Machine
+│   │   ├── mod.rs
+│   │   ├── orb_state.rs          # Main state enum
+│   │   ├── transitions.rs        # State transition logic
+│   │   └── persistence.rs        # State persistence
+│   │
+│   ├── voice/                    # Voice Pipeline
+│   │   ├── mod.rs
+│   │   ├── capture.rs            # Audio capture (I2S)
+│   │   ├── vad.rs                # Voice activity detection
+│   │   ├── wake_word.rs          # Wake word detection
+│   │   ├── beamforming.rs        # Mic array processing
+│   │   └── streaming.rs          # Audio to API
+│   │
+│   ├── led/                      # LED Control
+│   │   ├── mod.rs
+│   │   ├── ring.rs               # SK6812 driver
+│   │   ├── patterns.rs           # Animation patterns
+│   │   ├── colony_colors.rs      # Color definitions
+│   │   └── animator.rs           # Animation scheduler
+│   │
+│   ├── power/                    # Power Management
+│   │   ├── mod.rs
+│   │   ├── battery.rs            # BQ40Z50 fuel gauge
+│   │   ├── charger.rs            # BQ25895 charger
+│   │   ├── resonant_rx.rs        # Resonant wireless power (NOT Qi)
+│   │   └── sleep.rs              # Low power modes
+│   │
+│   ├── api/                      # API Client
+│   │   ├── mod.rs
+│   │   ├── client.rs             # HTTP client
+│   │   ├── websocket.rs          # WebSocket connection
+│   │   ├── orb_state.rs          # State sync
+│   │   └── voice_proxy.rs        # Voice streaming
+│   │
+│   ├── sensors/                  # Sensor Integration
+│   │   ├── mod.rs
+│   │   ├── hall_effect.rs        # Dock detection
+│   │   ├── temperature.rs        # Thermal monitoring
+│   │   └── accelerometer.rs      # Motion detection (optional)
+│   │
+│   ├── hal/                      # Hardware Abstraction
+│   │   ├── mod.rs
+│   │   ├── i2s.rs                # Audio I/O
+│   │   ├── spi.rs                # LED data
+│   │   ├── i2c.rs                # Sensor bus
+│   │   └── gpio.rs               # Digital I/O
+│   │
+│   └── util/                     # Utilities
+│       ├── mod.rs
+│       ├── config.rs             # Configuration loading
+│       ├── logger.rs             # Logging setup
+│       └── event_bus.rs          # Inter-task communication
+│
+└── tests/
+    ├── integration/
+    │   ├── state_machine_test.rs
+    │   ├── led_animation_test.rs
+    │   └── api_client_test.rs
+    └── unit/
+        └── ...
+</code></pre>
+<hr />
+<h2 id="state-machine">State Machine</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         ORB STATE MACHINE                                        │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+                              ┌─────────────────┐
+                              │                 │
+                   ┌──────────│    STARTUP      │──────────┐
+                   │          │                 │          │
+                   │          └────────┬────────┘          │
+                   │                   │                   │
+                   │                   │ init complete     │ init failed
+                   │                   ▼                   ▼
+                   │          ┌─────────────────┐  ┌─────────────────┐
+                   │          │                 │  │                 │
+                   │          │     IDLE        │  │     ERROR       │
+                   │          │   (Breathing)   │  │   (Red pulse)   │
+                   │          │                 │  │                 │
+                   │          └────────┬────────┘  └────────┬────────┘
+                   │                   │                    │
+                   │      wake word    │                    │ recovery
+                   │          ┌────────┴────────┐           │
+                   │          ▼                 │           │
+                   │  ┌─────────────────┐       │           │
+                   │  │                 │       │           │
+                   │  │   LISTENING     │◄──────┴───────────┘
+                   │  │   (Blue pulse)  │
+                   │  │                 │
+                   │  └────────┬────────┘
+                   │           │
+                   │           │ speech detected
+                   │           ▼
+                   │  ┌─────────────────┐
+                   │  │                 │
+                   │  │   CAPTURING     │───────────────────┐
+                   │  │   (Blue solid)  │                   │
+                   │  │                 │                   │
+                   │  └────────┬────────┘                   │
+                   │           │                            │
+                   │           │ speech complete            │ timeout
+                   │           ▼                            │
+                   │  ┌─────────────────┐                   │
+                   │  │                 │                   │
+                   │  │   PROCESSING    │                   │
+                   │  │ (Purple spin)   │                   │
+                   │  │                 │                   │
+                   │  └────────┬────────┘                   │
+                   │           │                            │
+                   │           │ response ready             │
+                   │           ▼                            │
+                   │  ┌─────────────────┐                   │
+                   │  │                 │                   │
+                   │  │   RESPONDING    │                   │
+                   │  │ (Colony color)  │                   │
+                   │  │                 │                   │
+                   │  └────────┬────────┘                   │
+                   │           │                            │
+                   │           │ complete                   │
+                   │           ▼                            │
+                   └───────────────────────────────────────►│
+                                                            ▼
+                                                   (return to IDLE)
+
+
+SPECIAL STATES (can interrupt any state):
+
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│                 │     │                 │     │                 │
+│   UNDOCKED      │     │  BATTERY_LOW    │     │   SAFETY_HALT   │
+│  (Portable)     │     │  (Amber warn)   │     │   (Red frozen)  │
+│                 │     │                 │     │                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+    ↑                       ↑                       ↑
+    │ lift detected         │ &lt;20% SOC              │ h(x) = 0
+    │                       │                       │
+────┴───────────────────────┴───────────────────────┴─────────────────
+                    (interrupts from any state)
+</code></pre>
+<h3 id="state-definition-rust">State Definition (Rust)</h3>
+<pre><code class="language-rust">/// Primary orb state machine
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OrbState {
+    /// Initial boot sequence
+    Startup,
+
+    /// Idle, breathing animation, waiting for wake word
+    Idle,
+
+    /// Wake word detected, listening for command
+    Listening,
+
+    /// Actively capturing speech
+    Capturing { start_time: Instant },
+
+    /// Processing command via API
+    Processing { request_id: u64 },
+
+    /// Speaking response
+    Responding { colony: Colony },
+
+    /// Unrecoverable error
+    Error { code: ErrorCode },
+
+    /// Undocked, running on battery
+    Undocked { battery_soc: u8 },
+
+    /// Battery critically low
+    BatteryLow { soc: u8 },
+
+    /// Safety violation, commands blocked
+    SafetyHalt { reason: SafetyReason },
+}
+
+/// Colony identifier for color mapping
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Colony {
+    Spark,
+    Forge,
+    Flow,
+    Nexus,
+    Beacon,
+    Grove,
+    Crystal,
+}
+
+impl Colony {
+    pub fn color(&amp;self) -&gt; Rgb {
+        match self {
+            Colony::Spark   =&gt; Rgb::new(255, 107, 53),   // #FF6B35
+            Colony::Forge   =&gt; Rgb::new(255, 179, 71),   // #FFB347
+            Colony::Flow    =&gt; Rgb::new(78, 205, 196),   // #4ECDC4
+            Colony::Nexus   =&gt; Rgb::new(155, 89, 182),   // #9B59B6
+            Colony::Beacon  =&gt; Rgb::new(212, 175, 55),   // #D4AF37
+            Colony::Grove   =&gt; Rgb::new(39, 174, 96),    // #27AE60
+            Colony::Crystal =&gt; Rgb::new(224, 224, 224),  // #E0E0E0
+        }
+    }
+}
+</code></pre>
+<hr />
+<h2 id="task-architecture">Task Architecture</h2>
+<p>Tokio uses cooperative async tasks. Each task runs on a thread pool but yields at await points.</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         TASK ARCHITECTURE                                        │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+HIGH PRIORITY (real-time sensitive)
+────────────────────────────────────
+
+┌─────────────────┐
+│ audio_capture   │  Priority: HIGHEST
+│                 │  Period: 16kHz continuous
+│                 │  DMA-driven, minimal CPU
+│                 │  Feeds: wake_word, voice_stream
+└─────────────────┘
+
+┌─────────────────┐
+│ led_driver      │  Priority: HIGH
+│                 │  Period: 60 FPS (16.6ms)
+│                 │  DMA-driven SPI
+│                 │  Reads: led_state channel
+└─────────────────┘
+
+MEDIUM PRIORITY (responsive)
+────────────────────────────────────
+
+┌─────────────────┐
+│ wake_word       │  Priority: MEDIUM
+│                 │  Period: 32ms windows
+│                 │  Porcupine/openWakeWord
+│                 │  Signals: state_machine
+└─────────────────┘
+
+┌─────────────────┐
+│ state_machine   │  Priority: MEDIUM
+│                 │  Event-driven
+│                 │  Coordinates all tasks
+│                 │  Publishes: led_state, api_state
+└─────────────────┘
+
+┌─────────────────┐
+│ api_client      │  Priority: MEDIUM
+│                 │  WebSocket + HTTP
+│                 │  Bidirectional state sync
+│                 │  Handles: commands, responses
+└─────────────────┘
+
+LOW PRIORITY (background)
+────────────────────────────────────
+
+┌─────────────────┐
+│ power_monitor   │  Priority: LOW
+│                 │  Period: 1 second
+│                 │  I2C to BQ40Z50
+│                 │  Reports: battery state
+└─────────────────┘
+
+┌─────────────────┐
+│ thermal_monitor │  Priority: LOW
+│                 │  Period: 5 seconds
+│                 │  Reads: temp sensors
+│                 │  Triggers: throttling
+└─────────────────┘
+
+┌─────────────────┐
+│ heartbeat       │  Priority: LOWEST
+│                 │  Period: 30 seconds
+│                 │  API keepalive
+│                 │  Reports: orb status
+└─────────────────┘
+</code></pre>
+<h3 id="task-implementation-rust">Task Implementation (Rust)</h3>
+<pre><code class="language-rust">use tokio::sync::mpsc::{channel, Sender, Receiver};
+use tokio::time::{Duration, interval};
+
+/// Main entry point
+#[tokio::main]
+async fn main() {
+    // Initialize hardware
+    let peripherals = init_peripherals();
+
+    // Create shared channels
+    let (led_tx, led_rx) = channel::&lt;LedCommand, 16&gt;();
+    let (state_tx, state_rx) = channel::&lt;StateEvent, 32&gt;();
+    let (audio_tx, audio_rx) = channel::&lt;AudioFrame, 64&gt;();
+
+    // Spawn tasks
+    spawner.spawn(audio_capture(peripherals.i2s, audio_tx)).unwrap();
+    spawner.spawn(led_driver(peripherals.spi, led_rx)).unwrap();
+    spawner.spawn(wake_word_detector(audio_rx.clone(), state_tx.clone())).unwrap();
+    spawner.spawn(state_machine(state_rx, led_tx, api_tx)).unwrap();
+    spawner.spawn(api_client(api_rx, state_tx.clone())).unwrap();
+    spawner.spawn(power_monitor(peripherals.i2c, state_tx.clone())).unwrap();
+    spawner.spawn(thermal_monitor(peripherals.i2c, state_tx.clone())).unwrap();
+    spawner.spawn(heartbeat(api_tx.clone())).unwrap();
+
+    // Main loop handles unexpected termination
+    loop {
+        Timer::after(Duration::from_secs(3600)).await;
+    }
+}
+
+/// Audio capture task - DMA-driven I2S
+#[embassy_executor::task]
+async fn audio_capture(
+    i2s: I2sPeripheral,
+    audio_tx: Sender&lt;AudioFrame&gt;,
+) {
+    let mut buffer = [0i16; 512]; // 32ms at 16kHz
+
+    loop {
+        // DMA fills buffer, await completes when ready
+        i2s.read_dma(&amp;mut buffer).await;
+
+        let frame = AudioFrame::new(&amp;buffer);
+        let _ = audio_tx.try_send(frame); // Non-blocking
+    }
+}
+
+/// LED driver task - SPI to SK6812
+#[embassy_executor::task]
+async fn led_driver(
+    spi: SpiPeripheral,
+    led_rx: Receiver&lt;LedCommand&gt;,
+) {
+    let mut ring = Sk6812Ring::new(spi, 24);
+    let mut animator = LedAnimator::new();
+
+    loop {
+        // Check for new commands (non-blocking)
+        if let Ok(cmd) = led_rx.try_receive() {
+            animator.apply_command(cmd);
+        }
+
+        // Compute next frame
+        let frame = animator.tick();
+        ring.write(&amp;frame).await;
+
+        // 60 FPS target
+        Timer::after(Duration::from_millis(16)).await;
+    }
+}
+
+/// State machine task - event-driven coordinator
+#[embassy_executor::task]
+async fn state_machine(
+    state_rx: Receiver&lt;StateEvent&gt;,
+    led_tx: Sender&lt;LedCommand&gt;,
+    api_tx: Sender&lt;ApiCommand&gt;,
+) {
+    let mut state = OrbState::Startup;
+
+    loop {
+        let event = state_rx.receive().await;
+
+        // Process event and compute next state
+        let (next_state, actions) = state.transition(event);
+
+        // Execute actions
+        for action in actions {
+            match action {
+                Action::SetLed(cmd) =&gt; led_tx.send(cmd).await,
+                Action::SendApi(cmd) =&gt; api_tx.send(cmd).await,
+                Action::PlayAudio(clip) =&gt; play_audio(clip).await,
+            }
+        }
+
+        state = next_state;
+    }
+}
+</code></pre>
+<hr />
+<h2 id="gpio-assignments">GPIO Assignments</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         GPIO PIN ASSIGNMENTS                                     │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  I2S AUDIO (ReSpeaker + Speaker)                                                │
+│  ─────────────────────────────────                                               │
+│  GPIO12 (PCM_CLK)  → I2S BCLK (shared)                                          │
+│  GPIO19 (PCM_FS)   → I2S LRCLK (shared)                                         │
+│  GPIO20 (PCM_DIN)  ← ReSpeaker Data Out                                         │
+│  GPIO21 (PCM_DOUT) → MAX98357A Data In                                          │
+│                                                                                  │
+│  SPI (LED Ring)                                                                  │
+│  ─────────────────────────────────                                               │
+│  GPIO10 (SPI_MOSI) → SK6812 DIN (via level shifter)                             │
+│  GPIO11 (SPI_SCLK) → (unused, but reserved)                                     │
+│                                                                                  │
+│  I2C (Sensors + Power ICs)                                                       │
+│  ─────────────────────────────────                                               │
+│  GPIO2 (SDA)       ↔ I2C Bus                                                    │
+│  GPIO3 (SCL)       → I2C Bus                                                    │
+│                                                                                  │
+│  I2C DEVICES:                                                                    │
+│  ├── 0x6A: BQ25895 (Charger)                                                    │
+│  ├── 0x0B: BQ40Z50 (Fuel Gauge) — SMBus                                         │
+│  ├── 0x35: ReSpeaker (XMOS config)                                              │
+│  └── 0x48: TMP117 (Temperature)                                                 │
+│                                                                                  │
+│  GPIO (Digital I/O)                                                              │
+│  ─────────────────────────────────                                               │
+│  GPIO17 (INPUT)    ← Resonant charging status                                   │
+│  GPIO22 (INPUT)    ← Hall sensor (dock detect)                                  │
+│  GPIO23 (INPUT)    ← Temperature alert                                          │
+│  GPIO24 (INPUT)    ← ReSpeaker voice activity                                   │
+│  GPIO27 (INPUT)    ← Battery alert (low/critical)                               │
+│  GPIO25 (OUTPUT)   → Status LED (debug)                                         │
+│  GPIO26 (OUTPUT)   → Amplifier enable                                           │
+│                                                                                  │
+│  RESERVED FOR EXPANSION                                                          │
+│  ─────────────────────────────────                                               │
+│  GPIO4, GPIO5, GPIO6, GPIO13, GPIO16                                            │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr />
+<h2 id="memory-map">Memory Map</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         MEMORY ALLOCATION                                        │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  CM4 4GB RAM ALLOCATION (Linux userspace)                                       │
+│  ────────────────────────────────────────                                        │
+│                                                                                  │
+│  0x0000_0000 - 0x3FFF_FFFF (1GB)   Kernel + System                              │
+│                                                                                  │
+│  0x4000_0000 - 0x7FFF_FFFF (1GB)   Kagami Orb Process                           │
+│  ├── 256 MB: Audio buffers (ring buffers, streaming)                            │
+│  ├── 128 MB: LED frame buffers (double-buffered)                                │
+│  ├── 256 MB: Wake word model (Porcupine/openWakeWord)                           │
+│  ├── 128 MB: API client buffers                                                 │
+│  └── 256 MB: General heap                                                       │
+│                                                                                  │
+│  0x8000_0000 - 0xBFFF_FFFF (1GB)   Coral TPU shared memory                      │
+│  └── Model loading, inference tensors                                           │
+│                                                                                  │
+│  0xC000_0000 - 0xFFFF_FFFF (1GB)   Reserved / GPU                               │
+│                                                                                  │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  DMA CHANNELS                                                                    │
+│  ─────────────────────────────────                                               │
+│  Channel 0: I2S RX (audio capture) - HIGHEST priority                           │
+│  Channel 1: I2S TX (audio playback)                                             │
+│  Channel 2: SPI TX (LED data)                                                   │
+│  Channel 3: Reserved                                                            │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr />
+<h2 id="power-state-transitions">Power State Transitions</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         POWER STATE MACHINE                                      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+                    ┌──────────────────────────────────────────────────────┐
+                    │                                                      │
+                    │                    POWERED_OFF                       │
+                    │                                                      │
+                    └──────────────────────────┬───────────────────────────┘
+                                               │
+                                               │ Resonant power detected OR button press
+                                               ▼
+                    ┌──────────────────────────────────────────────────────┐
+                    │                                                      │
+                    │                    BOOTING                           │
+                    │                                                      │
+                    │  • Linux kernel loads                               │
+                    │  • Embassy runtime starts                           │
+                    │  • WiFi connects                                    │
+                    │  • API handshake                                    │
+                    │                                                      │
+                    └──────────────────────────┬───────────────────────────┘
+                                               │
+                                               │ init complete
+                                               ▼
+        ┌───────────────────────────────────────────────────────────────────────┐
+        │                                                                       │
+        │                         DOCKED_ACTIVE                                 │
+        │                                                                       │
+        │  • Full functionality                                                 │
+        │  • Resonant charging active                                            │
+        │  • CPU: 1.5 GHz                                                       │
+        │  • LEDs: Full brightness                                              │
+        │  • Power consumption: 9.5W average                                    │
+        │                                                                       │
+        └──────────────────────┬─────────────────────┬──────────────────────────┘
+                               │                     │
+              lift detected    │                     │ idle &gt; 5 minutes
+                               ▼                     ▼
+        ┌────────────────────────────┐   ┌────────────────────────────┐
+        │                            │   │                            │
+        │       UNDOCKED             │   │      DOCKED_IDLE           │
+        │                            │   │                            │
+        │  • Battery power           │   │  • Resonant charge (trickle)│
+        │  • Reduced CPU (1.0 GHz)   │   │  • Reduced CPU (600 MHz)   │
+        │  • LEDs: 15% brightness    │   │  • LEDs: 30% brightness    │
+        │  • Power: 4W average       │   │  • Power: 3W average       │
+        │                            │   │                            │
+        └────────────┬───────────────┘   └────────────────────────────┘
+                     │
+                     │ SOC &lt; 20%
+                     ▼
+        ┌────────────────────────────┐
+        │                            │
+        │      BATTERY_LOW           │
+        │                            │
+        │  • Warning pulses          │
+        │  • CPU: 600 MHz            │
+        │  • Voice disabled          │
+        │  • Power: 2W average       │
+        │                            │
+        └────────────┬───────────────┘
+                     │
+                     │ SOC &lt; 5%
+                     ▼
+        ┌────────────────────────────┐
+        │                            │
+        │      SHUTDOWN              │
+        │                            │
+        │  • Graceful shutdown       │
+        │  • Save state              │
+        │  • Single red LED blink    │
+        │  • Power off               │
+        │                            │
+        └────────────────────────────┘
+
+
+POWER BUDGET BY STATE
+─────────────────────
+
+| State         | CPU (GHz) | LEDs    | WiFi    | Audio   | Total  |
+|---------------|-----------|---------|---------|---------|--------|
+| DOCKED_ACTIVE | 1.5       | 100%    | Active  | Active  | 9.5W   |
+| DOCKED_IDLE   | 0.6       | 30%     | Active  | Standby | 3.0W   |
+| UNDOCKED      | 1.0       | 15%     | Active  | Active  | 4.0W   |
+| BATTERY_LOW   | 0.6       | 10%     | Active  | Off     | 2.0W   |
+</code></pre>
+<hr />
+<h2 id="voice-pipeline">Voice Pipeline</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         VOICE PIPELINE                                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+    MIC ARRAY (4 channels)
+           │
+           │ I2S @ 16kHz, 16-bit
+           ▼
+    ┌─────────────────┐
+    │                 │
+    │   ReSpeaker     │  Beamforming (XMOS hardware)
+    │   XMOS DSP      │  Noise suppression
+    │                 │  Echo cancellation (when speaker active)
+    │                 │
+    └────────┬────────┘
+             │
+             │ Single channel, enhanced
+             ▼
+    ┌─────────────────┐
+    │                 │
+    │   Ring Buffer   │  512 samples (32ms) per frame
+    │   (Embassy)     │  Triple buffer for lock-free
+    │                 │
+    └────────┬────────┘
+             │
+             │ Frame available
+             ▼
+    ┌─────────────────┐
+    │                 │
+    │   Wake Word     │  Porcupine or openWakeWord
+    │   Detector      │  &quot;Hey Kagami&quot; or &quot;Kagami&quot;
+    │                 │  Threshold: 0.6
+    │                 │
+    └────────┬────────┘
+             │
+             │ Wake word detected
+             ▼
+    ┌─────────────────┐
+    │                 │
+    │   VAD           │  Voice Activity Detection
+    │   (WebRTC)      │  Determines speech boundaries
+    │                 │  Timeout: 2 seconds silence
+    │                 │
+    └────────┬────────┘
+             │
+             │ Speech segment
+             ▼
+    ┌─────────────────┐
+    │                 │
+    │   Opus Encoder  │  Compress for streaming
+    │                 │  20ms frames, 24kbps
+    │                 │
+    └────────┬────────┘
+             │
+             │ WebSocket
+             ▼
+    ┌─────────────────┐
+    │                 │
+    │   Kagami API    │  /ws/orb/voice
+    │                 │  Streaming recognition
+    │                 │  Response streaming
+    │                 │
+    └────────┬────────┘
+             │
+             │ Audio response
+             ▼
+    ┌─────────────────┐
+    │                 │
+    │   Opus Decoder  │  Decompress
+    │                 │
+    └────────┬────────┘
+             │
+             │ PCM
+             ▼
+    ┌─────────────────┐
+    │                 │
+    │   MAX98357A     │  I2S DAC + Class-D amp
+    │                 │  3W into 4Ω speaker
+    │                 │
+    └─────────────────┘
+</code></pre>
+<hr />
+<h2 id="ota-update-mechanism">OTA Update Mechanism</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         OTA UPDATE PROCESS                                       │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+PARTITION LAYOUT (A/B Scheme)
+─────────────────────────────
+
+/dev/mmcblk0
+├── p1: boot_a (256MB)     # Kernel + DTB
+├── p2: boot_b (256MB)     # Backup kernel
+├── p3: root_a (4GB)       # Active rootfs
+├── p4: root_b (4GB)       # Backup rootfs
+└── p5: data (remaining)   # Persistent data
+
+
+UPDATE SEQUENCE
+─────────────────────────────
+
+1. API NOTIFICATION
+   ┌─────────────────┐
+   │  Kagami API     │ → &quot;update available: v1.2.0&quot;
+   │                 │    sha256: abc123...
+   │                 │    size: 450MB
+   └─────────────────┘
+
+2. DOWNLOAD (Background)
+   ┌─────────────────┐
+   │  Orb downloads  │ → /data/update/update.img
+   │  while active   │    Resume on disconnect
+   │                 │    Verify sha256
+   └─────────────────┘
+
+3. VERIFY SIGNATURE
+   ┌─────────────────┐
+   │  Ed25519 sig    │ → Signed by Kagami key
+   │  verification   │    Reject unsigned
+   └─────────────────┘
+
+4. INSTALL (Idle only)
+   ┌─────────────────┐
+   │  Write to B     │ → flash to inactive partition
+   │  partition      │    Verify after write
+   │                 │    ~5 minutes
+   └─────────────────┘
+
+5. REBOOT
+   ┌─────────────────┐
+   │  Set boot flag  │ → Try B on next boot
+   │  Reboot         │    LED: amber spin
+   └─────────────────┘
+
+6. VERIFICATION
+   ┌─────────────────┐
+   │  Boot B         │ → If success: commit B
+   │  Health check   │    If fail: revert to A
+   │                 │    3 boot attempts max
+   └─────────────────┘
+
+
+LED INDICATION DURING UPDATE
+─────────────────────────────
+
+• Downloading:    Slow blue pulse (0.5 Hz)
+• Installing:     Amber spin (2 Hz)
+• Rebooting:      All off, then boot sequence
+• Failed/Revert:  Red triple-flash, then normal
+</code></pre>
+<hr />
+<h2 id="build-deploy">Build &amp; Deploy</h2>
+<pre><code class="language-bash"># Development build
+cd apps/hub/kagami-orb/firmware/orb
+cargo build --release --target aarch64-unknown-linux-gnu
+
+# Run on development Pi
+cargo run --release
+
+# Cross-compile for CM4
+cross build --release --target aarch64-unknown-linux-gnu
+
+# Deploy to orb
+scp target/aarch64-unknown-linux-gnu/release/kagami-orb kagami@orb.local:/opt/kagami/
+
+# Systemd service
+sudo systemctl enable kagami-orb
+sudo systemctl start kagami-orb
+</code></pre>
+<hr />
+<h2 id="configuration">Configuration</h2>
+<pre><code class="language-toml"># config/default.toml
+
+[general]
+name = &quot;Kagami Orb&quot;
+location = &quot;living_room&quot;
+
+[api]
+host = &quot;kagami.local&quot;
+port = 8001
+websocket_path = &quot;/ws/orb/stream&quot;
+reconnect_interval_ms = 5000
+
+[audio]
+sample_rate = 16000
+channels = 1
+frame_size = 512
+wake_word = &quot;hey kagami&quot;
+wake_word_threshold = 0.6
+vad_timeout_ms = 2000
+
+[led]
+num_leds = 24
+brightness_max = 255
+brightness_idle = 60
+animation_fps = 60
+
+[power]
+battery_low_threshold = 20
+battery_critical_threshold = 5
+undocked_cpu_mhz = 1000
+docked_idle_cpu_mhz = 600
+
+[thermal]
+warning_temp_c = 65
+critical_temp_c = 75
+throttle_temp_c = 70
+</code></pre>
+<hr />
+<pre><code>鏡
+
+h(x) ≥ 0. Always.
+
+The firmware breathes life into the mirror.
+Tasks await. Events flow. State persists.
+Tokio orchestrates the dance.
+</code></pre>
+        </div>
+    </main>
+
+    <button class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" aria-label="Back to top">↑</button>
+
+    <footer>
+        <div class="kanji">鏡</div>
+        <p>h(x) ≥ 0 · Always</p>
+    </footer>
+
+    <script>
+        // Back to top button
+        const backToTop = document.querySelector('.back-to-top');
+        let ticking = false;
+        
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    backToTop.classList.toggle('visible', window.scrollY > 400);
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        });
+
+        // Wrap tables
+        document.querySelectorAll('table').forEach(table => {
+            if (!table.parentElement.classList.contains('table-wrapper')) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'table-wrapper';
+                table.parentNode.insertBefore(wrapper, table);
+                wrapper.appendChild(table);
+            }
+        });
+
+        // External links
+        document.querySelectorAll('a[href^="http"]').forEach(link => {
+            if (!link.href.includes(window.location.hostname)) {
+                link.setAttribute('target', '_blank');
+                link.setAttribute('rel', 'noopener noreferrer');
+            }
+        });
+
+        // Current page highlight
+        const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            if (link.getAttribute('href') === currentPage) {
+                link.classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>

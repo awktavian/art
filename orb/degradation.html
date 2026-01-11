@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kagami Orb — Graceful <em>Degradation</em> Modes — Kagami Orb</title>
+    <meta name="description" content="When components fail or resources are limited, the Orb should degrade gracefully — reducing capability while maintaining safety and user awareness. The user sho">
+    <meta name="theme-color" content="#0A0A0C">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Kagami Orb — Graceful <em>Degradation</em> Modes — Kagami Orb">
+    <meta property="og:description" content="When components fail or resources are limited, the Orb should degrade gracefully — reducing capability while maintaining safety and user awareness. The user sho">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://storage.googleapis.com/kagami-media-public/orb/degradation.html">
+    <meta name="twitter:card" content="summary">
+
+    <!-- Fonts: Cormorant Garamond (display) + IBM Plex (body/mono) + Noto Sans JP (kanji) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@300;400;500&family=Noto+Sans+JP:wght@100;200;300&display=swap" rel="stylesheet">
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           KAGAMI ORB DOCUMENTATION — DESIGN SYSTEM v4.0
+           Unified with ~/projects/art/ design language
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :root {
+            /* Core palette — matched to art projects */
+            --void: #0A0A0C;
+            --void-deep: #05050A;
+            --void-elevated: #0f0e14;
+            --void-surface: #16141f;
+            --void-hover: #1d1b26;
+            
+            /* Gold spectrum */
+            --gold: #D4AF37;
+            --gold-bright: #E5C158;
+            --gold-dim: rgba(212, 175, 55, 0.6);
+            --gold-faint: rgba(212, 175, 55, 0.3);
+            --gold-glow: rgba(212, 175, 55, 0.15);
+            --gold-whisper: rgba(212, 175, 55, 0.06);
+            
+            /* Accent colors */
+            --cyan: #3dd6d0;
+            --cyan-dim: rgba(61, 214, 208, 0.4);
+            --success: #4ECB71;
+            --warning: #FF9F40;
+            --error: #FF6B6B;
+            
+            /* Text hierarchy — WCAG AA compliant */
+            --text: #F4F1EA;
+            --text-secondary: rgba(244, 241, 234, 0.75);
+            --text-tertiary: rgba(244, 241, 234, 0.55);
+            --text-ghost: rgba(244, 241, 234, 0.35);
+            --text-muted: rgba(244, 241, 234, 0.2);
+            
+            /* Borders & surfaces */
+            --border: rgba(255, 255, 255, 0.06);
+            --border-subtle: rgba(255, 255, 255, 0.03);
+            --border-focus: rgba(212, 175, 55, 0.4);
+            
+            /* Typography scale (Major Third 1.25) */
+            --text-xs: clamp(0.688rem, 0.65rem + 0.15vw, 0.75rem);
+            --text-sm: clamp(0.813rem, 0.77rem + 0.17vw, 0.875rem);
+            --text-base: clamp(1rem, 0.95rem + 0.2vw, 1.063rem);
+            --text-lg: clamp(1.125rem, 1.05rem + 0.3vw, 1.25rem);
+            --text-xl: clamp(1.424rem, 1.25rem + 0.7vw, 1.953rem);
+            --text-2xl: clamp(1.802rem, 1.5rem + 1.2vw, 2.441rem);
+            --text-3xl: clamp(2.281rem, 1.8rem + 2vw, 3.052rem);
+            --text-4xl: clamp(2.887rem, 2.2rem + 3vw, 3.815rem);
+            
+            /* Spacing (8px grid) */
+            --space-1: 0.5rem;
+            --space-2: 1rem;
+            --space-3: 1.5rem;
+            --space-4: 2rem;
+            --space-5: 2.5rem;
+            --space-6: 3rem;
+            --space-8: 4rem;
+            --space-10: 5rem;
+            
+            /* Animation */
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --duration-fast: 150ms;
+            --duration-normal: 300ms;
+            --duration-slow: 500ms;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESET & BASE
+           ═══════════════════════════════════════════════════════════════════ */
+
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        ::selection {
+            background: var(--gold);
+            color: var(--void);
+        }
+
+        html {
+            scroll-behavior: smooth;
+            font-size: 17px;
+            scroll-padding-top: 5rem;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--void);
+            color: var(--text);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            min-height: 100vh;
+        }
+
+        /* Film grain overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.015;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+
+        /* Subtle gradient background */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse 80% 50% at 50% -20%, var(--gold-whisper), transparent),
+                radial-gradient(ellipse 60% 40% at 100% 100%, rgba(61, 214, 208, 0.02), transparent);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           NAVIGATION
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .top-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: linear-gradient(to bottom, 
+                rgba(10, 10, 12, 0.95), 
+                rgba(10, 10, 12, 0.85));
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-bottom: 1px solid var(--border);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 var(--space-6);
+        }
+
+        .nav-brand {
+            font-family: 'Noto Sans JP', sans-serif;
+            font-weight: 200;
+            font-size: var(--text-xl);
+            color: var(--gold);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .nav-brand:hover {
+            color: var(--gold-bright);
+            text-shadow: 0 0 30px var(--gold-glow);
+        }
+
+        .nav-brand .kanji {
+            font-size: 1.8rem;
+            transition: transform var(--duration-slow) var(--ease-out-expo);
+        }
+
+        .nav-brand:hover .kanji {
+            transform: scale(1.1);
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .nav-links a,
+        .nav-dropdown-btn {
+            color: var(--text-tertiary);
+            text-decoration: none;
+            font-size: var(--text-sm);
+            font-weight: 400;
+            padding: var(--space-1) var(--space-2);
+            border-radius: 6px;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .nav-links a:hover,
+        .nav-dropdown-btn:hover {
+            color: var(--text);
+            background: var(--gold-whisper);
+        }
+
+        .nav-links a.active {
+            color: var(--gold);
+            background: var(--gold-whisper);
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: calc(100% + var(--space-1));
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            min-width: 200px;
+            box-shadow: 
+                0 4px 6px -1px rgba(0, 0, 0, 0.3),
+                0 20px 40px -8px rgba(0, 0, 0, 0.5);
+            z-index: 1001;
+            padding: var(--space-1);
+            opacity: 0;
+            transform: translateY(-8px);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-content,
+        .nav-dropdown:focus-within .nav-dropdown-content {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-content a {
+            display: flex;
+            align-items: center;
+            padding: var(--space-1) var(--space-2);
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: var(--text-sm);
+            border-radius: 8px;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        .nav-dropdown-content a:hover {
+            background: var(--gold-whisper);
+            color: var(--gold);
+            padding-left: var(--space-3);
+        }
+
+        .nav-dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: var(--space-1) var(--space-2);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           MAIN CONTENT
+           ═══════════════════════════════════════════════════════════════════ */
+
+        main {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: calc(64px + var(--space-8)) var(--space-6) var(--space-8);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           DOCUMENT HEADER — Signature Title Treatment
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .doc-header {
+            margin-bottom: var(--space-8);
+            padding-bottom: var(--space-6);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            text-align: center;
+        }
+
+        /* Gold accent line */
+        .doc-header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        }
+
+        /* Display title — Cormorant Garamond */
+        .doc-header h1 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-4xl);
+            font-weight: 300;
+            color: var(--text);
+            margin-bottom: var(--space-3);
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+        }
+
+        /* Accent words in titles */
+        .doc-header h1 em {
+            font-style: italic;
+            color: var(--gold);
+            font-weight: 400;
+        }
+
+        .doc-meta {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: var(--space-4);
+            font-size: var(--text-sm);
+            color: var(--text-ghost);
+            font-family: 'IBM Plex Mono', monospace;
+            letter-spacing: 0.05em;
+        }
+
+        .doc-meta span {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           TYPOGRAPHY
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .content > *:first-child {
+            margin-top: 0;
+        }
+
+        h2 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-2xl);
+            font-weight: 400;
+            color: var(--text);
+            margin-top: var(--space-8);
+            margin-bottom: var(--space-4);
+            padding-bottom: var(--space-2);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            letter-spacing: -0.01em;
+        }
+
+        h2::before {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 60px;
+            height: 2px;
+            background: var(--gold-dim);
+        }
+
+        /* Accent words in H2 */
+        h2 em {
+            font-style: italic;
+            color: var(--gold);
+        }
+
+        h3 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-xl);
+            font-weight: 500;
+            color: var(--gold);
+            margin-top: var(--space-6);
+            margin-bottom: var(--space-3);
+            letter-spacing: -0.01em;
+        }
+
+        h4 {
+            font-size: var(--text-lg);
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-top: var(--space-5);
+            margin-bottom: var(--space-2);
+        }
+
+        p {
+            margin-bottom: var(--space-3);
+            color: var(--text-secondary);
+        }
+
+        strong {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           LINKS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        a {
+            color: var(--cyan);
+            text-decoration: none;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        a:hover {
+            color: var(--gold);
+        }
+
+        .content a {
+            background: linear-gradient(to right, var(--gold-dim), var(--gold-dim)) no-repeat right bottom;
+            background-size: 0% 1px;
+            transition: background-size var(--duration-normal) var(--ease-out-expo), color var(--duration-fast);
+        }
+
+        .content a:hover {
+            background-size: 100% 1px;
+            background-position: left bottom;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           LISTS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        ul, ol {
+            margin-bottom: var(--space-3);
+            padding-left: var(--space-5);
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: var(--space-1);
+        }
+
+        li::marker {
+            color: var(--gold-dim);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           TABLES
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin: var(--space-5) 0;
+            border-radius: 12px;
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            box-shadow: 
+                0 1px 3px rgba(0, 0, 0, 0.2),
+                0 8px 24px -4px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 var(--border-subtle);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--text-sm);
+        }
+
+        thead {
+            background: linear-gradient(to bottom, var(--void-surface), var(--void-elevated));
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        th {
+            padding: var(--space-3) var(--space-3);
+            text-align: left;
+            font-weight: 500;
+            color: var(--gold);
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        td {
+            padding: var(--space-2) var(--space-3);
+            border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr {
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        tbody tr:hover {
+            background: var(--gold-whisper);
+        }
+
+        tbody tr:hover td {
+            color: var(--text);
+        }
+
+        /* Code in tables */
+        td code, th code {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.9em;
+        }
+
+        /* Status badges */
+        .status-validated { color: var(--success); }
+        .status-warning { color: var(--warning); }
+        .status-deprecated { 
+            color: var(--error); 
+            text-decoration: line-through;
+            opacity: 0.7;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           CODE BLOCKS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        pre {
+            background: var(--void-deep);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: var(--space-4);
+            overflow-x: auto;
+            margin: var(--space-5) 0;
+            font-size: var(--text-sm);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        code {
+            font-family: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+            font-size: 0.9em;
+        }
+
+        :not(pre) > code {
+            background: var(--void-surface);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: var(--cyan);
+            border: 1px solid var(--border-subtle);
+        }
+
+        pre code {
+            color: var(--text-secondary);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           BLOCKQUOTES & ALERTS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        blockquote {
+            border-left: 3px solid var(--gold);
+            padding: var(--space-3) var(--space-4);
+            margin: var(--space-5) 0;
+            background: var(--gold-whisper);
+            border-radius: 0 12px 12px 0;
+            color: var(--text-secondary);
+            font-style: italic;
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-lg);
+        }
+
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, var(--border), var(--border-subtle), transparent);
+            margin: var(--space-8) 0;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           FOOTER
+           ═══════════════════════════════════════════════════════════════════ */
+
+        footer {
+            margin-top: var(--space-10);
+            padding: var(--space-6) 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+
+        footer .kanji {
+            font-family: 'Noto Sans JP', sans-serif;
+            font-size: 2.5rem;
+            color: var(--gold-dim);
+            margin-bottom: var(--space-2);
+            opacity: 0.5;
+            animation: breathe 5s ease-in-out infinite;
+        }
+
+        @keyframes breathe {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.6; }
+        }
+
+        footer p {
+            color: var(--text-ghost);
+            font-size: var(--text-sm);
+            margin-bottom: 0;
+            font-family: 'IBM Plex Mono', monospace;
+            letter-spacing: 0.05em;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           BACK TO TOP
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .back-to-top {
+            position: fixed;
+            bottom: var(--space-6);
+            right: var(--space-6);
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            font-family: 'IBM Plex Sans', sans-serif;
+        }
+
+        .back-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .back-to-top:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+            background: var(--void-surface);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 0 30px var(--gold-glow);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           PRINT STYLES
+           ═══════════════════════════════════════════════════════════════════ */
+
+        @media print {
+            .top-nav, .back-to-top { display: none; }
+            body { background: white; color: black; }
+            body::before, body::after { display: none; }
+            main { padding: 0; max-width: 100%; }
+            a { color: inherit; }
+            table, th, td { border: 1px solid #ddd; }
+            .table-wrapper { box-shadow: none; }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESPONSIVE
+           ═══════════════════════════════════════════════════════════════════ */
+
+        @media (max-width: 768px) {
+            .top-nav {
+                padding: 0 var(--space-3);
+            }
+
+            .nav-links a:not(:first-child):not(:last-child) {
+                display: none;
+            }
+
+            main {
+                padding: calc(64px + var(--space-5)) var(--space-3) var(--space-5);
+            }
+
+            .doc-header h1 {
+                font-size: var(--text-3xl);
+            }
+
+            h2 { font-size: var(--text-xl); }
+            h3 { font-size: var(--text-lg); }
+
+            .table-wrapper {
+                margin-left: calc(-1 * var(--space-3));
+                margin-right: calc(-1 * var(--space-3));
+                border-radius: 0;
+                border-left: none;
+                border-right: none;
+            }
+
+            table { font-size: var(--text-xs); }
+            th, td { padding: var(--space-1) var(--space-2); }
+
+            .doc-meta { gap: var(--space-2); }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           SCROLLBAR
+           ═══════════════════════════════════════════════════════════════════ */
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--void);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--text-muted);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-ghost);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           ACCESSIBILITY
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :focus-visible {
+            outline: 2px solid var(--gold);
+            outline-offset: 2px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        :target {
+            scroll-margin-top: calc(64px + var(--space-5));
+        }
+    </style>
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="index.html" class="nav-brand">
+            <span class="kanji">鏡</span>
+            <span>Kagami Orb</span>
+        </a>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="bom.html">BOM</a>
+            <a href="buy.html">Buy</a>
+            <a href="assembly.html">Assembly</a>
+            <a href="spec.html">Spec</a>
+            <div class="nav-dropdown">
+                <button class="nav-dropdown-btn">More ▾</button>
+                <div class="nav-dropdown-content">
+                    <a href="alternatives.html">Alternatives</a>
+                    <a href="custom-pcb.html">Custom PCB</a>
+                    <a href="thermal.html">Thermal Analysis</a>
+                    <a href="fmea.html">FMEA</a>
+                    <a href="firmware.html">Firmware</a>
+                    <a href="system.html">System Design</a>
+                    <a href="validation.html">Validation Plan</a>
+                    <div class="nav-dropdown-divider"></div>
+                    <a href="hardware/kagami_orb_bom.csv" download>📥 Download CSV</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <article class="doc-header">
+            <h1>Kagami Orb — Graceful <em>Degradation</em> Modes</h1>
+            <div class="doc-meta">
+                <span>January 11, 2026</span>
+                <span>v2.0</span>
+            </div>
+        </article>
+
+        <div class="content">
+            <h2 id="philosophy">Philosophy</h2>
+<p>When components fail or resources are limited, the Orb should degrade gracefully — reducing capability while maintaining safety and user awareness. The user should always know what's happening.</p>
+<hr />
+<h2 id="degradation-hierarchy">Degradation Hierarchy</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         DEGRADATION LEVELS                                       │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+LEVEL 0: FULL CAPABILITY
+─────────────────────────
+• All systems nominal
+• Full voice interaction
+• Complete smart home control
+• Normal LED animations
+• Standard power consumption
+
+
+LEVEL 1: REDUCED PERFORMANCE
+─────────────────────────
+Triggers: CPU thermal warning, high load
+Actions:
+  • Reduce LED brightness 50%
+  • Throttle CPU to 1.0 GHz
+  • Disable non-essential animations
+  • Voice still functional
+User indication: Slight LED dimming
+
+
+LEVEL 2: POWER CONSERVATION
+─────────────────────────
+Triggers: Battery &lt; 30%, Undocked
+Actions:
+  • LED constellation mode (7 LEDs only)
+  • CPU at 600 MHz
+  • Reduce wake word sensitivity
+  • Disable AI accelerator
+  • Shorten response timeouts
+User indication: Dim LEDs, amber battery indicator
+
+
+LEVEL 3: MINIMAL OPERATION
+─────────────────────────
+Triggers: Battery &lt; 15%, WiFi loss, API timeout
+Actions:
+  • Single LED heartbeat
+  • Wake word only (no full commands)
+  • Cache critical commands locally
+  • Prioritize reconnection
+User indication: Slow amber pulse, voice explains status
+
+
+LEVEL 4: EMERGENCY MODE
+─────────────────────────
+Triggers: Battery &lt; 5%, Thermal critical, h(x) approaching 0
+Actions:
+  • Red LED indicator
+  • Voice: &quot;I need to rest soon&quot;
+  • Shutdown countdown begins
+  • Save state to flash
+User indication: Red pulse, countdown voice
+
+
+LEVEL 5: SAFE SHUTDOWN
+─────────────────────────
+Triggers: Battery critical, Thermal shutdown, h(x) = 0
+Actions:
+  • Graceful shutdown sequence
+  • State saved
+  • Single red flash
+  • Power off
+User indication: Final red flash, silence
+</code></pre>
+<hr />
+<h2 id="component-specific-degradation">Component-Specific Degradation</h2>
+<h3 id="wifi-failure">WiFi Failure</h3>
+<pre><code>STATE: WiFi disconnected for &gt; 30 seconds
+
+IMMEDIATE:
+  • LED: Slow blue pulse (offline indicator)
+  • Voice: &quot;I've lost my connection. Trying to reconnect.&quot;
+  • Begin reconnect attempts (exponential backoff)
+
+AFTER 2 MINUTES:
+  • LED: Amber pulse added to blue
+  • Voice: &quot;Still offline. Limited functionality available.&quot;
+  • Enable local-only mode:
+    - Wake word detection works
+    - LED patterns work
+    - Smart home commands cached (max 5)
+    - Voice responses limited to status
+
+AFTER 10 MINUTES:
+  • LED: Dim amber only
+  • Voice: &quot;I'm still offline. Place me on a base or move closer to WiFi.&quot;
+  • Reduce power consumption
+  • Continue reconnect attempts every 30 seconds
+
+ON RECONNECTION:
+  • LED: Green flash
+  • Voice: &quot;I'm back online.&quot;
+  • Replay cached commands
+  • Sync state with API
+</code></pre>
+<h3 id="api-unreachable">API Unreachable</h3>
+<pre><code>STATE: WiFi connected but API not responding
+
+IMMEDIATE:
+  • LED: Purple pulse (processing indicator stays)
+  • Internal timeout tracking
+
+AFTER 10 SECONDS:
+  • LED: Slow purple pulse
+  • Voice: &quot;I'm having trouble reaching home. Give me a moment.&quot;
+
+AFTER 30 SECONDS:
+  • LED: Amber pulse
+  • Voice: &quot;Kagami's main system isn't responding. I can still listen.&quot;
+  • Enable limited local mode
+
+CAPABILITIES WHILE API DOWN:
+  • Wake word: YES
+  • Voice capture: NO (nowhere to send)
+  • LED control: YES (local patterns)
+  • Status queries: Limited (cached data)
+  • Smart home: NO
+  • Time/date: YES (local clock)
+</code></pre>
+<h3 id="battery-degradation">Battery Degradation</h3>
+<pre><code>100% - 30%: NORMAL
+─────────────────────────
+• Full functionality
+• No user indication
+• Standard power management
+
+30% - 20%: LOW BATTERY
+─────────────────────────
+• LED: Occasional amber pulse (every 60s)
+• Voice (once): &quot;Battery is getting low.&quot;
+• Reduce LED brightness to 70%
+• Disable idle animations
+
+20% - 10%: BATTERY WARNING
+─────────────────────────
+• LED: Amber pulse every 30s
+• Voice (every 5 min): &quot;Battery low. Please place me on a base.&quot;
+• Reduce LED brightness to 40%
+• Disable voice response audio (use LED only)
+• Reduce CPU to 600 MHz
+
+10% - 5%: CRITICAL BATTERY
+─────────────────────────
+• LED: Continuous slow amber
+• Voice: &quot;Battery critical. Shutting down in 5 minutes unless docked.&quot;
+• Disable wake word (save power)
+• Only respond to direct dock event
+
+&lt; 5%: IMMINENT SHUTDOWN
+─────────────────────────
+• LED: Red slow pulse
+• Voice: &quot;Goodbye for now.&quot;
+• Graceful shutdown
+• Save state
+</code></pre>
+<h3 id="thermal-degradation">Thermal Degradation</h3>
+<pre><code>&lt; 60°C: NORMAL
+─────────────────────────
+• Full performance
+• No indication
+
+60°C - 70°C: WARM
+─────────────────────────
+• Reduce CPU to 1.2 GHz
+• Reduce LED brightness 20%
+• No user indication (transparent)
+
+70°C - 75°C: HOT
+─────────────────────────
+• LED: Slight orange tint to all colors
+• Reduce CPU to 800 MHz
+• Disable AI accelerator (use CPU fallback)
+• Voice (once): &quot;I'm running a bit warm.&quot;
+
+75°C - 80°C: CRITICAL
+─────────────────────────
+• LED: Amber overlay on all patterns
+• Voice: &quot;I need to cool down. Reducing activity.&quot;
+• CPU at minimum (600 MHz)
+• LEDs at 20%
+• Disable voice capture
+
+&gt; 80°C: EMERGENCY
+─────────────────────────
+• LED: Red pulse
+• Voice: &quot;Too hot. Shutting down for safety.&quot;
+• Graceful shutdown
+• Will not restart until &lt; 50°C
+</code></pre>
+<h3 id="audio-system-failure">Audio System Failure</h3>
+<pre><code>MICROPHONE FAILURE (1-2 mics)
+─────────────────────────
+• Automatic fallback to remaining mics
+• Reduced beamforming quality
+• Voice: (none - user won't notice)
+• Log error for diagnostics
+
+MICROPHONE FAILURE (3+ mics)
+─────────────────────────
+• LED: Blue pulse without voice response
+• Cannot capture voice
+• Visual-only interaction mode
+• Log critical error
+
+SPEAKER FAILURE
+─────────────────────────
+• LED: Enhanced visual feedback
+• No audio output
+• LED patterns communicate status:
+  - Green pulse = success
+  - Amber pulse = warning
+  - Red pulse = error
+• Continue voice capture normally
+</code></pre>
+<h3 id="led-system-failure">LED System Failure</h3>
+<pre><code>1-3 LEDs DEAD
+─────────────────────────
+• Automatic pattern compensation
+• Skip dead LEDs in animations
+• No user indication
+• Log for maintenance
+
+4+ LEDs DEAD
+─────────────────────────
+• Simplified patterns (static colors)
+• Voice: &quot;My display isn't working fully.&quot;
+• Audio feedback enhanced
+
+COMPLETE LED FAILURE
+─────────────────────────
+• Audio-only operation
+• Voice confirms all actions
+• &quot;I can't show you, but I heard that.&quot;
+• Prioritize reconnection for remote diagnostics
+</code></pre>
+<h3 id="levitation-failure">Levitation Failure</h3>
+<pre><code>OSCILLATION DETECTED
+─────────────────────────
+• Base adjusts PID parameters
+• If persistent: controlled descent
+• Voice: &quot;Adjusting my balance.&quot;
+
+MAGLEV POWER LOSS
+─────────────────────────
+• Passive magnetic catch engages
+• Orb settles gently (&lt; 5mm drop)
+• Voice: &quot;I've landed safely.&quot;
+• Continue operating on base surface
+
+QI POWER LOSS (while docked)
+─────────────────────────
+• Switch to battery immediately
+• Amber battery indicator
+• Voice: &quot;Charging stopped. Running on battery.&quot;
+• Check base alignment
+</code></pre>
+<hr />
+<h2 id="state-recovery">State Recovery</h2>
+<h3 id="after-power-restoration">After Power Restoration</h3>
+<pre><code>BOOT SEQUENCE AFTER UNEXPECTED SHUTDOWN
+─────────────────────────
+
+1. Hardware initialization (5s)
+2. Load saved state from flash
+3. Check battery status
+4. Attempt WiFi connection
+
+IF STATE WAS SAVED:
+  • Voice: &quot;I'm back. I remember where we were.&quot;
+  • Resume previous activity
+  • Replay any cached commands
+
+IF STATE WAS NOT SAVED:
+  • Voice: &quot;Hello again. I had an unexpected restart.&quot;
+  • Default to idle state
+  • Request state sync from API
+</code></pre>
+<h3 id="after-thermal-shutdown">After Thermal Shutdown</h3>
+<pre><code>THERMAL RECOVERY
+─────────────────────────
+
+1. Wait until temp &lt; 50°C
+2. Boot with reduced power mode
+3. Gradually increase capability as temp stable
+
+Voice: &quot;I've cooled down. Starting carefully.&quot;
+
+Initial limits:
+  • CPU: 800 MHz
+  • LEDs: 50%
+  • Coral: disabled
+
+After 5 minutes stable &lt; 60°C:
+  • Full capability restored
+  • Voice: &quot;All systems normal.&quot;
+</code></pre>
+<hr />
+<h2 id="user-communication">User Communication</h2>
+<h3 id="voice-messages-degradation">Voice Messages (Degradation)</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Trigger</th>
+<th>Message</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>WiFi loss</td>
+<td>"I've lost my connection."</td>
+</tr>
+<tr>
+<td>API timeout</td>
+<td>"I'm having trouble reaching home."</td>
+</tr>
+<tr>
+<td>Battery 30%</td>
+<td>"Battery is getting low."</td>
+</tr>
+<tr>
+<td>Battery 10%</td>
+<td>"Please place me on a base soon."</td>
+</tr>
+<tr>
+<td>Battery 5%</td>
+<td>"Goodbye for now."</td>
+</tr>
+<tr>
+<td>Thermal 70°C</td>
+<td>"I'm running a bit warm."</td>
+</tr>
+<tr>
+<td>Thermal 80°C</td>
+<td>"Too hot. Shutting down for safety."</td>
+</tr>
+<tr>
+<td>Reconnected</td>
+<td>"I'm back online."</td>
+</tr>
+<tr>
+<td>Recovered</td>
+<td>"All systems normal."</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="led-patterns-degradation">LED Patterns (Degradation)</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>State</th>
+<th>Pattern</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Offline</td>
+<td>Slow blue pulse</td>
+</tr>
+<tr>
+<td>API timeout</td>
+<td>Slow purple pulse</td>
+</tr>
+<tr>
+<td>Battery low</td>
+<td>Amber pulse every 60s</td>
+</tr>
+<tr>
+<td>Battery critical</td>
+<td>Continuous amber</td>
+</tr>
+<tr>
+<td>Thermal warning</td>
+<td>Orange tint overlay</td>
+</tr>
+<tr>
+<td>Thermal critical</td>
+<td>Amber overlay</td>
+</tr>
+<tr>
+<td>Emergency</td>
+<td>Red pulse</td>
+</tr>
+<tr>
+<td>Recovered</td>
+<td>Green flash</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="logging-and-diagnostics">Logging and Diagnostics</h2>
+<p>All degradation events are logged:</p>
+<pre><code class="language-json">{
+  &quot;timestamp&quot;: &quot;2026-01-05T12:00:00Z&quot;,
+  &quot;event&quot;: &quot;degradation_level_change&quot;,
+  &quot;previous_level&quot;: 0,
+  &quot;new_level&quot;: 2,
+  &quot;triggers&quot;: [
+    {&quot;type&quot;: &quot;battery&quot;, &quot;value&quot;: 28, &quot;threshold&quot;: 30}
+  ],
+  &quot;actions_taken&quot;: [
+    &quot;reduce_led_brightness&quot;,
+    &quot;reduce_cpu_frequency&quot;
+  ]
+}
+</code></pre>
+<p>Logs are:<br />
+- Stored locally (last 1000 events)<br />
+- Synced to API when connected<br />
+- Available for diagnostics</p>
+<hr />
+<pre><code>h(x) ≥ 0. Always.
+
+Graceful degradation IS safety.
+The orb never surprises.
+It explains. It adapts. It survives.
+
+鏡
+</code></pre>
+        </div>
+    </main>
+
+    <button class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" aria-label="Back to top">↑</button>
+
+    <footer>
+        <div class="kanji">鏡</div>
+        <p>h(x) ≥ 0 · Always</p>
+    </footer>
+
+    <script>
+        // Back to top button
+        const backToTop = document.querySelector('.back-to-top');
+        let ticking = false;
+        
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    backToTop.classList.toggle('visible', window.scrollY > 400);
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        });
+
+        // Wrap tables
+        document.querySelectorAll('table').forEach(table => {
+            if (!table.parentElement.classList.contains('table-wrapper')) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'table-wrapper';
+                table.parentNode.insertBefore(wrapper, table);
+                wrapper.appendChild(table);
+            }
+        });
+
+        // External links
+        document.querySelectorAll('a[href^="http"]').forEach(link => {
+            if (!link.href.includes(window.location.hostname)) {
+                link.setAttribute('target', '_blank');
+                link.setAttribute('rel', 'noopener noreferrer');
+            }
+        });
+
+        // Current page highlight
+        const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            if (link.getAttribute('href') === currentPage) {
+                link.classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>

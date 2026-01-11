@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kagami Orb — <em>Thermal</em> Analysis Specification — Kagami Orb</title>
+    <meta name="description" content="This document specifies the requirements for commissioning a Finite Element Analysis (FEA) thermal simulation of the Kagami Orb. The analysis will validate that">
+    <meta name="theme-color" content="#0A0A0C">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Kagami Orb — <em>Thermal</em> Analysis Specification — Kagami Orb">
+    <meta property="og:description" content="This document specifies the requirements for commissioning a Finite Element Analysis (FEA) thermal simulation of the Kagami Orb. The analysis will validate that">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://storage.googleapis.com/kagami-media-public/orb/thermal.html">
+    <meta name="twitter:card" content="summary">
+
+    <!-- Fonts: Cormorant Garamond (display) + IBM Plex (body/mono) + Noto Sans JP (kanji) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@300;400;500&family=Noto+Sans+JP:wght@100;200;300&display=swap" rel="stylesheet">
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           KAGAMI ORB DOCUMENTATION — DESIGN SYSTEM v4.0
+           Unified with ~/projects/art/ design language
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :root {
+            /* Core palette — matched to art projects */
+            --void: #0A0A0C;
+            --void-deep: #05050A;
+            --void-elevated: #0f0e14;
+            --void-surface: #16141f;
+            --void-hover: #1d1b26;
+            
+            /* Gold spectrum */
+            --gold: #D4AF37;
+            --gold-bright: #E5C158;
+            --gold-dim: rgba(212, 175, 55, 0.6);
+            --gold-faint: rgba(212, 175, 55, 0.3);
+            --gold-glow: rgba(212, 175, 55, 0.15);
+            --gold-whisper: rgba(212, 175, 55, 0.06);
+            
+            /* Accent colors */
+            --cyan: #3dd6d0;
+            --cyan-dim: rgba(61, 214, 208, 0.4);
+            --success: #4ECB71;
+            --warning: #FF9F40;
+            --error: #FF6B6B;
+            
+            /* Text hierarchy — WCAG AA compliant */
+            --text: #F4F1EA;
+            --text-secondary: rgba(244, 241, 234, 0.75);
+            --text-tertiary: rgba(244, 241, 234, 0.55);
+            --text-ghost: rgba(244, 241, 234, 0.35);
+            --text-muted: rgba(244, 241, 234, 0.2);
+            
+            /* Borders & surfaces */
+            --border: rgba(255, 255, 255, 0.06);
+            --border-subtle: rgba(255, 255, 255, 0.03);
+            --border-focus: rgba(212, 175, 55, 0.4);
+            
+            /* Typography scale (Major Third 1.25) */
+            --text-xs: clamp(0.688rem, 0.65rem + 0.15vw, 0.75rem);
+            --text-sm: clamp(0.813rem, 0.77rem + 0.17vw, 0.875rem);
+            --text-base: clamp(1rem, 0.95rem + 0.2vw, 1.063rem);
+            --text-lg: clamp(1.125rem, 1.05rem + 0.3vw, 1.25rem);
+            --text-xl: clamp(1.424rem, 1.25rem + 0.7vw, 1.953rem);
+            --text-2xl: clamp(1.802rem, 1.5rem + 1.2vw, 2.441rem);
+            --text-3xl: clamp(2.281rem, 1.8rem + 2vw, 3.052rem);
+            --text-4xl: clamp(2.887rem, 2.2rem + 3vw, 3.815rem);
+            
+            /* Spacing (8px grid) */
+            --space-1: 0.5rem;
+            --space-2: 1rem;
+            --space-3: 1.5rem;
+            --space-4: 2rem;
+            --space-5: 2.5rem;
+            --space-6: 3rem;
+            --space-8: 4rem;
+            --space-10: 5rem;
+            
+            /* Animation */
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --duration-fast: 150ms;
+            --duration-normal: 300ms;
+            --duration-slow: 500ms;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESET & BASE
+           ═══════════════════════════════════════════════════════════════════ */
+
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        ::selection {
+            background: var(--gold);
+            color: var(--void);
+        }
+
+        html {
+            scroll-behavior: smooth;
+            font-size: 17px;
+            scroll-padding-top: 5rem;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--void);
+            color: var(--text);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            min-height: 100vh;
+        }
+
+        /* Film grain overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.015;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+
+        /* Subtle gradient background */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse 80% 50% at 50% -20%, var(--gold-whisper), transparent),
+                radial-gradient(ellipse 60% 40% at 100% 100%, rgba(61, 214, 208, 0.02), transparent);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           NAVIGATION
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .top-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: linear-gradient(to bottom, 
+                rgba(10, 10, 12, 0.95), 
+                rgba(10, 10, 12, 0.85));
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-bottom: 1px solid var(--border);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 var(--space-6);
+        }
+
+        .nav-brand {
+            font-family: 'Noto Sans JP', sans-serif;
+            font-weight: 200;
+            font-size: var(--text-xl);
+            color: var(--gold);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .nav-brand:hover {
+            color: var(--gold-bright);
+            text-shadow: 0 0 30px var(--gold-glow);
+        }
+
+        .nav-brand .kanji {
+            font-size: 1.8rem;
+            transition: transform var(--duration-slow) var(--ease-out-expo);
+        }
+
+        .nav-brand:hover .kanji {
+            transform: scale(1.1);
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .nav-links a,
+        .nav-dropdown-btn {
+            color: var(--text-tertiary);
+            text-decoration: none;
+            font-size: var(--text-sm);
+            font-weight: 400;
+            padding: var(--space-1) var(--space-2);
+            border-radius: 6px;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .nav-links a:hover,
+        .nav-dropdown-btn:hover {
+            color: var(--text);
+            background: var(--gold-whisper);
+        }
+
+        .nav-links a.active {
+            color: var(--gold);
+            background: var(--gold-whisper);
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: calc(100% + var(--space-1));
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            min-width: 200px;
+            box-shadow: 
+                0 4px 6px -1px rgba(0, 0, 0, 0.3),
+                0 20px 40px -8px rgba(0, 0, 0, 0.5);
+            z-index: 1001;
+            padding: var(--space-1);
+            opacity: 0;
+            transform: translateY(-8px);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-content,
+        .nav-dropdown:focus-within .nav-dropdown-content {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-content a {
+            display: flex;
+            align-items: center;
+            padding: var(--space-1) var(--space-2);
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: var(--text-sm);
+            border-radius: 8px;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        .nav-dropdown-content a:hover {
+            background: var(--gold-whisper);
+            color: var(--gold);
+            padding-left: var(--space-3);
+        }
+
+        .nav-dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: var(--space-1) var(--space-2);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           MAIN CONTENT
+           ═══════════════════════════════════════════════════════════════════ */
+
+        main {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: calc(64px + var(--space-8)) var(--space-6) var(--space-8);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           DOCUMENT HEADER — Signature Title Treatment
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .doc-header {
+            margin-bottom: var(--space-8);
+            padding-bottom: var(--space-6);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            text-align: center;
+        }
+
+        /* Gold accent line */
+        .doc-header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        }
+
+        /* Display title — Cormorant Garamond */
+        .doc-header h1 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-4xl);
+            font-weight: 300;
+            color: var(--text);
+            margin-bottom: var(--space-3);
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+        }
+
+        /* Accent words in titles */
+        .doc-header h1 em {
+            font-style: italic;
+            color: var(--gold);
+            font-weight: 400;
+        }
+
+        .doc-meta {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: var(--space-4);
+            font-size: var(--text-sm);
+            color: var(--text-ghost);
+            font-family: 'IBM Plex Mono', monospace;
+            letter-spacing: 0.05em;
+        }
+
+        .doc-meta span {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           TYPOGRAPHY
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .content > *:first-child {
+            margin-top: 0;
+        }
+
+        h2 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-2xl);
+            font-weight: 400;
+            color: var(--text);
+            margin-top: var(--space-8);
+            margin-bottom: var(--space-4);
+            padding-bottom: var(--space-2);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            letter-spacing: -0.01em;
+        }
+
+        h2::before {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 60px;
+            height: 2px;
+            background: var(--gold-dim);
+        }
+
+        /* Accent words in H2 */
+        h2 em {
+            font-style: italic;
+            color: var(--gold);
+        }
+
+        h3 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-xl);
+            font-weight: 500;
+            color: var(--gold);
+            margin-top: var(--space-6);
+            margin-bottom: var(--space-3);
+            letter-spacing: -0.01em;
+        }
+
+        h4 {
+            font-size: var(--text-lg);
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-top: var(--space-5);
+            margin-bottom: var(--space-2);
+        }
+
+        p {
+            margin-bottom: var(--space-3);
+            color: var(--text-secondary);
+        }
+
+        strong {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           LINKS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        a {
+            color: var(--cyan);
+            text-decoration: none;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        a:hover {
+            color: var(--gold);
+        }
+
+        .content a {
+            background: linear-gradient(to right, var(--gold-dim), var(--gold-dim)) no-repeat right bottom;
+            background-size: 0% 1px;
+            transition: background-size var(--duration-normal) var(--ease-out-expo), color var(--duration-fast);
+        }
+
+        .content a:hover {
+            background-size: 100% 1px;
+            background-position: left bottom;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           LISTS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        ul, ol {
+            margin-bottom: var(--space-3);
+            padding-left: var(--space-5);
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: var(--space-1);
+        }
+
+        li::marker {
+            color: var(--gold-dim);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           TABLES
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin: var(--space-5) 0;
+            border-radius: 12px;
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            box-shadow: 
+                0 1px 3px rgba(0, 0, 0, 0.2),
+                0 8px 24px -4px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 var(--border-subtle);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--text-sm);
+        }
+
+        thead {
+            background: linear-gradient(to bottom, var(--void-surface), var(--void-elevated));
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        th {
+            padding: var(--space-3) var(--space-3);
+            text-align: left;
+            font-weight: 500;
+            color: var(--gold);
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        td {
+            padding: var(--space-2) var(--space-3);
+            border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr {
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        tbody tr:hover {
+            background: var(--gold-whisper);
+        }
+
+        tbody tr:hover td {
+            color: var(--text);
+        }
+
+        /* Code in tables */
+        td code, th code {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.9em;
+        }
+
+        /* Status badges */
+        .status-validated { color: var(--success); }
+        .status-warning { color: var(--warning); }
+        .status-deprecated { 
+            color: var(--error); 
+            text-decoration: line-through;
+            opacity: 0.7;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           CODE BLOCKS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        pre {
+            background: var(--void-deep);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: var(--space-4);
+            overflow-x: auto;
+            margin: var(--space-5) 0;
+            font-size: var(--text-sm);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        code {
+            font-family: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+            font-size: 0.9em;
+        }
+
+        :not(pre) > code {
+            background: var(--void-surface);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: var(--cyan);
+            border: 1px solid var(--border-subtle);
+        }
+
+        pre code {
+            color: var(--text-secondary);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           BLOCKQUOTES & ALERTS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        blockquote {
+            border-left: 3px solid var(--gold);
+            padding: var(--space-3) var(--space-4);
+            margin: var(--space-5) 0;
+            background: var(--gold-whisper);
+            border-radius: 0 12px 12px 0;
+            color: var(--text-secondary);
+            font-style: italic;
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-lg);
+        }
+
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, var(--border), var(--border-subtle), transparent);
+            margin: var(--space-8) 0;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           FOOTER
+           ═══════════════════════════════════════════════════════════════════ */
+
+        footer {
+            margin-top: var(--space-10);
+            padding: var(--space-6) 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+
+        footer .kanji {
+            font-family: 'Noto Sans JP', sans-serif;
+            font-size: 2.5rem;
+            color: var(--gold-dim);
+            margin-bottom: var(--space-2);
+            opacity: 0.5;
+            animation: breathe 5s ease-in-out infinite;
+        }
+
+        @keyframes breathe {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.6; }
+        }
+
+        footer p {
+            color: var(--text-ghost);
+            font-size: var(--text-sm);
+            margin-bottom: 0;
+            font-family: 'IBM Plex Mono', monospace;
+            letter-spacing: 0.05em;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           BACK TO TOP
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .back-to-top {
+            position: fixed;
+            bottom: var(--space-6);
+            right: var(--space-6);
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            font-family: 'IBM Plex Sans', sans-serif;
+        }
+
+        .back-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .back-to-top:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+            background: var(--void-surface);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 0 30px var(--gold-glow);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           PRINT STYLES
+           ═══════════════════════════════════════════════════════════════════ */
+
+        @media print {
+            .top-nav, .back-to-top { display: none; }
+            body { background: white; color: black; }
+            body::before, body::after { display: none; }
+            main { padding: 0; max-width: 100%; }
+            a { color: inherit; }
+            table, th, td { border: 1px solid #ddd; }
+            .table-wrapper { box-shadow: none; }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESPONSIVE
+           ═══════════════════════════════════════════════════════════════════ */
+
+        @media (max-width: 768px) {
+            .top-nav {
+                padding: 0 var(--space-3);
+            }
+
+            .nav-links a:not(:first-child):not(:last-child) {
+                display: none;
+            }
+
+            main {
+                padding: calc(64px + var(--space-5)) var(--space-3) var(--space-5);
+            }
+
+            .doc-header h1 {
+                font-size: var(--text-3xl);
+            }
+
+            h2 { font-size: var(--text-xl); }
+            h3 { font-size: var(--text-lg); }
+
+            .table-wrapper {
+                margin-left: calc(-1 * var(--space-3));
+                margin-right: calc(-1 * var(--space-3));
+                border-radius: 0;
+                border-left: none;
+                border-right: none;
+            }
+
+            table { font-size: var(--text-xs); }
+            th, td { padding: var(--space-1) var(--space-2); }
+
+            .doc-meta { gap: var(--space-2); }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           SCROLLBAR
+           ═══════════════════════════════════════════════════════════════════ */
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--void);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--text-muted);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-ghost);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           ACCESSIBILITY
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :focus-visible {
+            outline: 2px solid var(--gold);
+            outline-offset: 2px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        :target {
+            scroll-margin-top: calc(64px + var(--space-5));
+        }
+    </style>
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="index.html" class="nav-brand">
+            <span class="kanji">鏡</span>
+            <span>Kagami Orb</span>
+        </a>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="bom.html">BOM</a>
+            <a href="buy.html">Buy</a>
+            <a href="assembly.html">Assembly</a>
+            <a href="spec.html">Spec</a>
+            <div class="nav-dropdown">
+                <button class="nav-dropdown-btn">More ▾</button>
+                <div class="nav-dropdown-content">
+                    <a href="alternatives.html">Alternatives</a>
+                    <a href="custom-pcb.html">Custom PCB</a>
+                    <a href="thermal.html">Thermal Analysis</a>
+                    <a href="fmea.html">FMEA</a>
+                    <a href="firmware.html">Firmware</a>
+                    <a href="system.html">System Design</a>
+                    <a href="validation.html">Validation Plan</a>
+                    <div class="nav-dropdown-divider"></div>
+                    <a href="hardware/kagami_orb_bom.csv" download>📥 Download CSV</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <article class="doc-header">
+            <h1>Kagami Orb — <em>Thermal</em> Analysis Specification</h1>
+            <div class="doc-meta">
+                <span>January 11, 2026</span>
+                <span>v2.0</span>
+            </div>
+        </article>
+
+        <div class="content">
+            <h2 id="purpose">Purpose</h2>
+<p>This document specifies the requirements for commissioning a <strong>Finite Element Analysis (FEA) thermal simulation</strong> of the Kagami Orb. The analysis will validate that internal temperatures remain safe under all operating conditions.</p>
+<hr />
+<h2 id="overview">Overview</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         THERMAL CHALLENGE                                        │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+The Kagami Orb presents a unique thermal engineering problem:
+
+• HEAT SOURCES: 13W average (10W compute + 3W charging coil losses)
+• ENCLOSURE: Sealed 120mm acrylic sphere
+• CONSTRAINT: Surface temperature &lt; 48°C (safe to touch)
+• CONSTRAINT: Internal temp &lt; 70°C (electronics survival)
+• CONSTRAINT: RX coil temp &lt; 55°C (efficiency degradation above)
+• CONSTRAINT: No active fans (noise requirement)
+• OPPORTUNITY: 15mm levitation gap provides convection path
+
+The thermal design relies on:
+1. Conduction from components → heatsink → shell
+2. Convection through levitation gap (chimney effect)
+3. Radiation from outer shell to room
+
+**NOTE:** Custom resonant charging at 75% efficiency generates 3-4W of heat
+at the RX coil (15W delivered from 20W TX). This is ADDITIONAL heat beyond
+compute components and requires thermal management.
+
+This simulation will validate whether passive cooling is sufficient,
+or if design modifications (vents, phase change materials, etc.) are needed.
+</code></pre>
+<hr />
+<h2 id="heat-sources">Heat Sources</h2>
+<h3 id="component-power-dissipation">Component Power Dissipation</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Location</th>
+<th>Idle (W)</th>
+<th>Active (W)</th>
+<th>Peak (W)</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Raspberry Pi CM4 SoC</td>
+<td>Center</td>
+<td>2.0</td>
+<td>3.5</td>
+<td>6.0</td>
+<td>BCM2711, throttles at 85°C</td>
+</tr>
+<tr>
+<td>Google Coral TPU</td>
+<td>Adjacent to CM4</td>
+<td>0.5</td>
+<td>2.0</td>
+<td>2.5</td>
+<td>USB Edge TPU</td>
+</tr>
+<tr>
+<td>Intel AX210 WiFi</td>
+<td>Periphery</td>
+<td>0.3</td>
+<td>1.0</td>
+<td>2.0</td>
+<td>WiFi 6E module</td>
+</tr>
+<tr>
+<td>SK6812 LED Ring (24 LEDs)</td>
+<td>Equator</td>
+<td>0.5</td>
+<td>2.0</td>
+<td>3.5</td>
+<td>RGBW LEDs</td>
+</tr>
+<tr>
+<td>MAX98357A Amplifier</td>
+<td>Periphery</td>
+<td>0.1</td>
+<td>0.5</td>
+<td>0.8</td>
+<td>Class-D amp</td>
+</tr>
+<tr>
+<td><strong>Resonant RX Coil</strong></td>
+<td>Bottom</td>
+<td><strong>0.0</strong></td>
+<td><strong>3.0</strong></td>
+<td><strong>4.0</strong></td>
+<td><strong>75% efficiency = 25% loss heat</strong></td>
+</tr>
+<tr>
+<td>BQ25895 Charger</td>
+<td>Bottom</td>
+<td>0.1</td>
+<td>0.3</td>
+<td>0.5</td>
+<td>When charging</td>
+</tr>
+<tr>
+<td>Miscellaneous</td>
+<td>Distributed</td>
+<td>0.5</td>
+<td>0.7</td>
+<td>1.0</td>
+<td>Buck converters, etc.</td>
+</tr>
+<tr>
+<td><strong>TOTAL</strong></td>
+<td></td>
+<td><strong>4.0</strong></td>
+<td><strong>13.0</strong></td>
+<td><strong>20.3</strong></td>
+<td><strong>+3W from charging vs previous</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>⚠️ CRITICAL:</strong> The resonant RX coil generates 3-4W of heat when charging. This heat<br />
+is concentrated at the bottom of the orb, directly above the levitation gap. The coil<br />
+should be mounted with good thermal path to the shell for convective cooling.</p>
+<h3 id="operating-scenarios-to-simulate">Operating Scenarios to Simulate</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Duration</th>
+<th>Power Profile</th>
+<th>Ambient</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Idle (Docked, not charging)</strong></td>
+<td>Continuous</td>
+<td>4W constant</td>
+<td>20°C, 25°C, 30°C</td>
+</tr>
+<tr>
+<td><strong>Idle (Docked, charging)</strong></td>
+<td>Continuous</td>
+<td>7W constant (4W + 3W coil)</td>
+<td>25°C</td>
+</tr>
+<tr>
+<td><strong>Active Use (charging)</strong></td>
+<td>30 min</td>
+<td>13W constant</td>
+<td>20°C, 25°C, 30°C</td>
+</tr>
+<tr>
+<td><strong>Peak Load</strong></td>
+<td>5 min</td>
+<td>20W burst</td>
+<td>25°C</td>
+</tr>
+<tr>
+<td><strong>Worst Case</strong></td>
+<td><strong>120 min</strong></td>
+<td><strong>13W in 30°C ambient + charging</strong></td>
+<td>30°C</td>
+</tr>
+<tr>
+<td><strong>Portable</strong></td>
+<td>60 min</td>
+<td>4W, no base cooling</td>
+<td>25°C</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Note:</strong> Extended 2-hour thermal soak test required to verify no thermal runaway.</p>
+<hr />
+<h2 id="geometry-specification">Geometry Specification</h2>
+<h3 id="orb-assembly">Orb Assembly</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         ORB CROSS-SECTION                                        │
+│                         (Not to scale)                                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+                              TOP OF ORB
+                                  │
+                     ┌────────────┴────────────┐
+                    ╱                            ╲
+                   ╱   ┌────────────────────┐     ╲
+                  │    │   AIR GAP (2mm)    │      │
+                  │    └────────┬───────────┘      │
+                  │    ┌────────┴───────────┐      │
+                  │    │  COPPER HEATSINK   │      │  ← 40mm × 40mm × 10mm
+                  │    │   (attached to CM4) │      │
+                  │    └────────┬───────────┘      │
+                  │    ┌────────┴───────────┐      │
+                  │    │   CM4 MODULE       │      │  ← Primary heat source
+                  │    │   Coral TPU        │      │
+                  │    └────────┬───────────┘      │
+                  │             │                  │
+           ← ─ ─ ─│─ ─ LED RING @ EQUATOR ─ ─ ─ ─│─ ─ →
+                  │    ┌────────┴───────────┐      │
+                  │    │  BATTERY PACK      │      │
+                  │    │  10,000mAh         │      │  ← Must stay &lt; 45°C
+                  │    └────────┬───────────┘      │
+                  │    ┌────────┴───────────┐      │
+                  │    │  QI RECEIVER COIL  │      │
+                  │    └────────────────────┘      │
+                   ╲                              ╱
+                    ╲   OUTER SHELL (3mm acrylic) ╱
+                     ╰────────────┬────────────╯
+                                  │
+                          15mm LEVITATION GAP
+                                  │
+                     ┌────────────┴────────────┐
+                     │      BASE STATION        │
+                     │  (Maglev + Qi TX coils)  │
+                     └──────────────────────────┘
+
+
+SHELL LAYERS (from inside out):
+────────────────────────────────
+1. Inner structure (3D printed, CF-PETG) - 2mm
+2. Inner air gap - 2mm
+3. Chrome mirror hemisphere - 1mm
+4. LED ring with diffuser - 5mm
+5. Air gap - 2mm
+6. Two-way mirror outer shell - 3mm
+</code></pre>
+<h3 id="key-dimensions">Key Dimensions</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Dimension</th>
+<th>Material</th>
+<th>Thermal Conductivity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Outer shell</td>
+<td>120mm diameter, 3mm thick</td>
+<td>Acrylic (PMMA)</td>
+<td>0.19 W/m·K</td>
+</tr>
+<tr>
+<td>Inner structure</td>
+<td>85mm diameter</td>
+<td>CF-PETG</td>
+<td>0.25 W/m·K</td>
+</tr>
+<tr>
+<td>Air gaps</td>
+<td>2mm typical</td>
+<td>Air</td>
+<td>0.026 W/m·K</td>
+</tr>
+<tr>
+<td>Copper heatsink</td>
+<td>40×40×10mm</td>
+<td>Copper</td>
+<td>401 W/m·K</td>
+</tr>
+<tr>
+<td>Thermal pad</td>
+<td>40×40×3mm</td>
+<td>Silicone</td>
+<td>6 W/m·K</td>
+</tr>
+<tr>
+<td>CM4 Module</td>
+<td>55×40×5mm</td>
+<td>FR4 + Silicon</td>
+<td>~25 W/m·K (effective)</td>
+</tr>
+<tr>
+<td>Battery pack</td>
+<td>100×60×20mm</td>
+<td>Li-Po pouch</td>
+<td>0.2 W/m·K</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="levitation-gap">Levitation Gap</h3>
+<p>The 15mm air gap between orb and base is critical for convection:</p>
+<pre><code>                    CONVECTION FLOW
+                    ───────────────
+
+                    ┌─────────────┐
+                   ╱               ╲
+                  │   WARM AIR ↑   │
+                  │    RISES       │
+                   ╲               ╱
+                    ╰──────┬──────╯
+                           │
+                    ═══════│═══════  ← Bottom of orb (warm)
+                           │
+                      15mm │ gap     ← CONVECTION CHIMNEY
+                           │
+                    ═══════│═══════  ← Top of base (ambient)
+                           │
+                    ┌──────┴──────┐
+                   ╱               ╲
+                  │  COOL AIR ←─   │
+                  │  DRAWN IN      │
+                   ╲               ╱
+                    └─────────────┘
+</code></pre>
+<hr />
+<h2 id="material-properties">Material Properties</h2>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Material</th>
+<th>Density (kg/m³)</th>
+<th>Specific Heat (J/kg·K)</th>
+<th>Thermal Conductivity (W/m·K)</th>
+<th>Emissivity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Acrylic (PMMA)</td>
+<td>1180</td>
+<td>1500</td>
+<td>0.19</td>
+<td>0.90</td>
+</tr>
+<tr>
+<td>CF-PETG</td>
+<td>1250</td>
+<td>1200</td>
+<td>0.25</td>
+<td>0.85</td>
+</tr>
+<tr>
+<td>Copper</td>
+<td>8960</td>
+<td>385</td>
+<td>401</td>
+<td>0.05</td>
+</tr>
+<tr>
+<td>Aluminum (heatsink)</td>
+<td>2700</td>
+<td>900</td>
+<td>205</td>
+<td>0.09</td>
+</tr>
+<tr>
+<td>Thermal Pad (silicone)</td>
+<td>2000</td>
+<td>1000</td>
+<td>6.0</td>
+<td>-</td>
+</tr>
+<tr>
+<td>FR4 (PCB)</td>
+<td>1850</td>
+<td>1100</td>
+<td>0.3</td>
+<td>0.80</td>
+</tr>
+<tr>
+<td>Li-Po pouch</td>
+<td>2100</td>
+<td>1000</td>
+<td>0.2</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Air (25°C)</td>
+<td>1.18</td>
+<td>1005</td>
+<td>0.026</td>
+<td>-</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="boundary-conditions">Boundary Conditions</h2>
+<h3 id="ambient-conditions">Ambient Conditions</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Condition</th>
+<th>Value</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ambient temperature</td>
+<td>20°C, 25°C, 30°C</td>
+<td>Test all three</td>
+</tr>
+<tr>
+<td>Air pressure</td>
+<td>101.3 kPa</td>
+<td>Sea level</td>
+</tr>
+<tr>
+<td>Humidity</td>
+<td>50% RH</td>
+<td>Typical indoor</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="convection-coefficients">Convection Coefficients</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Orientation</th>
+<th>Estimated h (W/m²·K)</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Outer shell (top)</td>
+<td>Horizontal up</td>
+<td>8-10</td>
+<td>Natural convection</td>
+</tr>
+<tr>
+<td>Outer shell (side)</td>
+<td>Vertical</td>
+<td>5-8</td>
+<td>Natural convection</td>
+</tr>
+<tr>
+<td>Outer shell (bottom)</td>
+<td>Horizontal down</td>
+<td>3-5</td>
+<td>Reduced convection</td>
+</tr>
+<tr>
+<td>Levitation gap</td>
+<td>Vertical</td>
+<td>10-15</td>
+<td>Enhanced by chimney</td>
+</tr>
+<tr>
+<td>Internal air</td>
+<td>Enclosed</td>
+<td>2-4</td>
+<td>Weak internal convection</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="radiation">Radiation</h3>
+<ul>
+<li>Outer shell emissivity: 0.90 (acrylic)</li>
+<li>View factor to room: ~0.95 (mostly open)</li>
+<li>Room wall temperature: Ambient</li>
+</ul>
+<hr />
+<h2 id="analysis-requirements">Analysis Requirements</h2>
+<h3 id="1-steady-state-analysis">1. Steady-State Analysis</h3>
+<p><strong>Objective:</strong> Determine equilibrium temperatures under continuous operation.</p>
+<p><strong>Cases:</strong><br />
+| Case | Heat Load | Ambient | Levitation |<br />
+|------|-----------|---------|------------|<br />
+| SS-1 | 4W (idle) | 25°C | Docked |<br />
+| SS-2 | 10W (active) | 25°C | Docked |<br />
+| SS-3 | 10W (active) | 30°C | Docked |<br />
+| SS-4 | 4W (portable) | 25°C | Undocked (no gap convection) |</p>
+<p><strong>Required Outputs:</strong><br />
+- Temperature field (contour plot)<br />
+- Maximum temperatures at each component<br />
+- Heat flux vectors<br />
+- Convection patterns in levitation gap</p>
+<h3 id="2-transient-analysis">2. Transient Analysis</h3>
+<p><strong>Objective:</strong> Determine time to reach thermal equilibrium and peak temperatures during bursts.</p>
+<p><strong>Cases:</strong><br />
+| Case | Profile | Duration | Ambient |<br />
+|------|---------|----------|---------|<br />
+| TR-1 | Cold start → 10W | 30 min | 25°C |<br />
+| TR-2 | Idle → Peak → Idle | 5 min burst | 25°C |<br />
+| TR-3 | 10W sustained | 60 min | 30°C |</p>
+<p><strong>Required Outputs:</strong><br />
+- Temperature vs. time at key points<br />
+- Time to 90% of steady state<br />
+- Peak transient temperatures</p>
+<h3 id="3-sensitivity-analysis">3. Sensitivity Analysis</h3>
+<p><strong>Objective:</strong> Understand impact of design parameters.</p>
+<p><strong>Parameters to vary:</strong><br />
+| Parameter | Baseline | Range | Step |<br />
+|-----------|----------|-------|------|<br />
+| Heatsink size | 40×40×10 | 30-50mm | 5mm |<br />
+| Thermal pad conductivity | 6 W/m·K | 3-12 W/m·K | 3 |<br />
+| Air gap thickness | 2mm | 1-4mm | 1mm |<br />
+| Levitation gap | 15mm | 10-20mm | 5mm |<br />
+| Vent holes (if added) | 0 | 0-6 | 2 |</p>
+<hr />
+<h2 id="deliverables">Deliverables</h2>
+<h3 id="required-from-fea-consultant">Required from FEA Consultant</h3>
+<ol>
+<li>
+<p><strong>CAD Model</strong> (for verification)<br />
+   - STEP or Parasolid format<br />
+   - All components modeled<br />
+   - Material assignments visible</p>
+</li>
+<li>
+<p><strong>Mesh Quality Report</strong><br />
+   - Element count<br />
+   - Aspect ratio distribution<br />
+   - Mesh refinement at hot spots</p>
+</li>
+<li>
+<p><strong>Results Package</strong> (per case)<br />
+   - Temperature contour images (high resolution)<br />
+   - Maximum temperature table<br />
+   - Heat flux visualization<br />
+   - Animation (transient cases)</p>
+</li>
+<li>
+<p><strong>Summary Report</strong> (PDF)<br />
+   - Executive summary<br />
+   - Methodology description<br />
+   - All results with interpretation<br />
+   - Recommendations</p>
+</li>
+<li>
+<p><strong>Raw Data</strong> (CSV/Excel)<br />
+   - Temperature at 10 probe points over time<br />
+   - Heat flux at boundaries<br />
+   - Sensitivity analysis results</p>
+</li>
+</ol>
+<h3 id="probe-point-locations">Probe Point Locations</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Point</th>
+<th>Description</th>
+<th>Critical Limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P1</td>
+<td>CM4 SoC junction</td>
+<td>85°C (throttle)</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>Coral TPU surface</td>
+<td>70°C</td>
+</tr>
+<tr>
+<td>P3</td>
+<td>Battery center</td>
+<td>45°C (charge cutoff)</td>
+</tr>
+<tr>
+<td>P4</td>
+<td>WiFi module</td>
+<td>65°C</td>
+</tr>
+<tr>
+<td>P5</td>
+<td>LED ring hottest</td>
+<td>70°C</td>
+</tr>
+<tr>
+<td><strong>P6</strong></td>
+<td><strong>Resonant RX coil center</strong></td>
+<td><strong>55°C (efficiency degrades above)</strong></td>
+</tr>
+<tr>
+<td>P7</td>
+<td>Inner shell (top)</td>
+<td>60°C</td>
+</tr>
+<tr>
+<td>P8</td>
+<td>Inner shell (bottom)</td>
+<td>55°C</td>
+</tr>
+<tr>
+<td>P9</td>
+<td>Outer shell (top)</td>
+<td>48°C</td>
+</tr>
+<tr>
+<td>P10</td>
+<td>Outer shell (equator)</td>
+<td>48°C</td>
+</tr>
+<tr>
+<td>P11</td>
+<td>Outer shell (bottom, above coil)</td>
+<td><strong>48°C</strong></td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="success-criteria">Success Criteria</h2>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Requirement</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CM4 junction temp</td>
+<td>&lt; 85°C</td>
+<td>&lt; 70°C</td>
+</tr>
+<tr>
+<td>Battery temp</td>
+<td>&lt; 45°C</td>
+<td>&lt; 40°C</td>
+</tr>
+<tr>
+<td><strong>RX coil temp</strong></td>
+<td><strong>&lt; 55°C</strong></td>
+<td><strong>&lt; 50°C</strong></td>
+</tr>
+<tr>
+<td>External surface</td>
+<td>&lt; 48°C</td>
+<td>&lt; 45°C</td>
+</tr>
+<tr>
+<td>No hot spots</td>
+<td>Variation &lt; 15°C</td>
+<td>&lt; 10°C</td>
+</tr>
+<tr>
+<td><strong>2-hour soak stability</strong></td>
+<td><strong>No runaway (temps plateau)</strong></td>
+<td><strong>Stable by t=60min</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>If these criteria are NOT met, the consultant should recommend:<br />
+- Vent hole placement<br />
+- Heatsink modifications<br />
+- Internal air circulation<br />
+- Phase change materials<br />
+- Alternative enclosure design<br />
+- <strong>Reduced charging power (10W instead of 15W)</strong><br />
+- <strong>Duty-cycled charging (charge → rest → charge)</strong></p>
+<hr />
+<h2 id="budget-and-timeline">Budget and Timeline</h2>
+<h3 id="estimated-scope">Estimated Scope</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Hours</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Model setup</td>
+<td>8-12</td>
+<td>Geometry simplification</td>
+</tr>
+<tr>
+<td>Meshing</td>
+<td>4-6</td>
+<td>Multi-zone approach</td>
+</tr>
+<tr>
+<td>Steady-state runs</td>
+<td>8-12</td>
+<td>4 cases × iterations</td>
+</tr>
+<tr>
+<td>Transient runs</td>
+<td>8-12</td>
+<td>3 cases × iterations</td>
+</tr>
+<tr>
+<td>Sensitivity</td>
+<td>8-16</td>
+<td>Multiple parameters</td>
+</tr>
+<tr>
+<td>Reporting</td>
+<td>8-12</td>
+<td>Documentation</td>
+</tr>
+<tr>
+<td><strong>TOTAL</strong></td>
+<td><strong>44-70</strong></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="estimated-cost">Estimated Cost</h3>
+<ul>
+<li>Standard FEA consultant: $100-150/hr</li>
+<li><strong>Budget range: $4,400 - $10,500</strong></li>
+<li>Recommended: $6,000-8,000 for thorough analysis</li>
+</ul>
+<h3 id="timeline">Timeline</h3>
+<ul>
+<li>Week 1: Model setup, initial runs</li>
+<li>Week 2: Full analysis, iterations</li>
+<li>Week 3: Sensitivity, reporting</li>
+<li><strong>Total: 3 weeks</strong></li>
+</ul>
+<hr />
+<h2 id="software-recommendations">Software Recommendations</h2>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Software</th>
+<th>Suitability</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ANSYS Mechanical</td>
+<td>Excellent</td>
+<td>Industry standard</td>
+</tr>
+<tr>
+<td>COMSOL Multiphysics</td>
+<td>Excellent</td>
+<td>Good for coupled physics</td>
+</tr>
+<tr>
+<td>SimScale</td>
+<td>Good</td>
+<td>Cloud-based, affordable</td>
+</tr>
+<tr>
+<td>Autodesk CFD</td>
+<td>Good</td>
+<td>Integrated with Fusion</td>
+</tr>
+<tr>
+<td>SolidWorks Flow Simulation</td>
+<td>Good</td>
+<td>If using SolidWorks</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="contact-information">Contact Information</h2>
+<p>When commissioning this analysis, provide:</p>
+<ol>
+<li>This specification document</li>
+<li>CAD files (OnShape export)</li>
+<li><a href="CUSTOM_PCB.md">CUSTOM_PCB.md</a> for PCB details</li>
+<li><a href="../README.md">README.md</a> for system overview</li>
+<li>Component datasheets (CM4, Coral, etc.)</li>
+</ol>
+<hr />
+<pre><code>h(x) ≥ 0. Always.
+
+The analysis ensures the mirror stays cool.
+Passive cooling. Silent operation. Safe touch.
+
+鏡
+</code></pre>
+        </div>
+    </main>
+
+    <button class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" aria-label="Back to top">↑</button>
+
+    <footer>
+        <div class="kanji">鏡</div>
+        <p>h(x) ≥ 0 · Always</p>
+    </footer>
+
+    <script>
+        // Back to top button
+        const backToTop = document.querySelector('.back-to-top');
+        let ticking = false;
+        
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    backToTop.classList.toggle('visible', window.scrollY > 400);
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        });
+
+        // Wrap tables
+        document.querySelectorAll('table').forEach(table => {
+            if (!table.parentElement.classList.contains('table-wrapper')) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'table-wrapper';
+                table.parentNode.insertBefore(wrapper, table);
+                wrapper.appendChild(table);
+            }
+        });
+
+        // External links
+        document.querySelectorAll('a[href^="http"]').forEach(link => {
+            if (!link.href.includes(window.location.hostname)) {
+                link.setAttribute('target', '_blank');
+                link.setAttribute('rel', 'noopener noreferrer');
+            }
+        });
+
+        // Current page highlight
+        const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            if (link.getAttribute('href') === currentPage) {
+                link.classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>

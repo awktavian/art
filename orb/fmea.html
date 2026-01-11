@@ -1,0 +1,1931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kagami Orb — Failure Mode and Effects <em>Analysis</em> (FMEA) — Kagami Orb</title>
+    <meta name="description" content="This document systematically identifies potential failure modes, their effects, and mitigations for the Kagami Orb hardware. Each failure is assessed for:">
+    <meta name="theme-color" content="#0A0A0C">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Kagami Orb — Failure Mode and Effects <em>Analysis</em> (FMEA) — Kagami Orb">
+    <meta property="og:description" content="This document systematically identifies potential failure modes, their effects, and mitigations for the Kagami Orb hardware. Each failure is assessed for:">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://storage.googleapis.com/kagami-media-public/orb/fmea.html">
+    <meta name="twitter:card" content="summary">
+
+    <!-- Fonts: Cormorant Garamond (display) + IBM Plex (body/mono) + Noto Sans JP (kanji) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@300;400;500&family=Noto+Sans+JP:wght@100;200;300&display=swap" rel="stylesheet">
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           KAGAMI ORB DOCUMENTATION — DESIGN SYSTEM v4.0
+           Unified with ~/projects/art/ design language
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :root {
+            /* Core palette — matched to art projects */
+            --void: #0A0A0C;
+            --void-deep: #05050A;
+            --void-elevated: #0f0e14;
+            --void-surface: #16141f;
+            --void-hover: #1d1b26;
+            
+            /* Gold spectrum */
+            --gold: #D4AF37;
+            --gold-bright: #E5C158;
+            --gold-dim: rgba(212, 175, 55, 0.6);
+            --gold-faint: rgba(212, 175, 55, 0.3);
+            --gold-glow: rgba(212, 175, 55, 0.15);
+            --gold-whisper: rgba(212, 175, 55, 0.06);
+            
+            /* Accent colors */
+            --cyan: #3dd6d0;
+            --cyan-dim: rgba(61, 214, 208, 0.4);
+            --success: #4ECB71;
+            --warning: #FF9F40;
+            --error: #FF6B6B;
+            
+            /* Text hierarchy — WCAG AA compliant */
+            --text: #F4F1EA;
+            --text-secondary: rgba(244, 241, 234, 0.75);
+            --text-tertiary: rgba(244, 241, 234, 0.55);
+            --text-ghost: rgba(244, 241, 234, 0.35);
+            --text-muted: rgba(244, 241, 234, 0.2);
+            
+            /* Borders & surfaces */
+            --border: rgba(255, 255, 255, 0.06);
+            --border-subtle: rgba(255, 255, 255, 0.03);
+            --border-focus: rgba(212, 175, 55, 0.4);
+            
+            /* Typography scale (Major Third 1.25) */
+            --text-xs: clamp(0.688rem, 0.65rem + 0.15vw, 0.75rem);
+            --text-sm: clamp(0.813rem, 0.77rem + 0.17vw, 0.875rem);
+            --text-base: clamp(1rem, 0.95rem + 0.2vw, 1.063rem);
+            --text-lg: clamp(1.125rem, 1.05rem + 0.3vw, 1.25rem);
+            --text-xl: clamp(1.424rem, 1.25rem + 0.7vw, 1.953rem);
+            --text-2xl: clamp(1.802rem, 1.5rem + 1.2vw, 2.441rem);
+            --text-3xl: clamp(2.281rem, 1.8rem + 2vw, 3.052rem);
+            --text-4xl: clamp(2.887rem, 2.2rem + 3vw, 3.815rem);
+            
+            /* Spacing (8px grid) */
+            --space-1: 0.5rem;
+            --space-2: 1rem;
+            --space-3: 1.5rem;
+            --space-4: 2rem;
+            --space-5: 2.5rem;
+            --space-6: 3rem;
+            --space-8: 4rem;
+            --space-10: 5rem;
+            
+            /* Animation */
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --duration-fast: 150ms;
+            --duration-normal: 300ms;
+            --duration-slow: 500ms;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESET & BASE
+           ═══════════════════════════════════════════════════════════════════ */
+
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        ::selection {
+            background: var(--gold);
+            color: var(--void);
+        }
+
+        html {
+            scroll-behavior: smooth;
+            font-size: 17px;
+            scroll-padding-top: 5rem;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--void);
+            color: var(--text);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            min-height: 100vh;
+        }
+
+        /* Film grain overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.015;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+
+        /* Subtle gradient background */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse 80% 50% at 50% -20%, var(--gold-whisper), transparent),
+                radial-gradient(ellipse 60% 40% at 100% 100%, rgba(61, 214, 208, 0.02), transparent);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           NAVIGATION
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .top-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: linear-gradient(to bottom, 
+                rgba(10, 10, 12, 0.95), 
+                rgba(10, 10, 12, 0.85));
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-bottom: 1px solid var(--border);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 var(--space-6);
+        }
+
+        .nav-brand {
+            font-family: 'Noto Sans JP', sans-serif;
+            font-weight: 200;
+            font-size: var(--text-xl);
+            color: var(--gold);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .nav-brand:hover {
+            color: var(--gold-bright);
+            text-shadow: 0 0 30px var(--gold-glow);
+        }
+
+        .nav-brand .kanji {
+            font-size: 1.8rem;
+            transition: transform var(--duration-slow) var(--ease-out-expo);
+        }
+
+        .nav-brand:hover .kanji {
+            transform: scale(1.1);
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .nav-links a,
+        .nav-dropdown-btn {
+            color: var(--text-tertiary);
+            text-decoration: none;
+            font-size: var(--text-sm);
+            font-weight: 400;
+            padding: var(--space-1) var(--space-2);
+            border-radius: 6px;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .nav-links a:hover,
+        .nav-dropdown-btn:hover {
+            color: var(--text);
+            background: var(--gold-whisper);
+        }
+
+        .nav-links a.active {
+            color: var(--gold);
+            background: var(--gold-whisper);
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: calc(100% + var(--space-1));
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            min-width: 200px;
+            box-shadow: 
+                0 4px 6px -1px rgba(0, 0, 0, 0.3),
+                0 20px 40px -8px rgba(0, 0, 0, 0.5);
+            z-index: 1001;
+            padding: var(--space-1);
+            opacity: 0;
+            transform: translateY(-8px);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-content,
+        .nav-dropdown:focus-within .nav-dropdown-content {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-content a {
+            display: flex;
+            align-items: center;
+            padding: var(--space-1) var(--space-2);
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: var(--text-sm);
+            border-radius: 8px;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        .nav-dropdown-content a:hover {
+            background: var(--gold-whisper);
+            color: var(--gold);
+            padding-left: var(--space-3);
+        }
+
+        .nav-dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: var(--space-1) var(--space-2);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           MAIN CONTENT
+           ═══════════════════════════════════════════════════════════════════ */
+
+        main {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: calc(64px + var(--space-8)) var(--space-6) var(--space-8);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           DOCUMENT HEADER — Signature Title Treatment
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .doc-header {
+            margin-bottom: var(--space-8);
+            padding-bottom: var(--space-6);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            text-align: center;
+        }
+
+        /* Gold accent line */
+        .doc-header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        }
+
+        /* Display title — Cormorant Garamond */
+        .doc-header h1 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-4xl);
+            font-weight: 300;
+            color: var(--text);
+            margin-bottom: var(--space-3);
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+        }
+
+        /* Accent words in titles */
+        .doc-header h1 em {
+            font-style: italic;
+            color: var(--gold);
+            font-weight: 400;
+        }
+
+        .doc-meta {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: var(--space-4);
+            font-size: var(--text-sm);
+            color: var(--text-ghost);
+            font-family: 'IBM Plex Mono', monospace;
+            letter-spacing: 0.05em;
+        }
+
+        .doc-meta span {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           TYPOGRAPHY
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .content > *:first-child {
+            margin-top: 0;
+        }
+
+        h2 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-2xl);
+            font-weight: 400;
+            color: var(--text);
+            margin-top: var(--space-8);
+            margin-bottom: var(--space-4);
+            padding-bottom: var(--space-2);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            letter-spacing: -0.01em;
+        }
+
+        h2::before {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 60px;
+            height: 2px;
+            background: var(--gold-dim);
+        }
+
+        /* Accent words in H2 */
+        h2 em {
+            font-style: italic;
+            color: var(--gold);
+        }
+
+        h3 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-xl);
+            font-weight: 500;
+            color: var(--gold);
+            margin-top: var(--space-6);
+            margin-bottom: var(--space-3);
+            letter-spacing: -0.01em;
+        }
+
+        h4 {
+            font-size: var(--text-lg);
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-top: var(--space-5);
+            margin-bottom: var(--space-2);
+        }
+
+        p {
+            margin-bottom: var(--space-3);
+            color: var(--text-secondary);
+        }
+
+        strong {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           LINKS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        a {
+            color: var(--cyan);
+            text-decoration: none;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        a:hover {
+            color: var(--gold);
+        }
+
+        .content a {
+            background: linear-gradient(to right, var(--gold-dim), var(--gold-dim)) no-repeat right bottom;
+            background-size: 0% 1px;
+            transition: background-size var(--duration-normal) var(--ease-out-expo), color var(--duration-fast);
+        }
+
+        .content a:hover {
+            background-size: 100% 1px;
+            background-position: left bottom;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           LISTS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        ul, ol {
+            margin-bottom: var(--space-3);
+            padding-left: var(--space-5);
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: var(--space-1);
+        }
+
+        li::marker {
+            color: var(--gold-dim);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           TABLES
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin: var(--space-5) 0;
+            border-radius: 12px;
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            box-shadow: 
+                0 1px 3px rgba(0, 0, 0, 0.2),
+                0 8px 24px -4px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 var(--border-subtle);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--text-sm);
+        }
+
+        thead {
+            background: linear-gradient(to bottom, var(--void-surface), var(--void-elevated));
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        th {
+            padding: var(--space-3) var(--space-3);
+            text-align: left;
+            font-weight: 500;
+            color: var(--gold);
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        td {
+            padding: var(--space-2) var(--space-3);
+            border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr {
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        tbody tr:hover {
+            background: var(--gold-whisper);
+        }
+
+        tbody tr:hover td {
+            color: var(--text);
+        }
+
+        /* Code in tables */
+        td code, th code {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.9em;
+        }
+
+        /* Status badges */
+        .status-validated { color: var(--success); }
+        .status-warning { color: var(--warning); }
+        .status-deprecated { 
+            color: var(--error); 
+            text-decoration: line-through;
+            opacity: 0.7;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           CODE BLOCKS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        pre {
+            background: var(--void-deep);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: var(--space-4);
+            overflow-x: auto;
+            margin: var(--space-5) 0;
+            font-size: var(--text-sm);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        code {
+            font-family: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+            font-size: 0.9em;
+        }
+
+        :not(pre) > code {
+            background: var(--void-surface);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: var(--cyan);
+            border: 1px solid var(--border-subtle);
+        }
+
+        pre code {
+            color: var(--text-secondary);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           BLOCKQUOTES & ALERTS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        blockquote {
+            border-left: 3px solid var(--gold);
+            padding: var(--space-3) var(--space-4);
+            margin: var(--space-5) 0;
+            background: var(--gold-whisper);
+            border-radius: 0 12px 12px 0;
+            color: var(--text-secondary);
+            font-style: italic;
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-lg);
+        }
+
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, var(--border), var(--border-subtle), transparent);
+            margin: var(--space-8) 0;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           FOOTER
+           ═══════════════════════════════════════════════════════════════════ */
+
+        footer {
+            margin-top: var(--space-10);
+            padding: var(--space-6) 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+
+        footer .kanji {
+            font-family: 'Noto Sans JP', sans-serif;
+            font-size: 2.5rem;
+            color: var(--gold-dim);
+            margin-bottom: var(--space-2);
+            opacity: 0.5;
+            animation: breathe 5s ease-in-out infinite;
+        }
+
+        @keyframes breathe {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.6; }
+        }
+
+        footer p {
+            color: var(--text-ghost);
+            font-size: var(--text-sm);
+            margin-bottom: 0;
+            font-family: 'IBM Plex Mono', monospace;
+            letter-spacing: 0.05em;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           BACK TO TOP
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .back-to-top {
+            position: fixed;
+            bottom: var(--space-6);
+            right: var(--space-6);
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            font-family: 'IBM Plex Sans', sans-serif;
+        }
+
+        .back-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .back-to-top:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+            background: var(--void-surface);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 0 30px var(--gold-glow);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           PRINT STYLES
+           ═══════════════════════════════════════════════════════════════════ */
+
+        @media print {
+            .top-nav, .back-to-top { display: none; }
+            body { background: white; color: black; }
+            body::before, body::after { display: none; }
+            main { padding: 0; max-width: 100%; }
+            a { color: inherit; }
+            table, th, td { border: 1px solid #ddd; }
+            .table-wrapper { box-shadow: none; }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESPONSIVE
+           ═══════════════════════════════════════════════════════════════════ */
+
+        @media (max-width: 768px) {
+            .top-nav {
+                padding: 0 var(--space-3);
+            }
+
+            .nav-links a:not(:first-child):not(:last-child) {
+                display: none;
+            }
+
+            main {
+                padding: calc(64px + var(--space-5)) var(--space-3) var(--space-5);
+            }
+
+            .doc-header h1 {
+                font-size: var(--text-3xl);
+            }
+
+            h2 { font-size: var(--text-xl); }
+            h3 { font-size: var(--text-lg); }
+
+            .table-wrapper {
+                margin-left: calc(-1 * var(--space-3));
+                margin-right: calc(-1 * var(--space-3));
+                border-radius: 0;
+                border-left: none;
+                border-right: none;
+            }
+
+            table { font-size: var(--text-xs); }
+            th, td { padding: var(--space-1) var(--space-2); }
+
+            .doc-meta { gap: var(--space-2); }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           SCROLLBAR
+           ═══════════════════════════════════════════════════════════════════ */
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--void);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--text-muted);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-ghost);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           ACCESSIBILITY
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :focus-visible {
+            outline: 2px solid var(--gold);
+            outline-offset: 2px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        :target {
+            scroll-margin-top: calc(64px + var(--space-5));
+        }
+    </style>
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="index.html" class="nav-brand">
+            <span class="kanji">鏡</span>
+            <span>Kagami Orb</span>
+        </a>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="bom.html">BOM</a>
+            <a href="buy.html">Buy</a>
+            <a href="assembly.html">Assembly</a>
+            <a href="spec.html">Spec</a>
+            <div class="nav-dropdown">
+                <button class="nav-dropdown-btn">More ▾</button>
+                <div class="nav-dropdown-content">
+                    <a href="alternatives.html">Alternatives</a>
+                    <a href="custom-pcb.html">Custom PCB</a>
+                    <a href="thermal.html">Thermal Analysis</a>
+                    <a href="fmea.html">FMEA</a>
+                    <a href="firmware.html">Firmware</a>
+                    <a href="system.html">System Design</a>
+                    <a href="validation.html">Validation Plan</a>
+                    <div class="nav-dropdown-divider"></div>
+                    <a href="hardware/kagami_orb_bom.csv" download>📥 Download CSV</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <article class="doc-header">
+            <h1>Kagami Orb — Failure Mode and Effects <em>Analysis</em> (FMEA)</h1>
+            <div class="doc-meta">
+                <span>January 11, 2026</span>
+                <span>v2.0</span>
+            </div>
+        </article>
+
+        <div class="content">
+            <h2 id="purpose">Purpose</h2>
+<p>This document systematically identifies potential failure modes, their effects, and mitigations for the Kagami Orb hardware. Each failure is assessed for:</p>
+<ul>
+<li><strong>Severity (S)</strong>: Impact on user/system (1-10, 10 = catastrophic)</li>
+<li><strong>Occurrence (O)</strong>: Likelihood of occurrence (1-10, 10 = certain)</li>
+<li><strong>Detection (D)</strong>: Ability to detect before harm (1-10, 10 = undetectable)</li>
+<li><strong>RPN</strong>: Risk Priority Number = S × O × D (higher = more critical)</li>
+</ul>
+<p><strong>Target: All RPNs &lt; 100 before production build</strong></p>
+<hr />
+<h2 id="system-overview">System Overview</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         ORB SYSTEM BLOCKS                                        │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                              THE ORB                                     │
+    │                                                                          │
+    │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐        │
+    │  │   POWER    │  │  COMPUTE   │  │   AUDIO    │  │   VISUAL   │        │
+    │  │            │  │            │  │            │  │            │        │
+    │  │ • Res. RX  │  │ • CM4      │  │ • ReSpeaker│  │ • SK6812   │        │
+    │  │ • Battery  │  │ • Coral    │  │ • Speaker  │  │ • Infinity │        │
+    │  │ • BMS      │  │ • WiFi     │  │ • Amp      │  │   Mirror   │        │
+    │  │            │  │            │  │            │  │            │        │
+    │  └────────────┘  └────────────┘  └────────────┘  └────────────┘        │
+    │                                                                          │
+    │  ┌────────────┐  ┌────────────┐                                         │
+    │  │  THERMAL   │  │  SENSORS   │                                         │
+    │  │            │  │            │                                         │
+    │  │ • Heatsink │  │ • Hall     │                                         │
+    │  │ • Airflow  │  │ • Temp     │                                         │
+    │  │            │  │ • Accel    │                                         │
+    │  └────────────┘  └────────────┘                                         │
+    │                                                                          │
+    └──────────────────────────────┬──────────────────────────────────────────┘
+                                   │ 15mm gap
+    ┌──────────────────────────────┴──────────────────────────────────────────┐
+    │                           BASE STATION                                   │
+    │                                                                          │
+    │  ┌────────────┐  ┌────────────┐  ┌────────────┐                         │
+    │  │  MAGLEV    │  │ Res. TX    │  │   ESP32    │                         │
+    │  │            │  │            │  │            │                         │
+    │  │ • Coils    │  │ • 15W      │  │ • Control  │                         │
+    │  │ • Magnets  │  │ • Align    │  │ • Status   │                         │
+    │  │ • Control  │  │            │  │            │                         │
+    │  └────────────┘  └────────────┘  └────────────┘                         │
+    │                                                                          │
+    └─────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr />
+<h2 id="fmea-tables">FMEA Tables</h2>
+<h3 id="1-power-system">1. Power System</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Component</th>
+<th>Failure Mode</th>
+<th>Effect</th>
+<th>S</th>
+<th>O</th>
+<th>D</th>
+<th>RPN</th>
+<th>Mitigation</th>
+<th>Residual RPN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P-01</td>
+<td>Resonant Receiver</td>
+<td>Overtemperature</td>
+<td>Charge stops, orb goes to battery</td>
+<td>4</td>
+<td>3</td>
+<td>2</td>
+<td>24</td>
+<td>BMS thermal cutoff at 45°C</td>
+<td>24</td>
+</tr>
+<tr>
+<td>P-02</td>
+<td>Resonant Receiver</td>
+<td>Misalignment</td>
+<td>Reduced charge rate (&lt;10W)</td>
+<td>3</td>
+<td>4</td>
+<td>3</td>
+<td>36</td>
+<td>Alignment magnets, visual feedback</td>
+<td>18</td>
+</tr>
+<tr>
+<td>P-03</td>
+<td>Resonant Receiver</td>
+<td>Complete failure</td>
+<td>No wireless charging</td>
+<td>6</td>
+<td>2</td>
+<td>4</td>
+<td>48</td>
+<td>USB-C backup charge port</td>
+<td>24</td>
+</tr>
+<tr>
+<td>P-04</td>
+<td>Battery Pack</td>
+<td>Overdischarge</td>
+<td>Cell damage, reduced capacity</td>
+<td>7</td>
+<td>2</td>
+<td>2</td>
+<td>28</td>
+<td>BMS LVD at 3.0V/cell</td>
+<td>14</td>
+</tr>
+<tr>
+<td>P-05</td>
+<td>Battery Pack</td>
+<td>Overcharge</td>
+<td>Thermal runaway risk</td>
+<td>9</td>
+<td>2</td>
+<td>1</td>
+<td>18</td>
+<td>BMS OVP at 4.2V/cell, redundant</td>
+<td>9</td>
+</tr>
+<tr>
+<td>P-06</td>
+<td>Battery Pack</td>
+<td>Cell imbalance</td>
+<td>Reduced capacity, early shutdown</td>
+<td>4</td>
+<td>3</td>
+<td>3</td>
+<td>36</td>
+<td>Active cell balancing</td>
+<td>18</td>
+</tr>
+<tr>
+<td>P-07</td>
+<td>Battery Pack</td>
+<td>Swelling/venting</td>
+<td>Fire risk, shell damage</td>
+<td>10</td>
+<td>1</td>
+<td>3</td>
+<td>30</td>
+<td>Quality cells, temp monitoring</td>
+<td>15</td>
+</tr>
+<tr>
+<td>P-08</td>
+<td>BMS</td>
+<td>Failure</td>
+<td>No battery protection</td>
+<td>8</td>
+<td>1</td>
+<td>2</td>
+<td>16</td>
+<td>Redundant protection IC</td>
+<td>8</td>
+</tr>
+<tr>
+<td>P-09</td>
+<td>Buck Converter</td>
+<td>Overvoltage</td>
+<td>CM4 damage</td>
+<td>8</td>
+<td>1</td>
+<td>2</td>
+<td>16</td>
+<td>TVS diode on output</td>
+<td>8</td>
+</tr>
+<tr>
+<td>P-10</td>
+<td>Buck Converter</td>
+<td>Failure</td>
+<td>No 5V power</td>
+<td>7</td>
+<td>2</td>
+<td>3</td>
+<td>42</td>
+<td>Dual converter redundancy</td>
+<td>21</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="2-compute-system">2. Compute System</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Component</th>
+<th>Failure Mode</th>
+<th>Effect</th>
+<th>S</th>
+<th>O</th>
+<th>D</th>
+<th>RPN</th>
+<th>Mitigation</th>
+<th>Residual RPN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C-01</td>
+<td>CM4</td>
+<td>Thermal throttle</td>
+<td>Slow response, degraded UX</td>
+<td>5</td>
+<td>4</td>
+<td>2</td>
+<td>40</td>
+<td>Heatsink + thermal monitoring</td>
+<td>20</td>
+</tr>
+<tr>
+<td>C-02</td>
+<td>CM4</td>
+<td>Overheat shutdown</td>
+<td>Orb powers off</td>
+<td>7</td>
+<td>2</td>
+<td>2</td>
+<td>28</td>
+<td>Thermal cutoff at 75°C, warnings at 65°C</td>
+<td>14</td>
+</tr>
+<tr>
+<td>C-03</td>
+<td>CM4</td>
+<td>Memory failure</td>
+<td>Crashes, data corruption</td>
+<td>8</td>
+<td>1</td>
+<td>4</td>
+<td>32</td>
+<td>ECC memory (if available), watchdog</td>
+<td>16</td>
+</tr>
+<tr>
+<td>C-04</td>
+<td>CM4</td>
+<td>SD card corruption</td>
+<td>Boot failure</td>
+<td>7</td>
+<td>3</td>
+<td>4</td>
+<td>84</td>
+<td>A/B partition, read-only rootfs</td>
+<td>42</td>
+</tr>
+<tr>
+<td>C-05</td>
+<td>Coral TPU</td>
+<td>Overheat</td>
+<td>AI inference disabled</td>
+<td>4</td>
+<td>3</td>
+<td>2</td>
+<td>24</td>
+<td>Thermal pad to heatsink</td>
+<td>12</td>
+</tr>
+<tr>
+<td>C-06</td>
+<td>Coral TPU</td>
+<td>USB disconnect</td>
+<td>Fall back to CPU inference</td>
+<td>3</td>
+<td>2</td>
+<td>2</td>
+<td>12</td>
+<td>USB hub watchdog</td>
+<td>6</td>
+</tr>
+<tr>
+<td>C-07</td>
+<td>WiFi Module</td>
+<td>Connection loss</td>
+<td>Offline mode, local-only</td>
+<td>5</td>
+<td>4</td>
+<td>1</td>
+<td>20</td>
+<td>Reconnect logic, BLE fallback</td>
+<td>10</td>
+</tr>
+<tr>
+<td>C-08</td>
+<td>WiFi Module</td>
+<td>Antenna detuned</td>
+<td>Weak signal, drops</td>
+<td>4</td>
+<td>2</td>
+<td>3</td>
+<td>24</td>
+<td>Antenna placement testing</td>
+<td>12</td>
+</tr>
+<tr>
+<td>C-09</td>
+<td>Firmware</td>
+<td>Crash/hang</td>
+<td>Unresponsive orb</td>
+<td>6</td>
+<td>3</td>
+<td>2</td>
+<td>36</td>
+<td>Hardware watchdog, auto-reboot</td>
+<td>18</td>
+</tr>
+<tr>
+<td>C-10</td>
+<td>Firmware</td>
+<td>Update failure</td>
+<td>Bricked device</td>
+<td>8</td>
+<td>2</td>
+<td>3</td>
+<td>48</td>
+<td>A/B partitions, rollback</td>
+<td>24</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="3-audio-system">3. Audio System</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Component</th>
+<th>Failure Mode</th>
+<th>Effect</th>
+<th>S</th>
+<th>O</th>
+<th>D</th>
+<th>RPN</th>
+<th>Mitigation</th>
+<th>Residual RPN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A-01</td>
+<td>ReSpeaker</td>
+<td>Mic failure</td>
+<td>Can't hear user</td>
+<td>7</td>
+<td>2</td>
+<td>2</td>
+<td>28</td>
+<td>4-mic redundancy, degrade to 3</td>
+<td>14</td>
+</tr>
+<tr>
+<td>A-02</td>
+<td>ReSpeaker</td>
+<td>Beamforming fail</td>
+<td>Poor wake word detection</td>
+<td>5</td>
+<td>2</td>
+<td>3</td>
+<td>30</td>
+<td>Fall back to omnidirectional</td>
+<td>15</td>
+</tr>
+<tr>
+<td>A-03</td>
+<td>ReSpeaker</td>
+<td>I2S bus error</td>
+<td>No audio input</td>
+<td>7</td>
+<td>1</td>
+<td>3</td>
+<td>21</td>
+<td>Bus reset, watchdog</td>
+<td>10</td>
+</tr>
+<tr>
+<td>A-04</td>
+<td>Speaker</td>
+<td>Open circuit</td>
+<td>No audio output</td>
+<td>5</td>
+<td>2</td>
+<td>1</td>
+<td>10</td>
+<td>Visual feedback redundancy</td>
+<td>5</td>
+</tr>
+<tr>
+<td>A-05</td>
+<td>Speaker</td>
+<td>Distortion</td>
+<td>Poor audio quality</td>
+<td>3</td>
+<td>3</td>
+<td>1</td>
+<td>9</td>
+<td>Quality speaker selection</td>
+<td>4</td>
+</tr>
+<tr>
+<td>A-06</td>
+<td>Amplifier</td>
+<td>Overtemp</td>
+<td>Audio cuts out</td>
+<td>4</td>
+<td>2</td>
+<td>2</td>
+<td>16</td>
+<td>Thermal shutdown, auto-resume</td>
+<td>8</td>
+</tr>
+<tr>
+<td>A-07</td>
+<td>Amplifier</td>
+<td>DC fault</td>
+<td>Speaker damage</td>
+<td>6</td>
+<td>1</td>
+<td>3</td>
+<td>18</td>
+<td>DC blocking cap, protection</td>
+<td>9</td>
+</tr>
+<tr>
+<td>A-08</td>
+<td>AEC</td>
+<td>Failure</td>
+<td>Echo in conversation</td>
+<td>3</td>
+<td>3</td>
+<td>2</td>
+<td>18</td>
+<td>Software AEC fallback</td>
+<td>9</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="4-visual-system">4. Visual System</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Component</th>
+<th>Failure Mode</th>
+<th>Effect</th>
+<th>S</th>
+<th>O</th>
+<th>D</th>
+<th>RPN</th>
+<th>Mitigation</th>
+<th>Residual RPN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>V-01</td>
+<td>SK6812 Ring</td>
+<td>LED failure</td>
+<td>Dark spot in ring</td>
+<td>3</td>
+<td>3</td>
+<td>1</td>
+<td>9</td>
+<td>Quality LEDs, burn-in test</td>
+<td>4</td>
+</tr>
+<tr>
+<td>V-02</td>
+<td>SK6812 Ring</td>
+<td>Complete failure</td>
+<td>No visual feedback</td>
+<td>5</td>
+<td>1</td>
+<td>2</td>
+<td>10</td>
+<td>LED driver watchdog</td>
+<td>5</td>
+</tr>
+<tr>
+<td>V-03</td>
+<td>SK6812 Ring</td>
+<td>Data corruption</td>
+<td>Flickering/wrong colors</td>
+<td>4</td>
+<td>2</td>
+<td>1</td>
+<td>8</td>
+<td>Proper signal integrity</td>
+<td>4</td>
+</tr>
+<tr>
+<td>V-04</td>
+<td>Level Shifter</td>
+<td>Failure</td>
+<td>No LED data</td>
+<td>5</td>
+<td>1</td>
+<td>3</td>
+<td>15</td>
+<td>Quality IC, bypass option</td>
+<td>7</td>
+</tr>
+<tr>
+<td>V-05</td>
+<td>Mirror Film</td>
+<td>Delamination</td>
+<td>Degraded infinity effect</td>
+<td>4</td>
+<td>3</td>
+<td>2</td>
+<td>24</td>
+<td>Proper application process</td>
+<td>12</td>
+</tr>
+<tr>
+<td>V-06</td>
+<td>Acrylic Shell</td>
+<td>Cracking</td>
+<td>Structural damage</td>
+<td>6</td>
+<td>2</td>
+<td>1</td>
+<td>12</td>
+<td>Thick acrylic, drop testing</td>
+<td>6</td>
+</tr>
+<tr>
+<td>V-07</td>
+<td>Acrylic Shell</td>
+<td>Scratching</td>
+<td>Cosmetic damage</td>
+<td>3</td>
+<td>4</td>
+<td>1</td>
+<td>12</td>
+<td>Handling instructions</td>
+<td>6</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="5-levitation-system-base">5. Levitation System (Base)</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Component</th>
+<th>Failure Mode</th>
+<th>Effect</th>
+<th>S</th>
+<th>O</th>
+<th>D</th>
+<th>RPN</th>
+<th>Mitigation</th>
+<th>Residual RPN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L-01</td>
+<td>Maglev Coils</td>
+<td>Overcurrent</td>
+<td>Overheating, failure</td>
+<td>6</td>
+<td>2</td>
+<td>2</td>
+<td>24</td>
+<td>Current limiting, thermal fuse</td>
+<td>12</td>
+</tr>
+<tr>
+<td>L-02</td>
+<td>Maglev Coils</td>
+<td>Open circuit</td>
+<td>Orb falls</td>
+<td>6</td>
+<td>1</td>
+<td>2</td>
+<td>12</td>
+<td>Mechanical safety catch</td>
+<td>6</td>
+</tr>
+<tr>
+<td>L-03</td>
+<td>Maglev Control</td>
+<td>Instability</td>
+<td>Oscillation</td>
+<td>5</td>
+<td>3</td>
+<td>1</td>
+<td>15</td>
+<td>PID tuning, damping</td>
+<td>7</td>
+</tr>
+<tr>
+<td>L-04</td>
+<td>Maglev Control</td>
+<td>Failure</td>
+<td>Orb falls</td>
+<td>6</td>
+<td>1</td>
+<td>3</td>
+<td>18</td>
+<td>Mechanical detent catch</td>
+<td>9</td>
+</tr>
+<tr>
+<td>L-05</td>
+<td>Power Supply</td>
+<td>Failure</td>
+<td>System off, orb falls</td>
+<td>6</td>
+<td>2</td>
+<td>2</td>
+<td>24</td>
+<td>Graceful descent (magnetic catch)</td>
+<td>12</td>
+</tr>
+<tr>
+<td>L-06</td>
+<td>Power Supply</td>
+<td>Overvoltage</td>
+<td>Component damage</td>
+<td>7</td>
+<td>1</td>
+<td>2</td>
+<td>14</td>
+<td>TVS protection</td>
+<td>7</td>
+</tr>
+<tr>
+<td>L-07</td>
+<td>Hall Sensors</td>
+<td>Failure</td>
+<td>Levitation instability</td>
+<td>5</td>
+<td>1</td>
+<td>3</td>
+<td>15</td>
+<td>Redundant sensors (4x)</td>
+<td>7</td>
+</tr>
+<tr>
+<td>L-08</td>
+<td>Resonant Transmitter</td>
+<td>Overheat</td>
+<td>Charge stops</td>
+<td>4</td>
+<td>3</td>
+<td>2</td>
+<td>24</td>
+<td>Thermal monitoring, fan option</td>
+<td>12</td>
+</tr>
+<tr>
+<td>L-09</td>
+<td>Resonant Transmitter</td>
+<td>Interference</td>
+<td>Resonant efficiency loss</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>27</td>
+<td>Shielding, frequency selection</td>
+<td>13</td>
+</tr>
+<tr>
+<td>L-10</td>
+<td>ESP32</td>
+<td>Failure</td>
+<td>Base unresponsive</td>
+<td>4</td>
+<td>1</td>
+<td>3</td>
+<td>12</td>
+<td>Simple operation without MCU</td>
+<td>6</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="6-thermal-system">6. Thermal System</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Component</th>
+<th>Failure Mode</th>
+<th>Effect</th>
+<th>S</th>
+<th>O</th>
+<th>D</th>
+<th>RPN</th>
+<th>Mitigation</th>
+<th>Residual RPN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-01</td>
+<td>Heatsink</td>
+<td>Detachment</td>
+<td>Rapid overheating</td>
+<td>7</td>
+<td>1</td>
+<td>2</td>
+<td>14</td>
+<td>Thermal adhesive, mechanical clip</td>
+<td>7</td>
+</tr>
+<tr>
+<td>T-02</td>
+<td>Thermal Pad</td>
+<td>Degradation</td>
+<td>Reduced cooling</td>
+<td>5</td>
+<td>2</td>
+<td>4</td>
+<td>40</td>
+<td>Quality pads, periodic check</td>
+<td>20</td>
+</tr>
+<tr>
+<td>T-03</td>
+<td>Air Gap</td>
+<td>Blocked</td>
+<td>Convection loss</td>
+<td>6</td>
+<td>2</td>
+<td>2</td>
+<td>24</td>
+<td>Dust filters, user instruction</td>
+<td>12</td>
+</tr>
+<tr>
+<td>T-04</td>
+<td>Temperature Sensor</td>
+<td>Failure</td>
+<td>No thermal protection</td>
+<td>7</td>
+<td>1</td>
+<td>3</td>
+<td>21</td>
+<td>Redundant sensors</td>
+<td>10</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="7-sensors">7. Sensors</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Component</th>
+<th>Failure Mode</th>
+<th>Effect</th>
+<th>S</th>
+<th>O</th>
+<th>D</th>
+<th>RPN</th>
+<th>Mitigation</th>
+<th>Residual RPN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S-01</td>
+<td>Hall Effect</td>
+<td>Failure</td>
+<td>No dock detection</td>
+<td>4</td>
+<td>1</td>
+<td>3</td>
+<td>12</td>
+<td>Accelerometer backup</td>
+<td>6</td>
+</tr>
+<tr>
+<td>S-02</td>
+<td>Hall Effect</td>
+<td>Drift</td>
+<td>False dock state</td>
+<td>4</td>
+<td>2</td>
+<td>3</td>
+<td>24</td>
+<td>Calibration, hysteresis</td>
+<td>12</td>
+</tr>
+<tr>
+<td>S-03</td>
+<td>Temperature</td>
+<td>Failure</td>
+<td>No thermal protection</td>
+<td>7</td>
+<td>1</td>
+<td>2</td>
+<td>14</td>
+<td>Multiple sensors</td>
+<td>7</td>
+</tr>
+<tr>
+<td>S-04</td>
+<td>I2C Bus</td>
+<td>Lockup</td>
+<td>Sensor communication lost</td>
+<td>5</td>
+<td>2</td>
+<td>2</td>
+<td>20</td>
+<td>Bus recovery, watchdog</td>
+<td>10</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="critical-failure-chains">Critical Failure Chains</h2>
+<p>These are failure sequences that could lead to serious outcomes:</p>
+<pre><code>CHAIN 1: THERMAL RUNAWAY
+─────────────────────────
+
+  Heatsink detaches
+        │
+        ▼
+  CM4 overheats (no immediate detection)
+        │
+        ▼
+  Battery overheats from proximity
+        │
+        ▼
+  BMS thermal cutoff MUST activate
+        │
+        ▼
+  If BMS fails → Cell venting/fire
+
+  MITIGATION:
+  • Redundant temperature sensors
+  • BMS independent thermal cutoff
+  • Physical separation of battery from heat sources
+  • Thermal fuse in battery pack
+
+
+CHAIN 2: UNCONTROLLED DESCENT
+─────────────────────────
+
+  Base power failure
+        │
+        ▼
+  Maglev field collapses
+        │
+        ▼
+  Orb falls
+
+  MITIGATION:
+  • Magnetic detent catch (passive)
+  • Soft landing material on base
+  • Drop testing from 15mm
+  • Hall sensor triggers &quot;falling&quot; audio cue
+
+
+CHAIN 3: BATTERY EXHAUSTION WHILE UNDOCKED
+─────────────────────────
+
+  User carries orb
+        │
+        ▼
+  Forgets to dock
+        │
+        ▼
+  Battery depletes
+        │
+        ▼
+  Orb shuts down in random location
+        │
+        ▼
+  Potential drop if on surface
+
+  MITIGATION:
+  • 20% battery: Voice warning
+  • 10% battery: Persistent amber LED
+  • 5% battery: Repeated warnings, shutdown
+  • Graceful shutdown saves state
+</code></pre>
+<hr />
+<h2 id="safety-critical-items">Safety Critical Items</h2>
+<p>These items have the highest priority for testing:</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>ID</th>
+<th>Description</th>
+<th>Required Test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>P-05</td>
+<td>Battery overcharge protection</td>
+<td>Overcharge test with data logging</td>
+</tr>
+<tr>
+<td>2</td>
+<td>P-07</td>
+<td>Battery thermal protection</td>
+<td>Thermal chamber test</td>
+</tr>
+<tr>
+<td>3</td>
+<td>C-02</td>
+<td>CM4 thermal shutdown</td>
+<td>Sustained load in enclosure</td>
+</tr>
+<tr>
+<td>4</td>
+<td>L-02</td>
+<td>Maglev failure → soft landing</td>
+<td>Power cut test</td>
+</tr>
+<tr>
+<td>5</td>
+<td>P-04</td>
+<td>Battery LVD</td>
+<td>Discharge to cutoff</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="recommended-design-changes">Recommended Design Changes</h2>
+<p>Based on this FMEA, the following design changes are recommended:</p>
+<h3 id="must-implement-rpn-40">Must Implement (RPN &gt; 40)</h3>
+<ol>
+<li>
+<p><strong>A/B Partition for SD Card</strong> (C-04, RPN 84 → 42)<br />
+   - Implement dual boot partitions<br />
+   - Read-only root filesystem<br />
+   - Wear-leveling optimization</p>
+</li>
+<li>
+<p><strong>USB-C Backup Charging</strong> (P-03, RPN 48 → 24)<br />
+   - Add USB-C port for emergency charging<br />
+   - Bypass resonant charging when connected</p>
+</li>
+<li>
+<p><strong>OTA Rollback</strong> (C-10, RPN 48 → 24)<br />
+   - Automatic rollback on 3 failed boots<br />
+   - Signature verification</p>
+</li>
+</ol>
+<h3 id="should-implement-rpn-30-40">Should Implement (RPN 30-40)</h3>
+<ol start="4">
+<li>
+<p><strong>Dual Buck Converters</strong> (P-10, RPN 42 → 21)<br />
+   - Redundant 5V supply<br />
+   - Automatic failover</p>
+</li>
+<li>
+<p><strong>Enhanced Thermal Management</strong> (T-02, RPN 40 → 20)<br />
+   - Higher quality thermal interface<br />
+   - Temperature trending/alerts</p>
+</li>
+<li>
+<p><strong>Cell Balancing</strong> (P-06, RPN 36 → 18)<br />
+   - Active cell balancing<br />
+   - SOH monitoring</p>
+</li>
+</ol>
+<h3 id="consider-implementing-rpn-30">Consider Implementing (RPN &lt; 30)</h3>
+<ol start="7">
+<li>
+<p><strong>ECC Memory</strong> (C-03)<br />
+   - If CM4 with ECC available</p>
+</li>
+<li>
+<p><strong>Redundant Hall Sensors</strong> (L-07)<br />
+   - 4 sensors instead of 2</p>
+</li>
+</ol>
+<hr />
+<h2 id="test-requirements">Test Requirements</h2>
+<p>Each mitigation requires verification:</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Mitigation</th>
+<th>Test Method</th>
+<th>Pass Criteria</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P-05</td>
+<td>BMS OVP</td>
+<td>Apply 4.3V to cell input</td>
+<td>Charge terminates, no damage</td>
+</tr>
+<tr>
+<td>P-07</td>
+<td>Thermal cutoff</td>
+<td>Heat battery to 50°C</td>
+<td>Charge stops, alarm</td>
+</tr>
+<tr>
+<td>C-02</td>
+<td>CM4 thermal</td>
+<td>Stress test 30 min</td>
+<td>No throttle below 65°C</td>
+</tr>
+<tr>
+<td>L-02</td>
+<td>Soft landing</td>
+<td>Cut power at float</td>
+<td>Orb lands without bounce</td>
+</tr>
+<tr>
+<td>L-04</td>
+<td>Magnetic catch</td>
+<td>Remove power during float</td>
+<td>Orb held by magnets</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="sign-off">Sign-Off</h2>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Review</th>
+<th>Date</th>
+<th>Reviewer</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Initial FMEA</td>
+<td></td>
+<td></td>
+<td>Draft</td>
+</tr>
+<tr>
+<td>Design Review</td>
+<td></td>
+<td></td>
+<td>Pending</td>
+</tr>
+<tr>
+<td>Mitigation Verification</td>
+<td></td>
+<td></td>
+<td>Pending</td>
+</tr>
+<tr>
+<td>Production Release</td>
+<td></td>
+<td></td>
+<td>Pending</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<pre><code>h(x) ≥ 0. Always.
+
+Every failure mode anticipated.
+Every risk assessed.
+Every mitigation tested.
+
+The mirror must be safe.
+
+鏡
+</code></pre>
+        </div>
+    </main>
+
+    <button class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" aria-label="Back to top">↑</button>
+
+    <footer>
+        <div class="kanji">鏡</div>
+        <p>h(x) ≥ 0 · Always</p>
+    </footer>
+
+    <script>
+        // Back to top button
+        const backToTop = document.querySelector('.back-to-top');
+        let ticking = false;
+        
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    backToTop.classList.toggle('visible', window.scrollY > 400);
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        });
+
+        // Wrap tables
+        document.querySelectorAll('table').forEach(table => {
+            if (!table.parentElement.classList.contains('table-wrapper')) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'table-wrapper';
+                table.parentNode.insertBefore(wrapper, table);
+                wrapper.appendChild(table);
+            }
+        });
+
+        // External links
+        document.querySelectorAll('a[href^="http"]').forEach(link => {
+            if (!link.href.includes(window.location.hostname)) {
+                link.setAttribute('target', '_blank');
+                link.setAttribute('rel', 'noopener noreferrer');
+            }
+        });
+
+        // Current page highlight
+        const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            if (link.getAttribute('href') === currentPage) {
+                link.classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>

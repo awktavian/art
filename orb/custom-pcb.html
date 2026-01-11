@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kagami Orb — Custom Carrier PCB <em>Design</em> — Kagami Orb</title>
+    <meta name="description" content="The Kagami Orb requires a custom PCB to integrate:">
+    <meta name="theme-color" content="#0A0A0C">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Kagami Orb — Custom Carrier PCB <em>Design</em> — Kagami Orb">
+    <meta property="og:description" content="The Kagami Orb requires a custom PCB to integrate:">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://storage.googleapis.com/kagami-media-public/orb/custom-pcb.html">
+    <meta name="twitter:card" content="summary">
+
+    <!-- Fonts: Cormorant Garamond (display) + IBM Plex (body/mono) + Noto Sans JP (kanji) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@300;400;500&family=Noto+Sans+JP:wght@100;200;300&display=swap" rel="stylesheet">
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           KAGAMI ORB DOCUMENTATION — DESIGN SYSTEM v4.0
+           Unified with ~/projects/art/ design language
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :root {
+            /* Core palette — matched to art projects */
+            --void: #0A0A0C;
+            --void-deep: #05050A;
+            --void-elevated: #0f0e14;
+            --void-surface: #16141f;
+            --void-hover: #1d1b26;
+            
+            /* Gold spectrum */
+            --gold: #D4AF37;
+            --gold-bright: #E5C158;
+            --gold-dim: rgba(212, 175, 55, 0.6);
+            --gold-faint: rgba(212, 175, 55, 0.3);
+            --gold-glow: rgba(212, 175, 55, 0.15);
+            --gold-whisper: rgba(212, 175, 55, 0.06);
+            
+            /* Accent colors */
+            --cyan: #3dd6d0;
+            --cyan-dim: rgba(61, 214, 208, 0.4);
+            --success: #4ECB71;
+            --warning: #FF9F40;
+            --error: #FF6B6B;
+            
+            /* Text hierarchy — WCAG AA compliant */
+            --text: #F4F1EA;
+            --text-secondary: rgba(244, 241, 234, 0.75);
+            --text-tertiary: rgba(244, 241, 234, 0.55);
+            --text-ghost: rgba(244, 241, 234, 0.35);
+            --text-muted: rgba(244, 241, 234, 0.2);
+            
+            /* Borders & surfaces */
+            --border: rgba(255, 255, 255, 0.06);
+            --border-subtle: rgba(255, 255, 255, 0.03);
+            --border-focus: rgba(212, 175, 55, 0.4);
+            
+            /* Typography scale (Major Third 1.25) */
+            --text-xs: clamp(0.688rem, 0.65rem + 0.15vw, 0.75rem);
+            --text-sm: clamp(0.813rem, 0.77rem + 0.17vw, 0.875rem);
+            --text-base: clamp(1rem, 0.95rem + 0.2vw, 1.063rem);
+            --text-lg: clamp(1.125rem, 1.05rem + 0.3vw, 1.25rem);
+            --text-xl: clamp(1.424rem, 1.25rem + 0.7vw, 1.953rem);
+            --text-2xl: clamp(1.802rem, 1.5rem + 1.2vw, 2.441rem);
+            --text-3xl: clamp(2.281rem, 1.8rem + 2vw, 3.052rem);
+            --text-4xl: clamp(2.887rem, 2.2rem + 3vw, 3.815rem);
+            
+            /* Spacing (8px grid) */
+            --space-1: 0.5rem;
+            --space-2: 1rem;
+            --space-3: 1.5rem;
+            --space-4: 2rem;
+            --space-5: 2.5rem;
+            --space-6: 3rem;
+            --space-8: 4rem;
+            --space-10: 5rem;
+            
+            /* Animation */
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --duration-fast: 150ms;
+            --duration-normal: 300ms;
+            --duration-slow: 500ms;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESET & BASE
+           ═══════════════════════════════════════════════════════════════════ */
+
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        ::selection {
+            background: var(--gold);
+            color: var(--void);
+        }
+
+        html {
+            scroll-behavior: smooth;
+            font-size: 17px;
+            scroll-padding-top: 5rem;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--void);
+            color: var(--text);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            min-height: 100vh;
+        }
+
+        /* Film grain overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.015;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+
+        /* Subtle gradient background */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse 80% 50% at 50% -20%, var(--gold-whisper), transparent),
+                radial-gradient(ellipse 60% 40% at 100% 100%, rgba(61, 214, 208, 0.02), transparent);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           NAVIGATION
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .top-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: linear-gradient(to bottom, 
+                rgba(10, 10, 12, 0.95), 
+                rgba(10, 10, 12, 0.85));
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-bottom: 1px solid var(--border);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 var(--space-6);
+        }
+
+        .nav-brand {
+            font-family: 'Noto Sans JP', sans-serif;
+            font-weight: 200;
+            font-size: var(--text-xl);
+            color: var(--gold);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .nav-brand:hover {
+            color: var(--gold-bright);
+            text-shadow: 0 0 30px var(--gold-glow);
+        }
+
+        .nav-brand .kanji {
+            font-size: 1.8rem;
+            transition: transform var(--duration-slow) var(--ease-out-expo);
+        }
+
+        .nav-brand:hover .kanji {
+            transform: scale(1.1);
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .nav-links a,
+        .nav-dropdown-btn {
+            color: var(--text-tertiary);
+            text-decoration: none;
+            font-size: var(--text-sm);
+            font-weight: 400;
+            padding: var(--space-1) var(--space-2);
+            border-radius: 6px;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .nav-links a:hover,
+        .nav-dropdown-btn:hover {
+            color: var(--text);
+            background: var(--gold-whisper);
+        }
+
+        .nav-links a.active {
+            color: var(--gold);
+            background: var(--gold-whisper);
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: calc(100% + var(--space-1));
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            min-width: 200px;
+            box-shadow: 
+                0 4px 6px -1px rgba(0, 0, 0, 0.3),
+                0 20px 40px -8px rgba(0, 0, 0, 0.5);
+            z-index: 1001;
+            padding: var(--space-1);
+            opacity: 0;
+            transform: translateY(-8px);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-content,
+        .nav-dropdown:focus-within .nav-dropdown-content {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-content a {
+            display: flex;
+            align-items: center;
+            padding: var(--space-1) var(--space-2);
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: var(--text-sm);
+            border-radius: 8px;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        .nav-dropdown-content a:hover {
+            background: var(--gold-whisper);
+            color: var(--gold);
+            padding-left: var(--space-3);
+        }
+
+        .nav-dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: var(--space-1) var(--space-2);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           MAIN CONTENT
+           ═══════════════════════════════════════════════════════════════════ */
+
+        main {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: calc(64px + var(--space-8)) var(--space-6) var(--space-8);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           DOCUMENT HEADER — Signature Title Treatment
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .doc-header {
+            margin-bottom: var(--space-8);
+            padding-bottom: var(--space-6);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            text-align: center;
+        }
+
+        /* Gold accent line */
+        .doc-header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        }
+
+        /* Display title — Cormorant Garamond */
+        .doc-header h1 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-4xl);
+            font-weight: 300;
+            color: var(--text);
+            margin-bottom: var(--space-3);
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+        }
+
+        /* Accent words in titles */
+        .doc-header h1 em {
+            font-style: italic;
+            color: var(--gold);
+            font-weight: 400;
+        }
+
+        .doc-meta {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: var(--space-4);
+            font-size: var(--text-sm);
+            color: var(--text-ghost);
+            font-family: 'IBM Plex Mono', monospace;
+            letter-spacing: 0.05em;
+        }
+
+        .doc-meta span {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           TYPOGRAPHY
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .content > *:first-child {
+            margin-top: 0;
+        }
+
+        h2 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-2xl);
+            font-weight: 400;
+            color: var(--text);
+            margin-top: var(--space-8);
+            margin-bottom: var(--space-4);
+            padding-bottom: var(--space-2);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            letter-spacing: -0.01em;
+        }
+
+        h2::before {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 60px;
+            height: 2px;
+            background: var(--gold-dim);
+        }
+
+        /* Accent words in H2 */
+        h2 em {
+            font-style: italic;
+            color: var(--gold);
+        }
+
+        h3 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-xl);
+            font-weight: 500;
+            color: var(--gold);
+            margin-top: var(--space-6);
+            margin-bottom: var(--space-3);
+            letter-spacing: -0.01em;
+        }
+
+        h4 {
+            font-size: var(--text-lg);
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-top: var(--space-5);
+            margin-bottom: var(--space-2);
+        }
+
+        p {
+            margin-bottom: var(--space-3);
+            color: var(--text-secondary);
+        }
+
+        strong {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           LINKS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        a {
+            color: var(--cyan);
+            text-decoration: none;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        a:hover {
+            color: var(--gold);
+        }
+
+        .content a {
+            background: linear-gradient(to right, var(--gold-dim), var(--gold-dim)) no-repeat right bottom;
+            background-size: 0% 1px;
+            transition: background-size var(--duration-normal) var(--ease-out-expo), color var(--duration-fast);
+        }
+
+        .content a:hover {
+            background-size: 100% 1px;
+            background-position: left bottom;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           LISTS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        ul, ol {
+            margin-bottom: var(--space-3);
+            padding-left: var(--space-5);
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: var(--space-1);
+        }
+
+        li::marker {
+            color: var(--gold-dim);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           TABLES
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin: var(--space-5) 0;
+            border-radius: 12px;
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            box-shadow: 
+                0 1px 3px rgba(0, 0, 0, 0.2),
+                0 8px 24px -4px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 var(--border-subtle);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--text-sm);
+        }
+
+        thead {
+            background: linear-gradient(to bottom, var(--void-surface), var(--void-elevated));
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        th {
+            padding: var(--space-3) var(--space-3);
+            text-align: left;
+            font-weight: 500;
+            color: var(--gold);
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        td {
+            padding: var(--space-2) var(--space-3);
+            border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr {
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        tbody tr:hover {
+            background: var(--gold-whisper);
+        }
+
+        tbody tr:hover td {
+            color: var(--text);
+        }
+
+        /* Code in tables */
+        td code, th code {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.9em;
+        }
+
+        /* Status badges */
+        .status-validated { color: var(--success); }
+        .status-warning { color: var(--warning); }
+        .status-deprecated { 
+            color: var(--error); 
+            text-decoration: line-through;
+            opacity: 0.7;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           CODE BLOCKS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        pre {
+            background: var(--void-deep);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: var(--space-4);
+            overflow-x: auto;
+            margin: var(--space-5) 0;
+            font-size: var(--text-sm);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        code {
+            font-family: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+            font-size: 0.9em;
+        }
+
+        :not(pre) > code {
+            background: var(--void-surface);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: var(--cyan);
+            border: 1px solid var(--border-subtle);
+        }
+
+        pre code {
+            color: var(--text-secondary);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           BLOCKQUOTES & ALERTS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        blockquote {
+            border-left: 3px solid var(--gold);
+            padding: var(--space-3) var(--space-4);
+            margin: var(--space-5) 0;
+            background: var(--gold-whisper);
+            border-radius: 0 12px 12px 0;
+            color: var(--text-secondary);
+            font-style: italic;
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-lg);
+        }
+
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, var(--border), var(--border-subtle), transparent);
+            margin: var(--space-8) 0;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           FOOTER
+           ═══════════════════════════════════════════════════════════════════ */
+
+        footer {
+            margin-top: var(--space-10);
+            padding: var(--space-6) 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+
+        footer .kanji {
+            font-family: 'Noto Sans JP', sans-serif;
+            font-size: 2.5rem;
+            color: var(--gold-dim);
+            margin-bottom: var(--space-2);
+            opacity: 0.5;
+            animation: breathe 5s ease-in-out infinite;
+        }
+
+        @keyframes breathe {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.6; }
+        }
+
+        footer p {
+            color: var(--text-ghost);
+            font-size: var(--text-sm);
+            margin-bottom: 0;
+            font-family: 'IBM Plex Mono', monospace;
+            letter-spacing: 0.05em;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           BACK TO TOP
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .back-to-top {
+            position: fixed;
+            bottom: var(--space-6);
+            right: var(--space-6);
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            font-family: 'IBM Plex Sans', sans-serif;
+        }
+
+        .back-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .back-to-top:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+            background: var(--void-surface);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 0 30px var(--gold-glow);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           PRINT STYLES
+           ═══════════════════════════════════════════════════════════════════ */
+
+        @media print {
+            .top-nav, .back-to-top { display: none; }
+            body { background: white; color: black; }
+            body::before, body::after { display: none; }
+            main { padding: 0; max-width: 100%; }
+            a { color: inherit; }
+            table, th, td { border: 1px solid #ddd; }
+            .table-wrapper { box-shadow: none; }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESPONSIVE
+           ═══════════════════════════════════════════════════════════════════ */
+
+        @media (max-width: 768px) {
+            .top-nav {
+                padding: 0 var(--space-3);
+            }
+
+            .nav-links a:not(:first-child):not(:last-child) {
+                display: none;
+            }
+
+            main {
+                padding: calc(64px + var(--space-5)) var(--space-3) var(--space-5);
+            }
+
+            .doc-header h1 {
+                font-size: var(--text-3xl);
+            }
+
+            h2 { font-size: var(--text-xl); }
+            h3 { font-size: var(--text-lg); }
+
+            .table-wrapper {
+                margin-left: calc(-1 * var(--space-3));
+                margin-right: calc(-1 * var(--space-3));
+                border-radius: 0;
+                border-left: none;
+                border-right: none;
+            }
+
+            table { font-size: var(--text-xs); }
+            th, td { padding: var(--space-1) var(--space-2); }
+
+            .doc-meta { gap: var(--space-2); }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           SCROLLBAR
+           ═══════════════════════════════════════════════════════════════════ */
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--void);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--text-muted);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-ghost);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           ACCESSIBILITY
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :focus-visible {
+            outline: 2px solid var(--gold);
+            outline-offset: 2px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        :target {
+            scroll-margin-top: calc(64px + var(--space-5));
+        }
+    </style>
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="index.html" class="nav-brand">
+            <span class="kanji">鏡</span>
+            <span>Kagami Orb</span>
+        </a>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="bom.html">BOM</a>
+            <a href="buy.html">Buy</a>
+            <a href="assembly.html">Assembly</a>
+            <a href="spec.html">Spec</a>
+            <div class="nav-dropdown">
+                <button class="nav-dropdown-btn">More ▾</button>
+                <div class="nav-dropdown-content">
+                    <a href="alternatives.html">Alternatives</a>
+                    <a href="custom-pcb.html">Custom PCB</a>
+                    <a href="thermal.html">Thermal Analysis</a>
+                    <a href="fmea.html">FMEA</a>
+                    <a href="firmware.html">Firmware</a>
+                    <a href="system.html">System Design</a>
+                    <a href="validation.html">Validation Plan</a>
+                    <div class="nav-dropdown-divider"></div>
+                    <a href="hardware/kagami_orb_bom.csv" download>📥 Download CSV</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <article class="doc-header">
+            <h1>Kagami Orb — Custom Carrier PCB <em>Design</em></h1>
+            <div class="doc-meta">
+                <span>January 11, 2026</span>
+                <span>v2.0</span>
+            </div>
+        </article>
+
+        <div class="content">
+            <h2 id="overview">Overview</h2>
+<p>The Kagami Orb requires a custom PCB to integrate:<br />
+- CM4 compute module socket<br />
+- Battery management system<br />
+- Resonant wireless power receiver integration<br />
+- Audio I/O (ReSpeaker + speaker amp)<br />
+- LED ring control<br />
+- WiFi 6E antenna connections<br />
+- Thermal management</p>
+<p><strong>Design Philosophy:</strong> Compact, circular form factor to fit inside 120mm sphere.</p>
+<hr />
+<h2 id="pcb-specifications">PCB Specifications</h2>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Form Factor</td>
+<td>Circular, 85mm diameter</td>
+</tr>
+<tr>
+<td>Layers</td>
+<td>4-layer stackup</td>
+</tr>
+<tr>
+<td>Thickness</td>
+<td>1.6mm</td>
+</tr>
+<tr>
+<td>Copper</td>
+<td>1oz outer, 0.5oz inner</td>
+</tr>
+<tr>
+<td>Surface Finish</td>
+<td>ENIG (for fine pitch)</td>
+</tr>
+<tr>
+<td>Solder Mask</td>
+<td>Matte black</td>
+</tr>
+<tr>
+<td>Min Trace/Space</td>
+<td>0.15mm/0.15mm</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="block-diagram">Block Diagram</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                            KAGAMI ORB PCB v1.0                                   │
+│                           (Circular, 85mm dia)                                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+                         ┌───────────────────────┐
+                         │  RESONANT RECEIVER 15W│
+                         │    (Bottom of orb)    │
+                         └───────────┬───────────┘
+                                     │ 5V 3A
+                         ┌───────────┴───────────┐
+                         │   BATTERY MANAGEMENT  │
+                         │   BQ25895 + BQ40Z50   │
+                         │                       │
+                         │   ┌───────────────┐   │
+                         │   │ 3S Li-Po Pack │   │
+                         │   │ 10,000mAh     │   │
+                         │   └───────────────┘   │
+                         └───────────┬───────────┘
+                                     │ 5V (Switched)
+         ┌───────────────────────────┼───────────────────────────┐
+         │                           │                           │
+         ▼                           ▼                           ▼
+┌─────────────────┐       ┌─────────────────┐        ┌─────────────────┐
+│  3.3V LDO       │       │  5V_LOGIC       │        │  5V_LED         │
+│  TPS62840       │       │  (Direct)       │        │  (Direct)       │
+│  (Ultra-low Iq) │       │                 │        │                 │
+└────────┬────────┘       └────────┬────────┘        └────────┬────────┘
+         │                         │                          │
+         ▼                         ▼                          ▼
+┌─────────────────┐       ┌─────────────────┐        ┌─────────────────┐
+│                 │       │                 │        │                 │
+│   CM4 Module    │       │  USB Hub        │        │  SK6812 Ring    │
+│   (4GB RAM)     │       │  USB2514B       │        │  24 RGBW LEDs   │
+│                 │       │                 │        │                 │
+│  ┌───────────┐  │       └────────┬────────┘        └─────────────────┘
+│  │ BCM2711   │  │                │
+│  │ 1.5GHz    │  │    ┌───────────┴───────────┐
+│  └───────────┘  │    │                       │
+│                 │    ▼                       ▼
+│   I2C, I2S,     │  ┌─────────────┐   ┌─────────────┐
+│   SPI, GPIO     │  │ Coral USB   │   │ AX210 WiFi  │
+│                 │  │ (via USB)   │   │ (via USB)   │
+└────────┬────────┘  └─────────────┘   └─────────────┘
+         │
+         │ I2S / I2C / GPIO
+         │
+┌────────┴────────────────────────────────────────────────────────────┐
+│                                                                      │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐ │
+│  │ ReSpeaker   │  │ MAX98357A   │  │ Fuel Gauge  │  │ Hall Sensor │ │
+│  │ 4-Mic Array │  │ Audio Amp   │  │ (I2C)       │  │ (Lid detect)│ │
+│  │ (I2S Input) │  │ (I2S Output)│  │             │  │             │ │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘ │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr />
+<h2 id="schematic-sections">Schematic Sections</h2>
+<h3 id="1-power-management">1. Power Management</h3>
+<pre><code>                         RESONANT RECEIVER (Custom 80mm Litz Coil)
+                         ┌───────────────────────────┐
+                         │   Custom Resonant RX      │
+                         │  5V @ 3A (15W @ 140kHz)   │
+                         │                           │
+                         │  GND ──────────┐          │
+                         │  VOUT ─────────┼───┐      │
+                         │  CTRL ─────────┼───┼───┐  │
+                         └───────────────────────────┘
+                                          │   │   │
+                                          │   │   └───── Charging status (GPIO)
+                                          │   │
+                                          ▼   ▼
+                         ┌────────────────────────────────────────────────┐
+                         │              BQ25895 Charger IC                 │
+                         │         (I2C Programmable, USB OTG)             │
+                         │                                                 │
+                         │  VBUS ◄─────── 5V from Resonant RX             │
+                         │  VSYS ──────► System 5V                         │
+                         │  VBAT ◄─────► Battery Pack                      │
+                         │  SDA/SCL ───► I2C Bus                           │
+                         │  INT ────────► Interrupt (GPIO)                  │
+                         │  OTG ────────► USB Host (for Coral)             │
+                         │                                                 │
+                         │  Charge Current: Up to 3A                       │
+                         │  Input Current Limit: 3.25A                     │
+                         │  Buck/Boost: 3.5V-18V to VSYS                   │
+                         └────────────────────────────────────────────────┘
+                                                │
+                                                ▼
+                         ┌────────────────────────────────────────────────┐
+                         │              BQ40Z50 Fuel Gauge                 │
+                         │         (Smart Battery Manager)                 │
+                         │                                                 │
+                         │  BAT+ ◄─────► 3S Pack (11.1V nom)              │
+                         │  SDA/SCL ───► I2C Bus                           │
+                         │  ALERT ─────► Low battery GPIO                  │
+                         │                                                 │
+                         │  Reports: SOC%, Voltage, Current, Temp          │
+                         │  Protects: OV, UV, OC, OT, Cell Balance         │
+                         └────────────────────────────────────────────────┘
+
+
+                         VOLTAGE REGULATORS:
+
+                         ┌─────────────────┐     ┌─────────────────┐
+                         │  TPS62840       │     │  TPS62841       │
+                         │  3.3V @ 750mA   │     │  1.8V @ 750mA   │
+                         │  Iq = 60nA      │     │  Iq = 60nA      │
+                         │  (Ultra-low)    │     │  (For CM4 core) │
+                         └─────────────────┘     └─────────────────┘
+</code></pre>
+<h3 id="2-cm4-module-interface">2. CM4 Module Interface</h3>
+<pre><code>                         CM4 Module Connector (2× 100-pin Hirose DF40)
+                         ┌─────────────────────────────────────────────────────┐
+                         │                                                     │
+                         │  POWER PINS:                                        │
+                         │  ──────────                                         │
+                         │  VBAT (5V) ◄──── System 5V (via BQ25895)           │
+                         │  VDD_CORE ◄──── 1.8V (TPS62841)                    │
+                         │  VDD_IO ◄────── 3.3V (TPS62840)                    │
+                         │  GND ◄───────── Ground plane                        │
+                         │                                                     │
+                         │  USB 2.0 HOST:                                      │
+                         │  ─────────────                                      │
+                         │  USB_DP ────────► USB Hub (USB2514B)               │
+                         │  USB_DM ────────► USB Hub (USB2514B)               │
+                         │                                                     │
+                         │  I2C:                                               │
+                         │  ────                                               │
+                         │  SDA (GPIO2) ───► I2C Bus (shared)                  │
+                         │  SCL (GPIO3) ───► I2C Bus (shared)                  │
+                         │                                                     │
+                         │  I2S AUDIO:                                         │
+                         │  ──────────                                         │
+                         │  PCM_CLK ───────► Audio BCLK (shared bus)           │
+                         │  PCM_FS ────────► Audio LRCK (shared bus)           │
+                         │  PCM_DIN ───────◄ ReSpeaker Data Out                │
+                         │  PCM_DOUT ──────► MAX98357A Data In                 │
+                         │                                                     │
+                         │  LED CONTROL:                                       │
+                         │  ────────────                                       │
+                         │  GPIO18 (PWM0) ─► SK6812 DIN (via level shifter)    │
+                         │                                                     │
+                         │  STATUS:                                            │
+                         │  ───────                                            │
+                         │  GPIO17 ◄──────── Resonant charging status         │
+                         │  GPIO27 ◄──────── Battery alert                    │
+                         │  GPIO22 ◄──────── Hall sensor (lid detect)         │
+                         │  GPIO23 ◄──────── Temperature alert                │
+                         │                                                     │
+                         │  BOOT/CONFIG:                                       │
+                         │  ────────────                                       │
+                         │  nRPIBOOT ──────► Boot mode select                 │
+                         │  GLOBAL_EN ─────► System enable                    │
+                         │  RUN ───────────► Soft power control               │
+                         │                                                     │
+                         └─────────────────────────────────────────────────────┘
+</code></pre>
+<h3 id="3-usb-hub-for-peripherals">3. USB Hub for Peripherals</h3>
+<pre><code>                         ┌─────────────────────────────────────────────────────┐
+                         │              USB2514B 4-Port Hub IC                 │
+                         │                                                     │
+                         │  UPSTREAM:                                          │
+                         │  DP/DM ◄──────── CM4 USB Host                       │
+                         │                                                     │
+                         │  DOWNSTREAM:                                        │
+                         │  Port 1 ────────► Google Coral USB                  │
+                         │  Port 2 ────────► Intel AX210 (via adapter)         │
+                         │  Port 3 ────────► (Reserved - external USB-C)       │
+                         │  Port 4 ────────► (Reserved - debug)                │
+                         │                                                     │
+                         │  POWER:                                             │
+                         │  VDD33 ◄──────── 3.3V                               │
+                         │  VDD18 ◄──────── Internal 1.8V regulator            │
+                         │                                                     │
+                         │  CONFIG:                                            │
+                         │  NON_REM[4:1] ─► 1111 (all permanent)              │
+                         │  PRTPWR[4:1] ──► Port power control                 │
+                         │                                                     │
+                         └─────────────────────────────────────────────────────┘
+
+                         NOTE: USB-C connector on PCB edge for:
+                         - Emergency charging (5V path to BQ25895)
+                         - Debug/programming access
+                         - Factory testing
+</code></pre>
+<h3 id="4-audio-system">4. Audio System</h3>
+<pre><code>                         ┌─────────────────────────────────────────────────────┐
+                         │             AUDIO INPUT (ReSpeaker 4-Mic)           │
+                         │                                                     │
+                         │  External Module Connection (8-pin FFC):            │
+                         │                                                     │
+                         │  3V3 ◄────────── 3.3V Rail                          │
+                         │  GND ◄────────── Ground                             │
+                         │  BCK ◄────────── I2S BCLK (GPIO12)                  │
+                         │  WS  ◄────────── I2S LRCK (GPIO19)                  │
+                         │  DO  ──────────► I2S DIN (GPIO20)                   │
+                         │  INT ──────────► Voice Activity (GPIO24)            │
+                         │  SDA ◄─────────► I2C Bus (for config)               │
+                         │  SCL ◄────────── I2C Bus                            │
+                         │                                                     │
+                         └─────────────────────────────────────────────────────┘
+
+                         ┌─────────────────────────────────────────────────────┐
+                         │             AUDIO OUTPUT (MAX98357A)                │
+                         │                                                     │
+                         │  VDD ◄────────── 5V Rail (for 3W output)            │
+                         │  GND ◄────────── Ground                             │
+                         │  BCLK ◄───────── I2S BCLK (GPIO12)                  │
+                         │  LRCLK ◄──────── I2S LRCK (GPIO19)                  │
+                         │  DIN ◄────────── I2S DOUT (GPIO21)                  │
+                         │  GAIN ──────────┤ 15dB (float)                      │
+                         │  SD_MODE ──────┤ Always on (tied high)             │
+                         │                                                     │
+                         │  OUT+ ─────────► Speaker +                          │
+                         │  OUT- ─────────► Speaker -                          │
+                         │                                                     │
+                         └─────────────────────────────────────────────────────┘
+</code></pre>
+<h3 id="5-led-ring-control">5. LED Ring Control</h3>
+<pre><code>                         ┌─────────────────────────────────────────────────────┐
+                         │             SK6812 LEVEL SHIFTING                   │
+                         │                                                     │
+                         │  GPIO18 (3.3V) ───► 74AHCT125 ───► 5V LED Data      │
+                         │                                                     │
+                         │  Schematic:                                         │
+                         │                                                     │
+                         │       3.3V     5V                                   │
+                         │        │       │                                    │
+                         │        │   ┌───┴───┐                                │
+                         │  GPIO18 ──►│1A  1Y├──► SK6812 DIN                   │
+                         │            │      │                                  │
+                         │        GND─┤~1OE  │                                  │
+                         │            └──────┘                                  │
+                         │            74AHCT125                                 │
+                         │                                                     │
+                         │  Bypass: 100nF on both rails near IC                │
+                         │                                                     │
+                         └─────────────────────────────────────────────────────┘
+
+                         SK6812 Ring Connection (4-pin JST):
+                         ┌─────┬─────┬─────┬─────┐
+                         │ 5V  │ DIN │ GND │ NC  │
+                         └─────┴─────┴─────┴─────┘
+</code></pre>
+<hr />
+<h2 id="pcb-layout-guidelines">PCB Layout Guidelines</h2>
+<h3 id="layer-assignment-4-layer">Layer Assignment (4-Layer)</h3>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Purpose</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L1 (Top)</td>
+<td>Components + High-speed</td>
+<td>CM4, USB, I2S</td>
+</tr>
+<tr>
+<td>L2</td>
+<td>Ground plane</td>
+<td>Unbroken under CM4</td>
+</tr>
+<tr>
+<td>L3</td>
+<td>Power planes</td>
+<td>5V, 3.3V, 1.8V split</td>
+</tr>
+<tr>
+<td>L4 (Bottom)</td>
+<td>Components + Routing</td>
+<td>Battery, Resonant RX pads</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="critical-routing">Critical Routing</h3>
+<ol>
+<li><strong>USB 2.0</strong> — 90Ω differential, length-matched ±0.5mm</li>
+<li><strong>I2S</strong> — 50Ω single-ended, length-matched ±2mm</li>
+<li><strong>Power</strong> — Wide traces (2mm for 3A), star topology</li>
+<li><strong>LED Data</strong> — Series resistor at source, keep short</li>
+</ol>
+<h3 id="thermal-considerations">Thermal Considerations</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         THERMAL ZONES (Top View)                                 │
+│                                                                                  │
+│                              ┌───────────────┐                                   │
+│                             ╱                 ╲                                  │
+│                            ╱   HOT ZONE        ╲                                 │
+│                           │    (CM4 + BQ)       │                                │
+│                           │    ┌─────────┐      │                                │
+│                           │    │ CM4 SoC │      │                                │
+│                           │    │ THERMAL │      │                                │
+│                           │    │   VIA   │      │                                │
+│                           │    │  ARRAY  │      │                                │
+│                           │    └─────────┘      │                                │
+│                           │                     │                                │
+│                            ╲   COOL ZONE       ╱                                 │
+│                             ╲  (USB, Audio)   ╱                                  │
+│                              ╰───────────────╯                                   │
+│                                                                                  │
+│  THERMAL MANAGEMENT:                                                             │
+│  • 64 thermal vias (0.3mm) under CM4 to bottom copper pour                      │
+│  • Large GND pour on L4 as heatsink                                             │
+│  • Copper heatsink mounted to CM4 SoC                                           │
+│  • Thermal pad from heatsink to inner shell                                      │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3 id="mechanical-mounting">Mechanical Mounting</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         MOUNTING HOLES (85mm PCB)                                │
+│                                                                                  │
+│                              ○  M2.5 (0°)                                        │
+│                         ╱         │         ╲                                    │
+│                        ╱          │          ╲                                   │
+│                       ○           │           ○  M2.5 (60°, 120°)               │
+│                       │           │           │                                  │
+│                       │     ┌─────┴─────┐     │                                  │
+│                       │     │    PCB    │     │                                  │
+│                       │     │  85mm ⌀   │     │                                  │
+│                       │     └───────────┘     │                                  │
+│                       │           │           │                                  │
+│                       ○           │           ○  M2.5 (240°, 300°)              │
+│                        ╲          │          ╱                                   │
+│                         ╲         │         ╱                                    │
+│                              ○  M2.5 (180°)                                      │
+│                                                                                  │
+│  6× M2.5 mounting holes at 35mm radius, 60° spacing                             │
+│  Hole diameter: 2.7mm                                                           │
+│  Keep-out zone: 6mm diameter around each hole                                   │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr />
+<h2 id="bill-of-materials-pcb-only">Bill of Materials (PCB Only)</h2>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Ref</th>
+<th>Value</th>
+<th>Package</th>
+<th>Description</th>
+<th>Part Number</th>
+<th>Qty</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>U1</td>
+<td>CM4</td>
+<td>DF40C-100</td>
+<td>Compute Module 4 Connector</td>
+<td>DF40HC(3.0)-100DS-0.4V</td>
+<td>2</td>
+</tr>
+<tr>
+<td>U2</td>
+<td>BQ25895</td>
+<td>QFN-24</td>
+<td>Battery Charger</td>
+<td>BQ25895RTWR</td>
+<td>1</td>
+</tr>
+<tr>
+<td>U3</td>
+<td>BQ40Z50</td>
+<td>QFN-32</td>
+<td>Fuel Gauge</td>
+<td>BQ40Z50RSMT</td>
+<td>1</td>
+</tr>
+<tr>
+<td>U4</td>
+<td>TPS62840</td>
+<td>SOT-23-6</td>
+<td>3.3V LDO</td>
+<td>TPS62840DLCR</td>
+<td>1</td>
+</tr>
+<tr>
+<td>U5</td>
+<td>TPS62841</td>
+<td>SOT-23-6</td>
+<td>1.8V LDO</td>
+<td>TPS62841DLCR</td>
+<td>1</td>
+</tr>
+<tr>
+<td>U6</td>
+<td>USB2514B</td>
+<td>QFN-36</td>
+<td>USB Hub</td>
+<td>USB2514B-AEZC</td>
+<td>1</td>
+</tr>
+<tr>
+<td>U7</td>
+<td>74AHCT125</td>
+<td>TSSOP-14</td>
+<td>Level Shifter</td>
+<td>74AHCT125PW</td>
+<td>1</td>
+</tr>
+<tr>
+<td>U8</td>
+<td>MAX98357A</td>
+<td>QFN-16</td>
+<td>Audio Amp</td>
+<td>MAX98357AETE+T</td>
+<td>1</td>
+</tr>
+<tr>
+<td>J1</td>
+<td>USB-C</td>
+<td>SMD</td>
+<td>USB Type-C 2.0</td>
+<td>USB4110-GF-A</td>
+<td>1</td>
+</tr>
+<tr>
+<td>J2</td>
+<td>8-pin FFC</td>
+<td>0.5mm</td>
+<td>ReSpeaker Connector</td>
+<td>FH12-8S-0.5SH</td>
+<td>1</td>
+</tr>
+<tr>
+<td>J3</td>
+<td>4-pin JST</td>
+<td>2.0mm</td>
+<td>LED Ring</td>
+<td>B4B-PH-K-S</td>
+<td>1</td>
+</tr>
+<tr>
+<td>J4</td>
+<td>2-pin JST</td>
+<td>2.0mm</td>
+<td>Speaker</td>
+<td>B2B-PH-K-S</td>
+<td>1</td>
+</tr>
+<tr>
+<td>J5</td>
+<td>4-pin JST</td>
+<td>2.0mm</td>
+<td>Battery</td>
+<td>B4B-PH-K-S</td>
+<td>1</td>
+</tr>
+<tr>
+<td>J6</td>
+<td>3-pin Pogo</td>
+<td>2.54mm</td>
+<td>Resonant RX</td>
+<td>Mill-Max 0906</td>
+<td>1</td>
+</tr>
+</tbody>
+</table></div>
+<p>(Plus passives: capacitors, resistors, inductors per reference design)</p>
+<hr />
+<h2 id="design-files">Design Files</h2>
+<pre><code>/apps/hub/kagami-orb/hardware/
+├── CUSTOM_PCB.md           (This document)
+├── kagami_orb_bom.csv      (Full system BOM)
+├── schematic/
+│   └── kagami_orb.kicad_sch   (To be created)
+├── pcb/
+│   └── kagami_orb.kicad_pcb   (To be created)
+├── gerbers/
+│   └── (Generated output)
+├── 3d/
+│   └── kagami_orb_pcb.step    (For mechanical integration)
+└── simulation/
+    └── thermal_analysis.fea    (FEA thermal simulation)
+</code></pre>
+<hr />
+<h2 id="next-steps">Next Steps</h2>
+<ol>
+<li><strong>Validate Power Path</strong> — Test BQ25895 with resonant input</li>
+<li><strong>Prototype CM4 Carrier</strong> — Minimal viable board for software dev</li>
+<li><strong>Thermal Testing</strong> — Measure actual temps in sealed sphere</li>
+<li><strong>Full PCB Design</strong> — KiCad schematic and layout</li>
+<li><strong>DFM Review</strong> — JLCPCB/PCBWay compatibility check</li>
+</ol>
+<hr />
+<pre><code>鏡
+
+h(x) ≥ 0. Always.
+
+The heart of the orb beats with seven colonies.
+Power flows without wires. Thought flows without boundaries.
+</code></pre>
+        </div>
+    </main>
+
+    <button class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" aria-label="Back to top">↑</button>
+
+    <footer>
+        <div class="kanji">鏡</div>
+        <p>h(x) ≥ 0 · Always</p>
+    </footer>
+
+    <script>
+        // Back to top button
+        const backToTop = document.querySelector('.back-to-top');
+        let ticking = false;
+        
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    backToTop.classList.toggle('visible', window.scrollY > 400);
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        });
+
+        // Wrap tables
+        document.querySelectorAll('table').forEach(table => {
+            if (!table.parentElement.classList.contains('table-wrapper')) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'table-wrapper';
+                table.parentNode.insertBefore(wrapper, table);
+                wrapper.appendChild(table);
+            }
+        });
+
+        // External links
+        document.querySelectorAll('a[href^="http"]').forEach(link => {
+            if (!link.href.includes(window.location.hostname)) {
+                link.setAttribute('target', '_blank');
+                link.setAttribute('rel', 'noopener noreferrer');
+            }
+        });
+
+        // Current page highlight
+        const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            if (link.getAttribute('href') === currentPage) {
+                link.classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>

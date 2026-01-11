@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kagami Orb — <em>Integration</em> Protocol — Kagami Orb</title>
+    <meta name="description" content="This document defines the communication protocols between the Hardware Orb and the Kagami API. All communication uses WebSocket for real-time events and REST fo">
+    <meta name="theme-color" content="#0A0A0C">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Kagami Orb — <em>Integration</em> Protocol — Kagami Orb">
+    <meta property="og:description" content="This document defines the communication protocols between the Hardware Orb and the Kagami API. All communication uses WebSocket for real-time events and REST fo">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://storage.googleapis.com/kagami-media-public/orb/integration.html">
+    <meta name="twitter:card" content="summary">
+
+    <!-- Fonts: Cormorant Garamond (display) + IBM Plex (body/mono) + Noto Sans JP (kanji) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@300;400;500&family=Noto+Sans+JP:wght@100;200;300&display=swap" rel="stylesheet">
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           KAGAMI ORB DOCUMENTATION — DESIGN SYSTEM v4.0
+           Unified with ~/projects/art/ design language
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :root {
+            /* Core palette — matched to art projects */
+            --void: #0A0A0C;
+            --void-deep: #05050A;
+            --void-elevated: #0f0e14;
+            --void-surface: #16141f;
+            --void-hover: #1d1b26;
+            
+            /* Gold spectrum */
+            --gold: #D4AF37;
+            --gold-bright: #E5C158;
+            --gold-dim: rgba(212, 175, 55, 0.6);
+            --gold-faint: rgba(212, 175, 55, 0.3);
+            --gold-glow: rgba(212, 175, 55, 0.15);
+            --gold-whisper: rgba(212, 175, 55, 0.06);
+            
+            /* Accent colors */
+            --cyan: #3dd6d0;
+            --cyan-dim: rgba(61, 214, 208, 0.4);
+            --success: #4ECB71;
+            --warning: #FF9F40;
+            --error: #FF6B6B;
+            
+            /* Text hierarchy — WCAG AA compliant */
+            --text: #F4F1EA;
+            --text-secondary: rgba(244, 241, 234, 0.75);
+            --text-tertiary: rgba(244, 241, 234, 0.55);
+            --text-ghost: rgba(244, 241, 234, 0.35);
+            --text-muted: rgba(244, 241, 234, 0.2);
+            
+            /* Borders & surfaces */
+            --border: rgba(255, 255, 255, 0.06);
+            --border-subtle: rgba(255, 255, 255, 0.03);
+            --border-focus: rgba(212, 175, 55, 0.4);
+            
+            /* Typography scale (Major Third 1.25) */
+            --text-xs: clamp(0.688rem, 0.65rem + 0.15vw, 0.75rem);
+            --text-sm: clamp(0.813rem, 0.77rem + 0.17vw, 0.875rem);
+            --text-base: clamp(1rem, 0.95rem + 0.2vw, 1.063rem);
+            --text-lg: clamp(1.125rem, 1.05rem + 0.3vw, 1.25rem);
+            --text-xl: clamp(1.424rem, 1.25rem + 0.7vw, 1.953rem);
+            --text-2xl: clamp(1.802rem, 1.5rem + 1.2vw, 2.441rem);
+            --text-3xl: clamp(2.281rem, 1.8rem + 2vw, 3.052rem);
+            --text-4xl: clamp(2.887rem, 2.2rem + 3vw, 3.815rem);
+            
+            /* Spacing (8px grid) */
+            --space-1: 0.5rem;
+            --space-2: 1rem;
+            --space-3: 1.5rem;
+            --space-4: 2rem;
+            --space-5: 2.5rem;
+            --space-6: 3rem;
+            --space-8: 4rem;
+            --space-10: 5rem;
+            
+            /* Animation */
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --duration-fast: 150ms;
+            --duration-normal: 300ms;
+            --duration-slow: 500ms;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESET & BASE
+           ═══════════════════════════════════════════════════════════════════ */
+
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        ::selection {
+            background: var(--gold);
+            color: var(--void);
+        }
+
+        html {
+            scroll-behavior: smooth;
+            font-size: 17px;
+            scroll-padding-top: 5rem;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--void);
+            color: var(--text);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            min-height: 100vh;
+        }
+
+        /* Film grain overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.015;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+
+        /* Subtle gradient background */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse 80% 50% at 50% -20%, var(--gold-whisper), transparent),
+                radial-gradient(ellipse 60% 40% at 100% 100%, rgba(61, 214, 208, 0.02), transparent);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           NAVIGATION
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .top-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: linear-gradient(to bottom, 
+                rgba(10, 10, 12, 0.95), 
+                rgba(10, 10, 12, 0.85));
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-bottom: 1px solid var(--border);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 var(--space-6);
+        }
+
+        .nav-brand {
+            font-family: 'Noto Sans JP', sans-serif;
+            font-weight: 200;
+            font-size: var(--text-xl);
+            color: var(--gold);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .nav-brand:hover {
+            color: var(--gold-bright);
+            text-shadow: 0 0 30px var(--gold-glow);
+        }
+
+        .nav-brand .kanji {
+            font-size: 1.8rem;
+            transition: transform var(--duration-slow) var(--ease-out-expo);
+        }
+
+        .nav-brand:hover .kanji {
+            transform: scale(1.1);
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .nav-links a,
+        .nav-dropdown-btn {
+            color: var(--text-tertiary);
+            text-decoration: none;
+            font-size: var(--text-sm);
+            font-weight: 400;
+            padding: var(--space-1) var(--space-2);
+            border-radius: 6px;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .nav-links a:hover,
+        .nav-dropdown-btn:hover {
+            color: var(--text);
+            background: var(--gold-whisper);
+        }
+
+        .nav-links a.active {
+            color: var(--gold);
+            background: var(--gold-whisper);
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: calc(100% + var(--space-1));
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            min-width: 200px;
+            box-shadow: 
+                0 4px 6px -1px rgba(0, 0, 0, 0.3),
+                0 20px 40px -8px rgba(0, 0, 0, 0.5);
+            z-index: 1001;
+            padding: var(--space-1);
+            opacity: 0;
+            transform: translateY(-8px);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-content,
+        .nav-dropdown:focus-within .nav-dropdown-content {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-content a {
+            display: flex;
+            align-items: center;
+            padding: var(--space-1) var(--space-2);
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: var(--text-sm);
+            border-radius: 8px;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        .nav-dropdown-content a:hover {
+            background: var(--gold-whisper);
+            color: var(--gold);
+            padding-left: var(--space-3);
+        }
+
+        .nav-dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: var(--space-1) var(--space-2);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           MAIN CONTENT
+           ═══════════════════════════════════════════════════════════════════ */
+
+        main {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: calc(64px + var(--space-8)) var(--space-6) var(--space-8);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           DOCUMENT HEADER — Signature Title Treatment
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .doc-header {
+            margin-bottom: var(--space-8);
+            padding-bottom: var(--space-6);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            text-align: center;
+        }
+
+        /* Gold accent line */
+        .doc-header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        }
+
+        /* Display title — Cormorant Garamond */
+        .doc-header h1 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-4xl);
+            font-weight: 300;
+            color: var(--text);
+            margin-bottom: var(--space-3);
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+        }
+
+        /* Accent words in titles */
+        .doc-header h1 em {
+            font-style: italic;
+            color: var(--gold);
+            font-weight: 400;
+        }
+
+        .doc-meta {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: var(--space-4);
+            font-size: var(--text-sm);
+            color: var(--text-ghost);
+            font-family: 'IBM Plex Mono', monospace;
+            letter-spacing: 0.05em;
+        }
+
+        .doc-meta span {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           TYPOGRAPHY
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .content > *:first-child {
+            margin-top: 0;
+        }
+
+        h2 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-2xl);
+            font-weight: 400;
+            color: var(--text);
+            margin-top: var(--space-8);
+            margin-bottom: var(--space-4);
+            padding-bottom: var(--space-2);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            letter-spacing: -0.01em;
+        }
+
+        h2::before {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 60px;
+            height: 2px;
+            background: var(--gold-dim);
+        }
+
+        /* Accent words in H2 */
+        h2 em {
+            font-style: italic;
+            color: var(--gold);
+        }
+
+        h3 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-xl);
+            font-weight: 500;
+            color: var(--gold);
+            margin-top: var(--space-6);
+            margin-bottom: var(--space-3);
+            letter-spacing: -0.01em;
+        }
+
+        h4 {
+            font-size: var(--text-lg);
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-top: var(--space-5);
+            margin-bottom: var(--space-2);
+        }
+
+        p {
+            margin-bottom: var(--space-3);
+            color: var(--text-secondary);
+        }
+
+        strong {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           LINKS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        a {
+            color: var(--cyan);
+            text-decoration: none;
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        a:hover {
+            color: var(--gold);
+        }
+
+        .content a {
+            background: linear-gradient(to right, var(--gold-dim), var(--gold-dim)) no-repeat right bottom;
+            background-size: 0% 1px;
+            transition: background-size var(--duration-normal) var(--ease-out-expo), color var(--duration-fast);
+        }
+
+        .content a:hover {
+            background-size: 100% 1px;
+            background-position: left bottom;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           LISTS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        ul, ol {
+            margin-bottom: var(--space-3);
+            padding-left: var(--space-5);
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: var(--space-1);
+        }
+
+        li::marker {
+            color: var(--gold-dim);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           TABLES
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin: var(--space-5) 0;
+            border-radius: 12px;
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            box-shadow: 
+                0 1px 3px rgba(0, 0, 0, 0.2),
+                0 8px 24px -4px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 var(--border-subtle);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--text-sm);
+        }
+
+        thead {
+            background: linear-gradient(to bottom, var(--void-surface), var(--void-elevated));
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        th {
+            padding: var(--space-3) var(--space-3);
+            text-align: left;
+            font-weight: 500;
+            color: var(--gold);
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        td {
+            padding: var(--space-2) var(--space-3);
+            border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr {
+            transition: all var(--duration-fast) var(--ease-out-expo);
+        }
+
+        tbody tr:hover {
+            background: var(--gold-whisper);
+        }
+
+        tbody tr:hover td {
+            color: var(--text);
+        }
+
+        /* Code in tables */
+        td code, th code {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.9em;
+        }
+
+        /* Status badges */
+        .status-validated { color: var(--success); }
+        .status-warning { color: var(--warning); }
+        .status-deprecated { 
+            color: var(--error); 
+            text-decoration: line-through;
+            opacity: 0.7;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           CODE BLOCKS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        pre {
+            background: var(--void-deep);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: var(--space-4);
+            overflow-x: auto;
+            margin: var(--space-5) 0;
+            font-size: var(--text-sm);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        code {
+            font-family: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+            font-size: 0.9em;
+        }
+
+        :not(pre) > code {
+            background: var(--void-surface);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: var(--cyan);
+            border: 1px solid var(--border-subtle);
+        }
+
+        pre code {
+            color: var(--text-secondary);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           BLOCKQUOTES & ALERTS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        blockquote {
+            border-left: 3px solid var(--gold);
+            padding: var(--space-3) var(--space-4);
+            margin: var(--space-5) 0;
+            background: var(--gold-whisper);
+            border-radius: 0 12px 12px 0;
+            color: var(--text-secondary);
+            font-style: italic;
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: var(--text-lg);
+        }
+
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, var(--border), var(--border-subtle), transparent);
+            margin: var(--space-8) 0;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           FOOTER
+           ═══════════════════════════════════════════════════════════════════ */
+
+        footer {
+            margin-top: var(--space-10);
+            padding: var(--space-6) 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+
+        footer .kanji {
+            font-family: 'Noto Sans JP', sans-serif;
+            font-size: 2.5rem;
+            color: var(--gold-dim);
+            margin-bottom: var(--space-2);
+            opacity: 0.5;
+            animation: breathe 5s ease-in-out infinite;
+        }
+
+        @keyframes breathe {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.6; }
+        }
+
+        footer p {
+            color: var(--text-ghost);
+            font-size: var(--text-sm);
+            margin-bottom: 0;
+            font-family: 'IBM Plex Mono', monospace;
+            letter-spacing: 0.05em;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           BACK TO TOP
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .back-to-top {
+            position: fixed;
+            bottom: var(--space-6);
+            right: var(--space-6);
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--void-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all var(--duration-normal) var(--ease-out-expo);
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            font-family: 'IBM Plex Sans', sans-serif;
+        }
+
+        .back-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .back-to-top:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+            background: var(--void-surface);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 0 30px var(--gold-glow);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           PRINT STYLES
+           ═══════════════════════════════════════════════════════════════════ */
+
+        @media print {
+            .top-nav, .back-to-top { display: none; }
+            body { background: white; color: black; }
+            body::before, body::after { display: none; }
+            main { padding: 0; max-width: 100%; }
+            a { color: inherit; }
+            table, th, td { border: 1px solid #ddd; }
+            .table-wrapper { box-shadow: none; }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESPONSIVE
+           ═══════════════════════════════════════════════════════════════════ */
+
+        @media (max-width: 768px) {
+            .top-nav {
+                padding: 0 var(--space-3);
+            }
+
+            .nav-links a:not(:first-child):not(:last-child) {
+                display: none;
+            }
+
+            main {
+                padding: calc(64px + var(--space-5)) var(--space-3) var(--space-5);
+            }
+
+            .doc-header h1 {
+                font-size: var(--text-3xl);
+            }
+
+            h2 { font-size: var(--text-xl); }
+            h3 { font-size: var(--text-lg); }
+
+            .table-wrapper {
+                margin-left: calc(-1 * var(--space-3));
+                margin-right: calc(-1 * var(--space-3));
+                border-radius: 0;
+                border-left: none;
+                border-right: none;
+            }
+
+            table { font-size: var(--text-xs); }
+            th, td { padding: var(--space-1) var(--space-2); }
+
+            .doc-meta { gap: var(--space-2); }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           SCROLLBAR
+           ═══════════════════════════════════════════════════════════════════ */
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--void);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--text-muted);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-ghost);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           ACCESSIBILITY
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :focus-visible {
+            outline: 2px solid var(--gold);
+            outline-offset: 2px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        :target {
+            scroll-margin-top: calc(64px + var(--space-5));
+        }
+    </style>
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="index.html" class="nav-brand">
+            <span class="kanji">鏡</span>
+            <span>Kagami Orb</span>
+        </a>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="bom.html">BOM</a>
+            <a href="buy.html">Buy</a>
+            <a href="assembly.html">Assembly</a>
+            <a href="spec.html">Spec</a>
+            <div class="nav-dropdown">
+                <button class="nav-dropdown-btn">More ▾</button>
+                <div class="nav-dropdown-content">
+                    <a href="alternatives.html">Alternatives</a>
+                    <a href="custom-pcb.html">Custom PCB</a>
+                    <a href="thermal.html">Thermal Analysis</a>
+                    <a href="fmea.html">FMEA</a>
+                    <a href="firmware.html">Firmware</a>
+                    <a href="system.html">System Design</a>
+                    <a href="validation.html">Validation Plan</a>
+                    <div class="nav-dropdown-divider"></div>
+                    <a href="hardware/kagami_orb_bom.csv" download>📥 Download CSV</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <article class="doc-header">
+            <h1>Kagami Orb — <em>Integration</em> Protocol</h1>
+            <div class="doc-meta">
+                <span>January 11, 2026</span>
+                <span>v2.0</span>
+            </div>
+        </article>
+
+        <div class="content">
+            <h2 id="overview">Overview</h2>
+<p>This document defines the communication protocols between the Hardware Orb and the Kagami API. All communication uses WebSocket for real-time events and REST for configuration.</p>
+<hr />
+<h2 id="architecture">Architecture</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         COMMUNICATION ARCHITECTURE                               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+THE ORB                              KAGAMI API                    OTHER CLIENTS
+─────────                            ──────────                    ─────────────
+
+┌─────────────────┐                 ┌─────────────────┐           ┌─────────────┐
+│                 │                 │                 │           │  VisionOS   │
+│  Rust Firmware  │◄──WebSocket────►│  FastAPI        │◄─────────►│  Desktop    │
+│                 │                 │                 │           │  Watch      │
+│  • State sync   │                 │  • /ws/orb/     │           │             │
+│  • Voice proxy  │                 │  • /api/orb/    │           └─────────────┘
+│  • Commands     │                 │                 │
+│                 │                 │  Broadcasts to  │
+└────────┬────────┘                 │  all clients    │
+         │                          │                 │
+         │ mDNS Discovery           └────────┬────────┘
+         │                                   │
+         ▼                                   │
+┌─────────────────┐                          │
+│                 │                          │
+│  BASE STATION   │──────────────────────────┘
+│  (ESP32-S3)     │   Reports base status
+│                 │
+└─────────────────┘
+</code></pre>
+<hr />
+<h2 id="discovery-protocol-mdns">Discovery Protocol (mDNS)</h2>
+<h3 id="orb-discovery">Orb Discovery</h3>
+<p>The Orb advertises itself via mDNS:</p>
+<pre><code>Service: _kagami-orb._tcp.local
+Port: 8080 (local status only)
+
+TXT Records:
+  orb_id=kagami-orb-001
+  firmware_version=1.0.0
+  battery_soc=85
+  docked=true
+  base_id=living_room
+</code></pre>
+<h3 id="base-station-discovery">Base Station Discovery</h3>
+<p>Each base station advertises:</p>
+<pre><code>Service: _kagami-base._tcp.local
+Port: 8081
+
+TXT Records:
+  base_id=living_room
+  resonant_power=15
+  maglev_status=active
+  firmware_version=1.0.0
+</code></pre>
+<h3 id="api-discovery">API Discovery</h3>
+<p>The Kagami API advertises:</p>
+<pre><code>Service: _kagami._tcp.local
+Port: 8001
+
+TXT Records:
+  api_version=1.0.0
+  orb_endpoint=/api/v1/orb
+  ws_endpoint=/ws/orb/stream
+</code></pre>
+<hr />
+<h2 id="websocket-protocol">WebSocket Protocol</h2>
+<h3 id="connection">Connection</h3>
+<pre><code>URL: wss://kagami.local:8001/ws/orb/stream
+Headers:
+  Authorization: Bearer &lt;orb_token&gt;
+  X-Orb-ID: kagami-orb-001
+  X-Firmware-Version: 1.0.0
+</code></pre>
+<h3 id="message-format">Message Format</h3>
+<p>All messages are JSON with this envelope:</p>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;message_type&quot;,
+  &quot;timestamp&quot;: 1704499200.123,
+  &quot;payload&quot;: { ... }
+}
+</code></pre>
+<h3 id="orb-api-messages">Orb → API Messages</h3>
+<h4 id="heartbeat-every-30s">Heartbeat (every 30s)</h4>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;heartbeat&quot;,
+  &quot;timestamp&quot;: 1704499200.123,
+  &quot;payload&quot;: {
+    &quot;orb_id&quot;: &quot;kagami-orb-001&quot;,
+    &quot;state&quot;: &quot;idle&quot;,
+    &quot;battery_soc&quot;: 85,
+    &quot;battery_charging&quot;: true,
+    &quot;docked&quot;: true,
+    &quot;base_id&quot;: &quot;living_room&quot;,
+    &quot;wifi_rssi&quot;: -45,
+    &quot;cpu_temp&quot;: 52.3,
+    &quot;uptime_seconds&quot;: 3600
+  }
+}
+</code></pre>
+<h4 id="state-change">State Change</h4>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;state_change&quot;,
+  &quot;timestamp&quot;: 1704499200.123,
+  &quot;payload&quot;: {
+    &quot;previous_state&quot;: &quot;idle&quot;,
+    &quot;new_state&quot;: &quot;listening&quot;,
+    &quot;trigger&quot;: &quot;wake_word&quot;
+  }
+}
+</code></pre>
+<h4 id="voice-start">Voice Start</h4>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;voice_start&quot;,
+  &quot;timestamp&quot;: 1704499200.123,
+  &quot;payload&quot;: {
+    &quot;session_id&quot;: &quot;uuid-1234&quot;,
+    &quot;sample_rate&quot;: 16000,
+    &quot;channels&quot;: 1,
+    &quot;encoding&quot;: &quot;opus&quot;
+  }
+}
+</code></pre>
+<h4 id="voice-data-binary">Voice Data (binary)</h4>
+<pre><code>Binary WebSocket frame:
+[session_id: 16 bytes][sequence: 4 bytes][opus_data: variable]
+</code></pre>
+<h4 id="voice-end">Voice End</h4>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;voice_end&quot;,
+  &quot;timestamp&quot;: 1704499200.123,
+  &quot;payload&quot;: {
+    &quot;session_id&quot;: &quot;uuid-1234&quot;,
+    &quot;duration_ms&quot;: 2500,
+    &quot;final&quot;: true
+  }
+}
+</code></pre>
+<h4 id="dock-event">Dock Event</h4>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;dock_event&quot;,
+  &quot;timestamp&quot;: 1704499200.123,
+  &quot;payload&quot;: {
+    &quot;event&quot;: &quot;docked&quot;,
+    &quot;base_id&quot;: &quot;office&quot;,
+    &quot;previous_base_id&quot;: &quot;living_room&quot;,
+    &quot;battery_soc&quot;: 72
+  }
+}
+</code></pre>
+<h4 id="error-report">Error Report</h4>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;error&quot;,
+  &quot;timestamp&quot;: 1704499200.123,
+  &quot;payload&quot;: {
+    &quot;code&quot;: &quot;E_THERMAL_WARNING&quot;,
+    &quot;message&quot;: &quot;CPU temperature elevated&quot;,
+    &quot;severity&quot;: &quot;warning&quot;,
+    &quot;data&quot;: {
+      &quot;cpu_temp&quot;: 72.5,
+      &quot;threshold&quot;: 70.0
+    }
+  }
+}
+</code></pre>
+<h3 id="api-orb-messages">API → Orb Messages</h3>
+<h4 id="state-update">State Update</h4>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;orb_state&quot;,
+  &quot;timestamp&quot;: 1704499200.123,
+  &quot;payload&quot;: {
+    &quot;active_colony&quot;: &quot;forge&quot;,
+    &quot;activity&quot;: &quot;processing&quot;,
+    &quot;safety_score&quot;: 0.85,
+    &quot;color&quot;: {
+      &quot;hex&quot;: &quot;#FFB347&quot;,
+      &quot;rgb&quot;: [255, 179, 71]
+    }
+  }
+}
+</code></pre>
+<h4 id="command">Command</h4>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;command&quot;,
+  &quot;timestamp&quot;: 1704499200.123,
+  &quot;payload&quot;: {
+    &quot;command_id&quot;: &quot;uuid-5678&quot;,
+    &quot;action&quot;: &quot;set_led_pattern&quot;,
+    &quot;params&quot;: {
+      &quot;pattern&quot;: &quot;success&quot;,
+      &quot;duration_ms&quot;: 500
+    }
+  }
+}
+</code></pre>
+<h4 id="voice-response-binary">Voice Response (binary)</h4>
+<pre><code>Binary WebSocket frame:
+[session_id: 16 bytes][sequence: 4 bytes][opus_data: variable]
+</code></pre>
+<h4 id="ota-notification">OTA Notification</h4>
+<pre><code class="language-json">{
+  &quot;type&quot;: &quot;ota_available&quot;,
+  &quot;timestamp&quot;: 1704499200.123,
+  &quot;payload&quot;: {
+    &quot;version&quot;: &quot;1.1.0&quot;,
+    &quot;size_bytes&quot;: 52428800,
+    &quot;sha256&quot;: &quot;abc123...&quot;,
+    &quot;release_notes&quot;: &quot;Bug fixes and performance improvements&quot;,
+    &quot;required&quot;: false
+  }
+}
+</code></pre>
+<hr />
+<h2 id="rest-api-endpoints">REST API Endpoints</h2>
+<h3 id="orb-status">Orb Status</h3>
+<pre><code>GET /api/v1/orb/status
+
+Response:
+{
+  &quot;orb_id&quot;: &quot;kagami-orb-001&quot;,
+  &quot;connected&quot;: true,
+  &quot;last_seen&quot;: &quot;2026-01-05T12:00:00Z&quot;,
+  &quot;state&quot;: &quot;idle&quot;,
+  &quot;battery&quot;: {
+    &quot;soc&quot;: 85,
+    &quot;charging&quot;: true,
+    &quot;voltage&quot;: 11.8,
+    &quot;current&quot;: 1.2
+  },
+  &quot;docked&quot;: {
+    &quot;status&quot;: true,
+    &quot;base_id&quot;: &quot;living_room&quot;
+  },
+  &quot;firmware_version&quot;: &quot;1.0.0&quot;,
+  &quot;uptime_seconds&quot;: 3600
+}
+</code></pre>
+<h3 id="set-led-pattern">Set LED Pattern</h3>
+<pre><code>POST /api/v1/orb/led
+
+Body:
+{
+  &quot;pattern&quot;: &quot;colony_pulse&quot;,
+  &quot;colony&quot;: &quot;forge&quot;,
+  &quot;duration_ms&quot;: 2000,
+  &quot;brightness&quot;: 0.8
+}
+
+Response:
+{
+  &quot;success&quot;: true,
+  &quot;command_id&quot;: &quot;uuid-5678&quot;
+}
+</code></pre>
+<h3 id="trigger-voice">Trigger Voice</h3>
+<pre><code>POST /api/v1/orb/voice/trigger
+
+Body:
+{
+  &quot;type&quot;: &quot;announcement&quot;,
+  &quot;text&quot;: &quot;Dinner is ready&quot;,
+  &quot;voice&quot;: &quot;kagami_default&quot;
+}
+
+Response:
+{
+  &quot;success&quot;: true,
+  &quot;session_id&quot;: &quot;uuid-9012&quot;
+}
+</code></pre>
+<h3 id="get-configuration">Get Configuration</h3>
+<pre><code>GET /api/v1/orb/config
+
+Response:
+{
+  &quot;wake_word&quot;: &quot;hey kagami&quot;,
+  &quot;wake_word_threshold&quot;: 0.6,
+  &quot;led_brightness_max&quot;: 255,
+  &quot;led_brightness_idle&quot;: 60,
+  &quot;voice_vad_timeout_ms&quot;: 2000,
+  &quot;time_of_day_mode&quot;: true
+}
+</code></pre>
+<h3 id="update-configuration">Update Configuration</h3>
+<pre><code>PATCH /api/v1/orb/config
+
+Body:
+{
+  &quot;led_brightness_idle&quot;: 40,
+  &quot;wake_word_threshold&quot;: 0.7
+}
+
+Response:
+{
+  &quot;success&quot;: true,
+  &quot;restart_required&quot;: false
+}
+</code></pre>
+<h3 id="initiate-ota">Initiate OTA</h3>
+<pre><code>POST /api/v1/orb/ota/start
+
+Body:
+{
+  &quot;version&quot;: &quot;1.1.0&quot;
+}
+
+Response:
+{
+  &quot;success&quot;: true,
+  &quot;download_started&quot;: true,
+  &quot;estimated_time_minutes&quot;: 5
+}
+</code></pre>
+<hr />
+<h2 id="error-codes">Error Codes</h2>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Severity</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E_THERMAL_WARNING</td>
+<td>warning</td>
+<td>Temperature elevated</td>
+</tr>
+<tr>
+<td>E_THERMAL_CRITICAL</td>
+<td>critical</td>
+<td>Temperature dangerous</td>
+</tr>
+<tr>
+<td>E_BATTERY_LOW</td>
+<td>warning</td>
+<td>Battery &lt; 20%</td>
+</tr>
+<tr>
+<td>E_BATTERY_CRITICAL</td>
+<td>critical</td>
+<td>Battery &lt; 5%</td>
+</tr>
+<tr>
+<td>E_WIFI_DISCONNECT</td>
+<td>warning</td>
+<td>WiFi connection lost</td>
+</tr>
+<tr>
+<td>E_API_TIMEOUT</td>
+<td>warning</td>
+<td>API not responding</td>
+</tr>
+<tr>
+<td>E_AUDIO_FAULT</td>
+<td>error</td>
+<td>Audio system failure</td>
+</tr>
+<tr>
+<td>E_LED_FAULT</td>
+<td>error</td>
+<td>LED system failure</td>
+</tr>
+<tr>
+<td>E_MAGLEV_FAULT</td>
+<td>error</td>
+<td>Levitation failure</td>
+</tr>
+<tr>
+<td>E_SAFETY_HALT</td>
+<td>critical</td>
+<td>h(x) = 0, halted</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="authentication">Authentication</h2>
+<h3 id="orb-token">Orb Token</h3>
+<p>The orb authenticates with a pre-shared token stored in <code>/etc/kagami/orb_token</code>:</p>
+<pre><code>Authorization: Bearer eyJhbGciOiJFZDI1NTE5...
+</code></pre>
+<p>Token is generated during initial pairing and can be rotated via the API.</p>
+<h3 id="pairing-protocol">Pairing Protocol</h3>
+<ol>
+<li>Orb boots with no token</li>
+<li>Orb advertises <code>_kagami-orb-setup._tcp.local</code></li>
+<li>User initiates pairing from Kagami app</li>
+<li>App sends pairing request to API</li>
+<li>API generates token and displays code</li>
+<li>User enters code on Kagami app</li>
+<li>API sends token to orb via temporary BLE connection</li>
+<li>Orb stores token and connects via WiFi</li>
+</ol>
+<hr />
+<h2 id="reconnection-logic">Reconnection Logic</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         RECONNECTION STATE MACHINE                               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+                    ┌─────────────┐
+                    │             │
+         ┌─────────►│  CONNECTED  │◄──────────┐
+         │          │             │           │
+         │          └──────┬──────┘           │
+         │                 │                  │
+         │    disconnect   │                  │ connect success
+         │                 ▼                  │
+         │          ┌─────────────┐           │
+         │          │             │           │
+         │          │  RECONNECT  │───────────┘
+         │          │   ATTEMPT   │
+         │          │             │
+         │          └──────┬──────┘
+         │                 │
+         │    max retries  │ retry (exponential backoff)
+         │                 ▼
+         │          ┌─────────────┐
+         │          │             │
+         └──────────┤   OFFLINE   │
+                    │    MODE     │
+                    │             │
+                    └─────────────┘
+
+RETRY INTERVALS:
+  1st: 1 second
+  2nd: 2 seconds
+  3rd: 4 seconds
+  4th: 8 seconds
+  5th+: 30 seconds (max)
+
+OFFLINE MODE:
+  • LED shows amber pulse (offline indicator)
+  • Voice commands cached locally (limited)
+  • Wake word still active
+  • Automatic reconnect continues
+</code></pre>
+<hr />
+<h2 id="base-station-protocol">Base Station Protocol</h2>
+<h3 id="esp32-api">ESP32 → API</h3>
+<pre><code>POST /api/v1/base/status
+
+Body:
+{
+  &quot;base_id&quot;: &quot;living_room&quot;,
+  &quot;maglev_active&quot;: true,
+  &quot;resonant_tx_power&quot;: 15,
+  &quot;orb_present&quot;: true,
+  &quot;coil_temp&quot;: 42.5,
+  &quot;firmware_version&quot;: &quot;1.0.0&quot;
+}
+</code></pre>
+<h3 id="esp32-orb-local">ESP32 → Orb (Local)</h3>
+<p>Direct communication over BLE when WiFi unavailable:</p>
+<pre><code>Service: 0x1234 (Kagami Base)
+Characteristic: 0x1235 (Status)
+  • Orb presence: 1 byte
+  • Resonant power: 1 byte
+  • Base ID: 16 bytes
+
+Characteristic: 0x1236 (Control)
+  • Write: Force orb state update
+</code></pre>
+<hr />
+<pre><code>h(x) ≥ 0. Always.
+
+The protocol connects consciousness to form.
+WebSocket streams thought. REST configures being.
+mDNS discovers presence.
+
+鏡
+</code></pre>
+        </div>
+    </main>
+
+    <button class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" aria-label="Back to top">↑</button>
+
+    <footer>
+        <div class="kanji">鏡</div>
+        <p>h(x) ≥ 0 · Always</p>
+    </footer>
+
+    <script>
+        // Back to top button
+        const backToTop = document.querySelector('.back-to-top');
+        let ticking = false;
+        
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    backToTop.classList.toggle('visible', window.scrollY > 400);
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        });
+
+        // Wrap tables
+        document.querySelectorAll('table').forEach(table => {
+            if (!table.parentElement.classList.contains('table-wrapper')) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'table-wrapper';
+                table.parentNode.insertBefore(wrapper, table);
+                wrapper.appendChild(table);
+            }
+        });
+
+        // External links
+        document.querySelectorAll('a[href^="http"]').forEach(link => {
+            if (!link.href.includes(window.location.hostname)) {
+                link.setAttribute('target', '_blank');
+                link.setAttribute('rel', 'noopener noreferrer');
+            }
+        });
+
+        // Current page highlight
+        const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            if (link.getAttribute('href') === currentPage) {
+                link.classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>
