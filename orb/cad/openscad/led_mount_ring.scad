@@ -1,120 +1,129 @@
-// Kagami Orb — LED Mount Ring
-// Holds SK6812 24-LED ring at sphere equator
-// Material: Grey Pro
-// Print: Form 4, 25μm layer height
+// Kagami Orb V3.1 — LED Mount Ring (VERIFIED DIMENSIONS)
+// ========================================================
+// Holds 16× HD108 5050 LEDs at sphere equator
+// Material: Grey Pro or Black PETG
+// Print: Form 4, 50μm layer height
+//
+// VERIFIED SOURCES:
+// - HD108 LED: 5.1 × 5.0 × 1.6mm (5050 package)
+//   https://shine-leds.com/wp-content/uploads/2024/05/Specification-Datasheet-HD108.pdf
+
+/* [HD108 LED Parameters - VERIFIED] */
+// Source: HD108 datasheet
+led_length = 5.1;                 // VERIFIED
+led_width = 5.0;                  // VERIFIED (5050 = 5.0mm)
+led_height = 1.6;                 // VERIFIED
+led_count = 16;                   // Design spec
+led_spacing_angle = 360 / led_count;  // 22.5° between LEDs
 
 /* [Ring Parameters] */
-inner_diameter = 75;          // Inner diameter
-outer_diameter = 85;          // Outer diameter
-ring_height = 8;              // Total height
+ring_outer_diameter = 55;         // Fits at equator
+ring_inner_diameter = 45;         // Inner opening
+ring_height = 6;                  // Ring height
+ring_wall = 2;                    // Wall thickness
 
-/* [LED Groove] */
-led_groove_id = 68;           // LED ring inner diameter
-led_groove_od = 74;           // LED ring outer diameter  
-led_groove_depth = 2;         // Groove depth for PCB
+/* [PCB Integration] */
+pcb_thickness = 1.6;              // Standard PCB
+pcb_slot_depth = 2;               // PCB sits in slot
+led_ring_radius = 24;             // LED center radius
 
-/* [Diffuser Slot] */
-diffuser_slot_width = 3;      // Diffuser slot width
-diffuser_slot_depth = 4;      // Diffuser slot depth
+/* [Mounting] */
+snap_tab_count = 4;               // Snap-fit to frame
+snap_tab_width = 5;
+snap_tab_height = 3;
+snap_tab_protrusion = 1.5;
 
-/* [Snap Tabs] */
-snap_tab_count = 6;           // Number of snap tabs
-snap_tab_width = 6;           // Tab width
-snap_tab_length = 8;          // Tab length
-snap_tab_height = 3;          // Tab height
+/* [Diffuser Interface] */
+diffuser_slot_width = 2.5;        // Slot for diffuser ring
+diffuser_slot_depth = 1.5;
 
-/* [Cable Exit] */
-cable_notch_width = 8;        // Cable exit notch width
-cable_notch_depth = 5;        // Cable exit notch depth
+// ============================================================
+// DERIVED DIMENSIONS
+// ============================================================
+ring_mid_diameter = (ring_outer_diameter + ring_inner_diameter) / 2;
 
-$fn = 120;
-
-// Main ring body
-module ring_body() {
-    difference() {
-        // Outer ring
-        cylinder(d = outer_diameter, h = ring_height);
-        
-        // Inner cutout
-        translate([0, 0, -1])
-            cylinder(d = inner_diameter, h = ring_height + 2);
-    }
-}
-
-// LED PCB groove
-module led_groove() {
-    groove_z = (ring_height - led_groove_depth) / 2;
-    
-    translate([0, 0, groove_z])
-        difference() {
-            cylinder(d = led_groove_od + 1, h = led_groove_depth + 0.5);
-            translate([0, 0, -1])
-                cylinder(d = led_groove_id - 1, h = led_groove_depth + 2);
-        }
-}
-
-// Diffuser slot above LEDs
-module diffuser_slot() {
-    slot_z = ring_height - diffuser_slot_depth;
-    slot_mid_d = (inner_diameter + outer_diameter) / 2;
-    
-    translate([0, 0, slot_z])
-        difference() {
-            cylinder(d = slot_mid_d + diffuser_slot_width / 2, h = diffuser_slot_depth + 1);
-            translate([0, 0, -1])
-                cylinder(d = slot_mid_d - diffuser_slot_width / 2, h = diffuser_slot_depth + 2);
-        }
-}
-
-// Snap-fit tabs for frame attachment
-module snap_tabs() {
-    tab_radius = outer_diameter / 2;
-    
-    for (i = [0 : snap_tab_count - 1]) {
-        angle = i * (360 / snap_tab_count);
-        rotate([0, 0, angle])
-            translate([tab_radius - 1, 0, ring_height / 2]) {
-                // Tab body
-                difference() {
-                    translate([0, -snap_tab_width / 2, -snap_tab_height / 2])
-                        cube([snap_tab_length, snap_tab_width, snap_tab_height]);
-                    
-                    // Snap-fit ramp
-                    translate([snap_tab_length - 2, -snap_tab_width / 2 - 1, snap_tab_height / 2 - 1])
-                        rotate([0, 30, 0])
-                            cube([4, snap_tab_width + 2, 3]);
-                }
-            }
-    }
-}
-
-// Cable exit notch
-module cable_notch() {
-    notch_radius = (inner_diameter + outer_diameter) / 4;
-    
-    translate([notch_radius, 0, -1])
-        cube([cable_notch_depth, cable_notch_width, ring_height + 2], center = true);
-}
-
-// Final assembly
+// ============================================================
+// MAIN MODULE  
+// ============================================================
 module led_mount_ring() {
     difference() {
         union() {
-            ring_body();
-            snap_tabs();
+            // Main ring body
+            cylinder(h=ring_height, d=ring_outer_diameter, $fn=64);
+            
+            // Snap-fit tabs (outward)
+            for (i = [0:snap_tab_count-1]) {
+                rotate([0, 0, i * (360/snap_tab_count) + 45])
+                translate([ring_outer_diameter/2, 0, ring_height/2])
+                    snap_tab();
+            }
         }
-        led_groove();
-        diffuser_slot();
-        cable_notch();
+        
+        // Inner opening
+        translate([0, 0, -0.1])
+            cylinder(h=ring_height + 0.2, d=ring_inner_diameter, $fn=64);
+        
+        // PCB slot (circular channel)
+        translate([0, 0, ring_height - pcb_slot_depth])
+        difference() {
+            cylinder(h=pcb_slot_depth + 0.1, d=ring_outer_diameter - 4, $fn=64);
+            cylinder(h=pcb_slot_depth + 0.1, d=ring_inner_diameter + 4, $fn=64);
+        }
+        
+        // LED pockets (16×)
+        for (i = [0:led_count-1]) {
+            rotate([0, 0, i * led_spacing_angle])
+            translate([led_ring_radius, 0, ring_height - pcb_thickness - led_height])
+                led_pocket();
+        }
+        
+        // Diffuser ring slot (top outer edge)
+        translate([0, 0, ring_height - diffuser_slot_depth])
+        difference() {
+            cylinder(h=diffuser_slot_depth + 0.1, d=ring_outer_diameter + 0.2, $fn=64);
+            cylinder(h=diffuser_slot_depth + 0.1, d=ring_outer_diameter - diffuser_slot_width*2, $fn=64);
+        }
+        
+        // Wire channel (single entry point)
+        translate([ring_outer_diameter/2 - 3, 0, ring_height/2])
+            rotate([0, 90, 0])
+            cylinder(h=10, d=4, center=true, $fn=16);
     }
 }
 
-// Render
+// ============================================================
+// LED POCKET
+// ============================================================
+module led_pocket() {
+    // Pocket for HD108 5050 LED
+    // Slightly oversized for solder tolerance
+    cube([led_length + 0.3, led_width + 0.3, led_height + 1], center=true);
+}
+
+// ============================================================
+// SNAP TAB
+// ============================================================
+module snap_tab() {
+    // Snap-fit tab for frame attachment
+    hull() {
+        cube([snap_tab_protrusion * 2, snap_tab_width, snap_tab_height], center=true);
+        translate([snap_tab_protrusion, 0, snap_tab_height/2])
+            cube([0.5, snap_tab_width - 1, 0.5], center=true);
+    }
+}
+
+// ============================================================
+// RENDER
+// ============================================================
 led_mount_ring();
 
-// Reference dimensions
-echo("LED Mount Ring Dimensions:");
-echo(str("  Inner Diameter: ", inner_diameter, "mm"));
-echo(str("  Outer Diameter: ", outer_diameter, "mm"));
-echo(str("  Height: ", ring_height, "mm"));
-echo(str("  LED Groove: ", led_groove_id, "-", led_groove_od, "mm"));
+// ============================================================
+// VERIFICATION
+// ============================================================
+echo("=== LED MOUNT RING VERIFICATION ===");
+echo(str("Ring OD: ", ring_outer_diameter, "mm"));
+echo(str("Ring ID: ", ring_inner_diameter, "mm"));
+echo(str("LED count: ", led_count, " × HD108"));
+echo(str("LED size (verified): ", led_length, " × ", led_width, " × ", led_height, "mm"));
+echo(str("LED spacing: ", led_spacing_angle, "°"));
+echo(str("Fits in 70mm internal? ", ring_outer_diameter < 70 ? "YES ✓" : "NO ✗"));

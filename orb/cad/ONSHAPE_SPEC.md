@@ -1,520 +1,307 @@
-# Kagami Orb — OnShape CAD Specification
+# Kagami Orb V3 — CAD Specification
 
 ## Overview
 
-All CAD work for the Kagami Orb is done in **OnShape** (web-based parametric CAD).
+All CAD work for the Kagami Orb V3 is done in **OnShape** (web-based parametric CAD).
 
-**OnShape Document:** `Kagami Orb v1.0` (to be created)
-
----
-
-## Part List
-
-| Part | Material | Print/Buy | Priority |
-|------|----------|-----------|----------|
-| Internal Frame | CF-PETG or Tough 2000 | Print (Form 4) | P0 |
-| LED Mount Ring | Grey Pro | Print (Form 4) | P0 |
-| Battery Cradle | Tough 2000 | Print (Form 4) | P0 |
-| CM4 Mount Bracket | Grey Pro | Print (Form 4) | P1 |
-| Resonant Coil Mount | Tough 2000 | Print (Form 4) | P1 |
-| Diffuser Ring | White resin | Print (Form 4) | P1 |
-| Outer Shell | Acrylic 120mm | Buy (TAP Plastics) | - |
-| Inner Mirror | Acrylic 100mm | Buy | - |
-| Base Enclosure | Walnut | CNC | P2 |
-| **Outdoor Canopy** | Copper or Aluminum | CNC/Spin | P3 |
-| **Canopy Support Arms** | Stainless Steel | Laser + Bend | P3 |
-| **Canopy Mount Ring** | Walnut | CNC | P3 |
+**OnShape Document:** `Kagami Orb V3` (to be created)
+**Design Version:** 3.0 — 85mm Sealed SOTA
 
 ---
 
-## Part 1: Internal Frame
+## V3 Design Parameters
+
+| Parameter | V3 Value | Notes |
+|-----------|----------|-------|
+| **Outer Diameter** | 85mm | Sealed sphere |
+| **Inner Diameter** | 70mm | Component volume |
+| **Shell Thickness** | 7.5mm | Structural + thermal |
+| **Display Aperture** | 70mm | 2.8" round viewing area |
+| **LED Ring Diameter** | 55mm | 16× HD108 at equator |
+| **RX Coil Diameter** | 70mm | Compact wireless power |
+| **Weight Target** | 350g | Levitation compatible |
+
+---
+
+## V3 Part List
+
+| Part | Material | Fabrication | Priority | OpenSCAD |
+|------|----------|-------------|----------|----------|
+| Internal Frame | CF-PETG / Tough 2000 | Form 4 SLA | P0 | `internal_frame.scad` |
+| Display Mount | Grey Pro | Form 4 SLA (25μm) | P0 | `display_mount.scad` |
+| LED Mount Ring | Grey Pro | Form 4 SLA | P0 | `led_mount_ring.scad` |
+| Battery Cradle | Tough 2000 | Form 4 SLA | P0 | `battery_cradle.scad` |
+| Diffuser Ring | White / Frosted | Form 4 SLA | P1 | `diffuser_ring.scad` |
+| Resonant Coil Mount | Tough 2000 | Form 4 SLA | P1 | `resonant_coil_mount.scad` |
+| Outer Shell (2×) | Acrylic 85mm | Buy (TAP Plastics) | - | - |
+| Dielectric Mirror | Film | Buy (Edmund Optics) | - | - |
+| Base Enclosure | Walnut | CNC | P2 | - |
+| **Outdoor Canopy** | Copper/Aluminum | Metal Spinning | P3 | - |
+| **Support Arms ×3** | 304 Stainless | Laser + Bend | P3 | `canopy_arms.svg` |
+| **Mount Ring** | Walnut | CNC | P3 | `canopy_mount_ring.dxf` |
+
+---
+
+## Part 1: Internal Frame (V3)
 
 ### Design Requirements
 
 ```
-PURPOSE: Main structural element holding all electronics
-SIZE: Must fit inside 120mm sphere with 10mm wall clearance
-      Effective diameter: 100mm max
+PURPOSE: Main structural element for 85mm sealed sphere
+SIZE: 65mm diameter × 45mm height (fits inside 70mm inner shell)
 
-FEATURES:
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                         INTERNAL FRAME (Top View)                                │
+│                       V3 INTERNAL FRAME (Cross Section)                          │
 │                                                                                  │
-│                              ┌─────────────┐                                     │
-│                             ╱               ╲                                    │
-│                            ╱   CM4 MOUNT    ╲                                   │
-│                           │     PLATFORM     │  ← 55×40mm cutout                │
-│                           │    ┌───────┐     │                                   │
-│                           │    │ ○ ○ ○ │     │  ← M2.5 standoffs               │
-│                           │    │       │     │                                   │
-│                           │    │ CM4   │     │                                   │
-│                           │    │       │     │                                   │
-│                           │    └───────┘     │                                   │
-│                           │                  │                                   │
-│                            ╲   CORAL MOUNT  ╱                                   │
-│                             ╲    ┌───┐     ╱                                    │
-│                              ╲   │TPU│    ╱                                     │
-│                               ╲  └───┘   ╱                                      │
-│                                ╰────────╯                                       │
-│                                                                                  │
-│  SIDE FEATURES:                                                                  │
-│  • LED ring mount tabs (6×, 60° spacing)                                        │
-│  • Battery cradle mount points (4×)                                             │
-│  • Cable routing channels                                                       │
-│  • Ventilation slots                                                            │
-│                                                                                  │
+│            ╭──────────── 65mm ────────────╮                                     │
+│            │                               │                                     │
+│            │  ┌─────────────────────────┐  │                                     │
+│            │  │   DISPLAY MOUNT ZONE    │  │ ← Display mount interfaces here    │
+│            │  │   (78mm ring above)     │  │                                     │
+│            │  ├─────────────────────────┤  │                                     │
+│            │  │                         │  │                                     │
+│            │  │   QCS6490 SoM PLATFORM  │  │ ← 40×35mm SoM mount                │
+│            │  │   ┌─────────────────┐   │  │                                     │
+│       45mm │  │   │   □ □ □ □ □     │   │  │ ← M2 standoffs                     │
+│            │  │   │   HAILO-10H     │   │  │ ← M.2 2242 slot                    │
+│            │  │   └─────────────────┘   │  │                                     │
+│            │  │                         │  │                                     │
+│            │  │   BATTERY INTERFACE     │  │ ← M3 mount points                   │
+│            │  │                         │  │                                     │
+│            │  ├─────────────────────────┤  │                                     │
+│            │  │   LED RING TABS (×4)    │  │ ← 90° spacing                       │
+│            │  └─────────────────────────┘  │                                     │
+│            ╰───────────────────────────────╯                                     │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Dimensions
+### Key Dimensions
 
 | Feature | Dimension | Tolerance |
 |---------|-----------|-----------|
-| Overall diameter | 95mm | ±0.5mm |
-| Overall height | 60mm | ±0.5mm |
-| CM4 platform | 55×40mm | ±0.2mm |
-| Standoff holes | M2.5 | ±0.1mm |
-| Wall thickness | 3mm | ±0.2mm |
-| LED mount tab width | 8mm | ±0.3mm |
-
-### Assembly Features
-
-- 6× M2.5 threaded inserts for CM4 standoffs
-- 4× M3 threaded inserts for battery cradle
-- Snap-fit tabs for LED ring (replaceable)
-- Alignment features for shell mating
+| Overall diameter | 65mm | ±0.3mm |
+| Overall height | 45mm | ±0.3mm |
+| SoM platform | 40×35mm | ±0.2mm |
+| M.2 slot | 42×22mm | ±0.2mm |
+| Wall thickness | 2.5mm | ±0.2mm |
+| LED tab width | 6mm | ±0.2mm |
 
 ---
 
-## Part 2: LED Mount Ring
+## Part 2: Display Mount (V3 — NEW)
 
 ### Design Requirements
 
 ```
-PURPOSE: Hold SK6812 24-LED ring at sphere equator
-SIZE: Fits inside sphere equator with diffuser
+PURPOSE: Hold 2.8" round AMOLED + camera behind pupil
+SIZE: 78mm OD × 6mm height
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                         LED MOUNT RING (Cross Section)                           │
+│                       DISPLAY MOUNT (Top View)                                   │
 │                                                                                  │
-│        ┌──────────────────────────────────────────────────────────┐             │
-│        │                   DIFFUSER SLOT                          │             │
-│        │◄─────────────── 75mm ID ──────────────────►│             │
-│        │                                              │             │
-│    ════│════════════════════════════════════════════│════         │
-│        │         LED RING GROOVE (68mm)             │   ↑         │
-│        │    ┌────────────────────────────────┐      │   │         │
-│        │    │ ● ● ● ● ● LED PCB ● ● ● ● ● │      │   8mm        │
-│        │    └────────────────────────────────┘      │   │         │
-│    ════│════════════════════════════════════════════│════ ↓       │
-│        │                                              │             │
-│        │◄────────────── 85mm OD ──────────────────►│             │
-│        └──────────────────────────────────────────────┘             │
-│                                                                      │
-│  FEATURES:                                                           │
-│  • Groove for SK6812 ring PCB (68mm ID, 74mm OD)                    │
-│  • Slot for diffuser ring above LEDs                                │
-│  • Cable exit notch for data/power                                  │
-│  • 6× snap tabs to frame                                            │
-│                                                                      │
+│                         ╭─────── 78mm ───────╮                                  │
+│                        │                       │                                 │
+│                        │    ╭─── 70mm ───╮    │ ← Viewing aperture              │
+│                        │   │               │   │                                 │
+│                        │   │    ╭─────╮    │   │                                 │
+│                        │   │    │ 8mm │    │   │ ← Camera aperture (pupil)      │
+│                        │   │    ╰─────╯    │   │                                 │
+│                        │   │               │   │                                 │
+│                        │    ╰─────────────╯    │                                 │
+│                        │         │             │                                 │
+│                        │    FLEX CHANNEL       │ ← 15mm wide                    │
+│                         ╰─────────────────────╯                                  │
+│                                                                                  │
+│   FEATURES:                                                                      │
+│   • 2.8" AMOLED recess (72mm active, 76mm module)                               │
+│   • Camera aperture 8mm (IMX989 behind display)                                 │
+│   • Dielectric mirror film recess                                               │
+│   • Retention clips (×4)                                                        │
+│   • M2 screw mounts (×3)                                                        │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Dimensions
+### Key Dimensions
 
-| Feature | Dimension | Tolerance |
-|---------|-----------|-----------|
-| Inner diameter | 75mm | ±0.3mm |
-| Outer diameter | 85mm | ±0.3mm |
-| Height | 8mm | ±0.2mm |
-| LED groove depth | 2mm | ±0.1mm |
-| Diffuser slot width | 3mm | ±0.2mm |
+| Feature | Dimension | Notes |
+|---------|-----------|-------|
+| Mount OD | 78mm | Fits inside 85mm shell |
+| Viewing aperture | 70mm | Display active area |
+| Camera aperture | 8mm | IMX989 behind |
+| Display recess | 76mm × 3.5mm | Module depth |
+| Mirror recess | 74mm × 0.5mm | Dielectric film |
 
 ---
 
-## Part 3: Battery Cradle
+## Part 3: LED Mount Ring (V3)
 
 ### Design Requirements
 
 ```
-PURPOSE: Secure 3S Li-Po pack in bottom of sphere
-SIZE: Accommodate 100×60×20mm pouch cell
+PURPOSE: Hold 16× HD108 LEDs at sphere equator
+SIZE: 58mm OD × 6mm height
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                         BATTERY CRADLE (Isometric)                               │
+│                       LED MOUNT RING (Top View)                                  │
 │                                                                                  │
-│                    ╭──────────────────────────╮                                 │
-│                   ╱                            ╲                                │
-│                  ╱   ┌────────────────────┐    ╲                               │
-│                 │    │                    │     │                               │
-│                 │    │     BATTERY        │     │                               │
-│                 │    │     POCKET         │     │  ← Foam lined                │
-│                 │    │                    │     │                               │
-│                 │    └────────────────────┘     │                               │
-│                  ╲                              ╱                                │
-│                   ╲   STRAP SLOTS (2×)        ╱                                 │
-│                    ╲  ══════    ══════       ╱                                  │
-│                     ╰────────────────────────╯                                  │
+│                         ╭─────── 58mm ───────╮                                  │
+│                        │     ○ ○ ○ ○ ○        │ ← 16× HD108 positions           │
+│                        │   ○             ○    │   (22.5° spacing)               │
+│                        │  ○    ╭─────╮    ○   │                                 │
+│                        │ ○     │ 48mm│     ○  │ ← Inner opening                 │
+│                        │  ○    ╰─────╯    ○   │                                 │
+│                        │   ○             ○    │                                 │
+│                        │     ○ ○ ○ ○ ○        │                                 │
+│                         ╰─────────────────────╯                                  │
 │                                                                                  │
-│  FEATURES:                                                                       │
-│  • Pocket for 100×60×20mm battery                                               │
-│  • 2× Velcro strap slots                                                        │
-│  • Foam padding recesses                                                        │
-│  • Wire exit channel                                                            │
-│  • 4× M3 mount holes to frame                                                   │
-│                                                                                  │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Dimensions
-
-| Feature | Dimension | Tolerance |
-|---------|-----------|-----------|
-| Pocket length | 102mm | ±1mm |
-| Pocket width | 62mm | ±1mm |
-| Pocket depth | 22mm | ±1mm |
-| Wall thickness | 2mm | ±0.3mm |
-| Strap slot width | 15mm | ±0.5mm |
-
----
-
-## Part 4: CM4 Mount Bracket
-
-```
-PURPOSE: Heat sink mount and CM4 alignment
-SIZE: Matches CM4 footprint with thermal standoff
-
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                         CM4 MOUNT BRACKET (Top View)                             │
-│                                                                                  │
-│            ┌──────────────────────────────────────────────┐                     │
-│            │  ○                                       ○   │  ← M2.5 holes      │
-│            │                                              │                     │
-│            │      ┌────────────────────────────┐          │                     │
-│            │      │                            │          │                     │
-│            │      │     HEATSINK CONTACT       │          │                     │
-│            │      │       (40×40mm)            │          │  ← Thermal path    │
-│            │      │                            │          │                     │
-│            │      └────────────────────────────┘          │                     │
-│            │                                              │                     │
-│            │  ○                                       ○   │                     │
-│            └──────────────────────────────────────────────┘                     │
-│                                                                                  │
-│  FEATURES:                                                                       │
-│  • 4× M2.5 holes matching CM4 pattern                                           │
-│  • Central thermal contact area                                                  │
-│  • Raised standoffs for airflow                                                  │
-│                                                                                  │
+│   • PCB slot: 1.6mm for LED ring PCB                                            │
+│   • Diffuser slot: 2mm at top                                                   │
+│   • Mount tabs: 4× at 90° for frame attachment                                  │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Part 5: Diffuser Ring
+## Part 4: Battery Cradle (V3)
+
+### Design Requirements
 
 ```
-PURPOSE: Soften LED hotspots for infinity effect
-MATERIAL: White resin or frosted acrylic
+PURPOSE: Hold compact 3S 2200mAh LiPo + BMS (VERIFIED 55×35×20mm)
+SIZE: ~63×43×16mm
 
-Simple ring:
-• ID: 70mm
-• OD: 80mm
-• Height: 3mm
-• Frosted or opal finish
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                       BATTERY CRADLE (Top View)                                  │
+│                                                                                  │
+│              ╭──────────── 63mm ────────────╮                                   │
+│              │  ╔═══════════════════════╗   │                                   │
+│              │  ║                       ║   │                                   │
+│              │  ║   BATTERY POCKET      ║   │ ← 55×35×12mm                      │
+│         43mm │  ║   (foam-lined)        ║   │                                   │
+│              │  ║                       ║   │                                   │
+│              │  ╠═══════════════════════╣   │                                   │
+│              │  ║  BMS POCKET           ║   │ ← BQ25895 + BQ40Z50              │
+│              │  ╚═══════════════════════╝   │                                   │
+│              ╰──────────────────────────────╯                                   │
+│                                                                                  │
+│   FEATURES:                                                                      │
+│   • Strap slots for velcro retention                                            │
+│   • Wire exit channels                                                          │
+│   • Thermal pad recess (bottom)                                                 │
+│   • M3 mount points (×4)                                                        │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Part 6: Resonant Coil Mount
+## Part 5: Resonant Coil Mount (V3)
+
+### Design Requirements
 
 ```
-PURPOSE: Position resonant receiver coil at bottom of orb
-SIZE: Matches 80mm Litz coil footprint
+PURPOSE: Hold 70mm RX coil at sphere bottom
+SIZE: 72mm diameter × 6mm height
 
-Simple platform:
-• Diameter: 85mm (matches 80mm Litz coil)
-• Height: 5mm
-• Alignment pins for coil centering
-• Mount holes to frame
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                       COIL MOUNT (Cross Section)                                 │
+│                                                                                  │
+│              ╭─────────── 72mm ───────────╮                                     │
+│              │                             │                                     │
+│              │   ══════════════════════   │ ← Coil recess (70mm, 3mm deep)     │
+│              │  │░░░░░░░░░░░░░░░░░░░░░│   │ ← Ferrite sheet (60mm)             │
+│              │   ════════╤════════════    │                                     │
+│              │           │                │                                     │
+│              │     THERMAL VIAS (×8)      │ ← 4mm holes for heat path          │
+│              │           │                │                                     │
+│              ╰───────────┴────────────────╯                                     │
+│                                                                                  │
+│   FEATURES:                                                                      │
+│   • Coil recess with wire channel                                               │
+│   • Ferrite recess (bottom)                                                     │
+│   • 8× thermal vias for heat conduction                                         │
+│   • Alignment pins (×3)                                                         │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Assembly Model
+## Assembly Stack
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                         FULL ASSEMBLY (Cross Section)                            │
+│                       V3 ASSEMBLY STACK (85mm Sphere)                            │
 │                                                                                  │
-│                              ┌─────────────┐                                     │
-│                             ╱               ╲                                    │
-│                         ───╱─── OUTER SHELL ─╲───                               │
-│                        ╱  ╱                    ╲  ╲                              │
-│                       │  │  ┌──── AIR GAP ────┐ │  │                            │
-│                       │  │  │                  │ │  │                            │
-│                       │  │  │   CM4 + CORAL    │ │  │                            │
-│                       │  │  │   ┌─────────┐    │ │  │                            │
-│                       │  │  │   │ HEATSINK│    │ │  │                            │
-│          LED RING ─── │  │──│───●●●●●●●●●●────│ │  │                            │
-│                       │  │  │   └─────────┘    │ │  │                            │
-│                       │  │  │     FRAME        │ │  │                            │
-│                       │  │  │                  │ │  │                            │
-│                       │  │  │    BATTERY       │ │  │                            │
-│                       │  │  │   ┌────────┐     │ │  │                            │
-│                       │  │  │   │ 10Ah   │     │ │  │                            │
-│                       │  │  │   └────────┘     │ │  │                            │
-│                       │  │  │                  │ │  │                            │
-│                       │  │  │ RESONANT RECEIVER │ │  │                            │
-│                        ╲  ╲ └──────────────────┘ ╱  ╱                           │
-│                         ───╲─── INNER SHELL ──╱───                               │
-│                             ╲               ╱                                    │
-│                              └─────────────┘                                     │
-│                                    │                                             │
-│                              15mm GAP                                            │
-│                                    │                                             │
-│                         ══════════════════════                                   │
-│                                 BASE                                             │
+│   TOP (Display Side)                                                             │
+│   ═══════════════════                                                            │
+│                                                                                  │
+│   ┌─────────────────┐                                                            │
+│   │ Outer Shell Top │  ← 85mm acrylic hemisphere                                │
+│   ├─────────────────┤                                                            │
+│   │ Dielectric Film │  ← Touch-through mirror                                   │
+│   ├─────────────────┤                                                            │
+│   │ 2.8" AMOLED     │  ← 480×480 round display                                  │
+│   ├─────────────────┤                                                            │
+│   │ Display Mount   │  ← Grey Pro, 78mm                                         │
+│   ├─────────────────┤                                                            │
+│   │ IMX989 Camera   │  ← Behind display center                                  │
+│   ├─────────────────┤                                                            │
+│   │ QCS6490 + Hailo │  ← Main compute                                           │
+│   ├─────────────────┤                                                            │
+│   │ Internal Frame  │  ← CF-PETG, 65mm                                          │
+│   ├─────────────────┤                                                            │
+│   │ LED Mount Ring  │  ← 16× HD108 at equator                                   │
+│   ├─────────────────┤                                                            │
+│   │ Diffuser Ring   │  ← Light diffusion                                        │
+│   ├─────────────────┤                                                            │
+│   │ Battery + BMS   │  ← 2200mAh 3S LiPo (VERIFIED)                             │
+│   ├─────────────────┤                                                            │
+│   │ Battery Cradle  │  ← Tough 2000                                             │
+│   ├─────────────────┤                                                            │
+│   │ RX Coil Mount   │  ← Tough 2000, 72mm                                       │
+│   ├─────────────────┤                                                            │
+│   │ RX Coil 70mm    │  ← Litz wire, 18 turns                                    │
+│   ├─────────────────┤                                                            │
+│   │ Outer Shell Bot │  ← 85mm acrylic hemisphere                                │
+│   └─────────────────┘                                                            │
+│                                                                                  │
+│   BOTTOM (Base Side)                                                             │
 │                                                                                  │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## OnShape Workflow
+## Print Settings (Form 4)
 
-1. **Create Document:** "Kagami Orb v1.0"
-2. **Create Part Studios:**
-   - `Internal Frame`
-   - `LED Mount Ring`
-   - `Battery Cradle`
-   - `CM4 Bracket`
-   - `Diffuser Ring`
-   - `Resonant Coil Mount`
-3. **Create Assembly:** `Orb Assembly`
-4. **Import:** Hemisphere (as surface body reference)
-5. **Mate:** All parts to frame
-6. **Export:** STL for each part
+| Part | Resin | Layer Height | Supports | Post-Cure |
+|------|-------|--------------|----------|-----------|
+| Internal Frame | Tough 2000 | 50μm | Auto | 60min @ 70°C |
+| Display Mount | Grey Pro | 25μm | Manual | 30min @ 60°C |
+| LED Mount Ring | Grey Pro | 50μm | Auto | 30min @ 60°C |
+| Battery Cradle | Tough 2000 | 50μm | Auto | 60min @ 70°C |
+| Diffuser Ring | White | 50μm | Auto | 15min @ 60°C |
+| Coil Mount | Tough 2000 | 50μm | Auto | 60min @ 70°C |
 
 ---
 
-## STL Export Settings
+## Tolerances & Fits
 
-| Parameter | Value |
-|-----------|-------|
-| Format | STL (binary) |
-| Units | Millimeters |
-| Resolution | Fine |
-| Chord height | 0.01mm |
-| Angle tolerance | 1° |
-
----
-
-## Form 4 Print Settings
-
-| Part | Material | Layer | Supports | Time |
-|------|----------|-------|----------|------|
-| Internal Frame | Tough 2000 | 50μm | Yes | 8h |
-| LED Mount Ring | Grey Pro | 25μm | Minimal | 3h |
-| Battery Cradle | Tough 2000 | 50μm | Yes | 4h |
-| CM4 Bracket | Grey Pro | 50μm | Minimal | 2h |
-| Diffuser Ring | White | 50μm | No | 2h |
-| Resonant Coil Mount | Tough 2000 | 50μm | Minimal | 1h |
-
-**Total Print Time: ~20 hours**
+| Interface | Fit Type | Clearance |
+|-----------|----------|-----------|
+| Frame ↔ Shell | Loose | 2.5mm |
+| Display ↔ Mount | Press | 0.1mm |
+| LED Ring ↔ Frame | Snap | 0.2mm |
+| Battery ↔ Cradle | Loose | 0.3mm |
+| Coil ↔ Mount | Press | 0.1mm |
+| Shell halves | Adhesive | 0mm (glued) |
 
 ---
 
-## Outdoor Canopy Addon (P3)
+## Changelog
 
-The outdoor canopy is an **addon accessory** that converts the indoor dock into a weatherproof outdoor dock. The orb itself requires no modification—only the base station gains a protective pavilion.
-
-### Part 7: Outdoor Canopy
-
-```
-PURPOSE: Weatherproof shelter for floating orb
-FABRICATION: Metal spinning or CNC from sheet
-
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                         CANOPY (Cross Section)                                   │
-│                                                                                  │
-│                         ╭──────────────────────────╮                            │
-│                        ╱         5° SLOPE           ╲                           │
-│                       ╱    (drainage to edges)       ╲                          │
-│                      ╱                                 ╲                         │
-│                     │◄────────── 300mm ───────────────►│                        │
-│                     │                                   │                        │
-│            ┌────────┴───────────────────────────────────┴────────┐              │
-│            │                    DRIP EDGE                         │              │
-│            │               (15mm overhang, 45°)                   │              │
-│            └─────────────────────────────────────────────────────┘              │
-│                                                                                  │
-│  FEATURES:                                                                       │
-│  • 5° slope from center to edge (water drainage)                                │
-│  • 15mm drip edge all around (prevents water run-back)                          │
-│  • Center hole: 30mm (ventilation, star visibility)                             │
-│  • Material: 1.5mm copper sheet OR 2mm aluminum                                 │
-│  • Finish: Brushed copper patina OR powder-coat matte black                     │
-│                                                                                  │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Canopy Dimensions
-
-| Feature | Dimension | Tolerance |
-|---------|-----------|-----------|
-| Outer diameter | 300mm | ±1mm |
-| Inner edge diameter | 280mm | ±1mm |
-| Center vent hole | 30mm | ±0.5mm |
-| Material thickness | 1.5mm (Cu) / 2mm (Al) | - |
-| Slope angle | 5° | ±0.5° |
-| Drip edge height | 15mm | ±1mm |
-| Drip edge angle | 45° | ±2° |
-
-### Part 8: Canopy Support Arms (×3)
-
-```
-PURPOSE: Connect canopy to base while allowing orb access
-FABRICATION: Laser cut stainless steel, brake bend
-
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                         SUPPORT ARM (Side View)                                  │
-│                                                                                  │
-│                            ┌─── Canopy mount hole (M4)                          │
-│                            │                                                     │
-│                            ○                                                     │
-│                           ╱                                                      │
-│                          ╱   ← 250mm total height                               │
-│                         ╱                                                        │
-│                        │     ← 15mm wide, 3mm thick                             │
-│                        │                                                         │
-│                        │     ← Slight outward curve (aesthetic)                 │
-│                        │                                                         │
-│                        ╲                                                         │
-│                         ╲                                                        │
-│                          ○ ← Base mount hole (M4)                               │
-│                                                                                  │
-│  FEATURES:                                                                       │
-│  • 3× arms at 120° spacing                                                       │
-│  • 304 stainless steel, brushed finish                                          │
-│  • Brake bend at 15° outward (visual lightness)                                 │
-│  • M4 mounting holes top and bottom                                             │
-│                                                                                  │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Support Arm Dimensions
-
-| Feature | Dimension | Tolerance |
-|---------|-----------|-----------|
-| Total height | 250mm | ±1mm |
-| Width | 15mm | ±0.5mm |
-| Thickness | 3mm | - |
-| Bend angle | 15° outward | ±1° |
-| Mount hole diameter | 4.2mm (M4 clearance) | ±0.1mm |
-
-### Part 9: Canopy Mount Ring
-
-```
-PURPOSE: Attach support arms to walnut base
-FABRICATION: CNC from walnut, matches base aesthetic
-
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                         MOUNT RING (Top View)                                    │
-│                                                                                  │
-│                              ╭─────────────╮                                    │
-│                             ╱               ╲                                   │
-│                            ╱   ┌─────────┐   ╲                                  │
-│                           │    │  BASE   │    │                                  │
-│                           │    │ CUTOUT  │    │  ← Matches base top profile     │
-│                           │    └─────────┘    │                                  │
-│                           │  ○             ○  │  ← M4 threaded inserts (×3)     │
-│                            ╲       ○       ╱                                    │
-│                             ╲             ╱                                     │
-│                              ╰───────────╯                                      │
-│                                                                                  │
-│  FEATURES:                                                                       │
-│  • Sits atop walnut base (adds 10mm height)                                     │
-│  • 3× M4 brass threaded inserts for arm mounting                                │
-│  • Center cutout matches base top surface                                       │
-│  • Same walnut, same finish as base                                             │
-│                                                                                  │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Mount Ring Dimensions
-
-| Feature | Dimension | Tolerance |
-|---------|-----------|-----------|
-| Outer diameter | 200mm | ±0.5mm |
-| Inner cutout | 160mm | ±0.5mm |
-| Height | 10mm | ±0.3mm |
-| Insert spacing | 120° | - |
-| Insert radius | 85mm from center | ±0.5mm |
-
----
-
-## Outdoor Canopy Assembly
-
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                    OUTDOOR DOCK ASSEMBLY (Exploded View)                         │
-│                                                                                  │
-│                              ╭───────────────╮                                  │
-│                             ╱     CANOPY      ╲                                 │
-│                            ╱   (copper/alum)   ╲                                │
-│                           ╰─────────────────────╯                               │
-│                                     │                                            │
-│                                     ▼ M4 bolts (×3)                             │
-│                              │      │      │                                    │
-│                              │  ARM │  ARM │  ARM                               │
-│                              │      │      │                                    │
-│                                     │                                            │
-│                                     ▼ M4 bolts (×3)                             │
-│                              ╭─────────────╮                                    │
-│                              │ MOUNT RING  │                                    │
-│                              ╰──────┬──────╯                                    │
-│                                     │                                            │
-│                                     ▼ Sits on top                               │
-│                         ╔═══════════════════════╗                               │
-│                         ║    WALNUT BASE        ║                               │
-│                         ║  (indoor dock base)   ║                               │
-│                         ╚═══════════════════════╝                               │
-│                                                                                  │
-│  ASSEMBLY ORDER:                                                                 │
-│  1. Indoor dock complete and tested                                             │
-│  2. Place mount ring on base (alignment pins)                                   │
-│  3. Insert M4 bolts through arms into mount ring                                │
-│  4. Place canopy on arms, secure with M4 bolts                                  │
-│  5. Total assembly time: 15 minutes                                             │
-│                                                                                  │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Canopy Fabrication Options
-
-| Method | Material | Cost | Lead Time | Notes |
-|--------|----------|------|-----------|-------|
-| **Metal Spinning** | Copper 1.5mm | ~$150 | 2-3 weeks | Best for copper, seamless |
-| **CNC Waterjet** | Aluminum 2mm | ~$80 | 1 week | Requires welded drip edge |
-| **Sheet Forming** | Aluminum 2mm | ~$60 | 1 week | DIY possible with brake |
-| **3D Print + Plate** | PETG + Copper plate | ~$40 | 3 days | Prototype only |
-
-### Recommended Vendors
-
-| Component | Vendor | Notes |
-|-----------|--------|-------|
-| Copper spinning | Local metal spinner | Search "metal spinning [city]" |
-| Stainless arms | SendCutSend | Laser + brake service |
-| Walnut ring | Local CNC shop | Or Glowforge if <10mm |
-
----
-
-```
-鏡
-
-h(x) ≥ 0. Always.
-
-The form follows function.
-The CAD precedes the print.
-OnShape stores the truth.
-```
+### V3.0 (January 2026)
+- Complete redesign for 85mm sealed sphere
+- Added Display Mount (new part)
+- Updated all dimensions for compact form
+- Removed CM4 references (now QCS6490)
+- Added M.2 slot for Hailo-10H

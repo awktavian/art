@@ -1,5 +1,5 @@
 /**
- * Kagami Orb — The Floating Mirror
+ * Kagami Orb — The AI That Sees You
  * Interactive showcase JavaScript
  */
 
@@ -552,5 +552,5 @@ function hexToRgb(hex) {
         : '255, 255, 255';
 }
 
-console.log('🔮 Kagami Orb — The Floating Mirror');
+console.log('🔮 Kagami Orb — The AI That Sees You');
 console.log('鏡 h(x) ≥ 0. Always.');
