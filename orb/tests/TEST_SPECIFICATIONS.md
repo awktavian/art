@@ -280,12 +280,12 @@ async fn test_api_command_triggers_state_change() {
 **Procedure:**
 1. Run stress test (continuous inference + LED max)
 2. Record temperatures every 5 minutes for 60 minutes:
-   - CM4 SoC (via software)
+   - QCS6490 SoC (via software)
    - Internal air (thermocouple)
    - External shell (IR or probe)
 
 **Pass Criteria:**
-- CM4 SoC: < 75°C steady state
+- QCS6490 SoC: < 75°C steady state
 - Internal air: < 65°C
 - External shell: < 50°C (safe to touch)
 - No throttling events

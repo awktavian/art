@@ -7,7 +7,7 @@
 | Internal Frame | SLA/FDM | Tough 2000 / CF-PETG | `openscad/internal_frame.scad` |
 | LED Mount Ring | SLA/FDM | Grey Pro / PETG | `openscad/led_mount_ring.scad` |
 | Battery Cradle | SLA/FDM | Tough 2000 / PETG | `openscad/battery_cradle.scad` |
-| CM4 Bracket | SLA/FDM | Grey Pro / PETG | `openscad/cm4_bracket.scad` |
+| QCS6490 Bracket | SLA/FDM | Grey Pro / PETG | `openscad/qcs6490_bracket.scad` |
 | Diffuser Ring | SLA/FDM | White / White PETG | `openscad/diffuser_ring.scad` |
 | Resonant Coil Mount | SLA/FDM | Tough 2000 / PETG | `openscad/resonant_coil_mount.scad` |
 | Base Enclosure | CNC | Walnut | `cnc/base_enclosure.dxf` |
@@ -26,7 +26,7 @@
 | Internal Frame | Tough 2000 | 50μm | Yes (auto) | ~8h |
 | LED Mount Ring | Grey Pro | 25μm | Minimal | ~3h |
 | Battery Cradle | Tough 2000 | 50μm | Yes (auto) | ~4h |
-| CM4 Bracket | Grey Pro | 50μm | Minimal | ~2h |
+| QCS6490 Bracket | Grey Pro | 50μm | Minimal | ~2h |
 | Diffuser Ring | White | 50μm | None | ~2h |
 | Resonant Coil Mount | Tough 2000 | 50μm | Minimal | ~1h |
 
@@ -49,7 +49,7 @@
 | Internal Frame | CF-PETG | 0.2mm | 30% | Yes |
 | LED Mount Ring | PETG | 0.16mm | 25% | Minimal |
 | Battery Cradle | PETG | 0.2mm | 30% | Yes |
-| CM4 Bracket | PETG | 0.2mm | 30% | Yes |
+| QCS6490 Bracket | PETG | 0.2mm | 30% | Yes |
 | Diffuser Ring | White PETG | 0.2mm | 0% (2 walls) | None |
 | Resonant Coil Mount | PETG | 0.2mm | 40% | Minimal |
 

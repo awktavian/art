@@ -36,12 +36,12 @@ The Kagami Orb audio system achieves **far-field voice interaction** (3m target)
 | **THD** | <1% @ 94 dB SPL | Per IEC 61260-1 |
 | **Directivity** | ~120° half-power beamwidth (omnidirectional base) | Acoustic measurement |
 | **PDM Output** | 1.5–3.5 MHz clock, single-bit Σ-Δ | Hardware verified |
-| **Power Supply** | 1.8–3.3V (3.3V nominal) | CM4 IO bank I/O |
+| **Power Supply** | 1.8–3.3V (3.3V nominal) | QCS6490 IO bank I/O |
 | **Current Consumption** | <2 mA @ 3.3V | Operating specification |
 
 **Why SBM100B Over Alternatives:**
 - **vs INMP441:** Optical sensing eliminates vibration coupling (electrostatic design suffers from floor resonance)
-- **vs ReSpeaker Array:** SBM100B sensors are independent; ReSpeaker's built-in DSP adds latency (30–50ms)
+- **vs generic MEMS arrays:** SBM100B optical sensors eliminate vibration coupling that plagues electrostatic designs
 - **vs Knowles SPK0441:** SBM100B is 6mm vs 14mm, fits tetrahedral geometry in 85mm sphere
 
 ---
@@ -169,7 +169,7 @@ Each microphone mounted on **4 soft silicone pads** (Shore A 30–40):
 #### Clock and Data
 
 ```
-Master Clock (CM4):  3.072 MHz (standard for 16 kHz sampling)
+Master Clock (QCS6490):  3.072 MHz (standard for 16 kHz sampling)
 Bit Rate:            1.536 Mbps per microphone
 Total Bus:           4 × 1.536 = 6.144 Mbps (single I2S clock)
 
@@ -228,7 +228,7 @@ All 4 mics on **same I2S clock/LRCLK**:
 
 ### 2.2 XMOS XVF3800 Hardware AEC
 
-The **ReSpeaker XMOS XVF3800** contains dedicated hardware AEC processor.
+The **XMOS XVF3800** contains dedicated hardware AEC processor.
 
 #### Hardware Capabilities
 
@@ -279,7 +279,7 @@ The **ReSpeaker XMOS XVF3800** contains dedicated hardware AEC processor.
 │  └──────────┬───────────────┘                          │
 │             ↓                                          │
 │  PCM Output (Mono, 16-bit, 16 kHz)                     │
-│  → I2S TX to CM4                                       │
+│  → I2S TX to QCS6490                                   │
 │                                                        │
 └────────────────────────────────────────────────────────┘
 ```
@@ -294,7 +294,7 @@ The **ReSpeaker XMOS XVF3800** contains dedicated hardware AEC processor.
 
 ```
 ┌───────────────┐
-│   CM4 I2S    │ → Digital audio data
+│ QCS6490 I2S  │ → Digital audio data
 │   (PCM 16k)  │   • Clean, noise-free
 └───────┬───────┘   • Lowest latency (0 ms delay)
         │           • No coupling loss
@@ -328,16 +328,16 @@ Analog tap after speaker:
 
 ### 2.4 Reference Signal Path (Detailed)
 
-The CM4 sends the **speaker reference** to the XMOS via **high-speed I2C**:
+The QCS6490 sends the **speaker reference** to the XMOS via **high-speed I2C**:
 
 ```
-CM4 I2S TX (PCM out) @ 16 kHz
+QCS6490 I2S TX (PCM out) @ 16 kHz
         │
         ├─→ MAX98357A (Speaker amp)
         │
         └─→ [GPIO27] (Interrupt flag)
             ↓
-        CM4 Firmware Loop
+        QCS6490 Firmware Loop
             │
             ├─ Read I2S TX buffer (DMA)
             ├─ Prepare reference frame
@@ -400,9 +400,9 @@ CM4 I2S TX (PCM out) @ 16 kHz
 
 ---
 
-### 2.6 Software Post-Processing (CM4)
+### 2.6 Software Post-Processing (QCS6490)
 
-While XMOS handles the heavy lifting, the CM4 applies **secondary AEC** in software:
+While XMOS handles the heavy lifting, the QCS6490 applies **secondary AEC** in software:
 
 #### Spectral Subtraction
 
@@ -438,8 +438,8 @@ P_noise[f] = 30-sec avg   // Noise profile estimate
 │ XMOS PDM→PCM (64:1 decimation)              │ 2 ms  │
 │ XMOS AEC Processing (hardware)              │ <1 ms │
 │ XMOS Beamforming                            │ <1 ms │
-│ I2S TX to CM4 (16ms)                        │ 8 ms  │
-│ CM4 Post-processing (spectral sub)          │ 2 ms  │
+│ I2S TX to QCS6490 (16ms)                    │ 8 ms  │
+│ QCS6490 Post-processing (spectral sub)      │ 2 ms  │
 │ Opus encoding                                │ 5 ms  │
 │ Network delay to hub (USB→WiFi)             │ 5 ms  │
 │ ─────────────────────────────────────────────────────
@@ -984,7 +984,7 @@ XMOS XVF3800 (Hardware DSP)
         │ 1 channel, 16 kHz PCM
         │
 ┌───────┴─────────┐
-│ CM4 Firmware    │
+│ QCS6490 Firmware│
 ├─────────────────┤
 │ Wake Word       │ openWakeWord (ONNX)
 │ Detector        │ Threshold: 0.6
@@ -1153,7 +1153,7 @@ Timeline:
         └─ Beamform + AEC + NS
         └─ Output: Clean single-channel
 
-+40 ms: CM4 receives from XMOS
++40 ms: QCS6490 receives from XMOS
         └─ Wake word already triggered (before now)
         └─ Now in LISTENING state
 
@@ -1189,7 +1189,7 @@ TOTAL PERCEIVABLE LATENCY: ~260 ms
 
 ### 7.1 Component Integration Matrix
 
-| Component | Interface | Bandwidth | Protocol | CM4 Pin |
+| Component | Interface | Bandwidth | Protocol | QCS6490 Pin |
 |---|---|---|---|---|
 | **Mics (4×)** | I2S RX | 6.144 Mbps | PDM PCM | GPIO20 |
 | **XMOS XVF3800** | I2C | 400 kHz | SMBus | GPIO2/3 (I2C1) |
@@ -1350,7 +1350,7 @@ Ready for manufacturing
 ## Appendix B: Implementation Checklist
 
 - [x] Microphone array geometry locked (tetrahedral, 38.2mm spacing)
-- [x] Echo cancellation strategy (XMOS hardware + CM4 software) documented
+- [x] Echo cancellation strategy (XMOS hardware + QCS6490 software) documented
 - [x] Acoustic chamber tuned (Helmholtz port @ 282 Hz, foam damping)
 - [x] Beamformer DOA accuracy verified (±5° @ 3m)
 - [x] Speaker response flat ±2 dB (speech band)
@@ -1375,7 +1375,7 @@ Ready for manufacturing
 **What was added:**
 - XMOS XVF3800 hardware AEC detailed (512-tap FIR, <10ms latency)
 - Reference signal tap point from MAX98357A I2S output (0ms delay)
-- CM4 post-processing spectral subtraction (additional 6–10 dB @ <500 Hz)
+- QCS6490 post-processing spectral subtraction (additional 6–10 dB @ <500 Hz)
 - Latency budget breakdown (<100ms end-to-end)
 - Double-talk detection via Geigel algorithm (prevent divergence)
 

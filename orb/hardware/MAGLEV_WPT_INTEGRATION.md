@@ -859,7 +859,7 @@ impl LevitationSafetyVerifier {
 │  │  GPIO_PWM ────> MOSFET Gate (backup height control)                 │    │
 │  │  GPIO_IN  <──── Power Good signal                                   │    │
 │  │  GPIO_IN  <──── Temperature sensors (NTC × 2)                       │    │
-│  │  GPIO_SPI ────> SK6812 LED ring (thinking animation)                │    │
+│  │  GPIO_SPI ────> HD108 LED ring (thinking animation)                 │    │
 │  │                                                                      │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
 │                                                                              │
@@ -1103,7 +1103,7 @@ pub enum OrbToBase {
 | HCNT Maglev | 12-18 | 10 | Height dependent |
 | WPT TX | 20-24 | 0 | Charging only |
 | ESP32-S3 | 0.5 | 0.2 | WiFi active |
-| LEDs (8× SK6812) | 1.6 | 0.1 | Full brightness |
+| LEDs (8× HD108) | 1.6 | 0.1 | Full brightness |
 | Sensors/DAC | 0.1 | 0.1 | |
 | **Total** | **34-44W** | **10.4W** | |
 

@@ -13,10 +13,10 @@ flowchart TD
     subgraph phase0[Phase 0: Procurement]
         A0[Order Components] --> A1[Maglev Module]
         A0 --> A2[Resonant TX/RX Pair]
-        A0 --> A3[CM4 + IO Board]
-        A0 --> A4[ReSpeaker]
-        A0 --> A5[Coral TPU]
-        A0 --> A6[SK6812 Ring]
+        A0 --> A3[QCS6490 + IO Board]
+        A0 --> A4[sensiBel SBM100B]
+        A0 --> A5[Hailo-10H]
+        A0 --> A6[HD108 Ring]
         A0 --> A7[Hemispheres]
         A0 --> A8[Battery + BMS]
         A0 --> A9[Misc Components]
@@ -43,7 +43,7 @@ flowchart TD
     end
 
     subgraph phase3[Phase 3: Electronics Integration]
-        A3 --> D1[CM4 Setup]
+        A3 --> D1[QCS6490 Setup]
         A5 --> D2[Coral Integration]
         D1 --> D3[USB Hub Wiring]
         D2 --> D3
@@ -141,8 +141,8 @@ TOTAL CRITICAL PATH: ~7-8 weeks
 | **Phase 0: Procurement** ||||
 | Order all components | - | 1 day | - |
 | Receive maglev/Resonant | Order | 14 days | - |
-| Receive CM4/Coral | Order | 5 days | Yes |
-| Receive ReSpeaker | Order | 7 days | Yes |
+| Receive QCS6490/Coral | Order | 5 days | Yes |
+| Receive sensiBel SBM100B | Order | 7 days | Yes |
 | Receive hemispheres | Order | 7 days | Yes |
 | **Phase 1: Validation** ||||
 | Test maglev stability | Receive maglev | 2 hours | - |
@@ -155,10 +155,10 @@ TOTAL CRITICAL PATH: ~7-8 weeks
 | Print LED mount | Frame design | 3 hours | Yes (after frame) |
 | Print battery cradle | Frame design | 4 hours | Yes |
 | **Phase 3: Electronics** ||||
-| CM4 setup | Receive CM4 | 2 hours | Yes |
-| Coral integration | CM4 setup | 2 hours | - |
+| QCS6490 setup | Receive QCS6490 | 2 hours | Yes |
+| Coral integration | QCS6490 setup | 2 hours | - |
 | USB hub wiring | Coral done | 3 hours | - |
-| Audio system | Receive ReSpeaker | 3 hours | Yes |
+| Audio system | Receive sensiBel SBM100B | 3 hours | Yes |
 | Power system | Receive battery | 4 hours | Yes |
 | LED ring setup | Receive LEDs | 2 hours | Yes |
 | Electronics bench test | All electronics | 4 hours | - |
@@ -225,8 +225,8 @@ Stream B: Shell Preparation
   • 3D print structural parts
 
 Stream C: Electronics Setup
-  • CM4 + Coral on bench
-  • ReSpeaker testing
+  • QCS6490 + Coral on bench
+  • sensiBel SBM100B testing
   • LED ring testing
 
 
@@ -282,7 +282,7 @@ Stream B: Base Station
 | 3D printing | 2 | Yes |
 | Woodworking/CNC | 5 | Yes |
 | Wireless power | 1, 3 | Difficult |
-| Audio DSP | 3 | Yes (use ReSpeaker defaults) |
+| Audio DSP | 3 | Yes (use sensiBel SBM100B defaults) |
 
 ---
 

@@ -709,7 +709,7 @@ This document represents the **200/100 benchmark** for hardware bill of material
 | **TX Controller** | bq500215 | TI | 1 | $15 | $9 | In Stock | Philippines |
 | **Bridge Driver** | IRS2011SPBF | Infineon | 1 | $5 | $3 | In Stock | Germany |
 | **ESP32-S3** | ESP32-S3-WROOM-1-N8R8 | Espressif | 1 | $6.13 | $4.50 | In Stock | China |
-| **LED Ring** | SK6812-8 | Adafruit | 1 | $4 | $2 | In Stock | China |
+| **LED Ring** | HD108-8 | Adafruit | 1 | $4 | $2 | In Stock | China |
 | **Walnut Block** | Custom | Rockler | 1 | $40 | $20 | 1w | USA |
 | **BASE SUBTOTAL** | — | — | — | **$189** | **$106** | — | — |
 

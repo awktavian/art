@@ -491,8 +491,8 @@ pub struct DmaBuffers {
     /// SPI RX buffer for IPC (double-buffered)
     pub spi_rx: [[u8; 64]; 2],      // 128 bytes
 
-    /// LED data buffer (24 LEDs * 4 bytes RGBW * 3x for protocol)
-    pub led_data: [u8; 288],        // 288 bytes
+    /// LED data buffer (16 LEDs * 4 bytes RGBW * 3x for protocol)
+    pub led_data: [u8; 192],        // 192 bytes
 
     /// ADC sample buffer for Hall sensor (oversampling)
     pub adc_samples: [u16; 64],     // 128 bytes
@@ -1883,7 +1883,7 @@ impl HealthCheck {
 | 7 | SPI_MOSI | Output | IPC data out |
 | 8 | SPI_MISO | Input | IPC data in |
 | 9 | I2C_SCL | Output | I2C clock |
-| 10 | LED_DATA | Output | SK6812 data |
+| 10 | LED_DATA | Output | HD108 data |
 | 11 | WPT_PWM | Output | WPT frequency |
 | 12 | WPT_EN | Output | WPT enable |
 | 13 | HALL_DETECT | Input | Orb presence |

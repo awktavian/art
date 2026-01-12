@@ -14,10 +14,10 @@ This document specifies the **full component-level KiCad schematic** for the Kag
 |-------|------|----------|
 | 1 | Top Level | Block diagram, connectors |
 | 2 | Power Management | Resonant RX, BMS, buck converters |
-| 3 | CM4 Interface | Module connector, boot config |
+| 3 | QCS6490 Interface | Module connector, boot config |
 | 4 | USB Hub | USB2514B, downstream ports |
-| 5 | Audio | ReSpeaker connector, MAX98357A |
-| 6 | LED Control | Level shifter, SK6812 connector |
+| 5 | Audio | sensiBel SBM100B connector, MAX98357A |
+| 6 | LED Control | Level shifter, HD108 connector |
 | 7 | Sensors | Hall effect, temperature, I2C |
 
 ---
@@ -36,11 +36,11 @@ This document specifies the **full component-level KiCad schematic** for the Kag
                     └─────────────────────────────────────────────────────────────┘
 
      ┌──────────┐           ┌──────────┐           ┌──────────┐
-     │  POWER   │           │   CM4    │           │  USB HUB │
+     │  POWER   │           │ QCS6490  │           │  USB HUB │
      │  SHEET 2 │───5V──────│ SHEET 3  │───USB─────│ SHEET 4  │
      │          │           │          │           │          │
-     │ Res → BMS│           │ BCM2711  │           │ USB2514B │
-     │ → Buck   │           │ 4GB RAM  │           │ 4-Port   │
+     │ Res → BMS│           │ QCS6490  │           │ USB2514B │
+     │ → Buck   │           │ 8GB RAM  │           │ 4-Port   │
      └────┬─────┘           └────┬─────┘           └────┬─────┘
           │                      │                      │
           │ 3.3V                 │ I2S, I2C, GPIO       │ USB
@@ -49,8 +49,8 @@ This document specifies the **full component-level KiCad schematic** for the Kag
      │ SENSORS  │           │  AUDIO   │           │   LED    │
      │ SHEET 7  │◄──I2C─────│ SHEET 5  │           │ SHEET 6  │
      │          │           │          │           │          │
-     │ Hall     │           │ ReSpeaker│           │ 74AHCT   │
-     │ Temp     │           │ MAX98357 │           │ SK6812   │
+     │ Hall     │           │ sensiBel │           │ 74AHCT   │
+     │ Temp     │           │ MAX98357 │           │ HD108    │
      └──────────┘           └──────────┘           └──────────┘
 
 
@@ -58,8 +58,8 @@ EXTERNAL CONNECTORS:
 ────────────────────
 
 J1: USB-C (Programming/Debug/Emergency Charge)
-J2: ReSpeaker 8-pin FFC
-J3: SK6812 LED Ring (4-pin JST)
+J2: sensiBel SBM100B 8-pin FFC
+J3: HD108 16 LED Ring (4-pin JST)
 J4: Speaker (2-pin JST)
 J5: Battery (4-pin JST with balance)
 J6: Resonant Receiver (3-pin pogo)
@@ -180,7 +180,7 @@ J1 (USB-C)
    │           │
    │  VBUS     ├────────────► VIN_USB (diode OR with VIN_RES)
    │           │
-   │  D+/D-    ├────────────► USB_DATA (to CM4 for debug)
+   │  D+/D-    ├────────────► USB_DATA (to QCS6490 for debug)
    │           │
    │  GND      ├────────────► GND
    └───────────┘
@@ -188,13 +188,13 @@ J1 (USB-C)
 
 ---
 
-## Sheet 3: CM4 Interface
+## Sheet 3: QCS6490 Interface
 
 ### Component List
 
 | Ref | Part | Package | Description |
 |-----|------|---------|-------------|
-| J10, J11 | DF40HC(3.0)-100DS | 100-pin | CM4 connectors |
+| J10, J11 | DF40HC(3.0)-100DS | 100-pin | QCS6490 connectors |
 | R1-R4 | 10kΩ | 0402 | Boot config pullups |
 | C10-C15 | 100nF | 0402 | Decoupling |
 | C16-C17 | 10μF | 0603 | Bulk decoupling |
@@ -202,7 +202,7 @@ J1 (USB-C)
 ### Pin Assignments
 
 ```
-CM4 CONNECTOR PINOUT (Critical Signals)
+QCS6490 CONNECTOR PINOUT (Critical Signals)
 ───────────────────────────────────────
 
 POWER:
@@ -217,7 +217,7 @@ USB:
 I2S AUDIO:
   GPIO12 (PCM_CLK)  → I2S_BCLK (shared)
   GPIO19 (PCM_FS)   → I2S_LRCLK (shared)
-  GPIO20 (PCM_DIN)  ← ReSpeaker Data Out
+  GPIO20 (PCM_DIN)  ← sensiBel SBM100B Data Out
   GPIO21 (PCM_DOUT) → MAX98357A Data In
 
 I2C:
@@ -225,13 +225,13 @@ I2C:
   GPIO3 (SCL)       → I2C bus
 
 LED:
-  GPIO18 (PWM0)     → Level shifter → SK6812
+  GPIO18 (PWM0)     → Level shifter → HD108
 
 GPIO (Status):
   GPIO17            ← Resonant charging status
   GPIO22            ← Hall sensor (dock)
   GPIO23            ← Temperature alert
-  GPIO24            ← ReSpeaker VAD
+  GPIO24            ← sensiBel SBM100B VAD
   GPIO27            ← Battery alert
 
 BOOT:
@@ -259,10 +259,10 @@ USB HUB (USB2514B) DOWNSTREAM ALLOCATION
 ─────────────────────────────────────────
 
 UPSTREAM:
-  CM4 USB_DP/DM ──────► USB2514B USBDP/USBDM
+  QCS6490 USB_DP/DM ──────► USB2514B USBDP/USBDM
 
 DOWNSTREAM:
-  Port 1 ──────────────► Google Coral USB TPU
+  Port 1 ──────────────► Hailo-10H AI Accelerator
   Port 2 ──────────────► Intel AX210 WiFi (via adapter)
   Port 3 ──────────────► J1 USB-C (external access)
   Port 4 ──────────────► Reserved (debug header)
@@ -280,7 +280,7 @@ CONFIGURATION:
 
 | Ref | Part | Package | Description |
 |-----|------|---------|-------------|
-| J2 | FH12-8S-0.5SH | FFC | ReSpeaker connector |
+| J2 | FH12-8S-0.5SH | FFC | sensiBel SBM100B connector |
 | U7 | MAX98357AETE | QFN-16 | I2S Class-D amp |
 | J4 | B2B-PH-K-S | 2-pin | Speaker connector |
 | C20-C22 | Various | - | Filter caps |
@@ -288,8 +288,8 @@ CONFIGURATION:
 ### Connections
 
 ```
-RESPEAKER 4-MIC ARRAY (J2)
-─────────────────────────
+SENSIBEL SBM100B MEMS MIC ARRAY (J2)
+────────────────────────────────────
 
 Pin 1: 3V3         ← 3V3 rail
 Pin 2: GND         ← GND
@@ -341,8 +341,8 @@ GPIO18 (3.3V) ───► 74AHCT125 ───► 5V_LED_DATA
                    J3 Pin 2 (DIN)
 
 
-J3 (SK6812 CONNECTOR)
-─────────────────
+J3 (HD108 16 LED CONNECTOR)
+───────────────────────────
 
 Pin 1: 5V      ← 5V_LED rail
 Pin 2: DIN     ← 5V_LED_DATA
@@ -396,7 +396,7 @@ Address | Device        | Function
 0x48    | TMP117        | Temperature
 0x55    | BQ25895       | Charger
 0x55    | BQ40Z50       | Fuel gauge (SMBus)
-0x35    | ReSpeaker     | DSP configuration
+0x35    | sensiBel      | MEMS mic configuration
 ```
 
 ---

@@ -117,7 +117,7 @@
 | **bq500215** | Resonant TX controller | $15 | [TI](https://www.ti.com/) | In Stock |
 | **IRS2011SPBF** | Full-bridge driver | $5 | DigiKey | In Stock |
 | **ESP32-S3-WROOM-1-N8R8** | Base controller | $6.13 | DigiKey | In Stock |
-| **SK6812 Ring 8** | Status LEDs | $4 | [Adafruit](https://www.adafruit.com/) | In Stock |
+| **HD108 Ring 8** | Status LEDs | $4 | [Adafruit](https://www.adafruit.com/) | In Stock |
 | **Walnut Block** | 180×180×50mm | $40 | [Rockler](https://www.rockler.com/) | In Stock |
 
 ---

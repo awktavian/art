@@ -628,7 +628,7 @@ Where A=1.009e-3, B=2.378e-4, C=9.2e-8
 | **V_DISPLAY** | 5.0V | 0.5A | AMOLED driver (RM69330) | TI TPS61030 (boost) |
 | **V_RF** | 3.3V | 1A | Wireless charging RX (bq51025) | Dedicated buck |
 | **V_AUDIO** | 3.3V | 0.2A | Audio codec (XMOS), mics | Shared V_LOGIC |
-| **V_LED** | 5V | 0.8A | SK6812/HD108 LEDs | Boost from 3.3V |
+| **V_LED** | 5V | 0.8A | HD108 LEDs | Boost from 3.3V |
 
 ### 4.2 Power Tree (Block Diagram)
 

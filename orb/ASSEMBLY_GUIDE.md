@@ -127,7 +127,7 @@ Before beginning assembly, ensure you have:
 │                                   │                                              │
 │                      ╔════════════╧════════════╗                                │
 │                      ║    WALNUT ENCLOSURE     ║ ← CNC, 180×25mm                │
-│                      ║   ○ ○ ○ ○ ○ ○ ○ ○      ║ ← SK6812 status ring (×8)      │
+│                      ║   ○ ○ ○ ○ ○ ○ ○ ○      ║ ← HD108 status ring (×8)      │
 │                      ╚═════════════════════════╝                                │
 │                                                                                  │
 └─────────────────────────────────────────────────────────────────────────────────┘
@@ -192,7 +192,7 @@ PTZ Torque Coils (×4):
 1. Mount ESP32-S3-WROOM-1-N8R8
 2. Install DRV8833 motor drivers (×2)
 3. Connect 4× DRV5053 Hall sensors (orientation feedback)
-4. Wire SK6812 LED ring (8 LEDs)
+4. Wire HD108 LED ring (8 LEDs)
 5. Test "thinking" animation pattern
 
 ---

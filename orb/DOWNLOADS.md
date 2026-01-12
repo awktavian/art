@@ -22,7 +22,7 @@
 | Internal Frame | [internal_frame.scad](cad/openscad/internal_frame.scad) | Tough 2000 | ~8h |
 | LED Mount Ring | [led_mount_ring.scad](cad/openscad/led_mount_ring.scad) | Grey Pro | ~3h |
 | Battery Cradle | [battery_cradle.scad](cad/openscad/battery_cradle.scad) | Tough 2000 | ~4h |
-| CM4 Bracket | [cm4_bracket.scad](cad/openscad/cm4_bracket.scad) | Grey Pro | ~2h |
+| QCS6490 Bracket | [qcs6490_bracket.scad](cad/openscad/qcs6490_bracket.scad) | Grey Pro | ~2h |
 | Diffuser Ring | [diffuser_ring.scad](cad/openscad/diffuser_ring.scad) | White | ~2h |
 | Resonant Coil Mount | [resonant_coil_mount.scad](cad/openscad/resonant_coil_mount.scad) | Tough 2000 | ~1h |
 
@@ -62,7 +62,7 @@
 |-------|------|----------|
 | 1 | [kagami_orb.kicad_sch](pcb/kagami_orb.kicad_sch) | Top Level |
 | 2 | [kagami_orb_power.kicad_sch](pcb/kagami_orb_power.kicad_sch) | Power Management |
-| 3 | [kagami_orb_cm4.kicad_sch](pcb/kagami_orb_cm4.kicad_sch) | CM4 Interface |
+| 3 | [kagami_orb_qcs6490.kicad_sch](pcb/kagami_orb_qcs6490.kicad_sch) | QCS6490 Interface |
 | 4 | [kagami_orb_usb.kicad_sch](pcb/kagami_orb_usb.kicad_sch) | USB Hub |
 | 5 | [kagami_orb_audio.kicad_sch](pcb/kagami_orb_audio.kicad_sch) | Audio System |
 | 6 | [kagami_orb_led.kicad_sch](pcb/kagami_orb_led.kicad_sch) | LED Control |

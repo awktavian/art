@@ -363,23 +363,23 @@ where:
 
 ## 4. Hardware Integration
 
-### Raspberry Pi CM4 Pin Mapping
+### Qualcomm QCS6490 Pin Mapping
 
 | Function | Interface | GPIO/Pin |
 |----------|-----------|----------|
-| LED Ring (SK6812) | SPI0 MOSI | GPIO10 |
-| Microphones (INMP441) | I2S | GPIO18/19/20/21 |
-| Speaker (MAX98357A) | I2S | GPIO18/19/21 |
-| Thermal (TMP117) | I2C1 | GPIO2/3 |
-| Fuel Gauge (BQ40Z50) | I2C1 | GPIO2/3 |
-| Hall Sensor (AH49E) | GPIO | GPIO17 |
+| LED Ring (HD108) | SPI0 MOSI | GPIO36 |
+| Microphones (sensiBel SBM100B) | I2S | GPIO45/46/47/48 |
+| Speaker (MAX98357A) | I2S | GPIO45/46/48 |
+| Thermal (TMP117) | I2C1 | GPIO4/5 |
+| Fuel Gauge (BQ40Z50) | I2C1 | GPIO4/5 |
+| Hall Sensor (AH49E) | GPIO | GPIO26 |
 | Wake Signal | GPIO | GPIO27 |
 
 ### Software Dependencies
 
 | Crate | Purpose | Notes |
 |-------|---------|-------|
-| `tokio` | Async runtime | NOT Embassy (CM4 runs Linux) |
+| `tokio` | Async runtime | NOT Embassy (QCS6490 runs Linux) |
 | `rpi-pal` | GPIO/SPI/I2C | Maintained fork of rppal |
 | `cpal` | Audio I/O | Cross-platform |
 | `opus` | Audio encoding | For streaming to hub |
@@ -390,7 +390,7 @@ where:
 
 ### Critical Dependency Notes
 
-1. **Embassy vs Tokio**: Embassy is for bare-metal MCUs. CM4 runs Linux, so use Tokio.
+1. **Embassy vs Tokio**: Embassy is for bare-metal MCUs. QCS6490 runs Linux, so use Tokio.
 2. **rppal**: Retired July 2025. Use `rpi-pal` (maintained fork) instead.
 3. **VAD**: Use Silero VAD via ONNX runtime for voice activity detection.
 
@@ -444,7 +444,7 @@ All animations use Fibonacci-based timing for natural feel:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  MIC ARRAY (4ch) → ReSpeaker DSP → Ring Buffer                 │
+│  MIC ARRAY (4ch) → sensiBel SBM100B DSP → Ring Buffer          │
 │        ↓                                                        │
 │  Wake Word (openWakeWord/Porcupine)                            │
 │        ↓                                                        │
