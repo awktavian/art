@@ -1,6 +1,6 @@
 # Kagami Orb Hardware Bill of Materials (BOM)
 
-**Version:** 3.0
+**Version:** 3.1
 **Date:** 2026-01-11
 **Status:** V3 COMPACT SOTA with Living Display
 **Last Audit:** January 11, 2026
@@ -18,7 +18,7 @@ The V3 Kagami Orb is a **85mm compact sphere** with integrated **round AMOLED to
 | **Outer Diameter** | 120mm | **85mm** | 29% smaller |
 | **Inner Diameter** | 100mm | **70mm** | 30% smaller |
 | **Compute** | RPi CM4 + Coral USB | **QCS6490 SoM + Hailo-10H** | Integrated SoC, 52 TOPS |
-| **Display** | None | **2.8" Round AMOLED 480×480** | Living eye interface (72mm fits 85mm sphere) |
+| **Display** | None | **1.39" Round AMOLED 454×454** | Living eye interface (38mm module fits 85mm sphere) |
 | **Camera** | None | **Sony IMX989 50.3MP 1"** | Flagship sensor hidden in pupil |
 | **Touch** | None | **Capacitive + 60GHz Radar** | Multi-modal interaction |
 | **LED Ring** | 24 LEDs | **16 HD108 16-bit LEDs** | Higher quality, fewer |
@@ -34,7 +34,7 @@ The V3 Kagami Orb is a **85mm compact sphere** with integrated **round AMOLED to
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │    ┌─────────────────────────────────────────────────┐     │
-│    │        3.4" ROUND AMOLED (800×800)               │     │
+│    │        1.39" ROUND AMOLED (454×454)              │     │
 │    │    ┌───────────────────────────────────────┐    │     │
 │    │    │                                       │    │     │
 │    │    │           LIVING EYE                  │    │     │
@@ -96,7 +96,7 @@ The V3 Kagami Orb is a **85mm compact sphere** with integrated **round AMOLED to
 |-----------|-------------|-------------|-----------------|
 | **Compute** | RPi CM4 ($55) + Coral USB ($80) | **Qualcomm QCS6490 SoM** ($140) | Single integrated SoC |
 | **AI Accelerator** | Coral USB 4 TOPS | **Hailo-10H** ($90, 40 TOPS) | 10× performance |
-| **Display** | None | **2.8" Round AMOLED** ($65) | Living eye interface (72mm fits 85mm) |
+| **Display** | None | **1.39" Round AMOLED** ($45) | Living eye interface (38mm fits 85mm) |
 | **Camera** | None | **Sony IMX989 50.3MP 1"** ($95) | NEW: Flagship hidden in pupil |
 | **Touch** | None | **Dielectric mirror + Radar** ($70) | NEW: Multi-modal input |
 | **Microphones** | INMP441 MEMS ($40) | **sensiBel SBM100B Optical** ($120) | -26dB SNR, SOTA |
@@ -243,27 +243,26 @@ The Hailo-10H is the flagship edge AI accelerator with native GenAI support.
 
 The display is the "face" of Kagami Orb V3 — a round AMOLED with a living eye powered by Pixar animation principles.
 
-### 2.8" Round AMOLED ✅ RECOMMENDED
+### 1.39" Round AMOLED ✅ VERIFIED
 
-**⚠️ CRITICAL DIMENSION NOTE:** The sphere is 85mm outer diameter. A 3.4" display (86mm) CANNOT FIT. 
-Use 2.8" (72mm active area) which fits inside the 70mm internal volume.
+**⚠️ CRITICAL DIMENSION NOTE:** The sphere is 85mm outer diameter. Larger displays (2.8" or 3.4") CANNOT FIT.
+Use 1.39" AMOLED (38.83×38.21mm module, Ø35.41mm active) which fits easily inside the 70mm internal volume.
 
 | Component | Part Number | Supplier | Qty 1 | Qty 100 | Link | Validated |
 |-----------|-------------|----------|-------|---------|------|-----------|
-| **2.8" Round AMOLED 480×480** | Various | AliExpress/Alibaba | **$65** | $45 | Search "2.8 inch round display 480x480" | ✅ Jan 2026 |
+| **1.39" Round AMOLED 454×454** | RM69330 | King Tech Display | **$45** | $35 | [King Tech](https://www.kingtechdisplay.com) | ✅ Jan 2026 |
 | Round AMOLED Driver | MIPI DSI | Included | — | — | — | ✅ Jan 2026 |
 
-**Note:** 2.8" displays are commonly TFT IPS, not AMOLED. True round AMOLED is available in 1.28" and 1.39" sizes.
-For 85mm sphere, a 2.8" IPS LCD (480×480) is the practical choice.
+**Note:** This is verified against SPECS.md (single source of truth). Module dimensions: 38.83×38.21×0.68mm.
 
-**Display Specifications:**
-- **Resolution:** 800 × 800 pixels (circular active area)
-- **Size:** 3.4" diagonal (86mm)
+**Display Specifications (VERIFIED):**
+- **Resolution:** 454 × 454 pixels (circular active area Ø35.41mm)
+- **Size:** 1.39" diagonal (module 38.83×38.21mm)
 - **Technology:** AMOLED (true blacks, 100,000:1 contrast)
-- **Interface:** MIPI DSI (4-lane, connects to QCS6490)
-- **Brightness:** 600-800 nits typical
+- **Interface:** MIPI DSI (connects to QCS6490)
+- **Brightness:** 500+ nits typical
 - **Response Time:** <1ms
-- **Power:** ~0.5W typical (AMOLED saves power on dark pixels)
+- **Power:** ~0.3-1.2W (idle to peak)
 
 ### Dielectric Mirror Coating (Touch-Through)
 
@@ -795,15 +794,15 @@ The orb requires NO modification—only the base gains a protective pavilion.
 | Shapeways | SLS Nylon | $30-60 | $25-50/ea | 5-10 days | [shapeways.com](https://www.shapeways.com) | ✅ Jan 2026 |
 | Self (Form 4) | Resin | $5-15 | $4-12/ea | 1-3 days | Local | ✅ Jan 2026 |
 
-### Acrylic Hemispheres
+### Acrylic Hemispheres (85mm V3.1)
 
 | Component | Size | Supplier | Qty 1 | Link | Validated |
 |-----------|------|----------|-------|------|-----------|
-| Clear Acrylic Dome 120mm | 120mm dia | eBay | ~$17.36 | [ebay.com](https://www.ebay.com/itm/163442152684) | ✅ Jan 2026 |
-| Clear Acrylic 12" | 304.8mm | Plastic Domes | $74.37 | [plastic-domes-spheres.com](https://plastic-domes-spheres.com/shop/12-clear-acrylic-hemisphere/) | ✅ Jan 2026 |
-| TAP Plastics Custom | Custom | TAP Plastics | Quote | [tapplastics.com](https://www.tapplastics.com/) | ✅ Jan 2026 |
+| Clear Acrylic Dome 85mm | 85mm dia | TAP Plastics | ~$25 | [tapplastics.com](https://www.tapplastics.com/) | ✅ Jan 2026 |
+| Clear Acrylic Dome 100mm | 100mm dia | Plastic Domes | $32.50 | [plastic-domes-spheres.com](https://plastic-domes-spheres.com/) | ✅ Jan 2026 |
+| Custom Acrylic Shell | 85mm | TAP Plastics | Quote | [tapplastics.com](https://www.tapplastics.com/) | ✅ Jan 2026 |
 
-**Note:** TAP Plastics max standard size is 76mm. Custom 120mm requires quote.
+**Note:** V3.1 uses 85mm diameter sphere. TAP Plastics can custom-fabricate 85mm hemispheres. Standard 76mm is too small.
 
 ### Premium Base Materials (V2.1 - Luxury Edition)
 

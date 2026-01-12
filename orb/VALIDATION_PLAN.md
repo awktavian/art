@@ -16,7 +16,7 @@ This document defines the tests that must pass before the Kagami Orb is consider
 |---|------|------|--------|-----------|
 | 1 | ZT-HX500 Maglev Module (500g) | $180 | AliExpress | 7-14 days |
 | 2 | **80mm Resonant TX Coil** (Litz wire, 15 turns) | $25 | Würth Elektronik | 5-7 days |
-| 3 | **80mm Resonant RX Coil** (Litz wire, 20 turns) | $25 | Würth Elektronik | 5-7 days |
+| 3 | **70mm Resonant RX Coil** (Litz wire, 20 turns, 45µH) | $25 | Würth Elektronik | 5-7 days |
 | 4 | **Resonant TX Driver** (bq500215) | $18 | TI/DigiKey | 3-5 days |
 | 5 | **Resonant RX Controller** (bq51025) | $12 | TI/DigiKey | 3-5 days |
 | 6 | **Ferrite Shields** (2× 90mm Mn-Zn, 0.8mm) | $30 | Fair-Rite | 5-7 days |
@@ -72,7 +72,7 @@ This document defines the tests that must pass before the Kagami Orb is consider
 1. Place **80mm resonant TX coil** (Litz wire) on flat surface
 2. Install **ferrite shield** (0.8mm Mn-Zn) between TX coil and maglev magnets
 3. 3D print spacers: 10mm, 12mm, 15mm, 18mm, 20mm
-4. Place **80mm resonant RX coil** on spacer
+4. Place **70mm resonant RX coil** on spacer
 5. Tune TX and RX to ~140kHz with capacitors
 6. Connect TX to 24V 3A supply via bq500215 driver
 7. Connect RX to bq51025 controller → power meter

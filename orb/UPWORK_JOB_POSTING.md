@@ -137,7 +137,7 @@ Think: **Amazon Echo meets levitating desk globe meets infinity mirror art piece
 ## Required Experience
 
 **Must have demonstrated experience with:**
-- [ ] Qualcomm QCS6490 / embedded SoC development (show me a project)
+- [ ] Qualcomm QCS-series OR comparable embedded Linux SoM (Jetson, RK3588, i.MX8) — show me a project
 - [ ] Power electronics — battery management, charging circuits
 - [ ] Audio systems — microphone arrays, DSP, echo cancellation
 - [ ] LED control — addressable LEDs, animations
@@ -189,31 +189,49 @@ Think: **Amazon Echo meets levitating desk globe meets infinity mirror art piece
 
 ## Budget
 
-**Total Budget: $3,700 - $6,400 USD**
+**Labor Budget: $8,000 - $15,000 USD**
 
-This includes:
-- Your labor (hourly or fixed price, your preference)
-- Component costs (I can pay upfront or reimburse with receipts)
-- Shipping to Seattle, WA
+**Note:** Component budget (~$1,500) is separate and handled directly by me. This labor budget is for your engineering time only.
 
-I'm flexible on structure — we can do:
-- Fixed price per phase (milestone payments)
-- Hourly with weekly cap
+### Milestone Payment Structure
+
+| Milestone | Percentage | Trigger |
+|-----------|------------|---------|
+| **Upfront** | 25% | Contract signed, component acquisition begins |
+| **Phase 2 Complete** | 25% | Electronics integration validated |
+| **Phase 4 Complete** | 25% | Full system integration working |
+| **Final Acceptance** | 25% | Prototype delivered and accepted |
+
+I'm flexible on structure — we can also do:
+- Hourly with weekly cap ($40-80/hr range)
 - Hybrid (fixed for hardware, hourly for debugging)
 
 ## Timeline
 
-**Target: 6-8 weeks to working prototype**
+**Target: 10-14 weeks to working prototype**
 
 | Week | Phase |
 |------|-------|
-| 1-2 | Phase 1: Validation |
-| 2-3 | Phase 2: Electronics |
-| 3-5 | Phase 3: Enclosure |
-| 5-7 | Phase 4: Software |
-| 7-8 | Phase 5: Polish & Ship |
+| 1-3 | **Phase 0: Component Acquisition** (buffer for lead times) |
+| 3-5 | Phase 1: Validation |
+| 5-7 | Phase 2: Electronics |
+| 7-10 | Phase 3: Enclosure |
+| 10-12 | Phase 4: Software |
+| 12-14 | Phase 5: Polish & Ship |
+
+**Phase 0 Note:** Some components (QCS6490, Hailo-10H, sensiBel SBM100B) have longer lead times or MOQ requirements. Budget 2-3 weeks for component acquisition before active build begins.
 
 I understand hardware projects have unknowns. I'm flexible on timeline if you communicate proactively.
+
+## Communication Expectations
+
+| Channel | Frequency | Purpose |
+|---------|-----------|---------|
+| **Video Call** | Weekly | Progress review, blockers, planning |
+| **Slack/Discord** | Daily async | Quick questions, updates, photos |
+| **GitHub** | Continuous | Code, design files, documentation |
+
+I'm in Seattle (PST) and generally available 9am-6pm. I respond quickly to async messages and value proactive communication about blockers.
 
 ## How to Apply
 
@@ -227,9 +245,10 @@ I understand hardware projects have unknowns. I'm flexible on timeline if you co
 
 **Bonus points if you've worked with:**
 - Magnetic levitation
-- Wireless charging circuits
+- Wireless charging circuits (especially resonant, not just Qi)
 - Voice assistant hardware
-- Qualcomm QCS6490 specifically
+- Qualcomm QCS-series, Jetson, RK3588, or similar embedded Linux SoMs
+- Seattle-area local (strong preference for in-person collaboration)
 
 ## About Me
 
@@ -241,6 +260,36 @@ I have a home workshop with:
 - Basic electronics tools
 
 I can print/cut parts if that helps reduce your workload.
+
+### Local Preference
+
+**Strong preference for Seattle-area contractors** for potential in-person collaboration during critical phases. If you're local, please mention it!
+
+Alternatively, I'm open to working with established firms like:
+- Pillar Design (Seattle)
+- Made Cascade (Seattle area)
+
+Remote contractors with strong track records are also welcome to apply.
+
+## IP & NDA Requirements
+
+**This is a work-for-hire arrangement:**
+- All hardware designs, schematics, and PCB layouts become my intellectual property
+- **Firmware is open source** (MIT license) — you'll be contributing to a public repo
+- NDA required before sharing full technical specifications
+- Standard Upwork IP assignment applies
+
+## Component Availability Notes
+
+Some components have availability challenges. Acceptable fallbacks:
+
+| Primary Component | Acceptable Fallback | Notes |
+|-------------------|---------------------|-------|
+| sensiBel SBM100B | Infineon IM69D130 | Similar MEMS mic, easier to source |
+| Hailo-10H NPU | Software-only inference | Reduces AI performance but functional |
+| QCS6490 | — | MOQ is 10 units (~$2,000 budget impact) |
+
+**Hailo-10H availability is uncertain** — we may need to pivot to Hailo-8 or software inference depending on supply.
 
 ## Questions?
 
@@ -261,8 +310,8 @@ Looking forward to working with a skilled hardware engineer to bring this floati
 | **Category** | Engineering & Architecture > Electrical Engineering |
 | **Subcategory** | Embedded Systems, PCB Design, Hardware Prototyping |
 | **Experience Level** | Expert |
-| **Budget Type** | Fixed Price: $3,700 - $6,400 OR Hourly: $40-80/hr |
-| **Project Length** | 1-3 months |
+| **Budget Type** | Fixed Price: $8,000 - $15,000 (labor only) OR Hourly: $40-80/hr |
+| **Project Length** | 3-6 months |
 
 ### Skills to Tag
 - Qualcomm QCS6490
@@ -279,11 +328,12 @@ Looking forward to working with a skilled hardware engineer to bring this floati
 - Bluetooth
 
 ### Screening Questions
-1. "Have you built a project with Qualcomm QCS6490 or similar embedded SoC? Please share a link or photo."
+1. "Have you built a project with Qualcomm QCS-series, Jetson, RK3588, i.MX8, or similar embedded Linux SoM? Please share a link or photo."
 2. "Have you worked with wireless power transfer (Qi or resonant)? Describe briefly."
 3. "What's your experience with audio/microphone systems?"
 4. "Do you understand why standard Qi won't work at 18-25mm gap with maglev magnets?"
 5. "Are you able to ship a completed prototype to Seattle, WA, USA?"
+6. "Are you comfortable signing an NDA and work-for-hire IP assignment?"
 
 ---
 
@@ -305,10 +355,11 @@ When posting, include these **public URLs** in the job description:
 ### 🚩 AVOID applicants who:
 - Have no hardware projects in their portfolio (software only)
 - Can't explain the biggest risk (shows they didn't read the spec)
-- Quote significantly below $2,500 (likely underestimating)
+- Quote significantly below $5,000 (likely underestimating complexity)
 - Have no reviews/history on hardware projects
 - Are vague about their approach to Phase 1
 - Can't ship internationally (if they're overseas)
+- Refuse to sign NDA or IP assignment
 
 ### ✅ PREFER applicants who:
 - Show photos/videos of past hardware builds
@@ -318,6 +369,8 @@ When posting, include these **public URLs** in the job description:
 - Have experience with voice/audio systems
 - Propose a validation-first approach
 - Are in a timezone compatible with Seattle (PST)
+- **Are Seattle-local** for in-person collaboration
+- Have experience with component sourcing and lead time management
 
 ---
 

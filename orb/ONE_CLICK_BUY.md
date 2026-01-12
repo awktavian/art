@@ -178,11 +178,11 @@ Print these files from `apps/hub/kagami-orb/cad/`:
 
 ### Step 8: Custom Coils — ~$50
 
-Custom Litz wire coils (80mm, ~140kHz resonant):
+Custom Litz wire coils (RX: 70mm, TX: 80mm, ~140kHz resonant):
 
 | Qty | Item | Supplier | Price |
 |-----|------|----------|-------|
-| 1 | RX Coil (20 turns, 100μH) | Request quote from [yihetimes.en.made-in-china.com](https://yihetimes.en.made-in-china.com/) | ~$25 |
+| 1 | RX Coil (20 turns, 45μH) | Request quote from [yihetimes.en.made-in-china.com](https://yihetimes.en.made-in-china.com/) | ~$25 |
 | 1 | TX Coil (15 turns, 47μH) | Same supplier | ~$25 |
 
 **Alternative:** Wind your own with Litz wire from [wurth.com](https://www.wurth.com) or [digikey.com](https://www.digikey.com)

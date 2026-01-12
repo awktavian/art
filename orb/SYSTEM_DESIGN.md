@@ -1,6 +1,6 @@
-# Kagami Orb V3 System Design
+# Kagami Orb V3.1 System Design
 
-**Version:** 3.0
+**Version:** 3.1
 **Date:** 2026-01-11
 **Status:** Design Complete — SEALED 85mm SOTA
 

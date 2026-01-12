@@ -1,4 +1,4 @@
-# Kagami Orb V3 — Assembly Guide
+# Kagami Orb V3.1 — Assembly Guide
 
 ## Prerequisites
 
@@ -42,8 +42,8 @@ Before beginning assembly, ensure you have:
 │                         ╰─────────┬─────────╯                                   │
 │                                   │                                              │
 │                         ╭─────────┴─────────╮                                   │
-│                        │   2.8" ROUND AMOLED │ ← 480×480 living eye display     │
-│                        │   (72mm active)     │                                   │
+│                        │   1.39" ROUND AMOLED│ ← 454×454 living eye display     │
+│                        │   (Ø35.41mm active) │                                   │
 │                         ╰─────────┬─────────╯                                   │
 │                                   │                                              │
 │                         ┌─────────┴─────────┐                                   │
@@ -91,7 +91,7 @@ Before beginning assembly, ensure you have:
 │                         ┌─────────┴─────────┐                                   │
 │                        │   COIL MOUNT        │ ← Tough 2000, 72×6mm             │
 │                        │  ┌───────────────┐  │                                   │
-│                        │  │   RX COIL     │  │ ← 70mm Litz, 18 turns            │
+│                        │  │   RX COIL     │  │ ← 70mm Litz, 20 turns, 45µH      │
 │                        │  │   70mm        │  │                                   │
 │                        │  └───────────────┘  │                                   │
 │                        │  ┌───────────────┐  │                                   │
@@ -203,7 +203,7 @@ PTZ Torque Coils (×4):
 
 1. Print coil mount (Tough 2000)
 2. Position 60×60mm ferrite sheet
-3. Wind RX coil: 70mm, 18 turns Litz, 85μH
+3. Wind RX coil: 70mm, 20 turns Litz, 45μH
 4. Secure coil in mount recess
 5. Route leads through channel
 
@@ -301,10 +301,10 @@ Thermal stack (critical!):
 
 ### 5.2 AMOLED Installation
 
-⚠️ **CRITICAL: The display MUST be 2.8" round (72mm active).
-   The BOM lists "3.4 inch" which is an ERROR — 86mm won't fit in 85mm sphere!**
+⚠️ **CRITICAL: The display MUST be 1.39" round (Ø35.41mm active, 38.83×38.21mm module).
+   Larger displays (2.8" or 3.4") will NOT fit in the 85mm sphere!**
 
-1. Position 2.8" AMOLED in recess
+1. Position 1.39" AMOLED in recess
 2. Align camera aperture with display center
 3. Secure with retention clips
 4. Route flex cable through channel
@@ -444,10 +444,10 @@ Use kapton tape at crossings.
 
 ## Changelog
 
-### V3.0 (January 2026)
+### V3.1 (January 2026)
 - Complete rewrite for V3 85mm SOTA design
 - Updated all components to V3 BOM
 - Added PTZ torque coil assembly
 - Added sensiBel microphone array
-- Fixed display size to 2.8" (72mm)
+- Fixed display size to 1.39" (Ø35.41mm active)
 - Removed all CM4/Coral references
