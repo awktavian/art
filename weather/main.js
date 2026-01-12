@@ -601,6 +601,15 @@ class WeatherAtmosphere {
                 abbreviation: this.timezoneAbbr
             }
         }));
+
+        // Dispatch weather-ready event for Live Demo
+        window.dispatchEvent(new CustomEvent('weather-ready', {
+            detail: {
+                condition: this.condition,
+                cloudCover: this.cloudCover,
+                temperature: this.temperature
+            }
+        }));
     }
 
     calculateModifiers() {
@@ -5465,6 +5474,11 @@ class CelestialDemo {
         // Initialize weather-based atmosphere adaptation
         // This sneakily adjusts all animations based on reader's real weather
         atmosphere.init();
+
+        // Listen for weather data to be ready and update display
+        window.addEventListener('weather-ready', () => {
+            this.update();
+        });
     }
 
     cacheElements() {
@@ -6045,13 +6059,40 @@ class CelestialDemo {
             isDay.className = `output-value ${sun.isDay ? 'good' : ''}`;
         }
         
-        if (this.weather) {
-            if (weatherCondition) weatherCondition.textContent = `${this.weather.icon} ${this.weather.name}`;
-            if (cloudCoverage) cloudCoverage.textContent = `${this.weather.cloudCoverage}%`;
+        // Display weather: prefer simulated (toggle), fallback to real atmosphere data
+        const weatherSource = this.weather || (typeof atmosphere !== 'undefined' && atmosphere.condition ? {
+            icon: this.getWeatherIcon(atmosphere.condition),
+            name: atmosphere.condition,
+            cloudCoverage: atmosphere.cloudCover ?? 0
+        } : null);
+
+        if (weatherSource) {
+            if (weatherCondition) weatherCondition.textContent = `${weatherSource.icon} ${weatherSource.name}`;
+            if (cloudCoverage) cloudCoverage.textContent = `${weatherSource.cloudCoverage}%`;
         } else {
             if (weatherCondition) weatherCondition.textContent = '—';
             if (cloudCoverage) cloudCoverage.textContent = '—';
         }
+    }
+
+    getWeatherIcon(condition) {
+        const iconMap = {
+            'clear': '☀️',
+            'mainly_clear': '🌤️',
+            'partly_cloudy': '⛅',
+            'overcast': '☁️',
+            'fog': '🌫️',
+            'drizzle': '🌦️',
+            'rain': '🌧️',
+            'freezing_rain': '🌨️',
+            'snow': '❄️',
+            'thunderstorm': '⛈️',
+            'clouds': '☁️',
+            'Cloudy': '☁️',
+            'Clear': '☀️',
+            'Rain': '🌧️'
+        };
+        return iconMap[condition] || '🌡️';
     }
 
     startAutoUpdate() {
@@ -6229,29 +6270,50 @@ class MiniGlobe {
     init() {
         if (typeof THREE === 'undefined') {
             console.warn('Three.js not loaded, globe disabled');
+            this.enableFallback();
             return;
         }
-        
+
         const width = this.canvas.clientWidth || 300;
         const height = this.canvas.clientHeight || 300;
-        
+
         // Scene
         this.scene = new THREE.Scene();
-        
+
         // Camera - positioned to look at globe
         this.camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
         this.camera.position.set(0, 0, 2.5);
         this.camera.lookAt(0, 0, 0);
-        
-        // Renderer
-        this.renderer = new THREE.WebGLRenderer({
-            canvas: this.canvas,
-            alpha: true,
-            antialias: true
-        });
-        this.renderer.setSize(width, height);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        this.renderer.setClearColor(0x000000, 0);
+
+        // Renderer with WebGL validation
+        this.renderer = null;
+        this.webglAvailable = false;
+
+        try {
+            this.renderer = new THREE.WebGLRenderer({
+                canvas: this.canvas,
+                alpha: true,
+                antialias: true
+            });
+
+            // Verify WebGL context was actually created
+            const context = this.renderer.getContext();
+            if (!context) {
+                throw new Error('WebGL context is null');
+            }
+
+            this.renderer.setSize(width, height);
+            this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            this.renderer.setClearColor(0x000000, 0);
+            this.webglAvailable = true;
+
+        } catch (error) {
+            console.warn('%c🌍 WebGL not available:', 'color: #FFA726;', error.message);
+            this.renderer = null;
+            this.webglAvailable = false;
+            this.enableFallback();
+            return;
+        }
         
         // Initialize quaternions
         this.homeQuat = new THREE.Quaternion();
