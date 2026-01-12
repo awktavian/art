@@ -623,21 +623,21 @@
             <h1>Kagami Orb — Custom Carrier PCB Design</h1>
             <div class="doc-meta">
                 <span>📅 Last updated: January 11, 2026</span>
-                <span>📦 Version: 2.0</span>
+                <span>📦 Version: 3.1</span>
             </div>
         </article>
 
         <div class="content">
             <h2 id="overview">Overview</h2>
 <p>The Kagami Orb requires a custom PCB to integrate:<br />
-- CM4 compute module socket<br />
+- QCS6490 compute module socket<br />
 - Battery management system<br />
 - Resonant wireless power receiver integration<br />
-- Audio I/O (ReSpeaker + speaker amp)<br />
+- Audio I/O (sensiBel SBM100B + speaker amp)<br />
 - LED ring control<br />
 - WiFi 6E antenna connections<br />
 - Thermal management</p>
-<p><strong>Design Philosophy:</strong> Compact, circular form factor to fit inside 120mm sphere.</p>
+<p><strong>Design Philosophy:</strong> Compact, circular form factor to fit inside 85mm sphere.</p>
 <hr />
 <h2 id="pcb-specifications">PCB Specifications</h2>
 <div class="table-wrapper"><table>
@@ -712,17 +712,17 @@
          ▼                         ▼                          ▼
 ┌─────────────────┐       ┌─────────────────┐        ┌─────────────────┐
 │                 │       │                 │        │                 │
-│   CM4 Module    │       │  USB Hub        │        │  SK6812 Ring    │
-│   (4GB RAM)     │       │  USB2514B       │        │  24 RGBW LEDs   │
+│   QCS6490 Module    │       │  USB Hub        │        │  HD108 Ring    │
+│   (8GB RAM)     │       │  USB2514B       │        │  16 RGBW LEDs   │
 │                 │       │                 │        │                 │
 │  ┌───────────┐  │       └────────┬────────┘        └─────────────────┘
-│  │ BCM2711   │  │                │
-│  │ 1.5GHz    │  │    ┌───────────┴───────────┐
+│  │ QCS6490   │  │                │
+│  │ 2.7GHz    │  │    ┌───────────┴───────────┐
 │  └───────────┘  │    │                       │
 │                 │    ▼                       ▼
 │   I2C, I2S,     │  ┌─────────────┐   ┌─────────────┐
-│   SPI, GPIO     │  │ Coral USB   │   │ AX210 WiFi  │
-│                 │  │ (via USB)   │   │ (via USB)   │
+│   SPI, GPIO     │  │ Hailo-10H   │   │ AX210 WiFi  │
+│                 │  │ (via PCIe)  │   │ (via USB)   │
 └────────┬────────┘  └─────────────┘   └─────────────┘
          │
          │ I2S / I2C / GPIO
@@ -730,7 +730,7 @@
 ┌────────┴────────────────────────────────────────────────────────────┐
 │                                                                      │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐ │
-│  │ ReSpeaker   │  │ MAX98357A   │  │ Fuel Gauge  │  │ Hall Sensor │ │
+│  │ sensiBel SBM100B   │  │ MAX98357A   │  │ Fuel Gauge  │  │ Hall Sensor │ │
 │  │ 4-Mic Array │  │ Audio Amp   │  │ (I2C)       │  │ (Lid detect)│ │
 │  │ (I2S Input) │  │ (I2S Output)│  │             │  │             │ │
 │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘ │
@@ -789,11 +789,11 @@
                          │  TPS62840       │     │  TPS62841       │
                          │  3.3V @ 750mA   │     │  1.8V @ 750mA   │
                          │  Iq = 60nA      │     │  Iq = 60nA      │
-                         │  (Ultra-low)    │     │  (For CM4 core) │
+                         │  (Ultra-low)    │     │  (For QCS6490 core) │
                          └─────────────────┘     └─────────────────┘
 </code></pre>
-<h3 id="2-cm4-module-interface">2. CM4 Module Interface</h3>
-<pre><code>                         CM4 Module Connector (2× 100-pin Hirose DF40)
+<h3 id="2-cm4-module-interface">2. QCS6490 Module Interface</h3>
+<pre><code>                         QCS6490 Module Connector (2× 100-pin Hirose DF40)
                          ┌─────────────────────────────────────────────────────┐
                          │                                                     │
                          │  POWER PINS:                                        │
@@ -817,12 +817,12 @@
                          │  ──────────                                         │
                          │  PCM_CLK ───────► Audio BCLK (shared bus)           │
                          │  PCM_FS ────────► Audio LRCK (shared bus)           │
-                         │  PCM_DIN ───────◄ ReSpeaker Data Out                │
+                         │  PCM_DIN ───────◄ sensiBel SBM100B Data Out                │
                          │  PCM_DOUT ──────► MAX98357A Data In                 │
                          │                                                     │
                          │  LED CONTROL:                                       │
                          │  ────────────                                       │
-                         │  GPIO18 (PWM0) ─► SK6812 DIN (via level shifter)    │
+                         │  GPIO18 (PWM0) ─► HD108 DIN (via level shifter)    │
                          │                                                     │
                          │  STATUS:                                            │
                          │  ───────                                            │
@@ -844,10 +844,10 @@
                          │              USB2514B 4-Port Hub IC                 │
                          │                                                     │
                          │  UPSTREAM:                                          │
-                         │  DP/DM ◄──────── CM4 USB Host                       │
+                         │  DP/DM ◄──────── QCS6490 USB Host                       │
                          │                                                     │
                          │  DOWNSTREAM:                                        │
-                         │  Port 1 ────────► Google Coral USB                  │
+                         │  Port 1 ────────► Hailo-10H                  │
                          │  Port 2 ────────► Intel AX210 (via adapter)         │
                          │  Port 3 ────────► (Reserved - external USB-C)       │
                          │  Port 4 ────────► (Reserved - debug)                │
@@ -869,7 +869,7 @@
 </code></pre>
 <h3 id="4-audio-system">4. Audio System</h3>
 <pre><code>                         ┌─────────────────────────────────────────────────────┐
-                         │             AUDIO INPUT (ReSpeaker 4-Mic)           │
+                         │             AUDIO INPUT (sensiBel SBM100B 4-Mic)           │
                          │                                                     │
                          │  External Module Connection (8-pin FFC):            │
                          │                                                     │
@@ -902,7 +902,7 @@
 </code></pre>
 <h3 id="5-led-ring-control">5. LED Ring Control</h3>
 <pre><code>                         ┌─────────────────────────────────────────────────────┐
-                         │             SK6812 LEVEL SHIFTING                   │
+                         │             HD108 LEVEL SHIFTING                   │
                          │                                                     │
                          │  GPIO18 (3.3V) ───► 74AHCT125 ───► 5V LED Data      │
                          │                                                     │
@@ -911,7 +911,7 @@
                          │       3.3V     5V                                   │
                          │        │       │                                    │
                          │        │   ┌───┴───┐                                │
-                         │  GPIO18 ──►│1A  1Y├──► SK6812 DIN                   │
+                         │  GPIO18 ──►│1A  1Y├──► HD108 DIN                   │
                          │            │      │                                  │
                          │        GND─┤~1OE  │                                  │
                          │            └──────┘                                  │
@@ -921,7 +921,7 @@
                          │                                                     │
                          └─────────────────────────────────────────────────────┘
 
-                         SK6812 Ring Connection (4-pin JST):
+                         HD108 Ring Connection (4-pin JST):
                          ┌─────┬─────┬─────┬─────┐
                          │ 5V  │ DIN │ GND │ NC  │
                          └─────┴─────┴─────┴─────┘
@@ -941,12 +941,12 @@
 <tr>
 <td>L1 (Top)</td>
 <td>Components + High-speed</td>
-<td>CM4, USB, I2S</td>
+<td>QCS6490, USB, I2S</td>
 </tr>
 <tr>
 <td>L2</td>
 <td>Ground plane</td>
-<td>Unbroken under CM4</td>
+<td>Unbroken under QCS6490</td>
 </tr>
 <tr>
 <td>L3</td>
@@ -974,9 +974,9 @@
 │                              ┌───────────────┐                                   │
 │                             ╱                 ╲                                  │
 │                            ╱   HOT ZONE        ╲                                 │
-│                           │    (CM4 + BQ)       │                                │
+│                           │    (QCS6490 + BQ)       │                                │
 │                           │    ┌─────────┐      │                                │
-│                           │    │ CM4 SoC │      │                                │
+│                           │    │ QCS6490 SoC │      │                                │
 │                           │    │ THERMAL │      │                                │
 │                           │    │   VIA   │      │                                │
 │                           │    │  ARRAY  │      │                                │
@@ -987,9 +987,9 @@
 │                              ╰───────────────╯                                   │
 │                                                                                  │
 │  THERMAL MANAGEMENT:                                                             │
-│  • 64 thermal vias (0.3mm) under CM4 to bottom copper pour                      │
+│  • 64 thermal vias (0.3mm) under QCS6490 to bottom copper pour                      │
 │  • Large GND pour on L4 as heatsink                                             │
-│  • Copper heatsink mounted to CM4 SoC                                           │
+│  • Copper heatsink mounted to QCS6490 SoC                                           │
 │  • Thermal pad from heatsink to inner shell                                      │
 │                                                                                  │
 └─────────────────────────────────────────────────────────────────────────────────┘
@@ -1035,7 +1035,7 @@
 <tbody>
 <tr>
 <td>U1</td>
-<td>CM4</td>
+<td>QCS6490</td>
 <td>DF40C-100</td>
 <td>Compute Module 4 Connector</td>
 <td>DF40HC(3.0)-100DS-0.4V</td>
@@ -1109,7 +1109,7 @@
 <td>J2</td>
 <td>8-pin FFC</td>
 <td>0.5mm</td>
-<td>ReSpeaker Connector</td>
+<td>sensiBel SBM100B Connector</td>
 <td>FH12-8S-0.5SH</td>
 <td>1</td>
 </tr>
@@ -1168,7 +1168,7 @@
 <h2 id="next-steps">Next Steps</h2>
 <ol>
 <li><strong>Validate Power Path</strong> — Test BQ25895 with resonant input</li>
-<li><strong>Prototype CM4 Carrier</strong> — Minimal viable board for software dev</li>
+<li><strong>Prototype QCS6490 Carrier</strong> — Minimal viable board for software dev</li>
 <li><strong>Thermal Testing</strong> — Measure actual temps in sealed sphere</li>
 <li><strong>Full PCB Design</strong> — KiCad schematic and layout</li>
 <li><strong>DFM Review</strong> — JLCPCB/PCBWay compatibility check</li>

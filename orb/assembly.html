@@ -623,7 +623,7 @@
             <h1>Kagami Orb — Assembly Guide</h1>
             <div class="doc-meta">
                 <span>📅 Last updated: January 11, 2026</span>
-                <span>📦 Version: 2.0</span>
+                <span>📦 Version: 3.1</span>
             </div>
         </article>
 
@@ -649,7 +649,7 @@
 </ul>
 <h3 id="software">Software</h3>
 <ul>
-<li>Raspberry Pi Imager</li>
+<li>QCS6490 SDK and tools</li>
 <li>SSH client</li>
 <li>Serial terminal (for debug)</li>
 </ul>
@@ -679,7 +679,7 @@
 │                           🔮 ORB ASSEMBLY                                       │
 │                                                                                  │
 │                              ╭─────────────╮                                    │
-│                             ╱  OUTER SHELL  ╲  ← 2-way mirror, 120mm           │
+│                             ╱  OUTER SHELL  ╲  ← 2-way mirror, 85mm            │
 │                            ╱  (transparent)  ╲                                  │
 │                           ╰─────────────────╯                                   │
 │                                     │                                           │
@@ -689,16 +689,16 @@
 │                                     │                                           │
 │                           ┌─────────┴─────────┐                                 │
 │                           │    HEATSINK       │  ← Copper 40×40×10mm           │
-│                           │  (on CM4 SoC)     │                                 │
+│                           │  (on QCS6490 SoC) │                                 │
 │                           └─────────┬─────────┘                                 │
 │                                     │                                           │
 │                           ┌─────────┴─────────┐                                 │
-│                           │   CM4 MODULE      │  ← 55×40mm compute             │
-│                           │  + Coral TPU      │                                 │
+│                           │   QCS6490 MODULE  │  ← 55×40mm compute             │
+│                           │  + Hailo-10H      │                                 │
 │                           └─────────┬─────────┘                                 │
 │                                     │                                           │
 │                           ┌─────────┴─────────┐                                 │
-│                           │   CM4 BRACKET     │  ← Grey Pro, 55×45×8mm         │
+│                           │   QCS6490 BRACKET │  ← Grey Pro, 55×45×8mm         │
 │                           │  (thermal path)   │                                 │
 │                           └─────────┬─────────┘                                 │
 │                                     │                                           │
@@ -710,7 +710,7 @@
 │                       ╱            │              ╲                             │
 │              ┌───────┴────┐  ┌─────┴─────┐  ┌─────┴───────┐                    │
 │              │ LED MOUNT  │  │ DIFFUSER  │  │ LED RING    │                    │
-│              │   RING     │  │   RING    │  │ (SK6812×24) │                    │
+│              │   RING     │  │   RING    │  │ (HD108×16)  │                    │
 │              │ 85×75×8mm  │  │ 80×70×3mm │  │  74mm dia   │                    │
 │              └────────────┘  └───────────┘  └─────────────┘                    │
 │                                     │                                           │
@@ -779,7 +779,7 @@
 </tr>
 <tr>
 <td><strong>2. Orb Electronics</strong></td>
-<td>CM4, Coral, Audio, Sensors, LEDs</td>
+<td>QCS6490, Hailo-10H, Audio, Sensors, LEDs</td>
 <td>6 hours</td>
 </tr>
 <tr>
@@ -917,92 +917,45 @@ Custom resonant coils (80mm Litz wire @ 140kHz) are required.</p>
 <p><strong>Base station complete!</strong></p>
 <hr />
 <h2 id="phase-2-orb-electronics-assembly-6-hours">Phase 2: Orb Electronics Assembly (6 hours)</h2>
-<h3 id="step-21-cm4-setup">Step 2.1: CM4 Setup</h3>
+<h3 id="step-21-qcs6490-setup">Step 2.1: QCS6490 Setup</h3>
 <ol>
-<li>Insert microSD card with Raspberry Pi OS Lite</li>
-<li>Mount CM4 on IO board (or custom PCB)</li>
+<li>Flash QCS6490 with Kagami firmware image</li>
+<li>Mount QCS6490 SoM on carrier board (or custom PCB)</li>
 <li>Connect power (5V)</li>
 <li>Verify boot via HDMI or serial</li>
-<li>Configure WiFi (<code>raspi-config</code>)</li>
+<li>Configure WiFi via QCS6490 SDK</li>
 <li>Enable I2C, SPI, I2S interfaces</li>
 </ol>
 <h3 id="step-22-audio-system">Step 2.2: Audio System</h3>
-<p><strong>⚠️ ReSpeaker 4-Mic OUT OF STOCK — See Alternatives Below</strong></p>
-<h4 id="option-a-respeaker-xvf3800-recommended-9990">Option A: ReSpeaker XVF3800 (Recommended, $99.90)</h4>
-<pre><code>XVF3800 CONNECTION
-──────────────────
+<p><strong>sensiBel SBM100B — 4× Optical MEMS Microphones in Tetrahedral Array</strong></p>
+<pre><code>sensiBel SBM100B ×4 CONNECTION
+──────────────────────────────
 
-XVF3800    →  CM4
-───────────────────
-VCC (5V)   →  5V
-GND        →  GND
-USB        →  USB-A port
+sensiBel (×4)  →  QCS6490
+─────────────────────────
+VCC (3.3V)     →  3.3V
+GND            →  GND
+I2S_BCK        →  GPIO18 (shared clock)
+I2S_WS         →  GPIO19 (shared WS)
+I2S_DO (mic 1) →  GPIO20
+I2S_DO (mic 2) →  GPIO21
+I2S_DO (mic 3) →  GPIO22
+I2S_DO (mic 4) →  GPIO23
 </code></pre>
 <ol>
-<li>Connect XVF3800 via USB (plug and play)</li>
-<li>Verify device detected:<br />
-<code>bash
-   arecord -l | grep XVF</code></li>
-<li>Test microphone:<br />
-<code>bash
-   arecord -D plughw:XVF3800,0 -f S16_LE -r 16000 -c 1 test.wav</code></li>
-</ol>
-<h4 id="option-b-diy-inmp441-array-budget-48">Option B: DIY INMP441 Array (Budget, ~$48)</h4>
-<pre><code>INMP441 ×4 CONNECTION
-─────────────────────
-
-INMP441 (×4)  →  CM4
-────────────────────
-VCC (3.3V)    →  3.3V
-GND           →  GND
-BCK           →  GPIO18 (shared clock)
-WS            →  GPIO19 (shared WS)
-DO (mic 1)    →  GPIO20
-DO (mic 2)    →  GPIO21
-DO (mic 3-4)  →  TDM via I2S
-L/R SEL       →  GND (mic 1,3) / VCC (mic 2,4)
-</code></pre>
-<ol>
-<li>Wire 4× INMP441 in I2S TDM configuration</li>
+<li>Mount 4× sensiBel SBM100B in tetrahedral configuration</li>
+<li>Wire in I2S TDM configuration</li>
 <li>Configure device tree overlay for multi-mic I2S</li>
 <li>Test with:<br />
 <code>bash
-   arecord -D plughw:1,0 -f S32_LE -r 16000 -c 4 test.wav</code></li>
-</ol>
-<h4 id="option-c-respeaker-4-mic-linear-legacy-if-available">Option C: ReSpeaker 4-Mic Linear (Legacy - if available)</h4>
-<pre><code>RESPEAKER CONNECTION
-────────────────────
-
-ReSpeaker  →  CM4
-───────────────────
-VCC (3.3V) →  3.3V
-GND        →  GND
-BCK        →  GPIO12
-WS         →  GPIO19
-DO         →  GPIO20
-INT        →  GPIO24
-SDA        →  GPIO2
-SCL        →  GPIO3
-</code></pre>
-<ol>
-<li>Connect ReSpeaker 4-Mic via FFC or wires</li>
-<li>Install drivers:<br />
-<code>bash
-   cd ~
-   git clone https://github.com/respeaker/seeed-voicecard
-   cd seeed-voicecard
-   sudo ./install.sh
-   sudo reboot</code></li>
-<li>Test microphone:<br />
-<code>bash
-   arecord -D plughw:2,0 -f S16_LE -r 16000 -c 1 test.wav</code></li>
+   arecord -D plughw:1,0 -f S32_LE -r 48000 -c 4 test.wav</code></li>
 </ol>
 <h3 id="step-23-speaker-amplifier">Step 2.3: Speaker Amplifier</h3>
 <pre><code>MAX98357A CONNECTION
 ────────────────────
 
-MAX98357A  →  CM4
-───────────────────
+MAX98357A  →  QCS6490
+─────────────────────
 VIN        →  5V
 GND        →  GND
 BCLK       →  GPIO12
@@ -1011,36 +964,35 @@ DIN        →  GPIO21
 </code></pre>
 <ol>
 <li>Solder MAX98357A breakout</li>
-<li>Connect I2S lines (shares clock with ReSpeaker)</li>
+<li>Connect I2S lines (shares clock with sensiBel mics)</li>
 <li>Connect 4Ω speaker to MAX98357A output</li>
 <li>Test audio:<br />
 <code>bash
    speaker-test -D plughw:2,0 -t wav</code></li>
 </ol>
-<h3 id="step-24-coral-tpu">Step 2.4: Coral TPU</h3>
+<h3 id="step-24-hailo-10h-npu">Step 2.4: Hailo-10H NPU</h3>
 <ol>
-<li>Connect Coral USB to CM4 USB port</li>
-<li>Install runtime:<br />
+<li>Connect Hailo-10H to QCS6490 PCIe interface</li>
+<li>Install Hailo runtime:<br />
 <code>bash
-   echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | \
-     sudo tee /etc/apt/sources.list.d/coral-edgetpu.list
-   curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
-   sudo apt update
-   sudo apt install libedgetpu1-std</code></li>
+   # Install Hailo SDK
+   wget https://hailo.ai/download/hailo-runtime-latest.deb
+   sudo dpkg -i hailo-runtime-latest.deb
+   sudo ldconfig</code></li>
 <li>Verify:<br />
 <code>bash
-   lsusb | grep Google
-   # Should show: Google Inc. Coral AI Accelerator</code></li>
+   hailortcli fw-control identify
+   # Should show: Hailo-10H, firmware version</code></li>
 </ol>
 <h3 id="step-25-led-ring">Step 2.5: LED Ring</h3>
-<pre><code>SK6812 CONNECTION
-─────────────────
+<pre><code>HD108 CONNECTION
+────────────────
 
 Level Shifter (3.3V → 5V)
   IN  ← GPIO18 (PWM0)
-  OUT → SK6812 DIN (via 470Ω)
+  OUT → HD108 DIN (via 470Ω)
 
-SK6812 Ring
+HD108 Ring (16× LEDs on equator)
   VCC → 5V
   GND → GND
   DIN ← Level shifter OUT
@@ -1054,14 +1006,14 @@ SK6812 Ring
 <code>python
    import board
    import neopixel
-   pixels = neopixel.NeoPixel(board.D18, 24)
+   pixels = neopixel.NeoPixel(board.D18, 16)
    pixels.fill((255, 100, 0))  # Amber</code></li>
 </ol>
 <h3 id="step-26-power-system">Step 2.6: Power System</h3>
 <pre><code>BATTERY + BMS WIRING
 ────────────────────
 
-Battery Pack (3S Li-Po)
+Battery Pack (3S 2200mAh Li-Po)
   │
   └─► BQ25895 (Charger)
         │
@@ -1069,7 +1021,7 @@ Battery Pack (3S Li-Po)
         │
         └─► BQ40Z50 (Fuel Gauge)
               │
-              └─► I2C → CM4
+              └─► I2C → QCS6490
 
 Resonant RX Coil (80mm Litz)
   │
@@ -1110,13 +1062,13 @@ Resonant RX Coil (80mm Litz)
 </code></pre>
 <p>Expected output:</p>
 <pre><code>[✓] WiFi connected
-[✓] I2C devices: 0x35 (ReSpeaker), 0x48 (TMP117), 0x55 (BMS)
-[✓] Microphone: recording OK
+[✓] I2C devices: 0x35 (sensiBel), 0x48 (TMP117), 0x55 (BMS)
+[✓] Microphone: recording OK (4× sensiBel SBM100B)
 [✓] Speaker: playback OK
-[✓] LEDs: all 24 responding
-[✓] Battery: 78%, charging
+[✓] LEDs: all 16 responding (HD108)
+[✓] Battery: 78%, charging (2200mAh)
 [✓] Temperature: 42°C
-[✓] Coral TPU: detected
+[✓] Hailo-10H NPU: detected
 
 All tests passed!
 </code></pre>
@@ -1135,8 +1087,8 @@ All tests passed!
 <h3 id="step-32-install-internal-frame">Step 3.2: Install Internal Frame</h3>
 <ol>
 <li>Press-fit threaded inserts into frame (heat with soldering iron)</li>
-<li>Mount CM4 bracket to frame (M2.5 screws)</li>
-<li>Mount CM4 module to bracket</li>
+<li>Mount QCS6490 bracket to frame (M2.5 screws)</li>
+<li>Mount QCS6490 module to bracket</li>
 <li>Route antenna (if external WiFi)</li>
 </ol>
 <h3 id="step-33-install-battery">Step 3.3: Install Battery</h3>
@@ -1149,7 +1101,7 @@ All tests passed!
 <h3 id="step-34-install-led-ring">Step 3.4: Install LED Ring</h3>
 <ol>
 <li>Snap LED mount ring onto frame tabs</li>
-<li>Insert SK6812 ring into groove</li>
+<li>Insert HD108 ring (16 LEDs) into equator groove</li>
 <li>Insert diffuser ring above LEDs</li>
 <li>Route LED cable to main PCB</li>
 </ol>
@@ -1163,9 +1115,9 @@ All tests passed!
 <h3 id="step-36-apply-thermal-compound">Step 3.6: Apply Thermal Compound</h3>
 <p><strong>CRITICAL: Proper thermal contact required</strong></p>
 <ol>
-<li>Clean CM4 SoC surface with IPA</li>
+<li>Clean QCS6490 SoC surface with IPA</li>
 <li>Apply thin layer of thermal compound (Arctic MX-4 or similar)</li>
-<li>Attach heatsink to CM4</li>
+<li>Attach heatsink to QCS6490</li>
 <li>Verify good contact (heatsink should not wobble)</li>
 </ol>
 <h3 id="step-37-final-cable-management">Step 3.7: Final Cable Management</h3>
@@ -1226,7 +1178,7 @@ All tests passed!
 <ol>
 <li>Run stress test (continuous voice recognition)</li>
 <li>Monitor temperatures:<br />
-   - CM4 SoC: &lt; 70°C<br />
+   - QCS6490 SoC: &lt; 70°C<br />
    - Internal air: &lt; 60°C<br />
    - External shell: &lt; 50°C</li>
 <li>Run for 30 minutes minimum</li>
@@ -1381,7 +1333,7 @@ Mount ring sits on top of walnut base:
 <tr>
 <td>LEDs wrong color</td>
 <td>Wrong LED type</td>
-<td>Check SK6812 vs WS2812</td>
+<td>Check HD108 configuration</td>
 </tr>
 <tr>
 <td>Overheating</td>

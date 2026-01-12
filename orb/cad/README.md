@@ -68,7 +68,7 @@
 - **File:** `laser/canopy_arms.svg`
 - **Material:** 304 Stainless Steel, 3mm thick
 - **Quantity:** 3 pieces
-- **Settings:** 
+- **Settings:**
   - CO2 Laser: 150W, 8mm/s, 2 passes
   - Fiber Laser: 2kW, 15mm/s, N2 assist
 - **Post-process:** Brake bend at 15° outward

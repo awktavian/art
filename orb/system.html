@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kagami Orb System Design — Kagami Orb</title>
-    <meta name="description" content="Version: 1.0">
+    <meta name="description" content="Version: 3.1">
     <meta name="theme-color" content="#07070a">
 
     <!-- Open Graph -->
     <meta property="og:title" content="Kagami Orb System Design — Kagami Orb">
-    <meta property="og:description" content="Version: 1.0">
+    <meta property="og:description" content="Version: 3.1">
     <meta property="og:type" content="article">
     <meta property="og:url" content="https://storage.googleapis.com/kagami-media-public/orb/system.html">
     <meta name="twitter:card" content="summary">
@@ -622,14 +622,14 @@
         <article class="doc-header">
             <h1>Kagami Orb System Design</h1>
             <div class="doc-meta">
-                <span>📅 Last updated: 2026-01-05</span>
-                <span>📦 Version: 1.0</span>
+                <span>📅 Last updated: January 11, 2026</span>
+                <span>📦 Version: 3.1</span>
             </div>
         </article>
 
         <div class="content">
-            <p><strong>Version:</strong> 1.0<br />
-<strong>Date:</strong> 2026-01-05<br />
+            <p><strong>Version:</strong> 3.1<br />
+<strong>Date:</strong> January 11, 2026<br />
 <strong>Status:</strong> Design Complete</p>
 <hr />
 <h2 id="executive-summary">Executive Summary</h2>
@@ -645,7 +645,7 @@
 <tbody>
 <tr>
 <td><strong>Compute</strong></td>
-<td>Raspberry Pi CM4 4GB WiFi</td>
+<td>QCS6490 (12.5 TOPS) + Hailo-10H (40 TOPS)</td>
 </tr>
 <tr>
 <td><strong>Runtime</strong></td>
@@ -657,15 +657,15 @@
 </tr>
 <tr>
 <td><strong>LEDs</strong></td>
-<td>24× SK6812 RGBW, SPI-driven</td>
+<td>16× HD108 16-bit RGBW, SPI-driven</td>
 </tr>
 <tr>
 <td><strong>Audio</strong></td>
-<td>2-4× INMP441 I2S MEMS mics, MAX98357A amp</td>
+<td>4× sensiBel SBM100B optical MEMS mics + XMOS XVF3800 DSP, MAX98357A amp</td>
 </tr>
 <tr>
 <td><strong>Power</strong></td>
-<td>Custom resonant charging (15W @ 140kHz), LiPo 2000-3000mAh</td>
+<td>Custom resonant charging (15W @ 140kHz), 3S LiPo 2200mAh (24Wh)</td>
 </tr>
 <tr>
 <td><strong>Safety</strong></td>
@@ -971,7 +971,7 @@ where:
 </table></div>
 <hr />
 <h2 id="4-hardware-integration">4. Hardware Integration</h2>
-<h3 id="raspberry-pi-cm4-pin-mapping">Raspberry Pi CM4 Pin Mapping</h3>
+<h3 id="qcs6490-pin-mapping">QCS6490 Pin Mapping</h3>
 <div class="table-wrapper"><table>
 <thead>
 <tr>
@@ -982,39 +982,49 @@ where:
 </thead>
 <tbody>
 <tr>
-<td>LED Ring (SK6812)</td>
+<td>LED Ring (HD108)</td>
 <td>SPI0 MOSI</td>
-<td>GPIO10</td>
+<td>GPIO_36</td>
 </tr>
 <tr>
-<td>Microphones (INMP441)</td>
-<td>I2S</td>
-<td>GPIO18/19/20/21</td>
+<td>Microphones (sensiBel SBM100B)</td>
+<td>MI2S</td>
+<td>MI2S_0</td>
+</tr>
+<tr>
+<td>XMOS DSP (XVF3800)</td>
+<td>I2C + SPI</td>
+<td>QUP0_SE4 / SPI1</td>
 </tr>
 <tr>
 <td>Speaker (MAX98357A)</td>
-<td>I2S</td>
-<td>GPIO18/19/21</td>
+<td>MI2S</td>
+<td>MI2S_1</td>
 </tr>
 <tr>
 <td>Thermal (TMP117)</td>
-<td>I2C1</td>
-<td>GPIO2/3</td>
+<td>I2C</td>
+<td>QUP1_SE0</td>
 </tr>
 <tr>
 <td>Fuel Gauge (BQ40Z50)</td>
-<td>I2C1</td>
-<td>GPIO2/3</td>
+<td>I2C</td>
+<td>QUP1_SE0</td>
 </tr>
 <tr>
 <td>Hall Sensor (AH49E)</td>
 <td>GPIO</td>
-<td>GPIO17</td>
+<td>GPIO_85</td>
 </tr>
 <tr>
 <td>Wake Signal</td>
 <td>GPIO</td>
-<td>GPIO27</td>
+<td>GPIO_86</td>
+</tr>
+<tr>
+<td>Hailo-10H NPU</td>
+<td>PCIe Gen3</td>
+<td>PCIe0</td>
 </tr>
 </tbody>
 </table></div>
@@ -1031,12 +1041,12 @@ where:
 <tr>
 <td><code>tokio</code></td>
 <td>Async runtime</td>
-<td>NOT Embassy (CM4 runs Linux)</td>
+<td>NOT Embassy (QCS6490 runs Linux)</td>
 </tr>
 <tr>
-<td><code>rpi-pal</code></td>
-<td>GPIO/SPI/I2C</td>
-<td>Maintained fork of rppal</td>
+<td><code>qcs-hal</code></td>
+<td>GPIO/SPI/I2C/MI2S</td>
+<td>QCS6490 HAL bindings</td>
 </tr>
 <tr>
 <td><code>cpal</code></td>
@@ -1056,7 +1066,7 @@ where:
 <tr>
 <td><code>smart-leds</code></td>
 <td>LED protocol</td>
-<td>With rpi-ws281x driver</td>
+<td>HD108 16-bit driver</td>
 </tr>
 <tr>
 <td><code>reqwest</code></td>
@@ -1072,9 +1082,10 @@ where:
 </table></div>
 <h3 id="critical-dependency-notes">Critical Dependency Notes</h3>
 <ol>
-<li><strong>Embassy vs Tokio</strong>: Embassy is for bare-metal MCUs. CM4 runs Linux, so use Tokio.</li>
-<li><strong>rppal</strong>: Retired July 2025. Use <code>rpi-pal</code> (maintained fork) instead.</li>
+<li><strong>Embassy vs Tokio</strong>: Embassy is for bare-metal MCUs. QCS6490 runs Linux, so use Tokio.</li>
+<li><strong>Hailo-10H</strong>: 40 TOPS NPU via PCIe Gen3. Use HailoRT for inference acceleration.</li>
 <li><strong>VAD</strong>: Use Silero VAD via ONNX runtime for voice activity detection.</li>
+<li><strong>sensiBel SBM100B</strong>: Optical MEMS microphones with superior SNR. XMOS XVF3800 DSP handles beamforming.</li>
 </ol>
 <hr />
 <h2 id="5-led-system">5. LED System</h2>
@@ -1241,11 +1252,11 @@ where:
 <hr />
 <h2 id="6-voice-pipeline">6. Voice Pipeline</h2>
 <pre><code>┌─────────────────────────────────────────────────────────────────┐
-│  MIC ARRAY (4ch) → ReSpeaker DSP → Ring Buffer                 │
+│  MIC ARRAY (4× sensiBel SBM100B) → XMOS XVF3800 DSP → Ring Buf │
 │        ↓                                                        │
 │  Wake Word (openWakeWord/Porcupine)                            │
 │        ↓                                                        │
-│  VAD (Silero via ONNX)                                         │
+│  VAD (Silero via ONNX / Hailo-10H accelerated)                 │
 │        ↓                                                        │
 │  Opus Encoding → WebSocket → kagami-hub                        │
 └─────────────────────────────────────────────────────────────────┘
@@ -1557,7 +1568,7 @@ cargo clippy &amp;&amp; cargo test &amp;&amp; cargo doc
 </tr>
 <tr>
 <td><code>aarch64-unknown-linux-gnu</code></td>
-<td><code>raspberry-pi</code></td>
+<td><code>qcs6490</code></td>
 <td>Production</td>
 </tr>
 </tbody>
@@ -1566,11 +1577,11 @@ cargo clippy &amp;&amp; cargo test &amp;&amp; cargo doc
 <pre><code class="language-bash"># Install target
 rustup target add aarch64-unknown-linux-gnu
 
-# Build for Pi
-cross build --release --target aarch64-unknown-linux-gnu --features raspberry-pi
+# Build for QCS6490
+cross build --release --target aarch64-unknown-linux-gnu --features qcs6490
 
 # Deploy
-scp target/aarch64-unknown-linux-gnu/release/kagami-orb pi@kagami-orb.local:
+scp target/aarch64-unknown-linux-gnu/release/kagami-orb root@kagami-orb.local:
 </code></pre>
 <hr />
 <h2 id="12-manufacturing-considerations">12. Manufacturing Considerations</h2>

@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kagami Orb — Firmware Architecture — Kagami Orb</title>
-    <meta name="description" content="The Orb firmware runs on Raspberry Pi CM4 using Rust with the Tokio async runtime (NOT Embassy — Embassy is for bare-metal MCUs, CM4 runs Linux). This provides:">
+    <meta name="description" content="The Orb firmware runs on a two-tier architecture: ESP32-S3 (base controller) + QCS6490 (orb compute), both using Rust with Tokio async runtime. This provides:">
     <meta name="theme-color" content="#07070a">
 
     <!-- Open Graph -->
     <meta property="og:title" content="Kagami Orb — Firmware Architecture — Kagami Orb">
-    <meta property="og:description" content="The Orb firmware runs on Raspberry Pi CM4 using Rust with the Tokio async runtime (NOT Embassy — Embassy is for bare-metal MCUs, CM4 runs Linux). This provides:">
+    <meta property="og:description" content="The Orb firmware runs on a two-tier architecture: ESP32-S3 (base controller) + QCS6490 (orb compute), both using Rust with Tokio async runtime. This provides:">
     <meta property="og:type" content="article">
     <meta property="og:url" content="https://storage.googleapis.com/kagami-media-public/orb/firmware.html">
     <meta name="twitter:card" content="summary">
@@ -623,13 +623,13 @@
             <h1>Kagami Orb — Firmware Architecture</h1>
             <div class="doc-meta">
                 <span>📅 Last updated: January 11, 2026</span>
-                <span>📦 Version: 2.0</span>
+                <span>📦 Version: 3.1</span>
             </div>
         </article>
 
         <div class="content">
             <h2 id="overview">Overview</h2>
-<p>The Orb firmware runs on Raspberry Pi CM4 using <strong>Rust</strong> with the <strong>Tokio</strong> async runtime (NOT Embassy — Embassy is for bare-metal MCUs, CM4 runs Linux). This provides:<br />
+<p>The Orb firmware runs on a <strong>two-tier architecture</strong>: ESP32-S3 (base controller) + QCS6490 (orb compute), both using <strong>Rust</strong> with the <strong>Tokio</strong> async runtime. This provides:<br />
 - Zero-cost async/await for real-time responsiveness<br />
 - Memory safety without garbage collection<br />
 - Predictable latency for audio and LED control<br />
@@ -669,7 +669,7 @@
 │  │  Async executor  │  Timer  │  Channels    │  I/O  │  Networking        │    │
 │  └────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                  │
-│  LINUX KERNEL (Raspberry Pi OS Lite)                                            │
+│  LINUX KERNEL (QCS6490 - Qualcomm Linux)                                        │
 │                                                                                  │
 └─────────────────────────────────────────────────────────────────────────────────┘
 </code></pre>
@@ -703,7 +703,7 @@
 │   │
 │   ├── led/                      # LED Control
 │   │   ├── mod.rs
-│   │   ├── ring.rs               # SK6812 driver
+│   │   ├── ring.rs               # HD108 driver
 │   │   ├── patterns.rs           # Animation patterns
 │   │   ├── colony_colors.rs      # Color definitions
 │   │   └── animator.rs           # Animation scheduler
@@ -1009,13 +1009,13 @@ async fn audio_capture(
     }
 }
 
-/// LED driver task - SPI to SK6812
+/// LED driver task - SPI to HD108
 #[embassy_executor::task]
 async fn led_driver(
     spi: SpiPeripheral,
     led_rx: Receiver&lt;LedCommand&gt;,
 ) {
-    let mut ring = Sk6812Ring::new(spi, 24);
+    let mut ring = Hd108Ring::new(spi, 16);
     let mut animator = LedAnimator::new();
 
     loop {
@@ -1064,45 +1064,45 @@ async fn state_machine(
 <hr />
 <h2 id="gpio-assignments">GPIO Assignments</h2>
 <pre><code>┌─────────────────────────────────────────────────────────────────────────────────┐
-│                         GPIO PIN ASSIGNMENTS                                     │
+│                         GPIO PIN ASSIGNMENTS (QCS6490)                          │
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                  │
-│  I2S AUDIO (ReSpeaker + Speaker)                                                │
+│  I2S AUDIO (sensiBel SBM100B + XMOS XVF3800 + Speaker)                          │
 │  ─────────────────────────────────                                               │
-│  GPIO12 (PCM_CLK)  → I2S BCLK (shared)                                          │
-│  GPIO19 (PCM_FS)   → I2S LRCLK (shared)                                         │
-│  GPIO20 (PCM_DIN)  ← ReSpeaker Data Out                                         │
-│  GPIO21 (PCM_DOUT) → MAX98357A Data In                                          │
+│  GPIO_44 (MI2S_CLK)  → I2S BCLK (shared)                                        │
+│  GPIO_45 (MI2S_WS)   → I2S LRCLK (shared)                                       │
+│  GPIO_46 (MI2S_DIN)  ← XMOS XVF3800 Data Out                                    │
+│  GPIO_47 (MI2S_DOUT) → MAX98357A Data In                                        │
 │                                                                                  │
 │  SPI (LED Ring)                                                                  │
 │  ─────────────────────────────────                                               │
-│  GPIO10 (SPI_MOSI) → SK6812 DIN (via level shifter)                             │
-│  GPIO11 (SPI_SCLK) → (unused, but reserved)                                     │
+│  GPIO_20 (SPI_MOSI) → HD108 DIN (via level shifter)                             │
+│  GPIO_21 (SPI_SCLK) → HD108 CLK                                                 │
 │                                                                                  │
 │  I2C (Sensors + Power ICs)                                                       │
 │  ─────────────────────────────────                                               │
-│  GPIO2 (SDA)       ↔ I2C Bus                                                    │
-│  GPIO3 (SCL)       → I2C Bus                                                    │
+│  GPIO_0 (SDA)       ↔ I2C Bus                                                   │
+│  GPIO_1 (SCL)       → I2C Bus                                                   │
 │                                                                                  │
 │  I2C DEVICES:                                                                    │
 │  ├── 0x6A: BQ25895 (Charger)                                                    │
 │  ├── 0x0B: BQ40Z50 (Fuel Gauge) — SMBus                                         │
-│  ├── 0x35: ReSpeaker (XMOS config)                                              │
+│  ├── 0x2C: XMOS XVF3800 (Audio DSP config)                                      │
 │  └── 0x48: TMP117 (Temperature)                                                 │
 │                                                                                  │
 │  GPIO (Digital I/O)                                                              │
 │  ─────────────────────────────────                                               │
-│  GPIO17 (INPUT)    ← Resonant charging status                                   │
-│  GPIO22 (INPUT)    ← Hall sensor (dock detect)                                  │
-│  GPIO23 (INPUT)    ← Temperature alert                                          │
-│  GPIO24 (INPUT)    ← ReSpeaker voice activity                                   │
-│  GPIO27 (INPUT)    ← Battery alert (low/critical)                               │
-│  GPIO25 (OUTPUT)   → Status LED (debug)                                         │
-│  GPIO26 (OUTPUT)   → Amplifier enable                                           │
+│  GPIO_36 (INPUT)    ← Resonant charging status                                  │
+│  GPIO_37 (INPUT)    ← Hall sensor (dock detect)                                 │
+│  GPIO_38 (INPUT)    ← Temperature alert                                         │
+│  GPIO_39 (INPUT)    ← XMOS voice activity                                       │
+│  GPIO_40 (INPUT)    ← Battery alert (low/critical)                              │
+│  GPIO_52 (OUTPUT)   → Status LED (debug)                                        │
+│  GPIO_53 (OUTPUT)   → Amplifier enable                                          │
 │                                                                                  │
 │  RESERVED FOR EXPANSION                                                          │
 │  ─────────────────────────────────                                               │
-│  GPIO4, GPIO5, GPIO6, GPIO13, GPIO16                                            │
+│  GPIO_54, GPIO_55, GPIO_56, GPIO_57, GPIO_58                                    │
 │                                                                                  │
 └─────────────────────────────────────────────────────────────────────────────────┘
 </code></pre>
@@ -1112,22 +1112,22 @@ async fn state_machine(
 │                         MEMORY ALLOCATION                                        │
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                  │
-│  CM4 4GB RAM ALLOCATION (Linux userspace)                                       │
+│  QCS6490 8GB RAM ALLOCATION (Linux userspace)                                   │
 │  ────────────────────────────────────────                                        │
 │                                                                                  │
-│  0x0000_0000 - 0x3FFF_FFFF (1GB)   Kernel + System                              │
+│  0x0000_0000 - 0x7FFF_FFFF (2GB)   Kernel + System                              │
 │                                                                                  │
-│  0x4000_0000 - 0x7FFF_FFFF (1GB)   Kagami Orb Process                           │
-│  ├── 256 MB: Audio buffers (ring buffers, streaming)                            │
-│  ├── 128 MB: LED frame buffers (double-buffered)                                │
-│  ├── 256 MB: Wake word model (Porcupine/openWakeWord)                           │
-│  ├── 128 MB: API client buffers                                                 │
-│  └── 256 MB: General heap                                                       │
+│  0x8000_0000 - 0xFFFF_FFFF (2GB)   Kagami Orb Process                           │
+│  ├── 512 MB: Audio buffers (ring buffers, streaming)                            │
+│  ├── 256 MB: LED frame buffers (double-buffered)                                │
+│  ├── 512 MB: Wake word model (Porcupine/openWakeWord)                           │
+│  ├── 256 MB: API client buffers                                                 │
+│  └── 512 MB: General heap                                                       │
 │                                                                                  │
-│  0x8000_0000 - 0xBFFF_FFFF (1GB)   Coral TPU shared memory                      │
+│  0x1_0000_0000 - 0x1_7FFF_FFFF (2GB)   Hailo-10H shared memory                  │
 │  └── Model loading, inference tensors                                           │
 │                                                                                  │
-│  0xC000_0000 - 0xFFFF_FFFF (1GB)   Reserved / GPU                               │
+│  0x1_8000_0000 - 0x1_FFFF_FFFF (2GB)   Reserved / GPU                           │
 │                                                                                  │
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                  │
@@ -1159,7 +1159,7 @@ async fn state_machine(
                     │                    BOOTING                           │
                     │                                                      │
                     │  • Linux kernel loads                               │
-                    │  • Embassy runtime starts                           │
+                    │  • Tokio runtime starts                             │
                     │  • WiFi connects                                    │
                     │  • API handshake                                    │
                     │                                                      │
@@ -1235,14 +1235,14 @@ POWER BUDGET BY STATE
 │                         VOICE PIPELINE                                           │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-    MIC ARRAY (4 channels)
+    MIC ARRAY (sensiBel SBM100B optical MEMS, 4 channels)
            │
            │ I2S @ 16kHz, 16-bit
            ▼
     ┌─────────────────┐
     │                 │
-    │   ReSpeaker     │  Beamforming (XMOS hardware)
-    │   XMOS DSP      │  Noise suppression
+    │   XMOS XVF3800  │  Beamforming (512-tap AEC)
+    │   Audio DSP     │  Noise suppression
     │                 │  Echo cancellation (when speaker active)
     │                 │
     └────────┬────────┘
@@ -1252,7 +1252,7 @@ POWER BUDGET BY STATE
     ┌─────────────────┐
     │                 │
     │   Ring Buffer   │  512 samples (32ms) per frame
-    │   (Embassy)     │  Triple buffer for lock-free
+    │   (Tokio)       │  Triple buffer for lock-free
     │                 │
     └────────┬────────┘
              │
@@ -1390,7 +1390,7 @@ cargo build --release --target aarch64-unknown-linux-gnu
 # Run on development Pi
 cargo run --release
 
-# Cross-compile for CM4
+# Cross-compile for QCS6490
 cross build --release --target aarch64-unknown-linux-gnu
 
 # Deploy to orb
@@ -1423,7 +1423,7 @@ wake_word_threshold = 0.6
 vad_timeout_ms = 2000
 
 [led]
-num_leds = 24
+num_leds = 16
 brightness_max = 255
 brightness_idle = 60
 animation_fps = 60
@@ -1447,6 +1447,7 @@ h(x) ≥ 0. Always.
 The firmware breathes life into the mirror.
 Tasks await. Events flow. State persists.
 Tokio orchestrates the dance.
+Two tiers: ESP32-S3 base + QCS6490 orb.
 </code></pre>
         </div>
     </main>

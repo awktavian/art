@@ -2,8 +2,74 @@
 
 **Date:** January 11, 2026
 **Author:** Kagami
+**Version:** 0.4.0
 
 This document captures learnings from implementing production-grade hardware drivers for the Kagami Orb. These insights are critical for anyone working with these components.
+
+---
+
+## 🏗️ HAL Architecture (v0.4.0)
+
+### Design Principles
+
+1. **Clean Boundaries**
+   ```
+   Application → HAL Interface → Hardware Drivers → Physical Hardware
+   ```
+   - Application NEVER touches hardware directly
+   - All access goes through OrbSystem unified interface
+   - Drivers are interchangeable (real ↔ simulated)
+
+2. **Protocol Conformance**
+   Every driver MUST implement:
+   - `simulate: bool` - Simulation mode flag
+   - `is_initialized() -> bool` - Ready state check
+   - `close()` - Resource cleanup
+
+3. **Simulation-First**
+   - ALL drivers support `simulate=True`
+   - Tests run 100% in simulation (222 tests)
+   - No hardware required for development
+
+4. **Error Hierarchy**
+   ```python
+   HALError
+   ├── HardwareNotInitializedError  # Driver not ready
+   ├── HardwareNotAvailableError    # Hardware missing
+   ├── HardwareCommunicationError   # I2C/SPI failure
+   └── HardwareTimeoutError         # Operation timeout
+   ```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `kagami_orb/__init__.py` | OrbSystem unified interface |
+| `kagami_orb/hal.py` | Protocol definitions & validation |
+| `kagami_orb/drivers/*.py` | Individual hardware drivers |
+
+### Capability Detection
+
+```python
+from kagami_orb import HardwareCapability, HardwareCapabilities
+
+# Get platform capabilities
+caps = HardwareCapabilities.qcs6490()
+
+if caps.has(HardwareCapability.NPU):
+    # Use NPU acceleration
+    pass
+```
+
+### Validation
+
+```python
+from kagami_orb import validate_hal_interface, OrbSystem
+
+orb = OrbSystem(simulate=True)
+errors = validate_hal_interface(orb)
+assert errors == []  # No HAL violations
+```
 
 ---
 
@@ -135,7 +201,7 @@ This document captures learnings from implementing production-grade hardware dri
    ```python
    # Accelerometer: LSB → m/s²
    accel_ms2 = (raw / sensitivity) * 9.80665
-   
+
    # Gyroscope: LSB → rad/s
    gyro_rads = (raw / sensitivity) * (π / 180)
    ```
@@ -211,7 +277,7 @@ This document captures learnings from implementing production-grade hardware dri
    ```python
    temperature_c = -45.0 + 175.0 * (raw_temp / 65535.0)
    humidity_pct = -6.0 + 125.0 * (raw_hum / 65535.0)
-   
+
    # Clamp humidity
    humidity_pct = max(0.0, min(100.0, humidity_pct))
    ```
@@ -273,34 +339,50 @@ This document captures learnings from implementing production-grade hardware dri
 
 ## 💡 HD108 LED Protocol
 
-### Key Learnings
+**Reference:** Rose Lighting HD108 Datasheet v1.2
 
-1. **Frame Structure**
+### CRITICAL: Correct Protocol
+
+**⚠️ Many implementations get this wrong! Here is the CORRECT format:**
+
+1. **Frame Structure (per datasheet)**
    ```
-   [START: 64 bits of 0x00]
-   [LED 0: 64 bits]
-   [LED 1: 64 bits]
+   [START: 32 bits (4 bytes) of 0x00]
+   [LED 0: 64 bits (8 bytes)]
+   [LED 1: 64 bits (8 bytes)]
    ...
-   [LED N: 64 bits]
-   [END: 64 bits of 0xFF]
+   [LED N: 64 bits (8 bytes)]
+   [END: 32 bits (4 bytes) of 0xFF]
    ```
 
 2. **Per-LED Format (64 bits)**
    ```
-   [111:3][BRIGHTNESS:5][00000000:8][R:16][G:16][B:16]
+   Byte 0: [1:1][G_GAIN:5][R_GAIN[4:3]:2]
+   Byte 1: [R_GAIN[2:0]:3][B_GAIN:5]
+   Bytes 2-3: GREEN (16-bit, MSB first)
+   Bytes 4-5: RED (16-bit, MSB first)
+   Bytes 6-7: BLUE (16-bit, MSB first)
    ```
-   - First byte: 0b111xxxxx where xxxxx = brightness (0-31)
-   - Second byte: padding
-   - Bytes 3-8: RGB in 16-bit per channel
+   - Start bit (bit 63) MUST be 1
+   - Per-channel 5-bit gain (0-31) for G, R, B independently
+   - **COLOR ORDER IS G, R, B (NOT RGB!)**
 
-3. **Key Difference from APA102**
+3. **Common Mistakes to Avoid**
+   - ❌ Using 64-bit (8-byte) start/end frames (correct: 32-bit/4-byte)
+   - ❌ Single global brightness (correct: per-channel gains)
+   - ❌ RGB color order (correct: GRB order)
+   - ❌ Missing start bit (correct: bit 63 must be 1)
+
+4. **Key Differences from APA102**
    - HD108 has 16-bit color depth (vs 8-bit)
-   - Same global brightness control (5-bit)
-   - Similar SPI protocol but more data per LED
+   - HD108 has PER-CHANNEL gain (vs global brightness only)
+   - HD108 uses GRB order (vs RGB)
+   - HD108 has 32-bit frames (vs 32-bit frames - same)
 
-4. **SPI Configuration**
+5. **SPI Configuration**
    - Mode 0 (CPOL=0, CPHA=0)
-   - Max 20 MHz clock
+   - Max 40 MHz clock (faster than APA102!)
+   - PWM refresh rate: 27kHz
    - Data order: MSB first
 
 ---
@@ -315,7 +397,7 @@ Every driver should support simulation mode:
 class Driver:
     def __init__(self, simulate: bool = False):
         self.simulate = simulate or not HAS_HARDWARE_LIB
-        
+
     def read(self):
         if self.simulate:
             return self._simulate_read()
@@ -350,10 +432,10 @@ class Driver:
             self._bus.close()
             self._bus = None
         self._initialized = False
-    
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, *args):
         self.close()
 ```
@@ -385,7 +467,7 @@ def test_spi_frame_structure():
     """Validate wire protocol without hardware."""
     driver = Driver(simulate=True)
     frame = driver._build_frame()
-    
+
     assert frame[:8] == START_FRAME
     assert frame[-8:] == END_FRAME
     assert len(frame) == expected_length
@@ -399,7 +481,7 @@ def test_spi_frame_structure():
    ```python
    # BAD
    value = driver.read()
-   
+
    # GOOD
    if driver.is_initialized():
        value = driver.read()
@@ -409,7 +491,7 @@ def test_spi_frame_structure():
    ```python
    # BAD (assumes little-endian)
    value = (data[0] << 8) | data[1]
-   
+
    # GOOD (explicit)
    value = struct.unpack(">H", data)[0]  # Big-endian
    ```
@@ -419,7 +501,7 @@ def test_spi_frame_structure():
    # BAD (race condition)
    driver.start_conversion()
    result = driver.read_result()
-   
+
    # GOOD
    driver.start_conversion()
    time.sleep(CONVERSION_TIME_MS / 1000.0)
@@ -430,7 +512,7 @@ def test_spi_frame_structure():
    ```python
    # BAD (always positive)
    current = word_value
-   
+
    # GOOD (properly signed)
    if current >= 0x8000:
        current -= 0x10000
@@ -529,7 +611,7 @@ kagami_orb/
    ```python
    # CSQ (0-31) to RSSI (dBm)
    rssi_dbm = -113 + (csq * 2)
-   
+
    # Quality percentage
    quality_pct = (rssi_dbm + 113) / 62 * 100
    ```
@@ -624,7 +706,7 @@ kagami_orb/
    | 5-10 | Moderate |
    | 10-20 | Fair |
    | > 20 | Poor |
-   
+
    Horizontal accuracy ≈ HDOP × 5m (rough estimate)
 
 7. **Fix Types**

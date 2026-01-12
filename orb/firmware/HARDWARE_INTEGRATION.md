@@ -1,14 +1,15 @@
 # Kagami Orb V3.1 — Hardware Integration Architecture
 
-**Status:** ✅ PYTHON DRIVERS FULLY IMPLEMENTED & TESTED  
-**Platform:** Qualcomm QCS6490 (Linux)  
+**Status:** ✅ HAL COMPLETE — 206 TESTS PASSING
+**Platform:** Qualcomm QCS6490 (Linux)
+**Version:** 0.4.0
 **Last Updated:** January 11, 2026
 
 ---
 
-## ✅ IMPLEMENTATION COMPLETE
+## ✅ HAL IMPLEMENTATION COMPLETE
 
-**206 tests passing** — All Phase 1 Python drivers are implemented and tested:
+**206 tests passing** — Complete Hardware Abstraction Layer with:
 - LED driver (HD108) with animations
 - Power monitoring (BQ25895 + BQ40Z50)
 - Sensor hub (ICM-45686 + VL53L8CX + SHT45)
@@ -80,14 +81,15 @@ firmware/
 │       ├── main.rs          # Entry point
 │       └── levitation/      # Maglev control algorithms
 │
-└── python/                  # QCS6490 Python drivers (COMPLETE)
+└── python/                  # QCS6490 Python HAL (COMPLETE)
     ├── kagami_orb/
-    │   ├── __init__.py      # OrbSystem unified interface
+    │   ├── __init__.py      # OrbSystem unified interface (v0.4.0)
+    │   ├── hal.py           # HAL protocols, capabilities, errors
     │   └── drivers/
     │       ├── __init__.py  # All driver exports
-    │       ├── led.py       # HD108 LED driver (27 tests)
+    │       ├── led.py       # HD108 LED driver (22 tests)
     │       ├── power.py     # BQ25895/BQ40Z50 (29 tests)
-    │       ├── sensors.py   # IMU/ToF/Temp (33 tests)
+    │       ├── sensors.py   # IMU/ToF/Temp (39 tests)
     │       ├── npu.py       # Hailo-10H NPU (22 tests)
     │       ├── cellular.py  # LTE modem (20 tests)
     │       └── gnss.py      # GPS receiver (36 tests)

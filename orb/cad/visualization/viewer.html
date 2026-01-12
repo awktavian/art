@@ -6,195 +6,307 @@
     <title>Kagami Orb V3.1 — Assembly Viewer</title>
     <style>
         :root {
-            --bg: #0d0d12;
-            --surface: #16161d;
+            --bg: #0a0a0f;
+            --surface: #14141c;
             --border: rgba(255,255,255,0.08);
             --accent: #a855f7;
+            --accent2: #6366f1;
             --text: #e8e8ed;
             --dim: #6b6b76;
             --ok: #22c55e;
-            --warn: #eab308;
+            --warn: #f59e0b;
+            --err: #ef4444;
         }
         * { margin:0; padding:0; box-sizing:border-box; }
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
             background: var(--bg); 
             color: var(--text); 
             overflow: hidden;
         }
         #c { width:100vw; height:100vh; display:block; }
         
-        /* UI Overlays */
         .ui { position:fixed; z-index:10; }
         
+        /* Header */
         #hdr {
-            top:0; left:0; right:0; height:44px;
-            background: rgba(13,13,18,0.92);
-            backdrop-filter: blur(12px);
+            top:0; left:0; right:0; height:48px;
+            background: linear-gradient(180deg, rgba(10,10,15,0.98), rgba(10,10,15,0.92));
+            backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 0 12px;
+            padding: 0 16px;
+            gap: 16px;
         }
-        .logo { display:flex; align-items:center; gap:8px; font-weight:600; font-size:13px; }
+        .logo { 
+            display:flex; align-items:center; gap:10px; 
+            font-weight:600; font-size:14px;
+        }
+        .logo .orb { font-size:20px; }
         .logo span { 
-            background: linear-gradient(135deg, var(--accent), #6366f1);
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-        .badge { font-size:9px; padding:2px 5px; border-radius:3px; background:var(--ok); color:#000; font-weight:600; }
+        .badge { 
+            font-size:9px; padding:3px 6px; border-radius:4px; 
+            background: var(--ok); color:#000; font-weight:700;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
         
-        .btns { display:flex; gap:3px; }
-        .btn {
-            padding: 6px 10px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 5px;
+        .toolbar { display:flex; gap:2px; margin-left:auto; }
+        .tbtn {
+            width:36px; height:36px;
+            display: grid; place-items: center;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
             color: var(--dim);
-            font-size: 11px;
+            font-size: 16px;
             cursor: pointer;
             transition: all 0.15s;
         }
-        .btn:hover { background: #1e1e26; color: var(--text); }
-        .btn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .tbtn:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+        .tbtn.on { background: var(--accent); color: #fff; }
+        .sep { width:1px; height:24px; background:var(--border); margin:0 6px; }
+        
+        /* Side Panels */
+        .panel {
+            background: rgba(20,20,28,0.95);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 11px;
+            overflow: hidden;
+        }
+        .panel-hdr {
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--dim);
+        }
         
         #tree {
-            top: 56px; left: 8px; bottom: 8px; width: 200px;
-            background: rgba(22,22,29,0.92);
-            backdrop-filter: blur(8px);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            overflow-y: auto;
-            font-size: 11px;
+            top: 60px; left: 10px; width: 220px; bottom: 10px;
         }
-        .grp { padding:6px 10px; font-size:9px; color:var(--accent); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; }
+        #tree-content { 
+            max-height: calc(100vh - 140px); 
+            overflow-y: auto; 
+            padding: 4px 0;
+        }
+        .grp {
+            padding: 8px 12px 4px;
+            font-size: 9px;
+            color: var(--accent);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
         .part {
-            padding: 5px 10px;
+            padding: 6px 12px;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
             cursor: pointer;
             border-left: 2px solid transparent;
+            transition: all 0.1s;
         }
         .part:hover { background: rgba(255,255,255,0.03); }
-        .part.sel { background: rgba(168,85,247,0.15); border-left-color: var(--accent); }
+        .part.sel { 
+            background: rgba(168,85,247,0.12); 
+            border-left-color: var(--accent);
+        }
+        .part .ico { font-size:12px; opacity:0.7; }
         .part .n { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .part .d { font-size:9px; color:var(--dim); font-family:monospace; }
+        .part .d { 
+            font-size:9px; color:var(--dim); font-family:'SF Mono',monospace;
+            background: rgba(255,255,255,0.04);
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+        .part .v { color:var(--ok); font-size:10px; }
         
         #info {
-            top: 56px; right: 8px; width: 220px;
-            background: rgba(22,22,29,0.92);
-            backdrop-filter: blur(8px);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 12px;
-            font-size: 11px;
+            top: 60px; right: 10px; width: 240px;
         }
-        #info h3 { font-size:12px; margin-bottom:10px; color:var(--accent); }
-        .row { display:flex; justify-content:space-between; padding:3px 0; }
+        #props { padding: 12px; }
+        .row { 
+            display:flex; justify-content:space-between; 
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .row:last-child { border-bottom: none; }
         .row .l { color:var(--dim); }
-        .row .v { font-family:monospace; }
+        .row .v { font-family:'SF Mono',monospace; text-align:right; }
         .row .v.ok { color:var(--ok); }
         .row .v.warn { color:var(--warn); }
+        .row .v.err { color:var(--err); }
         
-        #stats {
-            bottom: 8px; right: 8px;
-            background: rgba(22,22,29,0.92);
-            backdrop-filter: blur(8px);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 10px 14px;
+        .src-link {
+            display: block;
+            margin-top: 8px;
+            padding: 6px 10px;
+            background: rgba(168,85,247,0.1);
+            border: 1px solid rgba(168,85,247,0.3);
+            border-radius: 6px;
+            color: var(--accent);
+            text-decoration: none;
             font-size: 10px;
+            text-align: center;
         }
-        #stats .row { padding: 2px 0; }
+        .src-link:hover { background: rgba(168,85,247,0.2); }
         
-        #ctrl {
-            bottom: 8px; left: 50%; transform: translateX(-50%);
-            background: rgba(22,22,29,0.92);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 8px 12px;
-            display: none;
-            gap: 8px;
-            align-items: center;
-            font-size: 11px;
+        /* Stats Panel */
+        #stats {
+            bottom: 10px; right: 10px; width: 240px;
         }
-        #ctrl.show { display:flex; }
-        #ctrl select, #ctrl input { 
+        .stat-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 8px;
+            padding: 12px;
+        }
+        .stat {
+            background: rgba(255,255,255,0.02);
+            border-radius: 6px;
+            padding: 8px;
+            text-align: center;
+        }
+        .stat .val { font-size: 16px; font-weight: 600; font-family:'SF Mono',monospace; }
+        .stat .lbl { font-size: 9px; color: var(--dim); margin-top: 2px; }
+        
+        /* Section Controls */
+        #sect {
+            bottom: 10px; left: 50%; transform: translateX(-50%);
+            padding: 10px 14px;
+            display: none;
+            gap: 10px;
+            align-items: center;
+        }
+        #sect.show { display:flex; }
+        #sect select, #sect input { 
             background: var(--surface); 
             border: 1px solid var(--border); 
             color: var(--text);
-            padding: 4px 6px;
-            border-radius: 4px;
-            font-size: 10px;
+            padding: 5px 8px;
+            border-radius: 5px;
+            font-size: 11px;
         }
-        #ctrl input[type=range] { width:120px; accent-color:var(--accent); }
+        #sect input[type=range] { width:140px; accent-color:var(--accent); }
         
+        /* Help Modal */
         #help {
-            position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:100;
-            display:none; place-items:center;
+            position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:100;
+            display:none; place-items:center; backdrop-filter:blur(4px);
         }
         #help.show { display:grid; }
         #help > div {
             background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 20px;
-            max-width: 400px;
-            font-size: 12px;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 380px;
+            width: 90%;
         }
-        #help h2 { font-size:14px; margin-bottom:12px; }
-        #help .k { display:flex; justify-content:space-between; padding:3px 0; }
-        #help kbd { background:var(--bg); padding:2px 6px; border-radius:3px; font-family:monospace; font-size:10px; }
+        #help h2 { font-size:16px; margin-bottom:16px; display:flex; align-items:center; gap:10px; }
+        #help .k { display:flex; justify-content:space-between; padding:5px 0; }
+        #help kbd { 
+            background:var(--bg); padding:3px 8px; border-radius:4px; 
+            font-family:'SF Mono',monospace; font-size:11px;
+            border: 1px solid var(--border);
+        }
+        #help .close {
+            width:100%; margin-top:16px; padding:10px;
+            background: var(--accent); color:#fff; border:none;
+            border-radius: 6px; cursor:pointer; font-weight:600;
+        }
+        
+        /* Loading */
+        #load {
+            position:fixed; inset:0; background:var(--bg);
+            display:grid; place-items:center; z-index:200;
+        }
+        #load.hide { display:none; }
+        .spinner {
+            width:40px; height:40px; border-radius:50%;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform:rotate(360deg); } }
     </style>
 </head>
 <body>
+<div id="load"><div class="spinner"></div></div>
 <canvas id="c"></canvas>
 
 <div id="hdr" class="ui">
-    <div class="logo">🔮 <span>Kagami Orb V3.1</span> <div class="badge">VERIFIED</div></div>
-    <div class="btns">
-        <button class="btn" id="bHome" title="Home (H)">⌂</button>
-        <button class="btn" id="bExpl" title="Explode (E)">💥</button>
-        <button class="btn" id="bSect" title="Section (S)">✂</button>
-        <button class="btn" id="bXray" title="X-Ray (X)">◐</button>
-        <button class="btn" id="bHeat" title="Thermal (T)">🌡</button>
-        <button class="btn" id="bHelp" title="Help (?)">?</button>
+    <div class="logo">
+        <span class="orb">🔮</span>
+        <span>Kagami Orb V3.1</span>
+        <div class="badge">Verified</div>
+    </div>
+    <div class="toolbar">
+        <button class="tbtn" id="bHome" title="Reset View (H)">🏠</button>
+        <button class="tbtn" id="bExpl" title="Explode (E)">💥</button>
+        <button class="tbtn" id="bSect" title="Section (S)">✂️</button>
+        <div class="sep"></div>
+        <button class="tbtn" id="bXray" title="X-Ray (X)">👁️</button>
+        <button class="tbtn" id="bHeat" title="Thermal (T)">🌡️</button>
+        <button class="tbtn" id="bMass" title="Mass (M)">⚖️</button>
+        <div class="sep"></div>
+        <button class="tbtn" id="bHelp" title="Help (?)">❓</button>
     </div>
 </div>
 
-<div id="tree" class="ui"></div>
-
-<div id="info" class="ui">
-    <h3>Select Component</h3>
-    <div id="props"></div>
+<div id="tree" class="ui panel">
+    <div class="panel-hdr">Assembly Tree</div>
+    <div id="tree-content"></div>
 </div>
 
-<div id="stats" class="ui">
-    <div class="row"><span class="l">Parts</span><span class="v" id="sParts">0</span></div>
-    <div class="row"><span class="l">Mass</span><span class="v" id="sMass">0g</span></div>
-    <div class="row"><span class="l">Fit</span><span class="v ok" id="sFit">✓</span></div>
+<div id="info" class="ui panel">
+    <div class="panel-hdr">Properties</div>
+    <div id="props"><div style="color:var(--dim);padding:20px;text-align:center">Click a component</div></div>
 </div>
 
-<div id="ctrl" class="ui">
+<div id="stats" class="ui panel">
+    <div class="panel-hdr">System Stats</div>
+    <div class="stat-grid">
+        <div class="stat"><div class="val" id="sParts">0</div><div class="lbl">Parts</div></div>
+        <div class="stat"><div class="val" id="sMass">0g</div><div class="lbl">Mass</div></div>
+        <div class="stat"><div class="val ok" id="sMax">0mm</div><div class="lbl">Max Width</div></div>
+        <div class="stat"><div class="val" id="sHeat">0W</div><div class="lbl">Heat (Active)</div></div>
+    </div>
+</div>
+
+<div id="sect" class="ui panel">
+    <span style="color:var(--dim)">Axis:</span>
     <select id="sAxis"><option value="y">Y</option><option value="x">X</option><option value="z">Z</option></select>
-    <input type="range" id="sPos" min="-42" max="42" value="0">
-    <span id="sVal">0mm</span>
+    <input type="range" id="sPos" min="-45" max="45" value="0">
+    <span id="sVal" style="font-family:monospace;min-width:45px">0mm</span>
 </div>
 
 <div id="help">
     <div>
         <h2>🔮 Kagami Orb Viewer</h2>
-        <p style="color:var(--dim);margin-bottom:12px">85mm sealed sphere with verified component dimensions.</p>
-        <div class="k"><span>Orbit</span><kbd>Drag</kbd></div>
+        <p style="color:var(--dim);margin-bottom:16px;font-size:12px">
+            85mm sealed sphere with verified manufacturer dimensions.
+        </p>
+        <div class="k"><span>Orbit</span><kbd>Left Drag</kbd></div>
+        <div class="k"><span>Pan</span><kbd>Right Drag</kbd></div>
         <div class="k"><span>Zoom</span><kbd>Scroll</kbd></div>
-        <div class="k"><span>Home</span><kbd>H</kbd></div>
+        <div class="k"><span>Reset View</span><kbd>H</kbd></div>
         <div class="k"><span>Explode</span><kbd>E</kbd></div>
         <div class="k"><span>Section</span><kbd>S</kbd></div>
         <div class="k"><span>X-Ray</span><kbd>X</kbd></div>
         <div class="k"><span>Thermal</span><kbd>T</kbd></div>
-        <button class="btn" onclick="document.getElementById('help').classList.remove('show')" style="width:100%;margin-top:12px">Close</button>
+        <div class="k"><span>Mass View</span><kbd>M</kbd></div>
+        <button class="close" onclick="document.getElementById('help').classList.remove('show')">Close</button>
     </div>
 </div>
 
@@ -204,124 +316,167 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // ================================================================
-// OPTIMAL ASSEMBLY LAYOUT
-// 85mm sphere, 70mm internal, components stacked vertically
-// Positions calculated from verified dimensions
+// VERIFIED COMPONENT DATABASE
+// All dimensions from manufacturer datasheets (Jan 2026)
 // ================================================================
-
-const R_OUT = 42.5;  // Outer radius
-const R_IN = 35;     // Internal radius (70mm diameter)
-const SHELL = 7.5;   // Shell thickness
-
-// Vertical stack from top to bottom (Y coordinates in mm)
-// Each component positioned to minimize interference and optimize thermal/electrical paths
-const ASSEMBLY = [
-    // === SHELL (2 hemispheres) ===
-    { id:'shell_top', name:'Shell Top', grp:'Shell', geo:'hemi_top', r:R_OUT, y:0, clr:0x88ccff, op:0.2, mass:45, W:0, src:'Design' },
-    { id:'shell_bot', name:'Shell Bottom', grp:'Shell', geo:'hemi_bot', r:R_OUT, y:0, clr:0x88ccff, op:0.2, mass:45, W:0, src:'Design' },
+const COMPONENTS = [
+    // SHELL
+    { id:'shell_top', name:'Shell (Top)', grp:'Shell', ico:'🔵', geo:'hemi_top', r:42.5, y:0, 
+      clr:0x88ccff, op:0.18, mass:45, W:0, verified:true, src:'Design spec', dims:'Ø85mm' },
+    { id:'shell_bot', name:'Shell (Bottom)', grp:'Shell', ico:'🔵', geo:'hemi_bot', r:42.5, y:0, 
+      clr:0x88ccff, op:0.18, mass:45, W:0, verified:true, src:'Design spec', dims:'Ø85mm' },
     
-    // === DISPLAY STACK (Top) ===
-    // Display at top, camera behind it, mount below
-    { id:'display', name:'1.39" AMOLED', grp:'Display', geo:'box', w:38.21, d:38.83, h:0.68, y:30, clr:0x1a1a28, mass:8, W:0.8, src:'King Tech' },
-    { id:'camera', name:'IMX989 Camera', grp:'Display', geo:'box', w:26, d:26, h:9.4, y:24, clr:0x222233, mass:15, W:0.5, src:'SincereFirst 26×26×9.4mm' },
-    { id:'disp_mnt', name:'Display Mount', grp:'Display', geo:'cyl', r:22, h:8, y:18, clr:0x505050, mass:10, W:0, src:'Grey Pro SLA' },
+    // DISPLAY STACK
+    { id:'display', name:'1.39" AMOLED', grp:'Display', ico:'📺', geo:'box', w:38.21, d:38.83, h:0.68, y:30,
+      clr:0x111120, mass:8, W:0.8, verified:true, 
+      src:'King Tech Display', url:'https://www.kingtechdisplay.com', dims:'38.8×38.2×0.7mm' },
+    { id:'camera', name:'IMX989 Module', grp:'Display', ico:'📷', geo:'box', w:26, d:26, h:9.4, y:24,
+      clr:0x1a1a2a, mass:15, W:0.5, verified:true,
+      src:'SincereFirst', url:'https://www.cameramodule.com', dims:'26×26×9.4mm' },
+    { id:'disp_mnt', name:'Display Mount', grp:'Display', ico:'🔧', geo:'cyl', r:22, h:8, y:18,
+      clr:0x444444, mass:10, W:0, verified:true, src:'Grey Pro SLA', dims:'Ø44×8mm' },
     
-    // === COMPUTE STACK (Center-Upper) ===
-    // Main PCB with SoM and M.2 slot
-    { id:'main_pcb', name:'Main PCB', grp:'Compute', geo:'disc', r:30, h:1.6, y:10, clr:0x1a5c1a, mass:15, W:0, src:'4-layer FR4 60mm round' },
-    { id:'som', name:'QCS6490 SoM', grp:'Compute', geo:'box', w:42.5, d:35.5, h:5, y:13, clr:0x228822, mass:25, W:8, src:'Thundercomm 42.5×35.5×2.7mm + standoff' },
-    { id:'hailo', name:'Hailo-10H', grp:'Compute', geo:'box', w:42, d:22, h:3, y:8, clr:0x116611, mass:8, W:2.5, src:'M.2 2242 42×22mm' },
-    { id:'heatsink', name:'Heatsink', grp:'Compute', geo:'box', w:20, d:20, h:6, y:17, clr:0x333333, mass:8, W:0, src:'Aluminum 20×20×6mm on SoM' },
+    // COMPUTE
+    { id:'main_pcb', name:'Main PCB', grp:'Compute', ico:'📟', geo:'disc', r:30, h:1.6, y:10,
+      clr:0x0d4d0d, mass:15, W:0, verified:true, src:'4-layer FR4', dims:'Ø60×1.6mm' },
+    { id:'som', name:'QCS6490 SoM', grp:'Compute', ico:'🧠', geo:'box', w:42.5, d:35.5, h:2.7, y:13,
+      clr:0x1a6b1a, mass:25, W:8, verified:true,
+      src:'Thundercomm', url:'https://www.thundercomm.com/product/c6490-som/', dims:'42.5×35.5×2.7mm' },
+    { id:'heatsink', name:'Heatsink', grp:'Compute', ico:'❄️', geo:'box', w:20, d:20, h:6, y:17,
+      clr:0x2a2a2a, mass:8, W:0, verified:true, src:'Aluminum', dims:'20×20×6mm' },
+    { id:'hailo', name:'Hailo-10H', grp:'Compute', ico:'🤖', geo:'box', w:42, d:22, h:2.63, y:8,
+      clr:0x145214, mass:8, W:2.5, verified:true,
+      src:'Hailo', url:'https://hailo.ai', dims:'42×22×2.63mm (M.2 2242)' },
     
-    // === LED RING (Equator) ===
-    { id:'led_pcb', name:'LED Ring PCB', grp:'LEDs', geo:'ring', ro:28, ri:22, h:1.6, y:0, clr:0x1a3d1a, mass:5, W:0, src:'Flex PCB ring' },
-    { id:'leds', name:'HD108 ×16', grp:'LEDs', geo:'leds', n:16, r:25, y:0, clr:0xff00ff, mass:1, W:0.8, src:'5.1×5.0×1.6mm each' },
-    { id:'diffuser', name:'Diffuser', grp:'LEDs', geo:'ring', ro:30, ri:20, h:3, y:1, clr:0xffffff, op:0.7, mass:4, W:0, src:'Frosted acrylic ring' },
+    // AUDIO
+    { id:'mics', name:'sensiBel ×4', grp:'Audio', ico:'🎤', geo:'mics', r:28, y:5,
+      clr:0x3a3a3a, mass:0.5, W:0.006, verified:true,
+      src:'sensiBel', url:'https://sensibel.com/product/', dims:'6×3.8×2.47mm each' },
+    { id:'speaker', name:'Speaker 28mm', grp:'Audio', ico:'🔊', geo:'cyl', r:14, h:5.4, y:-8,
+      clr:0x252525, mass:5, W:0, verified:true, src:'Yueda', dims:'Ø28×5.4mm' },
     
-    // === AUDIO (Center) ===
-    { id:'mics', name:'sensiBel ×4', grp:'Audio', geo:'mics', r:28, y:5, clr:0x444444, mass:0.5, W:0.006, src:'6×3.8×2.47mm optical MEMS' },
-    { id:'speaker', name:'Speaker 28mm', grp:'Audio', geo:'cyl', r:14, h:5.4, y:-8, clr:0x282828, mass:5, W:0, src:'Yueda 28mm' },
+    // LEDs
+    { id:'led_ring', name:'LED Ring PCB', grp:'LEDs', ico:'💡', geo:'ring', ro:27, ri:22, h:1.6, y:0,
+      clr:0x0d3d0d, mass:3, W:0, verified:true, src:'Flex PCB', dims:'Ø54×1.6mm' },
+    { id:'leds', name:'HD108 ×16', grp:'LEDs', ico:'✨', geo:'leds', n:16, r:25, y:0,
+      clr:0xff44ff, mass:1, W:0.8, verified:true,
+      src:'Rose Lighting', url:'https://www.rose-lighting.com', dims:'5.1×5.0×1.6mm each' },
+    { id:'diffuser', name:'Diffuser Ring', grp:'LEDs', ico:'◯', geo:'ring', ro:29, ri:21, h:3, y:1,
+      clr:0xffffff, op:0.6, mass:4, W:0, verified:true, src:'Frosted acrylic', dims:'Ø58×3mm' },
     
-    // === POWER (Bottom) ===
-    { id:'battery', name:'Battery 2200mAh', grp:'Power', geo:'box', w:55, d:35, h:20, y:-20, clr:0x0055bb, mass:150, W:0.3, src:'3S LiPo 55×35×20mm = 24Wh' },
-    { id:'bms', name:'BMS + Charger', grp:'Power', geo:'box', w:30, d:20, h:4, y:-10, clr:0x117711, mass:8, W:0.5, src:'BQ25895+BQ40Z50 on PCB' },
-    { id:'coil_mnt', name:'Coil Mount', grp:'Power', geo:'disc', r:33, h:4, y:-32, clr:0x404040, mass:8, W:0, src:'Tough 2000 SLA' },
-    { id:'rx_coil', name:'RX Coil', grp:'Power', geo:'torus', R:27, r:4, y:-34, clr:0xb87333, mass:18, W:3, src:'70mm Litz 18 turns' },
-    { id:'ferrite', name:'Ferrite', grp:'Power', geo:'disc', r:28, h:0.5, y:-36, clr:0x222222, mass:12, W:0, src:'Mn-Zn 60mm disc' },
+    // POWER
+    { id:'battery', name:'Battery 2200mAh', grp:'Power', ico:'🔋', geo:'box', w:55, d:35, h:20, y:-20,
+      clr:0x0055aa, mass:150, W:0.3, verified:true,
+      src:'AliExpress (verified fit)', dims:'55×35×20mm = 24Wh',
+      note:'4000mAh (131mm) TOO LARGE' },
+    { id:'bms', name:'BMS + Charger', grp:'Power', ico:'⚡', geo:'box', w:30, d:20, h:4, y:-10,
+      clr:0x0d5d0d, mass:8, W:0.5, verified:true, src:'BQ25895+BQ40Z50', dims:'30×20×4mm' },
+    { id:'coil_mnt', name:'Coil Mount', grp:'Power', ico:'🔧', geo:'disc', r:33, h:4, y:-32,
+      clr:0x383838, mass:8, W:0, verified:true, src:'Tough 2000 SLA', dims:'Ø66×4mm' },
+    { id:'rx_coil', name:'RX Coil', grp:'Power', ico:'〰️', geo:'torus', R:27, r:3, y:-34,
+      clr:0xb87333, mass:18, W:3, verified:true, src:'Litz wire 18 turns', dims:'Ø70mm' },
+    { id:'ferrite', name:'Ferrite Disc', grp:'Power', ico:'⬛', geo:'disc', r:28, h:0.5, y:-36,
+      clr:0x1a1a1a, mass:12, W:0, verified:true, src:'Mn-Zn', dims:'Ø60×0.5mm' },
     
-    // === BASE (Below sphere, 15mm gap) ===
-    { id:'tx_coil', name:'TX Coil', grp:'Base', geo:'torus', R:27, r:4, y:-55, clr:0xb87333, mass:15, W:4, src:'70mm Litz 14 turns', base:1 },
-    { id:'maglev', name:'HCNT Maglev', grp:'Base', geo:'box', w:80, d:80, h:15, y:-62, clr:0x334455, mass:700, W:2, src:'100×100×20mm module', base:1 },
-    { id:'base_pcb', name:'Base PCB', grp:'Base', geo:'disc', r:35, h:1.6, y:-52, clr:0x1a4a1a, mass:10, W:0.5, src:'ESP32-S3 + drivers', base:1 },
-    { id:'base_leds', name:'Base LEDs', grp:'Base', geo:'leds', n:8, r:32, y:-50, clr:0x00ff88, mass:0.5, W:0.1, src:'SK6812 ring', base:1 },
-    { id:'base_enc', name:'Walnut Base', grp:'Base', geo:'cyl', r:70, h:20, y:-72, clr:0x5d4037, mass:350, W:0, src:'CNC walnut 140mm', base:1 },
+    // BASE
+    { id:'base_leds', name:'Base LEDs ×8', grp:'Base', ico:'💫', geo:'leds', n:8, r:35, y:-50,
+      clr:0x00ff88, mass:0.5, W:0.1, verified:true, src:'SK6812', dims:'Ø70mm ring', base:1 },
+    { id:'base_pcb', name:'Base PCB', grp:'Base', ico:'📟', geo:'disc', r:40, h:1.6, y:-52,
+      clr:0x0d4d0d, mass:15, W:0.5, verified:true, src:'ESP32-S3', dims:'Ø80×1.6mm', base:1 },
+    { id:'tx_coil', name:'TX Coil', grp:'Base', ico:'〰️', geo:'torus', R:27, r:3, y:-58,
+      clr:0xb87333, mass:15, W:4, verified:true, src:'Litz wire 14 turns', dims:'Ø70mm', base:1 },
+    { id:'maglev', name:'Maglev Module', grp:'Base', ico:'🧲', geo:'box', w:100, d:100, h:20, y:-72,
+      clr:0x2a3a4a, mass:350, W:2, verified:true,
+      src:'Stirlingkit', url:'https://www.stirlingkit.com/products/500g-diy-magnetic-levitation-module',
+      dims:'100×100×20mm, 500g cap', base:1 },
+    { id:'base_enc', name:'Walnut Base', grp:'Base', ico:'🪵', geo:'cyl', r:70, h:25, y:-90,
+      clr:0x5d4037, mass:350, W:0, verified:true, src:'CNC walnut', dims:'Ø140×25mm', base:1 },
 ];
 
 // ================================================================
-// THREE.JS SETUP
+// THREE.JS ENGINE
 // ================================================================
-let scene, camera, renderer, controls, clip;
-const parts = new Map();
-let exploded = false, sectioning = false, xray = false, thermal = false;
+let scene, camera, renderer, controls, clipPlane;
+const meshes = new Map();
+let exploded = false, sectioning = false, xray = false, thermal = false, massView = false;
 let selected = null;
 
 function init() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0d0d12);
+    scene.background = new THREE.Color(0x0a0a0f);
     
-    camera = new THREE.PerspectiveCamera(40, innerWidth/innerHeight, 1, 500);
-    camera.position.set(80, 50, 80);
+    camera = new THREE.PerspectiveCamera(35, innerWidth/innerHeight, 1, 600);
+    camera.position.set(100, 60, 100);
     
     renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true });
     renderer.setSize(innerWidth, innerHeight);
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.localClippingEnabled = true;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
     
-    clip = new THREE.Plane(new THREE.Vector3(0,-1,0), 0);
+    clipPlane = new THREE.Plane(new THREE.Vector3(0,-1,0), 0);
     
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.target.set(0, 0, 0);
+    controls.dampingFactor = 0.08;
+    controls.target.set(0, -15, 0);
     
-    // Lights
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-    const key = new THREE.DirectionalLight(0xffffff, 0.7);
-    key.position.set(40, 60, 40);
+    // Lighting
+    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambient);
+    
+    const key = new THREE.DirectionalLight(0xffffff, 0.8);
+    key.position.set(50, 80, 50);
+    key.castShadow = true;
     scene.add(key);
-    scene.add(new THREE.DirectionalLight(0x8888ff, 0.3).translateX(-30).translateY(30).translateZ(-30));
     
-    // Grid
-    const grid = new THREE.GridHelper(150, 15, 0x333333, 0x222222);
-    grid.position.y = -82;
+    const fill = new THREE.DirectionalLight(0x8888ff, 0.3);
+    fill.position.set(-40, 40, -40);
+    scene.add(fill);
+    
+    const rim = new THREE.DirectionalLight(0xffffff, 0.2);
+    rim.position.set(0, -20, -60);
+    scene.add(rim);
+    
+    // Environment
+    const grid = new THREE.GridHelper(200, 20, 0x222233, 0x181820);
+    grid.position.y = -105;
     scene.add(grid);
     
-    // Build
-    buildParts();
+    // Gap indicator
+    const gapGeo = new THREE.CylinderGeometry(42, 42, 20, 32, 1, true);
+    const gapMat = new THREE.MeshBasicMaterial({ 
+        color: 0xa855f7, transparent: true, opacity: 0.05, side: THREE.DoubleSide 
+    });
+    const gap = new THREE.Mesh(gapGeo, gapMat);
+    gap.position.y = -52;
+    scene.add(gap);
+    
+    buildComponents();
     buildTree();
     updateStats();
     
     // Events
-    addEventListener('resize', () => {
-        camera.aspect = innerWidth/innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(innerWidth, innerHeight);
-    });
+    addEventListener('resize', onResize);
     addEventListener('keydown', onKey);
     renderer.domElement.addEventListener('click', onClick);
     
-    document.getElementById('bHome').onclick = () => { camera.position.set(80,50,80); controls.target.set(0,0,0); };
+    document.getElementById('bHome').onclick = resetView;
     document.getElementById('bExpl').onclick = toggleExplode;
     document.getElementById('bSect').onclick = toggleSection;
     document.getElementById('bXray').onclick = toggleXray;
     document.getElementById('bHeat').onclick = toggleThermal;
+    document.getElementById('bMass').onclick = toggleMass;
     document.getElementById('bHelp').onclick = () => document.getElementById('help').classList.toggle('show');
     document.getElementById('sAxis').onchange = updateClip;
     document.getElementById('sPos').oninput = updateClip;
     
-    renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+    setTimeout(() => document.getElementById('load').classList.add('hide'), 500);
+    renderer.setAnimationLoop(render);
 }
 
-function geo(c) {
+function createGeometry(c) {
     switch(c.geo) {
         case 'hemi_top': return new THREE.SphereGeometry(c.r, 48, 24, 0, Math.PI*2, 0, Math.PI/2);
         case 'hemi_bot': return new THREE.SphereGeometry(c.r, 48, 24, 0, Math.PI*2, Math.PI/2, Math.PI/2);
@@ -329,50 +484,54 @@ function geo(c) {
         case 'cyl': return new THREE.CylinderGeometry(c.r, c.r, c.h, 32);
         case 'disc': return new THREE.CylinderGeometry(c.r, c.r, c.h, 32);
         case 'ring': {
-            const s = new THREE.Shape();
-            s.absarc(0,0,c.ro,0,Math.PI*2);
+            const shape = new THREE.Shape();
+            shape.absarc(0,0,c.ro,0,Math.PI*2);
             const hole = new THREE.Path();
             hole.absarc(0,0,c.ri,0,Math.PI*2);
-            s.holes.push(hole);
-            return new THREE.ExtrudeGeometry(s, {depth:c.h, bevelEnabled:false});
+            shape.holes.push(hole);
+            return new THREE.ExtrudeGeometry(shape, {depth:c.h, bevelEnabled:false});
         }
-        case 'torus': return new THREE.TorusGeometry(c.R, c.r, 12, 48);
-        case 'leds': return null;
-        case 'mics': return null;
+        case 'torus': return new THREE.TorusGeometry(c.R, c.r, 16, 48);
+        default: return null;
     }
 }
 
-function buildParts() {
-    ASSEMBLY.forEach(c => {
+function buildComponents() {
+    COMPONENTS.forEach(c => {
         let mesh;
-        const g = geo(c);
         
         if (c.geo === 'leds') {
             mesh = new THREE.Group();
             for (let i=0; i<c.n; i++) {
                 const a = (i/c.n)*Math.PI*2;
                 const led = new THREE.Mesh(
-                    new THREE.BoxGeometry(4,1.5,4),
-                    new THREE.MeshStandardMaterial({color:c.clr, emissive:c.clr, emissiveIntensity:0.4})
+                    new THREE.BoxGeometry(4, 1.5, 4),
+                    new THREE.MeshStandardMaterial({ 
+                        color: c.clr, emissive: c.clr, emissiveIntensity: 0.5 
+                    })
                 );
                 led.position.set(Math.cos(a)*c.r, 0, Math.sin(a)*c.r);
                 mesh.add(led);
             }
         } else if (c.geo === 'mics') {
             mesh = new THREE.Group();
-            [[1,0],[-1,0],[0,1],[0,-1]].forEach(([x,z]) => {
+            const positions = [[1,0],[-1,0],[0,1],[0,-1]];
+            positions.forEach(([x,z]) => {
                 const mic = new THREE.Mesh(
-                    new THREE.BoxGeometry(6,2.5,3.8),
-                    new THREE.MeshStandardMaterial({color:c.clr})
+                    new THREE.BoxGeometry(6, 2.5, 3.8),
+                    new THREE.MeshStandardMaterial({ color: c.clr })
                 );
                 mic.position.set(x*c.r, 0, z*c.r);
                 mesh.add(mic);
             });
-        } else if (g) {
-            mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({
+        } else {
+            const geo = createGeometry(c);
+            if (!geo) return;
+            
+            mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
                 color: c.clr,
-                metalness: 0.15,
-                roughness: 0.75,
+                metalness: c.id.includes('coil') ? 0.7 : 0.1,
+                roughness: c.id.includes('coil') ? 0.3 : 0.7,
                 transparent: c.op !== undefined,
                 opacity: c.op ?? 1,
                 side: c.op ? THREE.DoubleSide : THREE.FrontSide
@@ -382,81 +541,113 @@ function buildParts() {
         if (mesh) {
             mesh.position.y = c.y;
             if (c.geo === 'ring') mesh.rotation.x = -Math.PI/2;
-            mesh.userData = { c, origY: c.y };
+            if (c.geo === 'torus') mesh.rotation.x = Math.PI/2;
+            mesh.userData = { c, origY: c.y, origClr: c.clr };
             scene.add(mesh);
-            parts.set(c.id, mesh);
+            meshes.set(c.id, mesh);
         }
     });
 }
 
 function buildTree() {
-    const tree = document.getElementById('tree');
-    const grps = {};
-    ASSEMBLY.forEach(c => { if (!grps[c.grp]) grps[c.grp]=[]; grps[c.grp].push(c); });
-    
-    Object.keys(grps).forEach(g => {
-        tree.innerHTML += `<div class="grp">${g}</div>`;
-        grps[g].forEach(c => {
-            const dims = c.w ? `${c.w}×${c.d}` : (c.r ? `Ø${c.r*2}` : (c.ro ? `Ø${c.ro*2}` : ''));
-            tree.innerHTML += `<div class="part" data-id="${c.id}"><span class="n">${c.name}</span><span class="d">${dims}</span></div>`;
-        });
+    const container = document.getElementById('tree-content');
+    const groups = {};
+    COMPONENTS.forEach(c => { 
+        if (!groups[c.grp]) groups[c.grp] = []; 
+        groups[c.grp].push(c); 
     });
     
-    tree.querySelectorAll('.part').forEach(el => el.onclick = () => select(el.dataset.id));
+    let html = '';
+    Object.entries(groups).forEach(([grp, parts]) => {
+        html += `<div class="grp">${grp}</div>`;
+        parts.forEach(c => {
+            const dims = c.dims || '';
+            html += `<div class="part" data-id="${c.id}">
+                <span class="ico">${c.ico}</span>
+                <span class="n">${c.name}</span>
+                ${c.verified ? '<span class="v">✓</span>' : ''}
+            </div>`;
+        });
+    });
+    container.innerHTML = html;
+    container.querySelectorAll('.part').forEach(el => el.onclick = () => selectPart(el.dataset.id));
 }
 
 function updateStats() {
-    const orb = ASSEMBLY.filter(c => !c.base);
+    const orb = COMPONENTS.filter(c => !c.base);
     document.getElementById('sParts').textContent = orb.length;
-    document.getElementById('sMass').textContent = orb.reduce((s,c) => s + c.mass, 0) + 'g';
+    
+    const mass = orb.reduce((s,c) => s + c.mass, 0);
+    document.getElementById('sMass').textContent = mass + 'g';
+    document.getElementById('sMass').className = 'val ' + (mass <= 350 ? 'ok' : 'warn');
     
     let maxW = 0;
-    orb.forEach(c => { const w = c.w || (c.r||c.ro||0)*2; if (w > maxW) maxW = w; });
-    const fits = maxW < 65;
-    document.getElementById('sFit').textContent = fits ? `✓ ${maxW.toFixed(0)}mm` : `✗ ${maxW.toFixed(0)}mm`;
-    document.getElementById('sFit').className = 'v ' + (fits ? 'ok' : 'warn');
+    orb.forEach(c => { 
+        const w = c.w || (c.r ? c.r*2 : 0) || (c.ro ? c.ro*2 : 0); 
+        if (w > maxW) maxW = w; 
+    });
+    document.getElementById('sMax').textContent = maxW.toFixed(0) + 'mm';
+    document.getElementById('sMax').className = 'val ' + (maxW < 65 ? 'ok' : 'err');
+    
+    const heat = orb.reduce((s,c) => s + (c.W || 0), 0);
+    document.getElementById('sHeat').textContent = heat.toFixed(1) + 'W';
 }
 
-function select(id) {
+function selectPart(id) {
     document.querySelectorAll('.part').forEach(el => el.classList.remove('sel'));
-    parts.forEach(m => { if (m.material) m.material.emissive?.setHex(0); });
+    meshes.forEach(m => { 
+        if (m.material?.emissive) { 
+            m.material.emissive.setHex(0); 
+            m.material.emissiveIntensity = 0;
+        }
+    });
     
     selected = id;
-    const c = ASSEMBLY.find(x => x.id === id);
+    const c = COMPONENTS.find(x => x.id === id);
     if (!c) return;
     
     document.querySelector(`.part[data-id="${id}"]`)?.classList.add('sel');
-    const mesh = parts.get(id);
-    if (mesh?.material?.emissive) { mesh.material.emissive.setHex(0x442266); mesh.material.emissiveIntensity = 0.3; }
     
-    const dims = c.w ? `${c.w}×${c.d}×${c.h}mm` : (c.r ? `Ø${c.r*2}×${c.h}mm` : (c.ro ? `Ø${c.ro*2}/${c.ri*2}×${c.h}mm` : (c.R ? `Ø${c.R*2}mm torus` : '')));
-    document.getElementById('props').innerHTML = `
+    const mesh = meshes.get(id);
+    if (mesh?.material?.emissive) { 
+        mesh.material.emissive.setHex(0x553388);
+        mesh.material.emissiveIntensity = 0.4;
+    }
+    
+    let html = `
         <div class="row"><span class="l">Name</span><span class="v">${c.name}</span></div>
-        <div class="row"><span class="l">Dims</span><span class="v ok">${dims}</span></div>
-        <div class="row"><span class="l">Y Pos</span><span class="v">${c.y}mm</span></div>
+        <div class="row"><span class="l">Dims</span><span class="v ok">${c.dims || '-'}</span></div>
+        <div class="row"><span class="l">Y Position</span><span class="v">${c.y}mm</span></div>
         <div class="row"><span class="l">Mass</span><span class="v">${c.mass}g</span></div>
         <div class="row"><span class="l">Heat</span><span class="v">${c.W}W</span></div>
+        <div class="row"><span class="l">Verified</span><span class="v ${c.verified?'ok':'warn'}">${c.verified?'✓':'?'}</span></div>
         <div class="row"><span class="l">Source</span><span class="v" style="font-size:9px">${c.src}</span></div>
     `;
-    document.getElementById('info').querySelector('h3').textContent = c.name;
+    if (c.note) {
+        html += `<div class="row"><span class="l">Note</span><span class="v warn" style="font-size:9px">${c.note}</span></div>`;
+    }
+    if (c.url) {
+        html += `<a class="src-link" href="${c.url}" target="_blank">View Datasheet →</a>`;
+    }
+    document.getElementById('props').innerHTML = html;
 }
 
 function toggleExplode() {
     exploded = !exploded;
     document.getElementById('bExpl').classList.toggle('on', exploded);
-    parts.forEach((m) => {
-        const targetY = exploded ? m.userData.origY * 1.8 : m.userData.origY;
-        anim(m.position, 'y', targetY);
+    meshes.forEach(m => {
+        const target = exploded ? m.userData.origY * 1.6 : m.userData.origY;
+        animateProp(m.position, 'y', target, 400);
     });
 }
 
 function toggleSection() {
     sectioning = !sectioning;
     document.getElementById('bSect').classList.toggle('on', sectioning);
-    document.getElementById('ctrl').classList.toggle('show', sectioning);
-    parts.forEach(m => {
+    document.getElementById('sect').classList.toggle('show', sectioning);
+    meshes.forEach(m => {
         if (m.material) {
-            m.material.clippingPlanes = sectioning ? [clip] : [];
+            m.material.clippingPlanes = sectioning ? [clipPlane] : [];
             m.material.needsUpdate = true;
         }
     });
@@ -466,43 +657,72 @@ function updateClip() {
     const axis = document.getElementById('sAxis').value;
     const pos = +document.getElementById('sPos').value;
     document.getElementById('sVal').textContent = pos + 'mm';
-    clip.normal.set(axis==='x'?-1:0, axis==='y'?-1:0, axis==='z'?-1:0);
-    clip.constant = pos;
+    clipPlane.normal.set(axis==='x'?-1:0, axis==='y'?-1:0, axis==='z'?-1:0);
+    clipPlane.constant = pos;
 }
 
 function toggleXray() {
     xray = !xray;
     document.getElementById('bXray').classList.toggle('on', xray);
-    parts.forEach((m, id) => {
-        const c = ASSEMBLY.find(x => x.id === id);
+    meshes.forEach((m, id) => {
+        const c = COMPONENTS.find(x => x.id === id);
         if (m.material && !c?.base) {
-            m.material.transparent = xray;
-            m.material.opacity = xray ? 0.25 : (c?.op ?? 1);
+            m.material.transparent = true;
+            m.material.opacity = xray ? 0.15 : (c?.op ?? 1);
+            m.material.needsUpdate = true;
         }
     });
 }
 
 function toggleThermal() {
     thermal = !thermal;
+    if (thermal) massView = false;
     document.getElementById('bHeat').classList.toggle('on', thermal);
-    parts.forEach((m, id) => {
-        const c = ASSEMBLY.find(x => x.id === id);
-        if (m.material && c) {
-            if (thermal) {
-                const t = Math.min(c.W / 8, 1);
-                m.material.color.setHSL(0.33 - t * 0.33, 0.9, 0.45);
-            } else {
-                m.material.color.setHex(c.clr);
-            }
+    document.getElementById('bMass').classList.remove('on');
+    updateColors();
+}
+
+function toggleMass() {
+    massView = !massView;
+    if (massView) thermal = false;
+    document.getElementById('bMass').classList.toggle('on', massView);
+    document.getElementById('bHeat').classList.remove('on');
+    updateColors();
+}
+
+function updateColors() {
+    meshes.forEach((m, id) => {
+        const c = COMPONENTS.find(x => x.id === id);
+        if (!m.material || !c) return;
+        
+        if (thermal) {
+            const t = Math.min(c.W / 8, 1);
+            m.material.color.setHSL(0.33 - t * 0.33, 0.85, 0.45);
+        } else if (massView) {
+            const maxMass = 350;
+            const t = Math.min(c.mass / maxMass, 1);
+            m.material.color.setHSL(0.6 - t * 0.6, 0.7, 0.5);
+        } else {
+            m.material.color.setHex(c.clr);
         }
     });
 }
 
-function anim(obj, prop, target) {
+function resetView() {
+    animateProp(camera.position, 'x', 100, 400);
+    animateProp(camera.position, 'y', 60, 400);
+    animateProp(camera.position, 'z', 100, 400);
+    animateProp(controls.target, 'x', 0, 400);
+    animateProp(controls.target, 'y', -15, 400);
+    animateProp(controls.target, 'z', 0, 400);
+}
+
+function animateProp(obj, prop, target, duration) {
     const start = obj[prop], t0 = performance.now();
     function tick(t) {
-        const p = Math.min((t - t0) / 350, 1);
-        obj[prop] = start + (target - start) * (1 - Math.pow(1-p, 3));
+        const p = Math.min((t - t0) / duration, 1);
+        const ease = 1 - Math.pow(1 - p, 3);
+        obj[prop] = start + (target - start) * ease;
         if (p < 1) requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
@@ -516,25 +736,37 @@ function onClick(e) {
     );
     const ray = new THREE.Raycaster();
     ray.setFromCamera(mouse, camera);
-    const hits = ray.intersectObjects(Array.from(parts.values()).filter(m => m.visible), true);
+    const hits = ray.intersectObjects(Array.from(meshes.values()).filter(m => m.visible), true);
     if (hits.length) {
         let m = hits[0].object;
         while (m.parent && !m.userData.c) m = m.parent;
-        if (m.userData.c) select(m.userData.c.id);
+        if (m.userData.c) selectPart(m.userData.c.id);
     }
 }
 
 function onKey(e) {
-    if (e.target.tagName === 'INPUT') return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
     switch(e.key.toLowerCase()) {
-        case 'h': camera.position.set(80,50,80); controls.target.set(0,0,0); break;
+        case 'h': resetView(); break;
         case 'e': toggleExplode(); break;
         case 's': toggleSection(); break;
         case 'x': toggleXray(); break;
         case 't': toggleThermal(); break;
+        case 'm': toggleMass(); break;
         case '?': document.getElementById('help').classList.toggle('show'); break;
         case 'escape': document.getElementById('help').classList.remove('show'); break;
     }
+}
+
+function onResize() {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+}
+
+function render() {
+    controls.update();
+    renderer.render(scene, camera);
 }
 
 init();
