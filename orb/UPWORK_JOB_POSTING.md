@@ -17,7 +17,7 @@
 
 ### Alternative Titles:
 - QCS6490 Voice Assistant with Magnetic Levitation & Wireless Charging — Full Prototype Build
-- Hardware Engineer for IoT Voice Assistant Prototype — QCS6490, Maglev, Qi Charging, 4-Mic Array
+- Hardware Engineer for IoT Voice Assistant Prototype — QCS6490, Maglev, Resonant Wireless Charging, 4-Mic Array
 
 ---
 
@@ -34,7 +34,7 @@ I'm looking for an experienced hardware engineer to build a fully functional pro
 ## What You're Building
 
 **The "Kagami Orb"** — an 85mm spherical voice assistant that:
-- Floats 15mm above a magnetic levitation base
+- Floats 18-25mm above a magnetic levitation base
 - Charges wirelessly via **custom resonant coils** (NOT standard Qi—see Technical Notes)
 - Has 4-microphone far-field voice input
 - **Chrome speaker at center** — 28mm driver with LED reflections on metallic surface
@@ -73,7 +73,7 @@ Think: **Amazon Echo meets levitating desk globe meets infinity mirror art piece
 | **Speaker** | **28mm chrome driver + MAX98357A Class-D amp** |
 | **Bluetooth** | **A2DP sink for speaker mode** |
 | Battery | 2,200mAh Li-Po with BMS |
-| **Wireless Power RX** | **Custom 80mm resonant coil @ 140kHz** |
+| **Wireless Power RX** | **Custom 70mm resonant coil @ 140kHz** |
 | Shell | 85mm clear acrylic sphere with mirror film |
 | Target Weight | <400g |
 | **Expansion** | **GPIO header exposed, I2C/SPI accessible** |
@@ -82,7 +82,7 @@ Think: **Amazon Echo meets levitating desk globe meets infinity mirror art piece
 | Component | Specification |
 |-----------|---------------|
 | Maglev Module | 500g capacity electromagnetic levitation |
-| **Wireless Power TX** | **Custom 80mm resonant coil @ 140kHz (20W)** |
+| **Wireless Power TX** | **Custom 70mm resonant coil @ 140kHz (20W)** |
 | **Ferrite Shielding** | **Mn-Zn between coils and maglev magnets** |
 | Power Input | 24V 3A DC |
 | Enclosure | CNC walnut, 180mm × 180mm × 45mm |
@@ -100,13 +100,13 @@ Think: **Amazon Echo meets levitating desk globe meets infinity mirror art piece
 
 ### ⚠️ CRITICAL TECHNICAL NOTE: Wireless Charging
 
-**Standard Qi EPP will NOT work** at 15mm gap with maglev magnets:
+**Standard Qi EPP will NOT work** at 18-25mm gap with maglev magnets:
 - Gap exceeds Qi spec (8mm max)
 - N52 magnets trigger FOD (Foreign Object Detection) false alarms
 - Result: 0W power transfer
 
 **Solution: Custom resonant coupling**
-- 80mm diameter Litz wire coils (vs 40mm standard Qi)
+- 70mm diameter Litz wire coils (vs 40mm standard Qi)
 - Tuned to ~140kHz
 - Achieves k ≈ 0.82 coupling coefficient
 - ~75% efficiency (20W TX → 15W RX)
@@ -154,7 +154,7 @@ Think: **Amazon Echo meets levitating desk globe meets infinity mirror art piece
 ## Project Phases
 
 ### Phase 1: Critical Path Validation ($700-1000)
-- **Test custom resonant power delivery** through 15mm air gap (NOT standard Qi)
+- **Test custom resonant power delivery** through 18-25mm air gap (NOT standard Qi)
 - Calibrate FOD to exclude maglev magnet signature
 - Test maglev stability at target weight
 - Verify no EMI between resonant coils and WiFi
@@ -282,7 +282,7 @@ Looking forward to working with a skilled hardware engineer to bring this floati
 1. "Have you built a project with Qualcomm QCS6490 or similar embedded SoC? Please share a link or photo."
 2. "Have you worked with wireless power transfer (Qi or resonant)? Describe briefly."
 3. "What's your experience with audio/microphone systems?"
-4. "Do you understand why standard Qi won't work at 15mm gap with maglev magnets?"
+4. "Do you understand why standard Qi won't work at 18-25mm gap with maglev magnets?"
 5. "Are you able to ship a completed prototype to Seattle, WA, USA?"
 
 ---
@@ -333,7 +333,7 @@ Thanks for your interest in the Kagami Orb project! Your experience with [specif
 Before we proceed, I'd like to share the full technical specification. Could you review it and let me know:
 
 1. What do you see as the top 3 risks?
-2. How would you approach the Qi-through-maglev-gap validation?
+2. How would you approach the resonant-through-maglev-gap validation?
 3. Any concerns about the timeline or budget?
 
 I've attached the complete spec (README.md) and Bill of Materials.
@@ -344,8 +344,8 @@ Tim
 
 ### Interview Questions
 
-1. "Standard Qi EPP won't work at 15mm with maglev magnets. How would you design the resonant charging system?"
-2. "What coupling coefficient would you expect with 80mm coils at 15mm gap? How does coil diameter affect this?"
+1. "Standard Qi EPP won't work at 18-25mm with maglev magnets. How would you design the resonant charging system?"
+2. "What coupling coefficient would you expect with 70mm coils at 18-25mm gap? How does coil diameter affect this?"
 3. "The sensiBel SBM100B 4-Mic needs echo cancellation when the speaker is playing. How would you approach that?"
 4. "If the thermal tests show the sphere gets too hot with charging, what are your fallback options?"
 5. "Have you shipped hardware to a client before? How do you package delicate electronics?"
