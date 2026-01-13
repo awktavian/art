@@ -287,6 +287,281 @@ const WMO_CODES = {
 };
 
 // ============================================================================
+// UTILITIES — Debounce, Throttle, Haptics
+// ============================================================================
+
+/**
+ * Debounce function - delays execution until after wait ms of no calls
+ * @param {Function} func - Function to debounce
+ * @param {number} wait - Milliseconds to wait
+ * @returns {Function} Debounced function
+ */
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+/**
+ * Throttle function - limits execution to once per wait ms
+ * @param {Function} func - Function to throttle
+ * @param {number} wait - Milliseconds between executions
+ * @returns {Function} Throttled function
+ */
+function throttle(func, wait) {
+    let lastTime = 0;
+    return function executedFunction(...args) {
+        const now = Date.now();
+        if (now - lastTime >= wait) {
+            lastTime = now;
+            func(...args);
+        }
+    };
+}
+
+/**
+ * Haptic feedback utility
+ * Provides tactile feedback on supported devices
+ */
+const Haptics = {
+    supported: 'vibrate' in navigator,
+    
+    // Light tap - button press, selection
+    light() {
+        if (this.supported && !MotionPreference?.prefersReduced) {
+            navigator.vibrate(10);
+        }
+    },
+    
+    // Medium tap - confirmation, success
+    medium() {
+        if (this.supported && !MotionPreference?.prefersReduced) {
+            navigator.vibrate(20);
+        }
+    },
+    
+    // Heavy tap - error, important action
+    heavy() {
+        if (this.supported && !MotionPreference?.prefersReduced) {
+            navigator.vibrate(40);
+        }
+    },
+    
+    // Double tap - special action
+    double() {
+        if (this.supported && !MotionPreference?.prefersReduced) {
+            navigator.vibrate([15, 50, 15]);
+        }
+    },
+    
+    // Success pattern - achievement unlocked
+    success() {
+        if (this.supported && !MotionPreference?.prefersReduced) {
+            navigator.vibrate([10, 30, 10, 30, 20]);
+        }
+    }
+};
+
+// ============================================================================
+// LOCATION MANAGER — Single Source of Truth for Location State
+// ============================================================================
+
+/**
+ * LocationManager centralizes all location state management.
+ * 
+ * Location sources (priority order):
+ * 1. secret - Secret location override (temporary, 10s)
+ * 2. globe - User dragged globe to new location
+ * 3. ip - IP-based geolocation (default)
+ * 4. fallback - HOME constant
+ * 
+ * Events dispatched:
+ * - 'location-changed': { latitude, longitude, source }
+ * - 'location-loading': { loading: boolean }
+ */
+class LocationManager {
+    constructor() {
+        this.coords = { latitude: HOME.latitude, longitude: HOME.longitude };
+        this.source = 'fallback'; // 'ip', 'gps', 'globe', 'secret', 'fallback'
+        this.loading = false;
+        this.error = null;
+        this.listeners = new Set();
+        this.initialized = false;
+        
+        // Debounced weather fetch to prevent rapid API calls during globe drag
+        this._debouncedWeatherFetch = debounce(this._fetchWeather.bind(this), 300);
+    }
+    
+    /**
+     * Add a listener for location changes
+     * @param {Function} callback - Called with { latitude, longitude, source }
+     * @returns {Function} Unsubscribe function
+     */
+    addListener(callback) {
+        this.listeners.add(callback);
+        return () => this.listeners.delete(callback);
+    }
+    
+    /**
+     * Get current location
+     * @returns {{ latitude: number, longitude: number, source: string }}
+     */
+    getLocation() {
+        return { ...this.coords, source: this.source };
+    }
+    
+    /**
+     * Set location from a specific source
+     * @param {number} lat - Latitude
+     * @param {number} lon - Longitude
+     * @param {string} source - 'ip', 'gps', 'globe', 'secret'
+     * @param {Object} options - { skipWeather: boolean, silent: boolean }
+     */
+    setLocation(lat, lon, source = 'globe', options = {}) {
+        if (typeof lat !== 'number' || typeof lon !== 'number' || isNaN(lat) || isNaN(lon)) {
+            console.warn('[LocationManager] Invalid coordinates:', lat, lon);
+            return;
+        }
+        
+        const changed = this.coords.latitude !== lat || this.coords.longitude !== lon;
+        
+        this.coords = { latitude: lat, longitude: lon };
+        this.source = source;
+        this.error = null;
+        
+        if (!options.silent) {
+            this._notifyListeners();
+            this._dispatchEvent('location-changed', { ...this.coords, source });
+        }
+        
+        // Fetch weather for new location (debounced to prevent API spam)
+        if (changed && !options.skipWeather) {
+            this._debouncedWeatherFetch(lat, lon);
+        }
+        
+        console.log(`%c📍 Location set: ${lat.toFixed(2)}°, ${lon.toFixed(2)}° (${source})`, 'color: #64B5F6;');
+    }
+    
+    /**
+     * Set loading state
+     * @param {boolean} loading
+     */
+    setLoading(loading) {
+        this.loading = loading;
+        this._dispatchEvent('location-loading', { loading });
+        document.body.classList.toggle('location-loading', loading);
+    }
+    
+    /**
+     * Initialize with IP-based location
+     */
+    async initialize() {
+        if (this.initialized) return;
+        
+        this.setLoading(true);
+        
+        try {
+            // Wait for atmosphere to provide IP location
+            if (typeof atmosphere !== 'undefined' && atmosphere.latitude != null) {
+                this.setLocation(atmosphere.latitude, atmosphere.longitude, 'ip', { skipWeather: true });
+            } else {
+                // Will be updated when atmosphere-location-ready fires
+                console.log('[LocationManager] Waiting for IP geolocation...');
+            }
+        } catch (e) {
+            this.error = e.message;
+            console.warn('[LocationManager] Initialization failed:', e);
+        } finally {
+            this.setLoading(false);
+            this.initialized = true;
+        }
+    }
+    
+    /**
+     * Request precise GPS location (prompts user)
+     */
+    async requestPreciseLocation() {
+        if (!navigator.geolocation) {
+            this.error = 'Geolocation not supported';
+            return false;
+        }
+        
+        this.setLoading(true);
+        
+        return new Promise((resolve) => {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    this.setLocation(pos.coords.latitude, pos.coords.longitude, 'gps');
+                    this.setLoading(false);
+                    Haptics.success();
+                    resolve(true);
+                },
+                (err) => {
+                    this.error = err.message;
+                    this.setLoading(false);
+                    resolve(false);
+                },
+                { timeout: 10000, enableHighAccuracy: true }
+            );
+        });
+    }
+    
+    /**
+     * Internal: Fetch weather for location
+     */
+    async _fetchWeather(lat, lon) {
+        if (typeof atmosphere === 'undefined' || !atmosphere.fetchWeather) return;
+        
+        try {
+            atmosphere.latitude = lat;
+            atmosphere.longitude = lon;
+            await atmosphere.fetchWeather(lat, lon);
+            atmosphere.applyAtmosphere();
+            
+            // Update timezone display
+            if (atmosphere.timezone) {
+                this._dispatchEvent('timezone-changed', {
+                    timezone: atmosphere.timezone,
+                    abbreviation: atmosphere.timezoneAbbr
+                });
+            }
+        } catch (e) {
+            console.warn('[LocationManager] Weather fetch failed:', e);
+        }
+    }
+    
+    /**
+     * Internal: Notify all listeners
+     */
+    _notifyListeners() {
+        const data = { ...this.coords, source: this.source };
+        this.listeners.forEach(cb => {
+            try {
+                cb(data);
+            } catch (e) {
+                console.error('[LocationManager] Listener error:', e);
+            }
+        });
+    }
+    
+    /**
+     * Internal: Dispatch custom event
+     */
+    _dispatchEvent(name, detail) {
+        window.dispatchEvent(new CustomEvent(name, { detail }));
+    }
+}
+
+// Global LocationManager instance
+const locationManager = new LocationManager();
+
+// ============================================================================
 // SOUND DESIGN — Subtle audio feedback
 // ============================================================================
 
@@ -957,6 +1232,58 @@ class WeatherAtmosphere {
         if (sound && sound.initialized) {
             sound.frequencyMod = mods.soundFreqMod;
         }
+        
+        // Update widget weather overlay (for watch/glasses/widget modes)
+        this.updateWidgetOverlay();
+    }
+    
+    updateWidgetOverlay() {
+        // Update the widget weather overlay with current conditions
+        const overlay = document.getElementById('widget-weather-overlay');
+        if (!overlay) return;
+        
+        const iconEl = overlay.querySelector('.weather-icon');
+        const tempEl = overlay.querySelector('.weather-temp');
+        const conditionEl = overlay.querySelector('.weather-condition');
+        
+        if (iconEl) {
+            iconEl.textContent = this.getConditionEmoji();
+        }
+        
+        if (tempEl && this.temperature != null) {
+            // Get current unit preference
+            const unitPref = localStorage.getItem('weatherUnit') || 'C';
+            const temp = unitPref === 'F' ? Math.round(this.temperature * 9/5 + 32) : Math.round(this.temperature);
+            tempEl.textContent = `${temp}°${unitPref}`;
+        }
+        
+        if (conditionEl) {
+            conditionEl.textContent = this.condition ? this.condition.replace(/_/g, ' ') : 'Unknown';
+        }
+    }
+    
+    getConditionEmoji() {
+        // Map weather conditions to emojis
+        const emojiMap = {
+            'clear': '☀️',
+            'mostly_clear': '🌤️',
+            'partly_cloudy': '⛅',
+            'overcast': '☁️',
+            'fog': '🌫️',
+            'drizzle': '🌦️',
+            'rain': '🌧️',
+            'heavy_rain': '⛈️',
+            'freezing_drizzle': '🌨️',
+            'freezing_rain': '🌨️',
+            'snow': '❄️',
+            'heavy_snow': '🌨️',
+            'snow_grains': '❄️',
+            'showers': '🌧️',
+            'heavy_showers': '⛈️',
+            'snow_showers': '🌨️',
+            'thunderstorm': '⛈️'
+        };
+        return emojiMap[this.condition] || '🌡️';
     }
 
     startAutoRefresh() {
@@ -5706,6 +6033,9 @@ class CelestialDemo {
             console.log('%c🌈 KONAMI UNLOCKED!', 'font-size: 24px; color: #FFD700;');
             console.log('%cYou found the easter egg! The sun is now extra shiny.', 'color: #888;');
 
+            // Haptic celebration
+            Haptics.success();
+
             // Play success chime
             sound.init().then(() => sound.playSuccess());
 
@@ -5741,6 +6071,9 @@ class CelestialDemo {
             const isHome = word === 'home';
             const titleColor = isHome ? '#22c55e' : '#8B4513';
             const nameColor = isHome ? '#4ade80' : '#D2691E';
+
+            // Haptic celebration for secret unlock
+            Haptics.success();
 
             console.log(`%c${location.emoji} ${isHome ? 'WELCOME HOME!' : 'SECRET LOCATION UNLOCKED!'}`, `font-size: 24px; color: ${titleColor};`);
             console.log(`%c${location.name}`, `font-size: 16px; color: ${nameColor}; font-weight: bold;`);
@@ -5840,35 +6173,51 @@ class CelestialDemo {
     }
     
     async revertToOriginalLocation() {
+        // ═══════════════════════════════════════════════════════════════════
+        // Revert to original location after secret location preview
+        // FIXED: Better fallback handling for edge cases
+        // ═══════════════════════════════════════════════════════════════════
+        
         // Validate originalLocation has valid coordinates
         const hasValidOriginal = (
             this.originalLocation &&
             typeof this.originalLocation.latitude === 'number' &&
-            typeof this.originalLocation.longitude === 'number'
+            typeof this.originalLocation.longitude === 'number' &&
+            !isNaN(this.originalLocation.latitude) &&
+            !isNaN(this.originalLocation.longitude)
         );
         
-        if (!hasValidOriginal) {
-            console.log('%c⚠️ No valid original location to revert to', 'color: #FFA726;');
-            // Clear any partial state
-            this.originalLocation = null;
-            this.secretLocationTimeout = null;
-            document.body.classList.remove('monmouth-mode', 'home-mode');
-            window.compassSundial?.clearSecretLocation?.({ preserveInfo: true });
-            return;
+        // If no valid original, try to get from LocationManager or atmosphere
+        let orig = null;
+        if (hasValidOriginal) {
+            orig = this.originalLocation;
+        } else if (typeof locationManager !== 'undefined' && locationManager.source === 'ip') {
+            orig = locationManager.getLocation();
+        } else if (typeof atmosphere !== 'undefined' && atmosphere.latitude != null && atmosphere.longitude != null) {
+            orig = { latitude: atmosphere.latitude, longitude: atmosphere.longitude };
+        }
+        
+        if (!orig || typeof orig.latitude !== 'number' || isNaN(orig.latitude)) {
+            console.log('%c⚠️ No valid original location to revert to, using HOME fallback', 'color: #FFA726;');
+            orig = { latitude: HOME.latitude, longitude: HOME.longitude };
         }
         
         console.log('%c🔄 Reverting to your location...', 'color: #64B5F6;');
         
-        // Restore original coordinates
-        const orig = this.originalLocation;
+        // Haptic feedback
+        Haptics.light();
         
+        // Update demo coordinates
         if (window.celestialDemo) {
             window.celestialDemo.latitude = orig.latitude;
             window.celestialDemo.longitude = orig.longitude;
         }
         
-        // Restore atmosphere location and fetch weather
-        if (typeof atmosphere !== 'undefined') {
+        // Use LocationManager for coordinated update (debounced weather fetch)
+        if (typeof locationManager !== 'undefined') {
+            locationManager.setLocation(orig.latitude, orig.longitude, 'ip');
+        } else if (typeof atmosphere !== 'undefined') {
+            // Fallback: direct atmosphere update
             atmosphere.latitude = orig.latitude;
             atmosphere.longitude = orig.longitude;
             
@@ -5885,6 +6234,7 @@ class CelestialDemo {
         if (window.compassSundial) {
             window.compassSundial.updateGlobeLocation(orig.latitude, orig.longitude);
             window.compassSundial.updateCelestialBodies(orig.latitude, orig.longitude);
+            window.compassSundial.focusedLatLon = { latitude: orig.latitude, longitude: orig.longitude };
         }
         
         // Remove location-specific CSS classes
@@ -5948,9 +6298,10 @@ class CelestialDemo {
             el.setAttribute('tabindex', '0');
             el.setAttribute('aria-label', 'Click to hear the weather');
 
-            // Click handler
+            // Click handler with haptic feedback
             el.addEventListener('click', (e) => {
                 e.stopPropagation();
+                Haptics.light();
                 celestialVoice.speak();
             });
 
@@ -5958,6 +6309,7 @@ class CelestialDemo {
             el.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
+                    Haptics.light();
                     celestialVoice.speak();
                 }
             });
@@ -6769,6 +7121,12 @@ class MiniGlobe {
         this.lastDragX = x;
         this.lastDragY = y;
         this.lastDragTime = performance.now();
+        
+        // Mark globe as touched (hides compass hint)
+        if (!document.body.classList.contains('globe-touched')) {
+            document.body.classList.add('globe-touched');
+            Haptics.light();
+        }
         
         // Reset velocity when starting new drag
         if (this.dragVelocity) {
@@ -7627,7 +7985,7 @@ class CompassSundial {
     async onGlobeLocationChange(lat, lon) {
         // ═══════════════════════════════════════════════════════════════════
         // Called when user finishes dragging the globe to a new location
-        // Updates focusedLatLon, celestial bodies, and WEATHER
+        // Uses LocationManager for debounced weather fetching
         // ═══════════════════════════════════════════════════════════════════
         
         console.log(`%c🌍 Globe moved to ${lat.toFixed(2)}°, ${lon.toFixed(2)}°`, 'color: #64B5F6;');
@@ -7641,32 +7999,42 @@ class CompassSundial {
         // Broadcast location change event
         this.broadcastFocusLocation();
         
-        // Fetch weather for the new location!
-        await this.updateWeatherForSpotlitLocation(lat, lon);
+        // Haptic feedback for location change
+        Haptics.light();
+        
+        // Use LocationManager for debounced weather fetch (prevents API spam during rapid drags)
+        if (typeof locationManager !== 'undefined') {
+            locationManager.setLocation(lat, lon, 'globe');
+        } else {
+            // Fallback to direct fetch
+            await this.updateWeatherForSpotlitLocation(lat, lon);
+        }
     }
     
     async updateWeatherForSpotlitLocation(lat, lon) {
         // ═══════════════════════════════════════════════════════════════════
         // Fetch and apply weather for the spotlit globe location
-        // Same pattern as secret codeword weather updates
+        // Now uses LocationManager's debounced fetch when available
         // ═══════════════════════════════════════════════════════════════════
         
+        // Use LocationManager if available (it has debouncing built in)
+        if (typeof locationManager !== 'undefined') {
+            locationManager.setLocation(lat, lon, 'globe');
+            return;
+        }
+        
+        // Fallback: direct fetch (not debounced)
         if (typeof atmosphere === 'undefined' || !atmosphere.fetchWeather) return;
         
         try {
-            // Reverse geocode to get location name (optional, for logging)
             const locationName = `${lat.toFixed(1)}°, ${lon.toFixed(1)}°`;
             console.log(`%c🌤️ Fetching weather for ${locationName}...`, 'color: #64B5F6;');
             
-            // Update atmosphere coordinates
             atmosphere.latitude = lat;
             atmosphere.longitude = lon;
-            
-            // Fetch and apply weather
             await atmosphere.fetchWeather(lat, lon);
             atmosphere.applyAtmosphere();
             
-            // Update Nixie clock timezone
             if (atmosphere.timezone) {
                 window.dispatchEvent(new CustomEvent('timezone-changed', {
                     detail: {
@@ -7741,6 +8109,9 @@ class CompassSundial {
         // ═══════════════════════════════════════════════════════════════════
         // Show comprehensive location + weather forecast toast
         // ═══════════════════════════════════════════════════════════════════
+        
+        // Haptic feedback for tap
+        Haptics.medium();
         
         const loc = this.focusedLatLon || this.getLocation();
         const weather = this.getWeatherData();
