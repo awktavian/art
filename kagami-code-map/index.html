@@ -4,9 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#06060a">
-    <meta name="description" content="Interactive semantic code visualization">
+    <meta name="description" content="Interactive semantic code visualization — explore your codebase in 3D">
+    
+    <!-- PWA -->
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Code Galaxy">
+    
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -644,20 +652,74 @@
         }
         
         /* ═══════════════════════════════════════════════════════════════════════════════
-           LOADING
+           STATE OVERLAY (Loading, Error, Empty, Offline)
            ═══════════════════════════════════════════════════════════════════════════════ */
-        .loading {
+        .state-overlay {
             position: fixed;
             inset: 0;
             background: var(--void-800);
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
+            gap: 20px;
             z-index: 1000;
             transition: opacity 0.4s var(--ease-out);
         }
         
-        .loading.hide { opacity: 0; pointer-events: none; }
+        .state-overlay.hide { opacity: 0; pointer-events: none; }
+        
+        .state-icon {
+            font-size: 64px;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+        
+        .state-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-100);
+        }
+        
+        .state-message {
+            font-size: 14px;
+            color: var(--text-400);
+            text-align: center;
+            max-width: 360px;
+        }
+        
+        .state-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        
+        .state-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.2s var(--ease-out);
+        }
+        
+        .state-btn-primary {
+            background: var(--gold-500);
+            color: var(--void-900);
+        }
+        
+        .state-btn-primary:hover {
+            background: var(--gold-400);
+            transform: translateY(-1px);
+        }
+        
+        .state-btn-secondary {
+            background: var(--void-500);
+            color: var(--text-200);
+        }
+        
+        .state-btn-secondary:hover {
+            background: var(--void-400);
+        }
         
         .spinner {
             width: 48px;
@@ -669,6 +731,63 @@
         }
         
         @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* Offline banner */
+        .offline-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 8px 16px;
+            background: var(--void-600);
+            color: var(--text-300);
+            text-align: center;
+            font-size: 13px;
+            z-index: 1001;
+            display: none;
+            animation: slideDown 0.3s var(--ease-out);
+        }
+        
+        .offline-banner.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        
+        .offline-banner .banner-icon { font-size: 16px; }
+        
+        /* Update banner */
+        .update-banner {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--gold-600), var(--gold-500));
+            color: var(--void-900);
+            font-weight: 500;
+            font-size: 14px;
+            border-radius: 24px;
+            z-index: 1001;
+            display: none;
+            box-shadow: 0 4px 24px rgba(240, 200, 96, 0.3);
+            animation: slideUp 0.4s var(--ease-spring);
+            cursor: pointer;
+        }
+        
+        .update-banner.active { display: flex; align-items: center; gap: 10px; }
+        .update-banner:hover { transform: translateX(-50%) translateY(-2px); }
+        
+        @keyframes slideDown {
+            from { transform: translateY(-100%); }
+            to { transform: translateY(0); }
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateX(-50%) translateY(100%); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
         
         /* ═══════════════════════════════════════════════════════════════════════════════
            RESPONSIVE
@@ -704,7 +823,25 @@
     </style>
 </head>
 <body>
-    <div class="loading" id="loading"><div class="spinner"></div></div>
+    <!-- State Overlay -->
+    <div class="state-overlay" id="state-overlay">
+        <div class="spinner"></div>
+        <div class="state-title" id="state-title">Loading...</div>
+        <div class="state-message" id="state-message"></div>
+        <div class="state-actions" id="state-actions"></div>
+    </div>
+    
+    <!-- Offline Banner -->
+    <div class="offline-banner" id="offline-banner">
+        <span class="banner-icon">⚡</span>
+        <span>You're offline — viewing cached data</span>
+    </div>
+    
+    <!-- Update Banner -->
+    <div class="update-banner" id="update-banner">
+        <span>🔄</span>
+        <span>New data available — click to refresh</span>
+    </div>
     
     <div id="app">
         <header class="header">
@@ -849,6 +986,127 @@
             READY: 'ready',
         };
         
+        // State configuration
+        const STATE_CONFIG = {
+            [UI_STATE.LOADING]: {
+                icon: '',
+                title: 'Loading...',
+                message: 'Analyzing codebase structure',
+                showSpinner: true,
+                actions: [],
+            },
+            [UI_STATE.ERROR]: {
+                icon: '⚠️',
+                title: 'Unable to Load',
+                message: 'Failed to load codebase data',
+                showSpinner: false,
+                actions: [
+                    { label: 'Try Again', action: 'retry', primary: true },
+                    { label: 'Use Cached', action: 'cache', primary: false },
+                ],
+            },
+            [UI_STATE.EMPTY]: {
+                icon: '📭',
+                title: 'No Data Found',
+                message: 'Run the analyzer to generate codebase data',
+                showSpinner: false,
+                actions: [
+                    { label: 'Refresh', action: 'retry', primary: true },
+                ],
+            },
+            [UI_STATE.OFFLINE]: {
+                icon: '📡',
+                title: 'You\'re Offline',
+                message: 'Viewing cached data. Some features may be limited.',
+                showSpinner: false,
+                actions: [
+                    { label: 'Continue Offline', action: 'continue', primary: true },
+                ],
+            },
+            [UI_STATE.READY]: {
+                hide: true,
+            },
+        };
+        
+        let retryCount = 0;
+        const MAX_RETRIES = 3;
+        
+        function setUIState(newState, context = {}) {
+            state.uiState = newState;
+            renderUIState(newState, context);
+        }
+        
+        function renderUIState(uiState, context = {}) {
+            const overlay = document.getElementById('state-overlay');
+            const config = STATE_CONFIG[uiState];
+            
+            if (!config || config.hide) {
+                overlay.classList.add('hide');
+                return;
+            }
+            
+            overlay.classList.remove('hide');
+            
+            // Update content
+            const spinner = overlay.querySelector('.spinner');
+            const title = document.getElementById('state-title');
+            const message = document.getElementById('state-message');
+            const actions = document.getElementById('state-actions');
+            
+            if (spinner) spinner.style.display = config.showSpinner ? 'block' : 'none';
+            if (title) title.textContent = context.title || config.title;
+            if (message) message.textContent = context.message || config.message;
+            
+            // Render actions
+            if (actions && config.actions) {
+                actions.innerHTML = config.actions.map(a => `
+                    <button class="state-btn ${a.primary ? 'state-btn-primary' : 'state-btn-secondary'}" 
+                            data-action="${a.action}">${a.label}</button>
+                `).join('');
+                
+                actions.querySelectorAll('button').forEach(btn => {
+                    btn.addEventListener('click', () => handleStateAction(btn.dataset.action));
+                });
+            }
+        }
+        
+        function handleStateAction(action) {
+            switch (action) {
+                case 'retry':
+                    retryCount++;
+                    if (retryCount <= MAX_RETRIES) {
+                        init();
+                    } else {
+                        setUIState(UI_STATE.ERROR, { 
+                            title: 'Multiple Failures',
+                            message: 'Please check your connection and try again later.'
+                        });
+                    }
+                    break;
+                case 'cache':
+                    loadFromCache();
+                    break;
+                case 'continue':
+                    setUIState(UI_STATE.READY);
+                    break;
+            }
+        }
+        
+        async function loadFromCache() {
+            try {
+                const cache = await caches.open(CONFIG.pwa.cacheVersion + '-data');
+                const cached = await cache.match('./codebase-analysis.json');
+                if (cached) {
+                    const data = await cached.json();
+                    processData(data);
+                } else {
+                    setUIState(UI_STATE.ERROR, { message: 'No cached data available' });
+                }
+            } catch (err) {
+                setUIState(UI_STATE.ERROR, { message: 'Cache read failed: ' + err.message });
+            }
+        }
+        
         // ═══════════════════════════════════════════════════════════════════════════════
         // CATEGORY COLORS — Vibrant, accessible palette
         // ═══════════════════════════════════════════════════════════════════════════════
@@ -946,43 +1204,199 @@
         let rafId = null;
         
         // ═══════════════════════════════════════════════════════════════════════════════
+        // LOCAL STORAGE PERSISTENCE
+        // ═══════════════════════════════════════════════════════════════════════════════
+        
+        const saveStateDebounced = debounce(saveState, 500);
+        
+        function saveState() {
+            try {
+                const persist = {
+                    version: 1,
+                    savedAt: Date.now(),
+                    repoId: state.data?.meta?.name || state.data?.meta?.root || 'unknown',
+                    view: state.view,
+                    filter: state.filter,
+                    treemapPath: state.treemap.path,
+                    semantic: {
+                        rotX: state.semantic.rotX,
+                        rotY: state.semantic.rotY,
+                        zoom: state.semantic.zoom,
+                        autoRotate: state.semantic.autoRotate,
+                    },
+                };
+                localStorage.setItem(CONFIG.pwa.storageKey, JSON.stringify(persist));
+            } catch (err) {
+                console.warn('Failed to save state:', err);
+            }
+        }
+        
+        function loadState() {
+            try {
+                const saved = localStorage.getItem(CONFIG.pwa.storageKey);
+                if (!saved) return false;
+                
+                const persist = JSON.parse(saved);
+                
+                // Check if same repo
+                const currentRepoId = state.data?.meta?.name || state.data?.meta?.root || 'unknown';
+                if (persist.repoId !== currentRepoId) {
+                    console.log('Different repo, skipping state restore');
+                    return false;
+                }
+                
+                // Restore state
+                if (persist.view) state.view = persist.view;
+                if (persist.filter !== undefined) state.filter = persist.filter;
+                if (Array.isArray(persist.treemapPath)) state.treemap.path = persist.treemapPath;
+                if (persist.semantic) {
+                    if (typeof persist.semantic.rotX === 'number') state.semantic.rotX = persist.semantic.rotX;
+                    if (typeof persist.semantic.rotY === 'number') state.semantic.rotY = persist.semantic.rotY;
+                    if (typeof persist.semantic.zoom === 'number') state.semantic.zoom = persist.semantic.zoom;
+                    if (typeof persist.semantic.autoRotate === 'boolean') state.semantic.autoRotate = persist.semantic.autoRotate;
+                }
+                
+                return true;
+            } catch (err) {
+                console.warn('Failed to load state:', err);
+                return false;
+            }
+        }
+        
+        function clearSavedState() {
+            localStorage.removeItem(CONFIG.pwa.storageKey);
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════════════════
         // INITIALIZATION
         // ═══════════════════════════════════════════════════════════════════════════════
         
         async function init() {
+            setUIState(UI_STATE.LOADING);
+            
             try {
-                const res = await fetch('codebase-analysis.json?v=' + Date.now());
-                if (!res.ok) throw new Error('Failed to load data');
-                state.data = await res.json();
-                state.files = state.data.files || [];
-                
-                // Use pre-built tree if available, otherwise build it
-                if (state.data.tree) {
-                    state.tree = state.data.tree;
-                } else {
-                    buildTree();
+                // Check online status first
+                if (!navigator.onLine) {
+                    state.isOnline = false;
+                    document.getElementById('offline-banner').classList.add('active');
+                    // Try to load from cache
+                    await loadFromCache();
+                    return;
                 }
                 
-                treemapCanvas = document.getElementById('treemap');
-                semanticCanvas = document.getElementById('semantic');
-                treemapCtx = treemapCanvas.getContext('2d');
-                semanticCtx = semanticCanvas.getContext('2d');
+                const res = await fetch('codebase-analysis.json?v=' + Date.now());
+                if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
                 
-                resize();
-                setupEvents();
-                updateStats();
-                buildLegend();
-                
-                document.getElementById('loading').classList.add('hide');
-                render();
+                const data = await res.json();
+                processData(data);
                 
             } catch (err) {
                 console.error('Init error:', err);
-                document.getElementById('loading').innerHTML = 
-                    `<div style="color:#ef4444;font-size:14px;text-align:center;">
-                        <div style="margin-bottom:8px;">Failed to load</div>
-                        <div style="font-size:12px;color:#888;">${err.message}</div>
-                    </div>`;
+                setUIState(UI_STATE.ERROR, { 
+                    title: 'Failed to Load',
+                    message: err.message || 'Network error. Check your connection.'
+                });
+            }
+        }
+        
+        function processData(data) {
+            if (!data || !data.files || data.files.length === 0) {
+                setUIState(UI_STATE.EMPTY, {
+                    message: 'No files found. Run the analyzer to generate data.'
+                });
+                return;
+            }
+            
+            state.data = data;
+            state.files = data.files || [];
+            
+            // Use pre-built tree if available, otherwise build it
+            if (data.tree) {
+                state.tree = data.tree;
+            } else {
+                buildTree();
+            }
+            
+            // Restore saved state (after data is set so repoId comparison works)
+            const restored = loadState();
+            
+            // Update page metadata from data
+            updateMetadata();
+            
+            // Initialize canvas elements
+            treemapCanvas = document.getElementById('treemap');
+            semanticCanvas = document.getElementById('semantic');
+            treemapCtx = treemapCanvas.getContext('2d');
+            semanticCtx = semanticCanvas.getContext('2d');
+            
+            resize();
+            setupEvents();
+            updateStats();
+            buildLegend();
+            
+            // Apply restored state to UI
+            if (restored) {
+                // Update view tabs
+                document.querySelectorAll('.tab').forEach(t => {
+                    t.classList.toggle('active', t.dataset.view === state.view);
+                });
+                
+                // Show/hide correct view
+                document.getElementById('treemap-view').classList.toggle('active', state.view === 'treemap');
+                document.getElementById('semantic-view').classList.toggle('active', state.view === 'semantic');
+                document.getElementById('controls').style.display = state.view === 'semantic' ? 'flex' : 'none';
+                document.getElementById('zoom').style.display = state.view === 'semantic' ? 'flex' : 'none';
+                document.getElementById('breadcrumbs').style.display = state.view === 'treemap' ? 'flex' : 'none';
+                
+                // Update breadcrumbs
+                updateBreadcrumbs();
+            }
+            setupOnlineListeners();
+            
+            // Success!
+            setUIState(UI_STATE.READY);
+            retryCount = 0;
+            render();
+        }
+        
+        function updateMetadata() {
+            const meta = state.data?.meta || {};
+            const title = meta.title || meta.name || 'Code Galaxy';
+            
+            document.title = title;
+            const logoText = document.querySelector('.logo span:last-child');
+            if (logoText) logoText.textContent = title;
+            
+            // Update theme color if specified
+            const themeColor = document.querySelector('meta[name="theme-color"]');
+            if (themeColor && meta.themeColor) {
+                themeColor.setAttribute('content', meta.themeColor);
+            }
+        }
+        
+        function setupOnlineListeners() {
+            window.addEventListener('online', () => {
+                state.isOnline = true;
+                document.getElementById('offline-banner').classList.remove('active');
+                // Optionally refresh data
+            });
+            
+            window.addEventListener('offline', () => {
+                state.isOnline = false;
+                document.getElementById('offline-banner').classList.add('active');
+            });
+            
+            // Listen for SW updates
+            if (navigator.serviceWorker) {
+                navigator.serviceWorker.addEventListener('message', e => {
+                    if (e.data?.type === 'DATA_UPDATED') {
+                        document.getElementById('update-banner').classList.add('active');
+                    }
+                });
+                
+                document.getElementById('update-banner').addEventListener('click', () => {
+                    location.reload();
+                });
             }
         }
         
@@ -1497,8 +1911,8 @@
             
             document.querySelectorAll('.zoom-btn').forEach(b => {
                 b.addEventListener('click', () => {
-                    const delta = b.dataset.dir === 'in' ? 1.25 : 0.8;
-                    state.semantic.zoom = Math.max(0.3, Math.min(4, state.semantic.zoom * delta));
+                    const delta = b.dataset.dir === 'in' ? CONFIG.render.zoomStep : 1 / CONFIG.render.zoomStep;
+                    state.semantic.zoom = Math.max(CONFIG.render.zoomMin, Math.min(CONFIG.render.zoomMax, state.semantic.zoom * delta));
                 });
             });
             
@@ -1511,7 +1925,7 @@
                 const query = e.target.value.trim();
                 state.query = query;
                 performSearch(query);
-            }, 100));
+            }, CONFIG.ui.searchDebounce));
             
             searchInput.addEventListener('focus', () => {
                 if (searchInput.value.trim()) performSearch(searchInput.value.trim());
@@ -1545,7 +1959,7 @@
             }
             
             function performSearch(query) {
-                if (!query || query.length < 2) {
+                if (!query || query.length < CONFIG.ui.searchMinLength) {
                     searchResults.classList.remove('active');
                     return;
                 }
@@ -1557,7 +1971,7 @@
                     matches: findMatches(f, tokens)
                 })).filter(r => r.score > 0)
                   .sort((a, b) => b.score - a.score)
-                  .slice(0, 50);
+                  .slice(0, CONFIG.ui.searchMaxResults);
                 
                 if (!scored.length) {
                     searchResults.innerHTML = '<div class="search-empty">No results for "' + escapeHtml(query) + '"</div>';
@@ -1755,6 +2169,9 @@
             
             // CRITICAL: Resize canvases after view switch since hidden elements have 0 dimensions
             requestAnimationFrame(() => resize());
+            
+            // Persist state
+            saveState();
         }
         
         function onTreemapMove(e) {
@@ -1805,9 +2222,9 @@
             if (state.semantic.dragging) {
                 const dx = e.clientX - state.semantic.lastX;
                 const dy = e.clientY - state.semantic.lastY;
-                state.semantic.rotY += dx * 0.006;
-                state.semantic.rotX += dy * 0.006;
-                state.semantic.rotX = Math.max(-Math.PI * 0.48, Math.min(Math.PI * 0.48, state.semantic.rotX));
+                state.semantic.rotY += dx * CONFIG.render.rotationSensitivity;
+                state.semantic.rotX += dy * CONFIG.render.rotationSensitivity;
+                state.semantic.rotX = Math.max(-CONFIG.render.rotationClamp, Math.min(CONFIG.render.rotationClamp, state.semantic.rotX));
                 state.semantic.lastX = e.clientX;
                 state.semantic.lastY = e.clientY;
             } else {
@@ -1829,8 +2246,8 @@
         
         function onSemanticWheel(e) {
             e.preventDefault();
-            const delta = e.deltaY > 0 ? 0.9 : 1.1;
-            state.semantic.zoom = Math.max(0.3, Math.min(4, state.semantic.zoom * delta));
+            const delta = e.deltaY > 0 ? 1 / CONFIG.render.zoomStep : CONFIG.render.zoomStep;
+            state.semantic.zoom = Math.max(CONFIG.render.zoomMin, Math.min(CONFIG.render.zoomMax, state.semantic.zoom * delta));
         }
         
         function onSemanticClick(e) {
@@ -1852,14 +2269,14 @@
                 document.querySelectorAll('.ctrl-btn[data-preset]').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 
-                if (preset === 'orbit') { state.semantic.rotX = 0.4; state.semantic.rotY = 0; }
-                else if (preset === 'top') { state.semantic.rotX = Math.PI / 2 - 0.1; state.semantic.rotY = 0; }
-                else if (preset === 'front') { state.semantic.rotX = 0; state.semantic.rotY = 0; }
+                if (preset === 'orbit') { state.semantic.rotX = CONFIG.render.initialRotX; state.semantic.rotY = CONFIG.render.initialRotY; }
+                else if (preset === 'top') { state.semantic.rotX = Math.PI / 2 - 0.1; state.semantic.rotY = CONFIG.render.initialRotY; }
+                else if (preset === 'front') { state.semantic.rotX = 0; state.semantic.rotY = CONFIG.render.initialRotY; }
             }
             
             if (action === 'reset') {
-                state.semantic.rotX = 0.4;
-                state.semantic.rotY = 0;
+                state.semantic.rotX = CONFIG.render.initialRotX;
+                state.semantic.rotY = CONFIG.render.initialRotY;
                 state.semantic.zoom = 1.0;
             }
             
@@ -1874,10 +2291,10 @@
             const projected = state.semantic.projected;
             for (let i = projected.length - 1; i >= 0; i--) {
                 const p = projected[i];
-                const baseSize = 3 + Math.sqrt(p.file.lines || 1) * 0.15 + (p.file.importance || 0) * 8;
-                const depthScale = 0.5 + p.depth * 0.8;
+                const baseSize = CONFIG.render.nodeBaseSize + Math.sqrt(p.file.lines || 1) * CONFIG.render.nodeSizeScale + (p.file.importance || 0) * CONFIG.render.importanceScale;
+                const depthScale = CONFIG.render.depthScaleMin + p.depth * CONFIG.render.depthScaleMax;
                 const size = baseSize * depthScale;
-                const hitRadius = Math.max(12, size * 1.5);
+                const hitRadius = Math.max(CONFIG.render.hitRadiusMin, size * CONFIG.render.hitRadiusScale);
                 
                 const dist = Math.hypot(p.sx - mx, p.sy - my);
                 if (dist < hitRadius) {
@@ -1924,6 +2341,8 @@
                 el.addEventListener('click', () => {
                     state.filter = state.filter === el.dataset.cat ? null : el.dataset.cat;
                     buildLegend();
+                    updateStats(); // Update stats when filter changes
+                    saveState();
                 });
             });
         }
@@ -2007,19 +2426,19 @@
                     (f.z - file.z) ** 2
                 );
                 
-                let score = Math.max(0, 1 - dist * 1.2);
+                let score = Math.max(0, 1 - dist * CONFIG.similarity.distanceScale);
                 
                 // Boost for same cluster
                 if (f.cluster !== undefined && f.cluster === file.cluster) {
-                    score += 0.2;
+                    score += CONFIG.similarity.clusterBoost;
                 }
                 
                 // Boost for same category
                 if (f.category === file.category) {
-                    score += 0.1;
+                    score += CONFIG.similarity.categoryBoost;
                 }
                 
-                if (score > 0.15) {
+                if (score > CONFIG.similarity.minScore) {
                     results.push({ file: f, score, dist });
                 }
             }
@@ -2034,7 +2453,7 @@
             document.getElementById('panel-title').textContent = file.name || file.path.split('/').pop();
             document.getElementById('panel-path').textContent = file.path;
             
-            const similar = findSimilar(file, 6);
+            const similar = findSimilar(file, CONFIG.ui.panelSimilarFiles);
             
             document.getElementById('panel-content').innerHTML = `
                 <div class="info-grid">

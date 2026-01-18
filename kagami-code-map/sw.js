@@ -3,7 +3,7 @@
  * Provides offline caching and background sync
  */
 
-const CACHE_VERSION = 'code-galaxy-v5.0.0';
+const CACHE_VERSION = 'code-galaxy-v6.0.0';
 const STATIC_CACHE = CACHE_VERSION + '-static';
 const DATA_CACHE = CACHE_VERSION + '-data';
 
