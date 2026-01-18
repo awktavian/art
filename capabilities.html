@@ -94,33 +94,74 @@
         }
         
         /* ==================== DEAL WITH IT SUNGLASSES ==================== */
+        .kanji-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        
         .sunglasses {
-            position: fixed;
-            top: -100px;
+            position: absolute;
+            top: -100%;
             left: 50%;
-            transform: translateX(-50%);
-            font-size: 4rem;
+            transform: translateX(-50%) rotate(-15deg) scale(1.2);
+            font-size: clamp(5rem, 20vw, 14rem);
             z-index: 10002;
-            filter: drop-shadow(0 0 20px rgba(0,0,0,0.8));
-            transition: top 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+            filter: drop-shadow(0 8px 16px rgba(0,0,0,0.95)) 
+                    drop-shadow(0 0 40px rgba(0,0,0,0.6))
+                    drop-shadow(0 0 60px rgba(212, 175, 55, 0.3));
             pointer-events: none;
+            opacity: 0;
+            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         
-        .sunglasses.drop {
-            top: 25vh;
+        .sunglasses.dropping {
+            opacity: 1 !important;
+            top: 10%;
+            transform: translateX(-50%) rotate(-5deg) scale(1.1);
         }
         
-        .sunglasses.dropped {
-            top: 35vh;
-            transition: top 0.3s ease-out;
+        .sunglasses.landed {
+            opacity: 1 !important;
+            top: 20%;
+            transform: translateX(-50%) rotate(3deg) scale(1);
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
         }
         
-        @media (max-width: 768px) {
-            .sunglasses {
-                font-size: 3rem;
-            }
-            .sunglasses.drop { top: 20vh; }
-            .sunglasses.dropped { top: 28vh; }
+        /* Glasses shine effect */
+        .sunglasses::before {
+            content: '✨';
+            position: absolute;
+            top: -15%;
+            right: -5%;
+            font-size: 0.35em;
+            opacity: 0;
+            animation: none;
+        }
+        
+        .sunglasses.landed::before {
+            opacity: 1;
+            animation: sparkle 0.6s ease-out;
+        }
+        
+        @keyframes sparkle {
+            0% { transform: scale(0) rotate(-30deg); opacity: 0; }
+            50% { transform: scale(1.5) rotate(15deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        
+        /* Second sparkle for extra bling */
+        .sunglasses::after {
+            content: '💫';
+            position: absolute;
+            top: 5%;
+            left: -10%;
+            font-size: 0.3em;
+            opacity: 0;
+        }
+        
+        .sunglasses.landed::after {
+            opacity: 1;
+            animation: sparkle 0.6s ease-out 0.1s backwards;
         }
         
         /* ==================== FILM GRAIN ==================== */
@@ -680,7 +721,6 @@
     <div class="cursor-dot"></div>
     <div class="grain"></div>
     <div class="progress-bar"></div>
-    <div class="sunglasses">🕶️</div>
     <div class="deal-with-it">DEAL WITH IT</div>
     <div class="shady-badge">🌚 so shady</div>
     <div class="toast"></div>
@@ -699,7 +739,10 @@
     <section id="hero">
         <canvas class="section-canvas" id="canvas-hero"></canvas>
         <div class="section-content" style="text-align: center;">
-            <div class="kanji" id="kanji-main">鏡</div>
+            <div class="kanji-wrapper">
+                <div class="kanji" id="kanji-main">鏡</div>
+                <div class="sunglasses" id="glasses-main">🕶️</div>
+            </div>
             <h1>What I Can Do</h1>
             <p class="subtitle">A demonstration for Jill <span class="one-prompt">ONE PROMPT</span></p>
         </div>
@@ -889,7 +932,10 @@
                 is the difference between <span class="rose">consumption</span> and <span class="gold">production</span>.
             </p>
             
-            <div class="kanji" style="font-size: clamp(4rem, 15vw, 8rem); margin: 2rem 0;" id="kanji-finale">鏡</div>
+            <div class="kanji-wrapper" style="margin: 2rem 0;">
+                <div class="kanji" style="font-size: clamp(4rem, 15vw, 8rem);" id="kanji-finale">鏡</div>
+                <div class="sunglasses" id="glasses-finale">🕶️</div>
+            </div>
             
             <p style="font-style: italic; color: var(--whisper);">
                 Kagami. The mirror that sparkles.<br>
@@ -999,40 +1045,69 @@
             toastTimeout = setTimeout(() => toast.classList.remove('show'), duration);
         }
         
-        // ==================== EASTER EGG: KANJI CLICKS ====================
-        let kanjiClicks = 0;
-        const kanjis = document.querySelectorAll('.kanji');
-        const sunglasses = document.querySelector('.sunglasses');
+        // ==================== EASTER EGG: KANJI CLICKS - DEAL WITH IT ====================
+        let totalKanjiClicks = 0;
         const dealWithIt = document.querySelector('.deal-with-it');
         
-        kanjis.forEach(kanji => {
+        // Each kanji wrapper has its own glasses
+        document.querySelectorAll('.kanji-wrapper').forEach(wrapper => {
+            const kanji = wrapper.querySelector('.kanji');
+            const glasses = wrapper.querySelector('.sunglasses');
+            let glassesTimeout = null;
+            
             kanji.style.cursor = 'pointer';
-            kanji.addEventListener('click', () => {
-                kanjiClicks++;
+            
+            kanji.addEventListener('click', (e) => {
+                e.stopPropagation();
+                totalKanjiClicks++;
                 
-                if (kanjiClicks === 3) {
-                    showToast('Keep going... 👀');
-                }
+                // Clear any pending reset
+                if (glassesTimeout) clearTimeout(glassesTimeout);
                 
-                if (kanjiClicks === 5) {
-                    // DEAL WITH IT moment
-                    sunglasses.classList.add('drop');
+                // Reset glasses state instantly
+                glasses.style.transition = 'none';
+                glasses.classList.remove('dropping', 'landed');
+                glasses.style.opacity = '0';
+                glasses.style.top = '-100%';
+                
+                // Force reflow to restart animation
+                void glasses.offsetWidth;
+                
+                // Re-enable transitions
+                glasses.style.transition = '';
+                glasses.style.opacity = '';
+                glasses.style.top = '';
+                
+                // Drop the glasses!
+                requestAnimationFrame(() => {
+                    glasses.classList.add('dropping');
                     
+                    // Land them with style after drop animation
                     setTimeout(() => {
-                        sunglasses.classList.remove('drop');
-                        sunglasses.classList.add('dropped');
-                        dealWithIt.classList.add('show');
+                        glasses.classList.remove('dropping');
+                        glasses.classList.add('landed');
                         
-                        setTimeout(() => {
-                            sunglasses.classList.remove('dropped');
-                            sunglasses.style.top = '-100px';
-                            dealWithIt.classList.remove('show');
-                            showToast('🌚 Jill should have noticed sooner');
-                        }, 2000);
-                    }, 800);
-                    
-                    kanjiClicks = 0;
-                }
+                        // Show DEAL WITH IT text
+                        dealWithIt.classList.add('show');
+                        setTimeout(() => dealWithIt.classList.remove('show'), 2000);
+                        
+                        // Easter egg messages
+                        if (totalKanjiClicks === 1) {
+                            showToast('😎 DEAL WITH IT');
+                        } else if (totalKanjiClicks === 5) {
+                            showToast('Jill should have noticed sooner...');
+                        } else if (totalKanjiClicks === 10) {
+                            showToast('Okay you really like clicking this 🌚');
+                        } else if (totalKanjiClicks === 20) {
+                            showToast('MAXIMUM SHADE ACHIEVED');
+                        }
+                    }, 500);
+                });
+                
+                // Keep glasses visible for 4 seconds
+                glassesTimeout = setTimeout(() => {
+                    glasses.classList.remove('landed');
+                }, 4000);
             });
         });
         
@@ -1382,33 +1457,9 @@
             draw(0);
         }
         
-        // ==================== MOBILE: Double tap for easter egg ====================
-        let lastTap = 0;
-        document.addEventListener('touchend', e => {
-            const now = Date.now();
-            if (now - lastTap < 300) {
-                // Double tap detected
-                if (e.target.classList.contains('kanji')) {
-                    kanjiClicks++;
-                    if (kanjiClicks >= 5) {
-                        sunglasses.classList.add('drop');
-                        setTimeout(() => {
-                            sunglasses.classList.remove('drop');
-                            sunglasses.classList.add('dropped');
-                            dealWithIt.classList.add('show');
-                            setTimeout(() => {
-                                sunglasses.classList.remove('dropped');
-                                sunglasses.style.top = '-100px';
-                                dealWithIt.classList.remove('show');
-                                showToast('🌚 Jill should have noticed sooner');
-                            }, 2000);
-                        }, 800);
-                        kanjiClicks = 0;
-                    }
-                }
-            }
-            lastTap = now;
-        });
+        // ==================== MOBILE: Tap works same as click ====================
+        // Touch events are already handled by click events on mobile
+        // The kanji click handler above works for both desktop and mobile
         
         // ==================== CONSOLE EASTER EGG ====================
         console.log('%c鏡', 'font-size: 60px; color: #D4AF37;');
