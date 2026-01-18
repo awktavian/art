@@ -2635,7 +2635,162 @@
         }
     }
     
-    async function init() {
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 3D SEMANTIC EXPLORER
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    let semanticAnimationId = null;
+    let cameraRotation = { x: 0.3, y: 0 };
+    let cameraZoom = 2.5;
+    let isDragging3D = false;
+    let lastMouse3D = { x: 0, y: 0 };
+    
+    function openSemanticExplorer() {
+        const explorer = document.getElementById('semantic-explorer');
+        if (!explorer) return;
+        explorer.classList.add('open');
+        initSemanticExplorer3D();
+        document.addEventListener('keydown', handleExplorerKey);
+    }
+    
+    function closeSemanticExplorer() {
+        const explorer = document.getElementById('semantic-explorer');
+        if (!explorer) return;
+        explorer.classList.remove('open');
+        if (semanticAnimationId) {
+            cancelAnimationFrame(semanticAnimationId);
+            semanticAnimationId = null;
+        }
+        document.removeEventListener('keydown', handleExplorerKey);
+    }
+    
+    function handleExplorerKey(e) {
+        if (e.key === 'Escape') closeSemanticExplorer();
+    }
+    
+    function initSemanticExplorer3D() {
+        const canvas = document.getElementById('semantic-canvas-3d');
+        if (!canvas) return;
+        canvas.width = window.innerWidth * (window.devicePixelRatio || 1);
+        canvas.height = window.innerHeight * (window.devicePixelRatio || 1);
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        buildSemanticLegend();
+        setupSemanticControls();
+        canvas.addEventListener('mousedown', e => { isDragging3D = true; lastMouse3D = { x: e.clientX, y: e.clientY }; });
+        canvas.addEventListener('mousemove', e => {
+            updateSemanticTooltip(e);
+            if (isDragging3D) {
+                cameraRotation.y += (e.clientX - lastMouse3D.x) * 0.005;
+                cameraRotation.x += (e.clientY - lastMouse3D.y) * 0.005;
+                cameraRotation.x = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, cameraRotation.x));
+                lastMouse3D = { x: e.clientX, y: e.clientY };
+            }
+        });
+        canvas.addEventListener('mouseup', () => isDragging3D = false);
+        canvas.addEventListener('mouseleave', () => isDragging3D = false);
+        canvas.addEventListener('wheel', e => { e.preventDefault(); cameraZoom *= e.deltaY > 0 ? 1.1 : 0.9; cameraZoom = Math.max(0.5, Math.min(10, cameraZoom)); }, { passive: false });
+        renderSemanticFrame();
+    }
+    
+    function buildSemanticLegend() {
+        const legend = document.getElementById('semantic-legend');
+        if (!legend || !DATA.cluster_labels) return;
+        const colors = ['#7eb8e8','#8ed4a8','#c4a8e8','#e8a8a8','#e8c8a8','#a8d8e8','#e8e8a8','#d8a8e8','#a8e8b8','#e8b8a8'];
+        let html = '';
+        Object.entries(DATA.cluster_labels).slice(0, 8).forEach(([id, label]) => {
+            html += '<div class="semantic-legend-item"><span class="semantic-legend-dot" style="background:' + colors[parseInt(id) % colors.length] + '"></span><span>' + label + '</span></div>';
+        });
+        legend.innerHTML = html;
+    }
+    
+    function setupSemanticControls() {
+        document.querySelectorAll('.semantic-control-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.semantic-control-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const view = btn.dataset.view;
+                if (view === 'orbit') cameraRotation = { x: 0.3, y: 0 };
+                else if (view === 'top') cameraRotation = { x: Math.PI / 2 - 0.01, y: 0 };
+                else if (view === 'front') cameraRotation = { x: 0, y: 0 };
+                else if (view === 'clusters') cameraRotation = { x: 0.5, y: Math.PI / 4 };
+            });
+        });
+    }
+    
+    function updateSemanticTooltip(e) {
+        const tooltip = document.getElementById('semantic-tooltip');
+        const canvas = document.getElementById('semantic-canvas-3d');
+        if (!tooltip || !canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        let nearest = null, nearestDist = 30;
+        DATA.files.forEach(f => {
+            if (f.x === undefined || f.y === undefined) return;
+            const rotated = rotate3D((f.x - 0.5) * 2, (f.y - 0.5) * 2, (f.cluster || 0) / 12 - 0.5, cameraRotation.x, cameraRotation.y);
+            const scale = 300 / (cameraZoom + rotated.z);
+            const sx = rect.width / 2 + rotated.x * scale;
+            const sy = rect.height / 2 - rotated.y * scale;
+            const dist = Math.sqrt((sx - (e.clientX - rect.left)) ** 2 + (sy - (e.clientY - rect.top)) ** 2);
+            if (dist < nearestDist) { nearest = f; nearestDist = dist; }
+        });
+        if (nearest) {
+            tooltip.classList.add('visible');
+            tooltip.style.left = (e.clientX + 15) + 'px';
+            tooltip.style.top = (e.clientY + 15) + 'px';
+            tooltip.innerHTML = '<div class="semantic-tooltip-name">' + escapeHtml(nearest.name || nearest.path.split('/').pop()) + '</div><div class="semantic-tooltip-path">' + escapeHtml(nearest.path) + '</div><div style="margin-top:4px;color:var(--text-tertiary);font-size:0.5625rem">' + formatNumber(nearest.lines) + ' ' + t('lines') + ' · ' + (nearest.category || 'Core') + '</div>';
+        } else {
+            tooltip.classList.remove('visible');
+        }
+    }
+    
+    function rotate3D(x, y, z, rotX, rotY) {
+        const y1 = y * Math.cos(rotX) - z * Math.sin(rotX);
+        const z1 = y * Math.sin(rotX) + z * Math.cos(rotX);
+        return { x: x * Math.cos(rotY) + z1 * Math.sin(rotY), y: y1, z: -x * Math.sin(rotY) + z1 * Math.cos(rotY) };
+    }
+    
+    function renderSemanticFrame() {
+        const canvas = document.getElementById('semantic-canvas-3d');
+        const explorer = document.getElementById('semantic-explorer');
+        if (!canvas || !explorer?.classList.contains('open')) return;
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width, h = canvas.height;
+        ctx.fillStyle = '#05050a';
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+        ctx.lineWidth = 1;
+        const scale = 300 / cameraZoom;
+        for (let i = -5; i <= 5; i++) {
+            const p1 = rotate3D(i * 0.2, -0.5, -1, cameraRotation.x, cameraRotation.y);
+            const p2 = rotate3D(i * 0.2, -0.5, 1, cameraRotation.x, cameraRotation.y);
+            ctx.beginPath();
+            ctx.moveTo(w / 2 + p1.x * scale, h / 2 - p1.y * scale);
+            ctx.lineTo(w / 2 + p2.x * scale, h / 2 - p2.y * scale);
+            ctx.stroke();
+        }
+        if (!isDragging3D) cameraRotation.y += 0.002;
+        const colors = ['#7eb8e8','#8ed4a8','#c4a8e8','#e8a8a8','#e8c8a8','#a8d8e8','#e8e8a8','#d8a8e8','#a8e8b8','#e8b8a8'];
+        const points = DATA.files.filter(f => f.x !== undefined && f.y !== undefined).map(f => {
+            const rotated = rotate3D((f.x - 0.5) * 2, (f.y - 0.5) * 2, (f.cluster || 0) / 12 - 0.5, cameraRotation.x, cameraRotation.y);
+            return { file: f, ...rotated, color: colors[f.cluster % colors.length] };
+        }).sort((a, b) => a.z - b.z);
+        points.forEach(p => {
+            const sc = 300 / (cameraZoom + p.z);
+            const sx = w / 2 + p.x * sc, sy = h / 2 - p.y * sc;
+            const size = (3 + Math.log10(p.file.lines + 1) * 2) * Math.max(0.5, 1 - p.z * 0.2);
+            const alpha = Math.max(0.3, 1 - Math.abs(p.z) * 0.3);
+            const [r, g, b] = [parseInt(p.color.slice(1,3), 16), parseInt(p.color.slice(3,5), 16), parseInt(p.color.slice(5,7), 16)];
+            ctx.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + (alpha * 0.2) + ')';
+            ctx.beginPath(); ctx.arc(sx, sy, size * 2, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+            ctx.beginPath(); ctx.arc(sx, sy, size, 0, Math.PI * 2); ctx.fill();
+        });
+        semanticAnimationId = requestAnimationFrame(renderSemanticFrame);
+    }
+
+
+        async function init() {
         try {
             const response = await fetch('codebase-analysis.json');
             DATA = await response.json();
