@@ -3531,17 +3531,60 @@
         
         ctx.clearRect(0, 0, w, h);
         
-        // Draw all points dimly
-        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        // Get current scope path
+        const scopePath = PATH.join('/');
+        
+        // Track bounds for current scope
+        let scopeBounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+        let hasScopeFiles = false;
+        
+        // Draw all points with category colors
         DATA.files.forEach(f => {
             if (f.x !== undefined && f.y !== undefined) {
                 const x = f.x * w;
                 const y = f.y * h;
+                
+                // Check if file is in current scope
+                const inScope = scopePath.length === 0 || f.path.startsWith(scopePath + '/') || f.path === scopePath;
+                
+                if (inScope && scopePath.length > 0) {
+                    hasScopeFiles = true;
+                    scopeBounds.minX = Math.min(scopeBounds.minX, x);
+                    scopeBounds.minY = Math.min(scopeBounds.minY, y);
+                    scopeBounds.maxX = Math.max(scopeBounds.maxX, x);
+                    scopeBounds.maxY = Math.max(scopeBounds.maxY, y);
+                }
+                
+                // Get category color
+                const pal = PALETTES[f.category] || PALETTES.default;
+                const alpha = inScope ? 0.6 : 0.12;
+                const size = inScope ? 2 : 1.2;
+                
+                ctx.fillStyle = `hsla(${pal.h}, ${pal.s}%, ${pal.l}%, ${alpha})`;
                 ctx.beginPath();
-                ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+                ctx.arc(x, y, size, 0, Math.PI * 2);
                 ctx.fill();
             }
         });
+        
+        // Draw scope bounding box
+        if (hasScopeFiles && scopePath.length > 0) {
+            const pad = 8;
+            const bx = scopeBounds.minX - pad;
+            const by = scopeBounds.minY - pad;
+            const bw = scopeBounds.maxX - scopeBounds.minX + pad * 2;
+            const bh = scopeBounds.maxY - scopeBounds.minY + pad * 2;
+            
+            // Glow
+            ctx.strokeStyle = 'rgba(240,200,96,0.3)';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(bx, by, bw, bh);
+            
+            // Border
+            ctx.strokeStyle = 'rgba(240,200,96,0.8)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(bx, by, bw, bh);
+        }
         
         // Highlight search results
         if (SEARCH_RESULTS.length > 0) {
@@ -3794,6 +3837,11 @@
         // Re-apply search highlighting if active
         if (SEARCH_RESULTS.length > 0) {
             requestAnimationFrame(highlightSearchResults);
+        }
+        
+        // Update minimap to show current scope
+        if (DATA?.files) {
+            updateEmbeddingMap();
         }
     }
     
@@ -4742,48 +4790,27 @@
     }
     
     function findNodeAtPosition(mx, my) {
-        // Simple 2D hit test (we project 3D to 2D for this)
+        // 3D hit test using projected coordinates
         const files = getScopedFiles().filter(f => f.x !== undefined && f.y !== undefined);
         const w = window.innerWidth;
         const h = window.innerHeight;
         const cx = w / 2;
         const cy = h / 2;
-        const scale = Math.min(w, h) * 0.35 * SEMANTIC_CAMERA.zoom;
+        const scale = Math.min(w, h) * 0.4 * SEMANTIC_CAMERA.zoom;
         
-        for (const file of files) {
-            const [sx, sy] = project3D(file.x - 0.5, file.y - 0.5, (file.z || 0) - 0.5, cx, cy, scale);
+        // Project all and sort front-to-back for hit testing
+        const projected = files.map(file => {
+            const z3d = file.z !== undefined ? (file.z - 0.5) : ((file.cluster || 0) * 0.15 - 0.3);
+            const [sx, sy, depth, realZ] = project3DFull(file.x - 0.5, file.y - 0.5, z3d, cx, cy, scale);
+            const size = Math.max(3, Math.sqrt(file.lines) * 0.06) * (0.6 + depth * 0.4);
+            return { file, sx, sy, size, realZ };
+        }).sort((a, b) => b.realZ - a.realZ); // Front first
+        
+        for (const { file, sx, sy, size } of projected) {
             const dist = Math.hypot(mx - sx, my - sy);
-            const size = Math.max(3, Math.sqrt(file.lines) * 0.05);
-            
-            if (dist < size + 8) return file;
+            if (dist < size + 10) return file;
         }
         return null;
-    }
-    
-    function project3D(x, y, z, cx, cy, scale) {
-        // Apply rotations
-        const cosX = Math.cos(SEMANTIC_CAMERA.rotX);
-        const sinX = Math.sin(SEMANTIC_CAMERA.rotX);
-        const cosY = Math.cos(SEMANTIC_CAMERA.rotY);
-        const sinY = Math.sin(SEMANTIC_CAMERA.rotY);
-        
-        // Rotate around Y axis
-        let x1 = x * cosY - z * sinY;
-        let z1 = x * sinY + z * cosY;
-        
-        // Rotate around X axis
-        let y1 = y * cosX - z1 * sinX;
-        let z2 = y * sinX + z1 * cosX;
-        
-        // Project to 2D with perspective
-        const perspective = 800;
-        const depth = perspective / (perspective + z2 * scale * 0.5);
-        
-        return [
-            cx + x1 * scale * depth,
-            cy + y1 * scale * depth,
-            depth
-        ];
     }
     
     function renderSemanticLoop() {
@@ -4803,23 +4830,30 @@
         const w = window.innerWidth;
         const h = window.innerHeight;
         
-        // Clear with gradient background
-        const grad = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, Math.max(w, h));
-        grad.addColorStop(0, '#0d0d15');
-        grad.addColorStop(1, '#05050a');
+        // Clear with deep space gradient
+        const grad = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, Math.max(w, h) * 0.8);
+        grad.addColorStop(0, '#0a0a14');
+        grad.addColorStop(0.5, '#06060c');
+        grad.addColorStop(1, '#020204');
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, w, h);
+        
+        // Draw subtle grid floor
+        drawGridFloor(ctx, w, h);
         
         // Get scoped files
         let files = getScopedFiles().filter(f => f.x !== undefined && f.y !== undefined);
         
         // Apply search filter
+        const searchMatches = new Set();
         if (SEMANTIC_SEARCH) {
-            files = files.filter(f => 
-                f.path.toLowerCase().includes(SEMANTIC_SEARCH) ||
-                f.name?.toLowerCase().includes(SEMANTIC_SEARCH) ||
-                f.category?.toLowerCase().includes(SEMANTIC_SEARCH)
-            );
+            files.forEach(f => {
+                if (f.path.toLowerCase().includes(SEMANTIC_SEARCH) ||
+                    f.name?.toLowerCase().includes(SEMANTIC_SEARCH) ||
+                    f.category?.toLowerCase().includes(SEMANTIC_SEARCH)) {
+                    searchMatches.add(f.path);
+                }
+            });
         }
         
         if (!files.length) {
@@ -4832,29 +4866,36 @@
         
         const cx = w / 2;
         const cy = h / 2;
-        const scale = Math.min(w, h) * 0.35 * SEMANTIC_CAMERA.zoom;
+        const scale = Math.min(w, h) * 0.4 * SEMANTIC_CAMERA.zoom;
         
-        // Sort by depth for proper z-ordering
+        // True 3D projection with proper depth
         const projected = files.map(f => {
-            const z = f.z !== undefined ? f.z : (f.cluster || 0) * 0.1;
-            const [sx, sy, depth] = project3D(f.x - 0.5, f.y - 0.5, z - 0.5, cx, cy, scale);
-            return { file: f, sx, sy, depth };
-        }).sort((a, b) => a.depth - b.depth);
+            // Use z from embedding or generate from cluster
+            const z3d = f.z !== undefined ? (f.z - 0.5) : ((f.cluster || 0) * 0.15 - 0.3);
+            const x3d = f.x - 0.5;
+            const y3d = f.y - 0.5;
+            
+            const [sx, sy, depth, realZ] = project3DFull(x3d, y3d, z3d, cx, cy, scale);
+            return { file: f, sx, sy, depth, realZ, x3d, y3d, z3d };
+        }).sort((a, b) => a.realZ - b.realZ); // Back to front
         
-        // Draw cluster glow areas first (in clusters view)
+        // Draw cluster volumes first (in clusters view)
         if (SEMANTIC_VIEW === 'clusters') {
-            drawClusterGlows(ctx, projected, cx, cy, scale);
+            drawClusterVolumes(ctx, projected, cx, cy, scale);
         }
         
-        // Draw connections between related files (subtle)
-        if (SEMANTIC_VIEW !== 'clusters') {
-            ctx.strokeStyle = 'rgba(255,255,255,0.02)';
-            ctx.lineWidth = 0.5;
-            for (let i = 0; i < Math.min(projected.length, 200); i++) {
-                const a = projected[i];
-                for (let j = i + 1; j < Math.min(projected.length, 200); j++) {
-                    const b = projected[j];
-                    if (a.file.cluster !== undefined && a.file.cluster === b.file.cluster) {
+        // Draw connection lines between nearby files in same cluster
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i < Math.min(projected.length, 300); i++) {
+            const a = projected[i];
+            for (let j = i + 1; j < Math.min(projected.length, 300); j++) {
+                const b = projected[j];
+                if (a.file.cluster !== undefined && a.file.cluster === b.file.cluster) {
+                    const dist = Math.hypot(a.sx - b.sx, a.sy - b.sy);
+                    if (dist < 80) {
+                        const alpha = Math.max(0.01, 0.08 - dist * 0.001);
+                        const pal = PALETTES[a.file.category] || PALETTES.default;
+                        ctx.strokeStyle = `hsla(${pal.h}, ${pal.s}%, ${pal.l}%, ${alpha})`;
                         ctx.beginPath();
                         ctx.moveTo(a.sx, a.sy);
                         ctx.lineTo(b.sx, b.sy);
@@ -4864,84 +4905,173 @@
             }
         }
         
-        // Draw nodes
-        for (const { file, sx, sy, depth } of projected) {
+        // Draw nodes with proper 3D depth and glow
+        for (const { file, sx, sy, depth, realZ } of projected) {
             const pal = PALETTES[file.category] || PALETTES.default;
-            const baseColor = `hsl(${pal.h}, ${pal.s}%, ${pal.l}%)`;
-            const glowColor = `hsla(${pal.h}, ${pal.s}%, ${pal.l + 20}%, 0.6)`;
             
-            // Size based on lines
-            const baseSize = Math.max(2, Math.sqrt(file.lines) * 0.04);
-            const size = baseSize * depth;
+            // Calculate depth-based adjustments
+            const depthFactor = 0.3 + (1 - (realZ + 1) / 2) * 0.7; // Closer = brighter
             
-            // Determine highlight state
-            const isHighlighted = 
-                (SEMANTIC_HIGHLIGHTED_CATEGORY && file.category === SEMANTIC_HIGHLIGHTED_CATEGORY) ||
-                (SEMANTIC_HOVERED_NODE && file.path === SEMANTIC_HOVERED_NODE.path) ||
-                (SEMANTIC_SEARCH && (file.path.toLowerCase().includes(SEMANTIC_SEARCH) || 
-                                     file.name?.toLowerCase().includes(SEMANTIC_SEARCH)));
+            // Size based on lines and depth
+            const baseSize = Math.max(3, Math.sqrt(file.lines) * 0.06);
+            const size = baseSize * depthFactor * (0.6 + depth * 0.4);
             
-            const alpha = isHighlighted ? 1 : 
-                          SEMANTIC_HIGHLIGHTED_CATEGORY ? 0.15 : 
-                          0.7 * depth;
+            // Determine states
+            const isHovered = SEMANTIC_HOVERED_NODE && file.path === SEMANTIC_HOVERED_NODE.path;
+            const isSearchMatch = searchMatches.has(file.path);
+            const isCategoryHighlight = SEMANTIC_HIGHLIGHTED_CATEGORY && file.category === SEMANTIC_HIGHLIGHTED_CATEGORY;
+            const isHighlighted = isHovered || isSearchMatch || isCategoryHighlight;
             
-            // Draw glow for highlighted nodes
+            // Calculate alpha based on state
+            let alpha = depthFactor * 0.85;
+            if (SEMANTIC_HIGHLIGHTED_CATEGORY && !isCategoryHighlight) alpha = 0.08;
+            if (SEMANTIC_SEARCH && searchMatches.size > 0 && !isSearchMatch) alpha = 0.08;
+            if (isHighlighted) alpha = 1;
+            
+            // Outer glow for highlighted/search matches
             if (isHighlighted) {
-                const glowGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, size * 4);
-                glowGrad.addColorStop(0, `hsla(${pal.h}, ${pal.s}%, ${pal.l + 20}%, 0.4)`);
-                glowGrad.addColorStop(0.5, `hsla(${pal.h}, ${pal.s}%, ${pal.l}%, 0.1)`);
+                const glowSize = size * 5;
+                const glowGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowSize);
+                glowGrad.addColorStop(0, `hsla(${pal.h}, ${pal.s + 20}%, ${pal.l + 25}%, 0.5)`);
+                glowGrad.addColorStop(0.3, `hsla(${pal.h}, ${pal.s}%, ${pal.l + 15}%, 0.2)`);
+                glowGrad.addColorStop(0.6, `hsla(${pal.h}, ${pal.s}%, ${pal.l}%, 0.05)`);
                 glowGrad.addColorStop(1, 'transparent');
                 ctx.fillStyle = glowGrad;
                 ctx.beginPath();
-                ctx.arc(sx, sy, size * 4, 0, Math.PI * 2);
+                ctx.arc(sx, sy, glowSize, 0, Math.PI * 2);
                 ctx.fill();
             }
             
-            // Draw node
-            ctx.fillStyle = baseColor;
-            ctx.globalAlpha = alpha;
+            // Core glow (always)
+            const coreGlowSize = size * 2;
+            const coreGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, coreGlowSize);
+            coreGrad.addColorStop(0, `hsla(${pal.h}, ${pal.s}%, ${pal.l + 15}%, ${alpha * 0.4})`);
+            coreGrad.addColorStop(0.5, `hsla(${pal.h}, ${pal.s}%, ${pal.l}%, ${alpha * 0.15})`);
+            coreGrad.addColorStop(1, 'transparent');
+            ctx.fillStyle = coreGrad;
+            ctx.beginPath();
+            ctx.arc(sx, sy, coreGlowSize, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Main node sphere (3D shaded)
+            const sphereGrad = ctx.createRadialGradient(
+                sx - size * 0.3, sy - size * 0.3, 0,
+                sx, sy, size
+            );
+            sphereGrad.addColorStop(0, `hsla(${pal.h}, ${pal.s - 10}%, ${pal.l + 35}%, ${alpha})`);
+            sphereGrad.addColorStop(0.4, `hsla(${pal.h}, ${pal.s}%, ${pal.l + 10}%, ${alpha})`);
+            sphereGrad.addColorStop(0.8, `hsla(${pal.h}, ${pal.s + 5}%, ${pal.l - 5}%, ${alpha})`);
+            sphereGrad.addColorStop(1, `hsla(${pal.h}, ${pal.s + 10}%, ${pal.l - 15}%, ${alpha * 0.8})`);
+            
+            ctx.fillStyle = sphereGrad;
             ctx.beginPath();
             ctx.arc(sx, sy, size, 0, Math.PI * 2);
             ctx.fill();
             
-            // Inner highlight
-            if (size > 3) {
-                ctx.fillStyle = `hsla(${pal.h}, ${pal.s - 10}%, ${pal.l + 30}%, 0.5)`;
+            // Specular highlight
+            if (size > 4) {
+                ctx.fillStyle = `rgba(255,255,255,${alpha * 0.4})`;
                 ctx.beginPath();
-                ctx.arc(sx - size * 0.2, sy - size * 0.2, size * 0.4, 0, Math.PI * 2);
+                ctx.arc(sx - size * 0.25, sy - size * 0.25, size * 0.25, 0, Math.PI * 2);
                 ctx.fill();
             }
-            
-            ctx.globalAlpha = 1;
         }
         
-        // Draw axis indicators (subtle)
+        // Draw 3D axis guides in orbit view
         if (SEMANTIC_VIEW === 'orbit') {
-            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-            ctx.lineWidth = 1;
-            ctx.setLineDash([4, 4]);
-            
-            // X axis
-            const [x1, y1] = project3D(-0.6, 0, 0, cx, cy, scale);
-            const [x2, y2] = project3D(0.6, 0, 0, cx, cy, scale);
+            draw3DAxes(ctx, cx, cy, scale);
+        }
+    }
+    
+    function project3DFull(x, y, z, cx, cy, scale) {
+        // Apply rotations
+        const cosX = Math.cos(SEMANTIC_CAMERA.rotX);
+        const sinX = Math.sin(SEMANTIC_CAMERA.rotX);
+        const cosY = Math.cos(SEMANTIC_CAMERA.rotY);
+        const sinY = Math.sin(SEMANTIC_CAMERA.rotY);
+        
+        // Rotate around Y axis (horizontal rotation)
+        let x1 = x * cosY - z * sinY;
+        let z1 = x * sinY + z * cosY;
+        
+        // Rotate around X axis (vertical tilt)
+        let y1 = y * cosX - z1 * sinX;
+        let z2 = y * sinX + z1 * cosX;
+        
+        // Perspective projection
+        const fov = 600;
+        const perspective = fov / (fov + z2 * scale * 0.5);
+        
+        return [
+            cx + x1 * scale * perspective,
+            cy + y1 * scale * perspective,
+            perspective,
+            z2  // Real Z for sorting
+        ];
+    }
+    
+    function drawGridFloor(ctx, w, h) {
+        const cx = w / 2;
+        const cy = h / 2;
+        const scale = Math.min(w, h) * 0.4 * SEMANTIC_CAMERA.zoom;
+        
+        ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+        ctx.lineWidth = 1;
+        
+        const gridSize = 0.1;
+        const gridExtent = 0.6;
+        
+        // Draw grid lines
+        for (let i = -gridExtent; i <= gridExtent; i += gridSize) {
+            // Lines along X
+            const [x1, y1] = project3DFull(-gridExtent, 0.5, i, cx, cy, scale);
+            const [x2, y2] = project3DFull(gridExtent, 0.5, i, cx, cy, scale);
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
             ctx.stroke();
             
-            // Y axis
-            const [x3, y3] = project3D(0, -0.6, 0, cx, cy, scale);
-            const [x4, y4] = project3D(0, 0.6, 0, cx, cy, scale);
+            // Lines along Z
+            const [x3, y3] = project3DFull(i, 0.5, -gridExtent, cx, cy, scale);
+            const [x4, y4] = project3DFull(i, 0.5, gridExtent, cx, cy, scale);
             ctx.beginPath();
             ctx.moveTo(x3, y3);
             ctx.lineTo(x4, y4);
             ctx.stroke();
-            
-            ctx.setLineDash([]);
         }
     }
     
-    function drawClusterGlows(ctx, projected, cx, cy, scale) {
+    function draw3DAxes(ctx, cx, cy, scale) {
+        const axisLen = 0.5;
+        
+        // X axis (red)
+        const [x1, y1] = project3DFull(0, 0, 0, cx, cy, scale);
+        const [x2, y2] = project3DFull(axisLen, 0, 0, cx, cy, scale);
+        ctx.strokeStyle = 'rgba(255,100,100,0.2)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        
+        // Y axis (green)
+        const [x3, y3] = project3DFull(0, -axisLen, 0, cx, cy, scale);
+        ctx.strokeStyle = 'rgba(100,255,100,0.2)';
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x3, y3);
+        ctx.stroke();
+        
+        // Z axis (blue)
+        const [x4, y4] = project3DFull(0, 0, axisLen, cx, cy, scale);
+        ctx.strokeStyle = 'rgba(100,100,255,0.2)';
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x4, y4);
+        ctx.stroke();
+    }
+    
+    function drawClusterVolumes(ctx, projected, cx, cy, scale) {
         // Group by cluster
         const clusters = {};
         for (const p of projected) {
@@ -4950,7 +5080,7 @@
             clusters[cluster].push(p);
         }
         
-        // Draw glow for each cluster
+        // Draw volume for each cluster
         for (const [clusterId, points] of Object.entries(clusters)) {
             if (points.length < 3) continue;
             
@@ -4963,26 +5093,27 @@
             cx2 /= points.length;
             cy2 /= points.length;
             
-            // Find radius (max distance from centroid)
+            // Find radius
             let maxDist = 0;
             for (const p of points) {
                 maxDist = Math.max(maxDist, Math.hypot(p.sx - cx2, p.sy - cy2));
             }
             
-            // Get dominant category color
+            // Dominant category
             const categories = {};
             for (const p of points) {
                 const cat = p.file.category || 'Other';
                 categories[cat] = (categories[cat] || 0) + 1;
             }
-            const dominantCat = Object.entries(categories).sort((a, b) => b[1] - a[1])[0][0];
-            const pal = PALETTES[dominantCat] || PALETTES.default;
+            const dominant = Object.entries(categories).sort((a, b) => b[1] - a[1])[0][0];
+            const pal = PALETTES[dominant] || PALETTES.default;
             
-            // Draw cluster glow
-            const radius = Math.max(maxDist + 30, 50);
+            // Draw elliptical glow
+            const radius = Math.max(maxDist + 40, 60);
             const grad = ctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, radius);
-            grad.addColorStop(0, `hsla(${pal.h}, ${pal.s}%, ${pal.l}%, 0.15)`);
-            grad.addColorStop(0.6, `hsla(${pal.h}, ${pal.s}%, ${pal.l}%, 0.05)`);
+            grad.addColorStop(0, `hsla(${pal.h}, ${pal.s}%, ${pal.l}%, 0.12)`);
+            grad.addColorStop(0.4, `hsla(${pal.h}, ${pal.s}%, ${pal.l}%, 0.06)`);
+            grad.addColorStop(0.7, `hsla(${pal.h}, ${pal.s}%, ${pal.l}%, 0.02)`);
             grad.addColorStop(1, 'transparent');
             
             ctx.fillStyle = grad;
@@ -4991,6 +5122,7 @@
             ctx.fill();
         }
     }
+    
     
     // ═══════════════════════════════════════════════════════════════════════════
     // START
