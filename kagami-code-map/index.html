@@ -1,50 +1,76 @@
 <!DOCTYPE html>
-<html lang="en" data-lang="en">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#06060a">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="description" content="Interactive semantic code visualization — explore your codebase in 3D">
-    
-    <!-- PWA -->
+    <meta name="description" content="Interactive semantic code visualization">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
-    <link rel="apple-touch-icon" href="icon-192.png">
-    
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    <title>Code Galaxy — Semantic Explorer</title>
-    <link rel="stylesheet" href="css/main.css">
-    
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <title>Code Galaxy</title>
     <style>
-        /* Critical CSS - inline for fast first paint */
-        body.loading::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background: #06060a;
-            z-index: 9999;
+        :root {
+            --void: #04040a;
+            --surface: #0c0c14;
+            --surface-2: #14141e;
+            --gold: #f0c860;
+            --gold-glow: rgba(240,200,96,0.4);
+            --text-1: #f5f2eb;
+            --text-2: #a0a098;
+            --text-3: #686868;
+            --border: rgba(255,255,255,0.08);
+            --font: 'IBM Plex Sans', system-ui, sans-serif;
+            --mono: 'IBM Plex Mono', monospace;
         }
         
-        body.loading::after {
-            content: 'Loading...';
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #8a8880;
-            font-family: system-ui, sans-serif;
-            font-size: 14px;
-            z-index: 10000;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html, body {
+            width: 100%; height: 100%;
+            background: var(--void);
+            color: var(--text-1);
+            font-family: var(--font);
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
         }
         
-        /* View tabs */
-        .view-tabs {
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        /* Header */
+        .header {
+            height: 52px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 0 20px;
+            background: linear-gradient(180deg, rgba(12,12,20,0.98), rgba(4,4,10,0.95));
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+            flex-shrink: 0;
+        }
+        
+        .logo {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--gold);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .logo-icon {
+            font-size: 24px;
+            filter: drop-shadow(0 0 12px var(--gold-glow));
+        }
+        
+        .tabs {
             display: flex;
             gap: 4px;
             padding: 4px;
@@ -52,37 +78,356 @@
             border-radius: 10px;
         }
         
-        .view-tab {
+        .tab {
             padding: 8px 16px;
-            background: transparent;
             border: none;
             border-radius: 8px;
-            color: var(--text-tertiary);
-            font-size: 13px;
-            font-weight: 500;
+            background: transparent;
+            color: var(--text-3);
+            font: 500 13px var(--font);
             cursor: pointer;
             transition: all 0.15s ease;
         }
         
-        .view-tab:hover {
-            color: var(--text-secondary);
+        .tab:hover { color: var(--text-2); }
+        .tab.active { background: var(--gold); color: var(--void); }
+        
+        .search {
+            flex: 1;
+            max-width: 400px;
+            position: relative;
         }
         
-        .view-tab.active {
-            background: var(--gold);
+        .search input {
+            width: 100%;
+            height: 36px;
+            padding: 0 12px 0 36px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-1);
+            font: 14px var(--font);
+            outline: none;
+            transition: all 0.15s ease;
+        }
+        
+        .search input:focus {
+            border-color: var(--gold);
+            box-shadow: 0 0 0 3px var(--gold-glow);
+        }
+        
+        .search input::placeholder { color: var(--text-3); }
+        
+        .search::before {
+            content: '⌘K';
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font: 11px var(--mono);
+            color: var(--text-3);
+        }
+        
+        .stats {
+            display: flex;
+            gap: 16px;
+            font-size: 13px;
+            color: var(--text-3);
+        }
+        
+        .stat-val {
+            color: var(--text-1);
+            font-weight: 500;
+            font-family: var(--mono);
+        }
+        
+        /* Main */
+        .main {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        #treemap { cursor: pointer; }
+        #semantic { cursor: grab; }
+        #semantic:active { cursor: grabbing; }
+        
+        .view { display: none; width: 100%; height: 100%; }
+        .view.active { display: block; }
+        
+        /* Legend */
+        .legend {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            padding: 16px;
+            background: rgba(12,12,20,0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            min-width: 160px;
+            z-index: 50;
+        }
+        
+        .legend-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-3);
+            margin-bottom: 10px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 0;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: all 0.15s ease;
+        }
+        
+        .legend-item:hover, .legend-item.active { opacity: 1; }
+        
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        
+        .legend-name { flex: 1; font-size: 13px; color: var(--text-2); }
+        .legend-count { font: 11px var(--mono); color: var(--text-3); }
+        
+        /* Side Panel */
+        .panel {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 340px;
+            height: 100%;
+            background: rgba(12,12,20,0.98);
+            backdrop-filter: blur(24px);
+            border-left: 1px solid var(--border);
+            z-index: 60;
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel.open { transform: translateX(0); }
+        
+        .panel-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .panel-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 8px;
+            background: var(--surface);
+            color: var(--text-3);
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        
+        .panel-close:hover { background: var(--surface-2); color: var(--text-1); }
+        
+        .panel-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-3);
+            margin-bottom: 8px;
+        }
+        
+        .file-name {
+            font-size: 16px;
+            font-weight: 600;
+            word-break: break-word;
+        }
+        
+        .file-path {
+            font: 12px var(--mono);
+            color: var(--text-3);
+            word-break: break-all;
+            margin-top: 4px;
+        }
+        
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .info-box {
+            padding: 12px;
+            background: var(--surface);
+            border-radius: 10px;
+        }
+        
+        .info-label { font-size: 11px; color: var(--text-3); margin-bottom: 4px; }
+        .info-value { font-size: 15px; font-weight: 500; }
+        
+        .section-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-3);
+            margin: 20px 0 10px;
+        }
+        
+        .summary {
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text-2);
+            font-style: italic;
+        }
+        
+        .similar-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            background: var(--surface);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        
+        .similar-item:hover {
+            background: var(--surface-2);
+            transform: translateX(4px);
+        }
+        
+        .similar-score {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--gold), #d4a840);
+            border-radius: 8px;
+            font: 700 12px var(--font);
             color: var(--void);
         }
         
-        /* View containers */
-        .view-container {
-            display: none;
-            width: 100%;
-            height: 100%;
+        .similar-info { flex: 1; min-width: 0; }
+        .similar-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .similar-reason { font-size: 11px; color: var(--text-3); }
+        
+        /* Controls */
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 4px;
+            padding: 6px;
+            background: rgba(12,12,20,0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            z-index: 50;
         }
         
-        .view-container.active {
-            display: block;
+        .ctrl-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 10px;
+            background: transparent;
+            color: var(--text-3);
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.15s ease;
         }
+        
+        .ctrl-btn:hover { background: var(--surface); color: var(--text-1); }
+        .ctrl-btn.active { background: var(--gold); color: var(--void); }
+        
+        .ctrl-divider {
+            width: 1px;
+            margin: 4px;
+            background: var(--border);
+        }
+        
+        .zoom {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            z-index: 50;
+        }
+        
+        .zoom-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(12,12,20,0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            color: var(--text-3);
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        
+        .zoom-btn:hover { background: var(--surface-2); color: var(--text-1); }
+        
+        /* Tooltip */
+        .tooltip {
+            position: fixed;
+            max-width: 280px;
+            padding: 12px 16px;
+            background: rgba(12,12,20,0.98);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(8px) scale(0.96);
+            transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 200;
+        }
+        
+        .tooltip.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+        
+        .tooltip-name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+        .tooltip-path { font: 11px var(--mono); color: var(--text-3); word-break: break-all; }
+        .tooltip-meta { display: flex; gap: 16px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-3); }
         
         /* Breadcrumbs */
         .breadcrumbs {
@@ -93,417 +438,485 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 8px 16px;
-            background: rgba(12,12,20,0.9);
+            padding: 10px 16px;
+            background: rgba(12,12,20,0.95);
             backdrop-filter: blur(20px);
-            border: 1px solid var(--border-subtle);
-            border-radius: 10px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
             font-size: 13px;
             z-index: 50;
         }
         
-        .breadcrumb {
-            color: var(--text-tertiary);
-            cursor: pointer;
-            transition: color 0.15s ease;
-        }
+        .crumb { color: var(--text-3); cursor: pointer; transition: color 0.15s ease; }
+        .crumb:hover { color: var(--text-1); }
+        .crumb.current { color: var(--gold); font-weight: 500; }
+        .crumb-sep { color: var(--text-3); opacity: 0.5; }
         
-        .breadcrumb:hover {
-            color: var(--text-primary);
-        }
-        
-        .breadcrumb.current {
-            color: var(--gold);
-            font-weight: 500;
-        }
-        
-        .breadcrumb-sep {
-            color: var(--text-quaternary);
-        }
-        
-        /* Install prompt */
-        .install-prompt {
+        /* Loading */
+        .loading {
             position: fixed;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: none;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 20px;
-            background: rgba(12,12,20,0.95);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--border-medium);
-            border-radius: 12px;
-            z-index: 100;
-        }
-        
-        .install-prompt.visible {
+            inset: 0;
+            background: var(--void);
             display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.3s ease;
         }
         
-        .install-btn {
-            padding: 8px 16px;
-            background: var(--gold);
-            border: none;
-            border-radius: 8px;
-            color: var(--void);
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
+        .loading.hide { opacity: 0; pointer-events: none; }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--surface);
+            border-top-color: var(--gold);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
         }
         
-        .install-dismiss {
-            background: none;
-            border: none;
-            color: var(--text-tertiary);
-            font-size: 18px;
-            cursor: pointer;
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* Category colors */
+        .cat-Python { color: #3b82f6; }
+        .cat-JavaScript { color: #facc15; }
+        .cat-TypeScript { color: #3178c6; }
+        .cat-Rust { color: #f97316; }
+        .cat-Swift { color: #f05138; }
+        .cat-Go { color: #00add8; }
+        .cat-Config { color: #64748b; }
+        .cat-Docs { color: #22c55e; }
+        .cat-Test { color: #f472b6; }
+        .cat-Other { color: #6b7280; }
     </style>
 </head>
-<body class="loading">
-    <!-- Skip link for accessibility -->
-    <a href="#main" class="skip-link" data-i18n="skipToMain">Skip to main content</a>
-    
-    <!-- ARIA live region -->
-    <div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+<body>
+    <div class="loading" id="loading"><div class="spinner"></div></div>
     
     <div id="app">
-        <!-- Top Bar -->
-        <header class="top-bar">
+        <header class="header">
             <div class="logo">
                 <span class="logo-icon">⬡</span>
-                <span data-i18n="appTitle">Code Galaxy</span>
+                <span>Code Galaxy</span>
             </div>
             
-            <div class="view-tabs">
-                <button class="view-tab active" data-view="treemap" data-i18n="treemapView">Treemap</button>
-                <button class="view-tab" data-view="semantic" data-i18n="semanticExplorer">3D Explorer</button>
+            <div class="tabs">
+                <button class="tab active" data-view="treemap">Treemap</button>
+                <button class="tab" data-view="semantic">3D Explorer</button>
             </div>
             
-            <div class="search-box">
-                <span class="search-icon">⌘K</span>
-                <input type="text" id="search" data-i18n-placeholder="searchPlaceholder" placeholder="Search files, classes, functions..." autocomplete="off" />
+            <div class="search">
+                <input type="text" id="search" placeholder="Search files..." autocomplete="off">
             </div>
             
             <div class="stats">
-                <span><span class="stat-value" id="file-count">—</span> <span data-i18n="files">files</span></span>
-                <span><span class="stat-value" id="line-count">—</span> <span data-i18n="lines">lines</span></span>
-                <span><span class="stat-value" id="cluster-count">—</span> <span data-i18n="clusters">clusters</span></span>
-            </div>
-            
-            <div class="lang-switcher">
-                <button class="lang-btn active" data-lang="en">EN</button>
-                <button class="lang-btn" data-lang="ja">日本語</button>
+                <span><span class="stat-val" id="file-count">—</span> files</span>
+                <span><span class="stat-val" id="line-count">—</span> lines</span>
             </div>
         </header>
         
-        <!-- Main Content -->
-        <main id="main" class="main-content">
-            <!-- Treemap View -->
-            <div id="treemap-view" class="view-container active">
-                <canvas id="treemap-canvas"></canvas>
+        <main class="main">
+            <div class="view active" id="treemap-view">
+                <canvas id="treemap"></canvas>
                 <div class="breadcrumbs" id="breadcrumbs">
-                    <span class="breadcrumb current" data-path="">root</span>
+                    <span class="crumb current">root</span>
                 </div>
             </div>
             
-            <!-- 3D Semantic View -->
-            <div id="semantic-view" class="view-container">
-                <canvas id="semantic-canvas" tabindex="0" role="application" aria-label="3D semantic code explorer"></canvas>
+            <div class="view" id="semantic-view">
+                <canvas id="semantic"></canvas>
             </div>
             
-            <!-- Legend -->
             <aside class="legend" id="legend"></aside>
             
-            <!-- Side Panel -->
-            <aside class="side-panel" id="side-panel"></aside>
+            <aside class="panel" id="panel">
+                <div class="panel-header">
+                    <button class="panel-close" id="panel-close">×</button>
+                    <div class="panel-title">File Details</div>
+                    <div class="file-name" id="panel-name">—</div>
+                    <div class="file-path" id="panel-path">—</div>
+                </div>
+                <div class="panel-content" id="panel-content"></div>
+            </aside>
             
-            <!-- Controls (for 3D view) -->
             <nav class="controls" id="controls" style="display: none;">
-                <button class="control-btn active" data-view="orbit" title="Orbit View">🌐</button>
-                <button class="control-btn" data-view="top" title="Top View">⬇</button>
-                <button class="control-btn" data-view="front" title="Front View">➡</button>
-                <div class="control-divider"></div>
-                <button class="control-btn" data-action="reset" title="Reset">↺</button>
-                <button class="control-btn" data-action="auto" title="Auto Rotate">▶</button>
+                <button class="ctrl-btn active" data-preset="orbit" title="Orbit">🌐</button>
+                <button class="ctrl-btn" data-preset="top" title="Top">⬇</button>
+                <button class="ctrl-btn" data-preset="front" title="Front">➡</button>
+                <div class="ctrl-divider"></div>
+                <button class="ctrl-btn" data-action="reset" title="Reset">↺</button>
+                <button class="ctrl-btn" data-action="auto" title="Auto Rotate">▶</button>
             </nav>
             
-            <!-- Zoom Controls -->
-            <div class="zoom-controls" id="zoom-controls" style="display: none;">
-                <button class="zoom-btn" data-zoom="in">+</button>
-                <button class="zoom-btn" data-zoom="out">−</button>
+            <div class="zoom" id="zoom" style="display: none;">
+                <button class="zoom-btn" data-dir="in">+</button>
+                <button class="zoom-btn" data-dir="out">−</button>
             </div>
         </main>
         
-        <!-- Tooltip -->
         <div class="tooltip" id="tooltip"></div>
-        
-        <!-- PWA Install Prompt -->
-        <div class="install-prompt" id="install-prompt">
-            <span>Install Code Galaxy for offline access</span>
-            <button class="install-btn" id="install-btn">Install</button>
-            <button class="install-dismiss" id="install-dismiss">×</button>
-        </div>
     </div>
     
-    <!-- Application Script -->
     <script type="module">
-        import { CONFIG, THEME, applyTheme, getCategoryColor, getCategoryHSL } from './js/config.js';
-        import { initI18n, t, setLang, getLang, formatNumber, onLangChange, updateI18nElements } from './js/i18n.js';
-        import { loadData, store, findSimilarFiles, searchFiles, getFileRelationships, getCategoryStats } from './js/data.js';
-        import { SpatialGrid2D, ProjectionCache } from './js/spatial.js';
+        // ═══════════════════════════════════════════════════════════════════════════
+        // CATEGORY COLORS
+        // ═══════════════════════════════════════════════════════════════════════════
         
-        // ═══════════════════════════════════════════════════════════════════════
+        const COLORS = {
+            Python: { h: 220, s: 85, l: 60, hex: '#3b82f6' },
+            JavaScript: { h: 48, s: 95, l: 55, hex: '#facc15' },
+            TypeScript: { h: 211, s: 60, l: 48, hex: '#3178c6' },
+            React: { h: 193, s: 95, l: 68, hex: '#61dafb' },
+            Rust: { h: 24, s: 95, l: 52, hex: '#f97316' },
+            Swift: { h: 8, s: 85, l: 58, hex: '#f05138' },
+            Kotlin: { h: 256, s: 100, l: 66, hex: '#7f52ff' },
+            Go: { h: 192, s: 75, l: 55, hex: '#00add8' },
+            Config: { h: 215, s: 15, l: 50, hex: '#64748b' },
+            Docs: { h: 142, s: 70, l: 50, hex: '#22c55e' },
+            Test: { h: 330, s: 80, l: 70, hex: '#f472b6' },
+            API: { h: 260, s: 70, l: 65, hex: '#a78bfa' },
+            Core: { h: 200, s: 80, l: 55, hex: '#0ea5e9' },
+            Security: { h: 0, s: 75, l: 60, hex: '#ef4444' },
+            Shell: { h: 80, s: 60, l: 50, hex: '#84cc16' },
+            Other: { h: 220, s: 10, l: 50, hex: '#6b7280' },
+            Folder: { h: 35, s: 30, l: 35, hex: '#8b7355' },
+        };
+        
+        function getColor(cat, alpha = 1) {
+            const c = COLORS[cat] || COLORS.Other;
+            return alpha === 1 ? c.hex : `hsla(${c.h}, ${c.s}%, ${c.l}%, ${alpha})`;
+        }
+        
+        function getHSL(cat) {
+            return COLORS[cat] || COLORS.Other;
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════════════
         // STATE
-        // ═══════════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════════════════
         
         const state = {
             view: 'treemap',
+            data: null,
+            files: [],
+            tree: null,
+            
             treemap: {
                 path: [],
-                selected: null,
                 hovered: null,
-                spatialGrid: null,
+                selected: null,
             },
+            
             semantic: {
-                camera: { rotX: 0.4, rotY: 0, zoom: 1 },
+                rotX: 0.5,
+                rotY: 0,
+                zoom: 1.2,
                 dragging: false,
-                lastMouse: { x: 0, y: 0 },
+                lastX: 0,
+                lastY: 0,
                 hovered: null,
                 selected: null,
                 autoRotate: false,
+                related: [],
             },
-            searchQuery: '',
-            categoryFilter: null,
-            highlightedRelated: [],
+            
+            filter: null,
+            query: '',
         };
         
         let treemapCanvas, treemapCtx;
         let semanticCanvas, semanticCtx;
-        let animationId = null;
+        let cells = [];
+        let rafId = null;
         
-        // ═══════════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════════════════
         // INITIALIZATION
-        // ═══════════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════════════════
         
         async function init() {
-            console.log(`Code Galaxy v${CONFIG.version}`);
-            
-            applyTheme();
-            initI18n();
-            
-            // Canvas setup
-            treemapCanvas = document.getElementById('treemap-canvas');
-            semanticCanvas = document.getElementById('semantic-canvas');
-            treemapCtx = treemapCanvas?.getContext('2d');
-            semanticCtx = semanticCanvas?.getContext('2d');
-            
-            resizeCanvases();
-            
             try {
-                await loadData();
-                console.log(`Loaded ${store.files.length} files with 3D coordinates`);
+                const res = await fetch('codebase-analysis.json?v=' + Date.now());
+                if (!res.ok) throw new Error('Failed to load data');
+                state.data = await res.json();
+                state.files = state.data.files || [];
                 
+                buildTree();
+                
+                treemapCanvas = document.getElementById('treemap');
+                semanticCanvas = document.getElementById('semantic');
+                treemapCtx = treemapCanvas.getContext('2d');
+                semanticCtx = semanticCanvas.getContext('2d');
+                
+                resize();
+                setupEvents();
                 updateStats();
                 buildLegend();
-                setupEventListeners();
-                startRenderLoop();
                 
-                document.body.classList.remove('loading');
-                document.body.classList.add('loaded');
+                document.getElementById('loading').classList.add('hide');
+                render();
                 
-                // Check for PWA install
-                setupPWA();
-                
-            } catch (error) {
-                console.error('Init failed:', error);
-                document.body.innerHTML = `<div class="error-message">Failed to load: ${error.message}</div>`;
+            } catch (err) {
+                console.error(err);
+                document.getElementById('loading').innerHTML = `<div style="color:#ef4444;font-size:14px;">Error: ${err.message}</div>`;
             }
         }
         
-        function resizeCanvases() {
+        function buildTree() {
+            const root = { name: 'root', path: '', lines: 0, isFile: false, children: {} };
+            
+            for (const f of state.files) {
+                const parts = f.path.split('/');
+                let node = root;
+                
+                for (let i = 0; i < parts.length - 1; i++) {
+                    if (!node.children[parts[i]]) {
+                        node.children[parts[i]] = { 
+                            name: parts[i], 
+                            path: parts.slice(0, i + 1).join('/'),
+                            lines: 0, 
+                            isFile: false, 
+                            children: {} 
+                        };
+                    }
+                    node = node.children[parts[i]];
+                }
+                
+                node.children[parts[parts.length - 1]] = {
+                    name: f.name || parts[parts.length - 1],
+                    path: f.path,
+                    lines: f.lines || 0,
+                    isFile: true,
+                    file: f,
+                };
+            }
+            
+            function sumLines(n) {
+                if (n.isFile) return n.lines;
+                let sum = 0;
+                for (const c of Object.values(n.children)) sum += sumLines(c);
+                n.lines = sum;
+                return sum;
+            }
+            
+            sumLines(root);
+            state.tree = root;
+        }
+        
+        function resize() {
             const dpr = window.devicePixelRatio || 1;
             
-            [treemapCanvas, semanticCanvas].forEach(canvas => {
-                if (!canvas) return;
-                const rect = canvas.parentElement.getBoundingClientRect();
-                canvas.width = rect.width * dpr;
-                canvas.height = rect.height * dpr;
-                canvas.style.width = rect.width + 'px';
-                canvas.style.height = rect.height + 'px';
-                const ctx = canvas.getContext('2d');
-                ctx.scale(dpr, dpr);
+            [treemapCanvas, semanticCanvas].forEach(c => {
+                if (!c) return;
+                const rect = c.parentElement.getBoundingClientRect();
+                c.width = rect.width * dpr;
+                c.height = rect.height * dpr;
+                c.style.width = rect.width + 'px';
+                c.style.height = rect.height + 'px';
+                c.getContext('2d').scale(dpr, dpr);
             });
         }
         
-        // ═══════════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════════════════
         // RENDERING
-        // ═══════════════════════════════════════════════════════════════════════
-        
-        function startRenderLoop() {
-            if (animationId) cancelAnimationFrame(animationId);
-            render();
-        }
+        // ═══════════════════════════════════════════════════════════════════════════
         
         function render() {
-            if (state.view === 'treemap') {
-                renderTreemap();
-            } else {
-                renderSemantic();
-            }
-            animationId = requestAnimationFrame(render);
+            if (state.view === 'treemap') renderTreemap();
+            else renderSemantic();
+            rafId = requestAnimationFrame(render);
         }
         
         function renderTreemap() {
-            if (!treemapCtx || !store.tree) return;
+            if (!treemapCtx || !state.tree) return;
             
             const dpr = window.devicePixelRatio || 1;
             const w = treemapCanvas.width / dpr;
             const h = treemapCanvas.height / dpr;
+            const ctx = treemapCtx;
             
-            // Clear
-            treemapCtx.fillStyle = THEME.colors.void;
-            treemapCtx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#04040a';
+            ctx.fillRect(0, 0, w, h);
             
-            // Navigate to current path
-            let node = store.tree;
+            let node = state.tree;
             for (const seg of state.treemap.path) {
                 node = node.children?.[seg];
                 if (!node) return;
             }
             
-            // Build spatial index
-            state.treemap.spatialGrid = new SpatialGrid2D(w, h);
+            cells = squarify(node, 4, 4, w - 8, h - 8);
             
-            // Layout
-            const cells = squarify(node, 4, 4, w - 8, h - 8);
-            
-            // Render cells
             for (const cell of cells) {
-                renderCell(cell);
-                state.treemap.spatialGrid.insert(cell.node, cell.x, cell.y, cell.w, cell.h);
+                drawCell(ctx, cell);
             }
         }
         
         function squarify(node, x, y, w, h) {
-            const children = Object.values(node.children || {}).filter(c => c.lines > 0);
-            if (!children.length || w < 8 || h < 8) return [];
+            const kids = Object.values(node.children || {}).filter(c => c.lines > 0);
+            if (!kids.length || w < 4 || h < 4) return [];
             
-            children.sort((a, b) => b.lines - a.lines);
-            const total = children.reduce((s, c) => s + c.lines, 0);
+            kids.sort((a, b) => b.lines - a.lines);
+            const total = kids.reduce((s, c) => s + c.lines, 0);
+            if (total === 0) return [];
             
-            const cells = [];
+            const result = [];
             let cx = x, cy = y, cw = w, ch = h;
             
-            for (const child of children) {
+            for (const child of kids) {
                 const ratio = child.lines / total;
                 let cellW, cellH;
                 
                 if (cw > ch) {
-                    cellW = Math.min(cw * ratio * children.length, cw);
+                    cellW = Math.max(4, cw * ratio * kids.length);
                     cellH = ch;
-                    cells.push({ node: child, x: cx, y: cy, w: cellW - 2, h: cellH - 2 });
+                    if (cellW > cw) cellW = cw;
+                    result.push({ node: child, x: cx, y: cy, w: cellW - 2, h: cellH - 2 });
                     cx += cellW;
                     cw -= cellW;
                 } else {
                     cellW = cw;
-                    cellH = Math.min(ch * ratio * children.length, ch);
-                    cells.push({ node: child, x: cx, y: cy, w: cellW - 2, h: cellH - 2 });
+                    cellH = Math.max(4, ch * ratio * kids.length);
+                    if (cellH > ch) cellH = ch;
+                    result.push({ node: child, x: cx, y: cy, w: cellW - 2, h: cellH - 2 });
                     cy += cellH;
                     ch -= cellH;
                 }
             }
             
-            return cells;
+            return result;
         }
         
-        function renderCell({ node, x, y, w, h }) {
-            const ctx = treemapCtx;
-            const isHovered = state.treemap.hovered === node;
-            const isSelected = state.treemap.selected === node;
+        function drawCell(ctx, { node, x, y, w, h }) {
+            if (w < 2 || h < 2) return;
+            
+            const hov = state.treemap.hovered === node;
+            const sel = state.treemap.selected === node;
             const cat = node.file?.category || (node.isFile ? 'Other' : 'Folder');
-            const color = getCategoryHSL(cat);
+            const c = getHSL(cat);
             
-            // Background
-            ctx.fillStyle = `hsla(${color.h}, ${color.s}%, ${color.l}%, ${node.isFile ? 0.7 : 0.3})`;
-            
-            // Rounded rect
+            // Fill
+            ctx.fillStyle = `hsla(${c.h}, ${c.s}%, ${c.l}%, ${node.isFile ? 0.75 : 0.35})`;
             const r = Math.min(6, w / 4, h / 4);
             ctx.beginPath();
             ctx.roundRect(x, y, w, h, r);
             ctx.fill();
             
             // Border
-            if (isHovered || isSelected) {
-                ctx.strokeStyle = isSelected ? THEME.colors.gold : THEME.colors.textPrimary;
-                ctx.lineWidth = isSelected ? 2 : 1;
+            if (hov || sel) {
+                ctx.strokeStyle = sel ? '#f0c860' : '#f5f2eb';
+                ctx.lineWidth = sel ? 2 : 1;
                 ctx.stroke();
+                
+                // Glow effect
+                if (sel) {
+                    ctx.shadowColor = 'rgba(240,200,96,0.5)';
+                    ctx.shadowBlur = 20;
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
             }
             
             // Label
             if (w > 50 && h > 24) {
-                ctx.fillStyle = THEME.colors.textPrimary;
-                ctx.font = `500 12px ${THEME.fonts.sans}`;
-                const label = node.name.length > Math.floor(w / 8) 
-                    ? node.name.slice(0, Math.floor(w / 8) - 2) + '…' 
-                    : node.name;
+                ctx.fillStyle = '#f5f2eb';
+                ctx.font = '500 12px "IBM Plex Sans", sans-serif';
+                const maxChars = Math.floor(w / 8);
+                const label = node.name.length > maxChars ? node.name.slice(0, maxChars - 2) + '…' : node.name;
                 ctx.fillText(label, x + 8, y + 16);
                 
-                if (h > 40) {
-                    ctx.fillStyle = THEME.colors.textTertiary;
-                    ctx.font = `400 10px ${THEME.fonts.mono}`;
-                    ctx.fillText(formatNumber(node.lines) + ' lines', x + 8, y + 30);
+                if (h > 38) {
+                    ctx.fillStyle = '#686868';
+                    ctx.font = '11px "IBM Plex Mono", monospace';
+                    ctx.fillText(formatNum(node.lines) + ' lines', x + 8, y + 30);
                 }
             }
         }
         
         function renderSemantic() {
-            if (!semanticCtx || !store.files.length) return;
+            if (!semanticCtx || !state.files.length) return;
             
             const dpr = window.devicePixelRatio || 1;
             const w = semanticCanvas.width / dpr;
             const h = semanticCanvas.height / dpr;
             const ctx = semanticCtx;
             
-            // Background gradient
-            const grad = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, Math.max(w, h) * 0.7);
-            grad.addColorStop(0, '#0c0c18');
-            grad.addColorStop(1, '#020206');
-            ctx.fillStyle = grad;
+            // Deep space background
+            const bg = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, Math.hypot(w, h) * 0.6);
+            bg.addColorStop(0, '#0a0a14');
+            bg.addColorStop(0.5, '#050510');
+            bg.addColorStop(1, '#020208');
+            ctx.fillStyle = bg;
             ctx.fillRect(0, 0, w, h);
             
+            // Stars
+            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            for (let i = 0; i < 100; i++) {
+                const sx = (Math.sin(i * 12.9898) * 43758.5453) % 1 * w;
+                const sy = (Math.cos(i * 78.233) * 43758.5453) % 1 * h;
+                ctx.beginPath();
+                ctx.arc(sx, sy, 0.5 + Math.random(), 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
             // Filter files
-            let files = store.files.filter(f => f.x != null && f.y != null && f.z != null);
-            if (state.categoryFilter) {
-                files = files.filter(f => f.category === state.categoryFilter);
-            }
-            if (state.searchQuery) {
-                const q = state.searchQuery.toLowerCase();
-                files = files.filter(f => f.path.toLowerCase().includes(q));
+            let files = state.files.filter(f => f.x != null && f.y != null && f.z != null);
+            if (state.filter) files = files.filter(f => f.category === state.filter);
+            if (state.query) {
+                const q = state.query.toLowerCase();
+                files = files.filter(f => f.path.toLowerCase().includes(q) || f.name?.toLowerCase().includes(q));
             }
             
-            // Project
-            const cx = w / 2, cy = h / 2;
-            const scale = Math.min(w, h) * 0.38 * state.semantic.camera.zoom;
+            // Project to 2D with STRONG perspective
+            const cx = w / 2;
+            const cy = h / 2;
+            const baseScale = Math.min(w, h) * 0.42 * state.semantic.zoom;
             
-            const projected = files.map(f => ({
-                file: f,
-                ...project3D(f.x, f.y, f.z, cx, cy, scale)
-            })).sort((a, b) => a.z - b.z);
+            const projected = files.map(f => {
+                // Normalize to -1..1
+                let px = (f.x - 0.5) * 2;
+                let py = (f.y - 0.5) * 2;
+                let pz = (f.z - 0.5) * 2;
+                
+                // Rotate Y
+                const cosY = Math.cos(state.semantic.rotY);
+                const sinY = Math.sin(state.semantic.rotY);
+                const x1 = px * cosY - pz * sinY;
+                const z1 = px * sinY + pz * cosY;
+                
+                // Rotate X
+                const cosX = Math.cos(state.semantic.rotX);
+                const sinX = Math.sin(state.semantic.rotX);
+                const y1 = py * cosX - z1 * sinX;
+                const z2 = py * sinX + z1 * cosX;
+                
+                // Strong perspective projection
+                const fov = 2.5;
+                const dist = 3;
+                const perspective = fov / (fov + z2 + dist);
+                
+                return {
+                    file: f,
+                    sx: cx + x1 * baseScale * perspective,
+                    sy: cy + y1 * baseScale * perspective,
+                    sz: z2,
+                    scale: perspective,
+                };
+            }).sort((a, b) => a.sz - b.sz); // Back to front
             
-            // Connections
-            if (state.semantic.selected) {
-                const selP = projected.find(p => p.file === state.semantic.selected);
-                if (selP) {
-                    for (const rel of state.highlightedRelated) {
-                        const relP = projected.find(p => p.file === rel);
-                        if (relP) {
+            // Draw connections for selected
+            if (state.semantic.selected && state.semantic.related.length) {
+                const sel = projected.find(p => p.file === state.semantic.selected);
+                if (sel) {
+                    for (const rel of state.semantic.related) {
+                        const rp = projected.find(p => p.file === rel);
+                        if (rp) {
+                            const grad = ctx.createLinearGradient(sel.sx, sel.sy, rp.sx, rp.sy);
+                            grad.addColorStop(0, 'rgba(240,200,96,0.6)');
+                            grad.addColorStop(1, 'rgba(240,200,96,0.1)');
+                            
                             ctx.beginPath();
-                            ctx.moveTo(selP.x, selP.y);
-                            ctx.lineTo(relP.x, relP.y);
-                            ctx.strokeStyle = 'rgba(240,200,96,0.3)';
+                            ctx.moveTo(sel.sx, sel.sy);
+                            ctx.lineTo(rp.sx, rp.sy);
+                            ctx.strokeStyle = grad;
                             ctx.lineWidth = 2;
                             ctx.stroke();
                         }
@@ -511,164 +924,156 @@
                 }
             }
             
-            // Nodes
+            // Draw nodes
             for (const p of projected) {
-                renderNode(ctx, p);
+                drawNode(ctx, p);
             }
             
             // Auto rotate
             if (state.semantic.autoRotate && !state.semantic.dragging) {
-                state.semantic.camera.rotY += 0.002;
+                state.semantic.rotY += 0.003;
             }
         }
         
-        function project3D(x, y, z, cx, cy, scale) {
-            const cam = state.semantic.camera;
-            const px = (x - 0.5) * 2, py = (y - 0.5) * 2, pz = (z - 0.5) * 2;
+        function drawNode(ctx, { file, sx, sy, sz, scale }) {
+            const hov = state.semantic.hovered === file;
+            const sel = state.semantic.selected === file;
+            const rel = state.semantic.related.includes(file);
             
-            const cosY = Math.cos(cam.rotY), sinY = Math.sin(cam.rotY);
-            const x1 = px * cosY - pz * sinY;
-            const z1 = px * sinY + pz * cosY;
-            
-            const cosX = Math.cos(cam.rotX), sinX = Math.sin(cam.rotX);
-            const y1 = py * cosX - z1 * sinX;
-            const z2 = py * sinX + z1 * cosX;
-            
-            const fov = 500, dist = 2;
-            const perspective = fov / (fov + (z2 + dist) * scale * 0.6);
-            
-            return {
-                x: cx + x1 * scale * perspective,
-                y: cy + y1 * scale * perspective,
-                z: z2,
-                scale: perspective
-            };
-        }
-        
-        function renderNode(ctx, { file, x, y, z, scale }) {
-            const isHovered = state.semantic.hovered === file;
-            const isSelected = state.semantic.selected === file;
-            const isRelated = state.highlightedRelated.includes(file);
-            
-            const baseSize = 2 + Math.sqrt(file.lines) * 0.15;
-            const size = baseSize * scale * (isHovered ? 1.4 : 1) * (isSelected ? 1.6 : 1);
+            // Size based on lines and depth
+            const baseSize = 3 + Math.sqrt(file.lines || 1) * 0.2;
+            const size = baseSize * scale * (hov ? 1.5 : 1) * (sel ? 1.8 : 1);
             const alpha = 0.4 + scale * 0.6;
             
-            // Glow
-            if (isSelected || isHovered || isRelated) {
-                const glow = ctx.createRadialGradient(x, y, 0, x, y, size * 4);
-                glow.addColorStop(0, getCategoryColor(file.category, 0.5));
+            const cat = file.category || 'Other';
+            const color = getColor(cat);
+            
+            // Outer glow for interactive states
+            if (sel || hov || rel) {
+                const glowSize = size * (sel ? 5 : 4);
+                const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowSize);
+                glow.addColorStop(0, getColor(cat, 0.6));
+                glow.addColorStop(0.5, getColor(cat, 0.2));
                 glow.addColorStop(1, 'transparent');
                 ctx.fillStyle = glow;
                 ctx.beginPath();
-                ctx.arc(x, y, size * 4, 0, Math.PI * 2);
+                ctx.arc(sx, sy, glowSize, 0, Math.PI * 2);
                 ctx.fill();
             }
             
-            // Node
+            // Main node
             ctx.beginPath();
-            ctx.arc(x, y, size, 0, Math.PI * 2);
-            ctx.fillStyle = getCategoryColor(file.category, alpha);
+            ctx.arc(sx, sy, size, 0, Math.PI * 2);
+            ctx.fillStyle = getColor(cat, alpha);
             ctx.fill();
             
-            // Core
+            // Inner core (makes it pop)
             if (size > 4) {
                 ctx.beginPath();
-                ctx.arc(x, y, size * 0.35, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255,255,255,${alpha * 0.7})`;
+                ctx.arc(sx, sy, size * 0.4, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255,255,255,${alpha * 0.8})`;
                 ctx.fill();
+            }
+            
+            // Label for important/hovered
+            if ((sel || hov) && size > 5) {
+                ctx.fillStyle = '#f5f2eb';
+                ctx.font = '500 11px "IBM Plex Sans", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(file.name || file.path.split('/').pop(), sx, sy - size - 8);
+                ctx.textAlign = 'left';
             }
         }
         
-        // ═══════════════════════════════════════════════════════════════════════
-        // EVENT HANDLERS
-        // ═══════════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════════════════
+        // EVENTS
+        // ═══════════════════════════════════════════════════════════════════════════
         
-        function setupEventListeners() {
-            window.addEventListener('resize', debounce(() => resizeCanvases(), 100));
+        function setupEvents() {
+            window.addEventListener('resize', debounce(resize, 100));
             
-            // View switching
-            document.querySelectorAll('.view-tab').forEach(tab => {
-                tab.addEventListener('click', () => switchView(tab.dataset.view));
+            // View tabs
+            document.querySelectorAll('.tab').forEach(t => {
+                t.addEventListener('click', () => switchView(t.dataset.view));
             });
             
-            // Treemap events
-            if (treemapCanvas) {
-                treemapCanvas.addEventListener('mousemove', onTreemapMove);
-                treemapCanvas.addEventListener('click', onTreemapClick);
-                treemapCanvas.addEventListener('mouseleave', () => {
-                    state.treemap.hovered = null;
-                    hideTooltip();
-                });
-            }
+            // Treemap
+            treemapCanvas.addEventListener('mousemove', onTreemapMove);
+            treemapCanvas.addEventListener('click', onTreemapClick);
+            treemapCanvas.addEventListener('mouseleave', () => {
+                state.treemap.hovered = null;
+                hideTooltip();
+            });
             
-            // Semantic events
-            if (semanticCanvas) {
-                semanticCanvas.addEventListener('mousedown', onSemanticDown);
-                semanticCanvas.addEventListener('mousemove', onSemanticMove);
-                semanticCanvas.addEventListener('mouseup', () => state.semantic.dragging = false);
-                semanticCanvas.addEventListener('mouseleave', () => {
-                    state.semantic.dragging = false;
-                    state.semantic.hovered = null;
-                    hideTooltip();
-                });
-                semanticCanvas.addEventListener('wheel', onSemanticWheel, { passive: false });
-                semanticCanvas.addEventListener('click', onSemanticClick);
-            }
-            
-            // Search
-            document.getElementById('search')?.addEventListener('input', debounce(e => {
-                state.searchQuery = e.target.value;
-            }, 150));
+            // Semantic 3D
+            semanticCanvas.addEventListener('mousedown', onSemanticDown);
+            semanticCanvas.addEventListener('mousemove', onSemanticMove);
+            semanticCanvas.addEventListener('mouseup', () => state.semantic.dragging = false);
+            semanticCanvas.addEventListener('mouseleave', () => {
+                state.semantic.dragging = false;
+                state.semantic.hovered = null;
+                hideTooltip();
+            });
+            semanticCanvas.addEventListener('wheel', onSemanticWheel, { passive: false });
+            semanticCanvas.addEventListener('click', onSemanticClick);
             
             // Controls
-            document.querySelectorAll('.control-btn').forEach(btn => {
-                btn.addEventListener('click', () => onControlClick(btn));
+            document.querySelectorAll('.ctrl-btn').forEach(b => {
+                b.addEventListener('click', () => onControl(b));
             });
             
-            document.querySelectorAll('.zoom-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    state.semantic.camera.zoom *= btn.dataset.zoom === 'in' ? 1.2 : 0.8;
-                    state.semantic.camera.zoom = Math.max(0.3, Math.min(5, state.semantic.camera.zoom));
+            document.querySelectorAll('.zoom-btn').forEach(b => {
+                b.addEventListener('click', () => {
+                    const delta = b.dataset.dir === 'in' ? 1.2 : 0.8;
+                    state.semantic.zoom = Math.max(0.3, Math.min(5, state.semantic.zoom * delta));
                 });
             });
             
-            // Language
-            document.querySelectorAll('.lang-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    setLang(btn.dataset.lang);
-                });
-            });
+            // Search
+            document.getElementById('search').addEventListener('input', debounce(e => {
+                state.query = e.target.value;
+            }, 150));
+            
+            // Panel close
+            document.getElementById('panel-close').addEventListener('click', closePanel);
             
             // Keyboard
-            document.addEventListener('keydown', onKeyDown);
-            
-            // Language change callback
-            onLangChange(() => {
-                updateI18nElements();
-                buildLegend();
+            document.addEventListener('keydown', e => {
+                if (e.key === 'Escape') closePanel();
+                if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                    e.preventDefault();
+                    document.getElementById('search').focus();
+                }
+                if (e.key === 'Backspace' && state.view === 'treemap' && state.treemap.path.length) {
+                    e.preventDefault();
+                    state.treemap.path.pop();
+                    updateBreadcrumbs();
+                }
             });
         }
         
         function switchView(view) {
             state.view = view;
-            document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
-            document.querySelectorAll('.view-container').forEach(v => v.classList.toggle('active', v.id === view + '-view'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+            document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === view + '-view'));
             
-            const show3DControls = view === 'semantic';
-            document.getElementById('controls').style.display = show3DControls ? 'flex' : 'none';
-            document.getElementById('zoom-controls').style.display = show3DControls ? 'flex' : 'none';
-            document.getElementById('breadcrumbs').style.display = view === 'treemap' ? 'flex' : 'none';
+            const is3D = view === 'semantic';
+            document.getElementById('controls').style.display = is3D ? 'flex' : 'none';
+            document.getElementById('zoom').style.display = is3D ? 'flex' : 'none';
+            document.getElementById('breadcrumbs').style.display = is3D ? 'none' : 'flex';
         }
         
         function onTreemapMove(e) {
             const rect = treemapCanvas.getBoundingClientRect();
-            const x = e.clientX - rect.left, y = e.clientY - rect.top;
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
             
-            const hits = state.treemap.spatialGrid?.queryPoint(x, y) || [];
-            state.treemap.hovered = hits[hits.length - 1] || null;
+            state.treemap.hovered = null;
+            for (const cell of cells) {
+                if (x >= cell.x && x <= cell.x + cell.w && y >= cell.y && y <= cell.y + cell.h) {
+                    state.treemap.hovered = cell.node;
+                }
+            }
             
             if (state.treemap.hovered) {
                 showTooltip(state.treemap.hovered, e.clientX, e.clientY);
@@ -693,18 +1098,20 @@
         
         function onSemanticDown(e) {
             state.semantic.dragging = true;
-            state.semantic.lastMouse = { x: e.clientX, y: e.clientY };
+            state.semantic.lastX = e.clientX;
+            state.semantic.lastY = e.clientY;
             semanticCanvas.style.cursor = 'grabbing';
         }
         
         function onSemanticMove(e) {
             if (state.semantic.dragging) {
-                const dx = e.clientX - state.semantic.lastMouse.x;
-                const dy = e.clientY - state.semantic.lastMouse.y;
-                state.semantic.camera.rotY += dx * 0.005;
-                state.semantic.camera.rotX += dy * 0.005;
-                state.semantic.camera.rotX = Math.max(-Math.PI/2, Math.min(Math.PI/2, state.semantic.camera.rotX));
-                state.semantic.lastMouse = { x: e.clientX, y: e.clientY };
+                const dx = e.clientX - state.semantic.lastX;
+                const dy = e.clientY - state.semantic.lastY;
+                state.semantic.rotY += dx * 0.006;
+                state.semantic.rotX += dy * 0.006;
+                state.semantic.rotX = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.45, state.semantic.rotX));
+                state.semantic.lastX = e.clientX;
+                state.semantic.lastY = e.clientY;
             } else {
                 const rect = semanticCanvas.getBoundingClientRect();
                 state.semantic.hovered = findNodeAt(e.clientX - rect.left, e.clientY - rect.top);
@@ -721,258 +1128,268 @@
         
         function onSemanticWheel(e) {
             e.preventDefault();
-            state.semantic.camera.zoom *= e.deltaY > 0 ? 0.9 : 1.1;
-            state.semantic.camera.zoom = Math.max(0.3, Math.min(5, state.semantic.camera.zoom));
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            state.semantic.zoom = Math.max(0.3, Math.min(5, state.semantic.zoom * delta));
         }
         
         function onSemanticClick() {
-            if (state.semantic.hovered) {
+            if (!state.semantic.dragging && state.semantic.hovered) {
                 selectFile(state.semantic.hovered);
             }
         }
         
-        function onControlClick(btn) {
-            const view = btn.dataset.view;
+        function onControl(btn) {
+            const preset = btn.dataset.preset;
             const action = btn.dataset.action;
             
-            if (view) {
-                document.querySelectorAll('.control-btn[data-view]').forEach(b => b.classList.remove('active'));
+            if (preset) {
+                document.querySelectorAll('.ctrl-btn[data-preset]').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                if (view === 'orbit') { state.semantic.camera.rotX = 0.4; state.semantic.camera.rotY = 0; }
-                else if (view === 'top') { state.semantic.camera.rotX = Math.PI/2; state.semantic.camera.rotY = 0; }
-                else if (view === 'front') { state.semantic.camera.rotX = 0; state.semantic.camera.rotY = 0; }
+                
+                if (preset === 'orbit') { state.semantic.rotX = 0.5; state.semantic.rotY = 0; }
+                else if (preset === 'top') { state.semantic.rotX = Math.PI / 2; state.semantic.rotY = 0; }
+                else if (preset === 'front') { state.semantic.rotX = 0; state.semantic.rotY = 0; }
             }
             
             if (action === 'reset') {
-                state.semantic.camera = { rotX: 0.4, rotY: 0, zoom: 1 };
+                state.semantic.rotX = 0.5;
+                state.semantic.rotY = 0;
+                state.semantic.zoom = 1.2;
             }
+            
             if (action === 'auto') {
                 state.semantic.autoRotate = !state.semantic.autoRotate;
                 btn.classList.toggle('active', state.semantic.autoRotate);
             }
         }
         
-        function onKeyDown(e) {
-            if (e.key === 'Escape') {
-                state.treemap.selected = null;
-                state.semantic.selected = null;
-                state.highlightedRelated = [];
-                hideSidePanel();
-            }
-            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-                e.preventDefault();
-                document.getElementById('search')?.focus();
-            }
-            if (e.key === 'Backspace' && state.view === 'treemap' && state.treemap.path.length > 0) {
-                e.preventDefault();
-                state.treemap.path.pop();
-                updateBreadcrumbs();
-            }
-        }
-        
         function findNodeAt(mx, my) {
             const dpr = window.devicePixelRatio || 1;
-            const w = semanticCanvas.width / dpr, h = semanticCanvas.height / dpr;
-            const cx = w / 2, cy = h / 2;
-            const scale = Math.min(w, h) * 0.38 * state.semantic.camera.zoom;
+            const w = semanticCanvas.width / dpr;
+            const h = semanticCanvas.height / dpr;
+            const cx = w / 2;
+            const cy = h / 2;
+            const baseScale = Math.min(w, h) * 0.42 * state.semantic.zoom;
             
-            let closest = null, closestDist = 25;
+            let best = null;
+            let bestDist = 30;
             
-            for (const f of store.files) {
+            for (const f of state.files) {
                 if (f.x == null) continue;
-                const p = project3D(f.x, f.y, f.z, cx, cy, scale);
-                const d = Math.hypot(p.x - mx, p.y - my);
-                if (d < closestDist) { closestDist = d; closest = f; }
+                
+                let px = (f.x - 0.5) * 2;
+                let py = (f.y - 0.5) * 2;
+                let pz = (f.z - 0.5) * 2;
+                
+                const cosY = Math.cos(state.semantic.rotY);
+                const sinY = Math.sin(state.semantic.rotY);
+                const x1 = px * cosY - pz * sinY;
+                const z1 = px * sinY + pz * cosY;
+                
+                const cosX = Math.cos(state.semantic.rotX);
+                const sinX = Math.sin(state.semantic.rotX);
+                const y1 = py * cosX - z1 * sinX;
+                const z2 = py * sinX + z1 * cosX;
+                
+                const fov = 2.5;
+                const dist = 3;
+                const perspective = fov / (fov + z2 + dist);
+                
+                const sx = cx + x1 * baseScale * perspective;
+                const sy = cy + y1 * baseScale * perspective;
+                
+                const d = Math.hypot(sx - mx, sy - my);
+                if (d < bestDist) {
+                    bestDist = d;
+                    best = f;
+                }
             }
             
-            return closest;
+            return best;
         }
         
-        // ═══════════════════════════════════════════════════════════════════════
-        // UI HELPERS
-        // ═══════════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════════════════
+        // UI
+        // ═══════════════════════════════════════════════════════════════════════════
         
         function updateStats() {
-            document.getElementById('file-count').textContent = formatNumber(store.stats?.totalFiles || 0);
-            document.getElementById('line-count').textContent = formatNumber(store.stats?.totalLines || 0);
-            document.getElementById('cluster-count').textContent = store.stats?.clusters || 0;
+            document.getElementById('file-count').textContent = formatNum(state.files.length);
+            const totalLines = state.files.reduce((s, f) => s + (f.lines || 0), 0);
+            document.getElementById('line-count').textContent = formatNum(totalLines);
         }
         
         function buildLegend() {
-            const legend = document.getElementById('legend');
-            const stats = getCategoryStats().slice(0, 10);
+            const counts = {};
+            for (const f of state.files) {
+                const cat = f.category || 'Other';
+                counts[cat] = (counts[cat] || 0) + 1;
+            }
             
-            legend.innerHTML = `
-                <div class="legend-title">${t('categories')}</div>
-                ${stats.map(({ name, count }) => `
-                    <div class="legend-item ${state.categoryFilter === name ? 'active' : ''}" data-cat="${name}">
-                        <div class="legend-dot" style="background:${getCategoryColor(name)}"></div>
+            const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+            
+            document.getElementById('legend').innerHTML = `
+                <div class="legend-title">Categories</div>
+                ${sorted.map(([name, count]) => `
+                    <div class="legend-item ${state.filter === name ? 'active' : ''}" data-cat="${name}">
+                        <div class="legend-dot" style="background:${getColor(name)}"></div>
                         <span class="legend-name">${name}</span>
                         <span class="legend-count">${count}</span>
                     </div>
                 `).join('')}
             `;
             
-            legend.querySelectorAll('.legend-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    state.categoryFilter = state.categoryFilter === item.dataset.cat ? null : item.dataset.cat;
+            document.querySelectorAll('.legend-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    state.filter = state.filter === el.dataset.cat ? null : el.dataset.cat;
                     buildLegend();
                 });
             });
         }
         
         function updateBreadcrumbs() {
-            const bc = document.getElementById('breadcrumbs');
             const parts = ['root', ...state.treemap.path];
-            
-            bc.innerHTML = parts.map((p, i) => `
-                <span class="breadcrumb ${i === parts.length - 1 ? 'current' : ''}" data-idx="${i}">${p}</span>
-                ${i < parts.length - 1 ? '<span class="breadcrumb-sep">/</span>' : ''}
+            document.getElementById('breadcrumbs').innerHTML = parts.map((p, i) => `
+                <span class="crumb ${i === parts.length - 1 ? 'current' : ''}" data-idx="${i}">${p}</span>
+                ${i < parts.length - 1 ? '<span class="crumb-sep">/</span>' : ''}
             `).join('');
             
-            bc.querySelectorAll('.breadcrumb').forEach(b => {
-                b.addEventListener('click', () => {
-                    const idx = parseInt(b.dataset.idx);
-                    state.treemap.path = state.treemap.path.slice(0, idx);
+            document.querySelectorAll('.crumb').forEach(el => {
+                el.addEventListener('click', () => {
+                    state.treemap.path = state.treemap.path.slice(0, parseInt(el.dataset.idx));
                     updateBreadcrumbs();
                 });
             });
         }
         
         function showTooltip(item, x, y) {
-            const tooltip = document.getElementById('tooltip');
+            const t = document.getElementById('tooltip');
             const file = item.file || item;
+            const cat = file.category || (item.isFile ? 'Other' : 'Folder');
             
-            tooltip.innerHTML = `
+            t.innerHTML = `
                 <div class="tooltip-name">${file.name || item.name}</div>
                 <div class="tooltip-path">${file.path || item.path}</div>
                 <div class="tooltip-meta">
-                    <span><strong>${formatNumber(file.lines || item.lines)}</strong> ${t('lines')}</span>
-                    <span class="tooltip-category" style="color:${getCategoryColor(file.category || 'Other')}">${file.category || 'Folder'}</span>
+                    <span><strong>${formatNum(file.lines || item.lines)}</strong> lines</span>
+                    <span style="color:${getColor(cat)}">${cat}</span>
                 </div>
             `;
             
-            tooltip.style.left = (x + 15) + 'px';
-            tooltip.style.top = (y + 15) + 'px';
-            tooltip.classList.add('visible');
+            t.style.left = Math.min(x + 15, window.innerWidth - 300) + 'px';
+            t.style.top = Math.min(y + 15, window.innerHeight - 100) + 'px';
+            t.classList.add('visible');
         }
         
         function hideTooltip() {
-            document.getElementById('tooltip')?.classList.remove('visible');
+            document.getElementById('tooltip').classList.remove('visible');
         }
         
         function selectFile(file) {
+            if (!file) return;
+            
             state.treemap.selected = file;
             state.semantic.selected = file;
-            state.highlightedRelated = findSimilarFiles(file, 8).map(s => s.file);
-            showSidePanel(file);
+            
+            // Find similar files
+            state.semantic.related = findSimilar(file, 8);
+            
+            showPanel(file);
         }
         
-        function showSidePanel(file) {
-            const panel = document.getElementById('side-panel');
-            const similar = findSimilarFiles(file, 6);
+        function findSimilar(file, limit = 5) {
+            if (!file || file.x == null) return [];
             
-            panel.innerHTML = `
-                <div class="panel-header">
-                    <div class="panel-title">${t('fileDetails')}</div>
-                    <div class="file-name">${file.name}</div>
-                    <div class="file-path">${file.path}</div>
+            const results = [];
+            
+            for (const f of state.files) {
+                if (f === file || f.x == null) continue;
+                
+                const dist = Math.sqrt(
+                    (f.x - file.x) ** 2 +
+                    (f.y - file.y) ** 2 +
+                    (f.z - file.z) ** 2
+                );
+                
+                let score = Math.max(0, 1 - dist * 1.5);
+                if (f.cluster === file.cluster) score += 0.2;
+                if (f.category === file.category) score += 0.1;
+                
+                if (score > 0.15) {
+                    results.push({ file: f, score });
+                }
+            }
+            
+            return results.sort((a, b) => b.score - a.score).slice(0, limit).map(r => r.file);
+        }
+        
+        function showPanel(file) {
+            document.getElementById('panel-name').textContent = file.name || file.path.split('/').pop();
+            document.getElementById('panel-path').textContent = file.path;
+            
+            const similar = findSimilar(file, 6).map(f => ({
+                file: f,
+                score: Math.round((1 - Math.sqrt((f.x - file.x) ** 2 + (f.y - file.y) ** 2 + (f.z - file.z) ** 2)) * 100),
+            }));
+            
+            document.getElementById('panel-content').innerHTML = `
+                <div class="info-grid">
+                    <div class="info-box">
+                        <div class="info-label">Lines</div>
+                        <div class="info-value">${formatNum(file.lines || 0)}</div>
+                    </div>
+                    <div class="info-box">
+                        <div class="info-label">Cluster</div>
+                        <div class="info-value">#${file.cluster ?? '—'}</div>
+                    </div>
                 </div>
-                <div class="panel-content">
-                    <div class="info-section">
-                        <div class="info-grid">
-                            <div class="info-item">
-                                <div class="info-label">${t('lines')}</div>
-                                <div class="info-value">${formatNumber(file.lines)}</div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-label">${t('cluster')}</div>
-                                <div class="info-value">#${file.cluster}</div>
+                
+                ${file.summary ? `
+                    <div class="section-title">Summary</div>
+                    <p class="summary">${file.summary}</p>
+                ` : ''}
+                
+                ${similar.length ? `
+                    <div class="section-title">Similar Files</div>
+                    ${similar.map(s => `
+                        <div class="similar-item" data-path="${s.file.path}">
+                            <div class="similar-score">${Math.max(0, s.score)}</div>
+                            <div class="similar-info">
+                                <div class="similar-name">${s.file.name || s.file.path.split('/').pop()}</div>
+                                <div class="similar-reason" style="color:${getColor(s.file.category)}">${s.file.category || 'Unknown'}</div>
                             </div>
                         </div>
-                    </div>
-                    ${file.summary ? `
-                    <div class="info-section">
-                        <div class="info-section-title">${t('summary')}</div>
-                        <p class="file-summary">${file.summary}</p>
-                    </div>
-                    ` : ''}
-                    ${similar.length ? `
-                    <div class="info-section">
-                        <div class="info-section-title">${t('similarFiles')}</div>
-                        ${similar.map(s => `
-                            <div class="similar-file" data-path="${s.file.path}">
-                                <div class="similar-score">${Math.round(s.score * 100)}</div>
-                                <div class="similar-info">
-                                    <div class="similar-name">${s.file.name}</div>
-                                    <div class="similar-reason">${s.primaryReason}</div>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                    ` : ''}
-                </div>
+                    `).join('')}
+                ` : ''}
             `;
             
-            panel.classList.add('open');
-            
-            panel.querySelectorAll('.similar-file').forEach(el => {
+            document.querySelectorAll('.similar-item').forEach(el => {
                 el.addEventListener('click', () => {
-                    const f = store.files.find(f => f.path === el.dataset.path);
+                    const f = state.files.find(f => f.path === el.dataset.path);
                     if (f) selectFile(f);
                 });
             });
+            
+            document.getElementById('panel').classList.add('open');
         }
         
-        function hideSidePanel() {
-            document.getElementById('side-panel')?.classList.remove('open');
+        function closePanel() {
+            document.getElementById('panel').classList.remove('open');
+            state.treemap.selected = null;
+            state.semantic.selected = null;
+            state.semantic.related = [];
         }
         
-        // ═══════════════════════════════════════════════════════════════════════
-        // PWA
-        // ═══════════════════════════════════════════════════════════════════════
-        
-        let deferredPrompt = null;
-        
-        function setupPWA() {
-            // Register service worker
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('sw.js')
-                    .then(reg => console.log('SW registered:', reg.scope))
-                    .catch(err => console.log('SW registration failed:', err));
-            }
-            
-            // Install prompt
-            window.addEventListener('beforeinstallprompt', e => {
-                e.preventDefault();
-                deferredPrompt = e;
-                document.getElementById('install-prompt')?.classList.add('visible');
-            });
-            
-            document.getElementById('install-btn')?.addEventListener('click', async () => {
-                if (!deferredPrompt) return;
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                console.log('Install outcome:', outcome);
-                deferredPrompt = null;
-                document.getElementById('install-prompt')?.classList.remove('visible');
-            });
-            
-            document.getElementById('install-dismiss')?.addEventListener('click', () => {
-                document.getElementById('install-prompt')?.classList.remove('visible');
-            });
-        }
-        
-        // ═══════════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════════════════
         // UTILS
-        // ═══════════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        function formatNum(n) {
+            return new Intl.NumberFormat().format(n);
+        }
         
         function debounce(fn, ms) {
-            let timer;
-            return (...args) => {
-                clearTimeout(timer);
-                timer = setTimeout(() => fn(...args), ms);
-            };
+            let t;
+            return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
         }
         
         // Start
