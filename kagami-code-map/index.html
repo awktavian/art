@@ -970,17 +970,19 @@
         }
         
         function drawTreemapCell(ctx, { node, x, y, w, h }) {
-            if (w < 2 || h < 2 || !isFinite(w) || !isFinite(h) || !isFinite(x) || !isFinite(y)) return;
-            
-            // Debug: log large cells
-            if (w > 300 && h > 300) {
-                console.log('Large cell:', node.name, 'at', x, y, 'size', w, h);
-            }
-            
-            const hov = state.treemap.hovered === node;
-            const sel = state.treemap.selected === node;
-            const cat = node.category || node.file?.category || (node.isFile ? 'Other' : 'Folder');
-            const c = getHSL(cat);
+            try {
+                if (w < 2 || h < 2 || !isFinite(w) || !isFinite(h) || !isFinite(x) || !isFinite(y)) return;
+                
+                // Debug: log only packages once
+                if (node.name === 'packages' && !window._pkgLogged) {
+                    window._pkgLogged = true;
+                    console.log('PACKAGES CELL:', x, y, w, h, 'node:', node);
+                }
+                
+                const hov = state.treemap.hovered === node;
+                const sel = state.treemap.selected === node;
+                const cat = node.category || node.file?.category || (node.isFile ? 'Other' : 'Folder');
+                const c = getHSL(cat);
             
             // Calculate corner radius safely
             const r = Math.max(0, Math.min(8, Math.min(w, h) / 4));
@@ -1065,6 +1067,9 @@
                 ctx.fillText(short, x + 5, y + 15);
                 ctx.fillStyle = '#ffffff';
                 ctx.fillText(short, x + 4, y + 14);
+            }
+            } catch (err) {
+                console.error('Error drawing cell', node?.name, err);
             }
         }
         
