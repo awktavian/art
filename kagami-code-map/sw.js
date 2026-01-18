@@ -10,13 +10,12 @@ const DATA_CACHE = CACHE_VERSION + '-data';
 // Static assets to cache on install
 const STATIC_ASSETS = [
   './',
-  './app.html',
+  './index.html',
   './css/main.css',
   './js/config.js',
   './js/i18n.js',
   './js/spatial.js',
   './js/data.js',
-  './js/main.js',
   './manifest.json',
 ];
 
@@ -107,7 +106,7 @@ async function cacheFirst(request, cacheName) {
     
     // Return offline page for navigation requests
     if (request.mode === 'navigate') {
-      return caches.match('./app.html');
+      return caches.match('./index.html');
     }
     
     throw error;
