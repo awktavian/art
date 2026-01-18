@@ -773,6 +773,83 @@
     
     <script>
         // ═══════════════════════════════════════════════════════════════════════════════
+        // CONFIGURATION — All tunable values in one place
+        // ═══════════════════════════════════════════════════════════════════════════════
+        
+        const CONFIG = {
+            // 3D Rendering
+            render: {
+                initialRotX: 0.4,
+                initialRotY: 0,
+                rotationSensitivity: 0.006,
+                rotationClamp: Math.PI * 0.48,
+                zoomMin: 0.3,
+                zoomMax: 4,
+                zoomStep: 1.25,
+                autoRotateSpeed: 0.003,
+                nodeBaseSize: 3,
+                nodeSizeScale: 0.15,
+                importanceScale: 8,
+                depthScaleMin: 0.5,
+                depthScaleMax: 0.8,
+                hitRadiusMin: 12,
+                hitRadiusScale: 1.5,
+                fov: 1.2,
+                cameraZ: 2.0,
+                scaleMultiplier: 0.85,
+            },
+            
+            // UI Timing
+            ui: {
+                maxLegendItems: 12,
+                tooltipDelay: 800,
+                searchDebounce: 100,
+                searchMinLength: 2,
+                searchMaxResults: 50,
+                maxSimilarFiles: 8,
+                panelSimilarFiles: 6,
+                durationFast: 150,
+                durationNormal: 233,
+                durationSlow: 377,
+            },
+            
+            // Treemap
+            treemap: {
+                padding: 4,
+                cellGap: 2,
+                minCellSize: 2,
+                cornerRadius: 8,
+                folderAlphaBase: 0.55,
+                folderAlphaEnd: 0.45,
+                fileAlphaBase: 0.85,
+                fileAlphaEnd: 0.75,
+            },
+            
+            // Similarity scoring
+            similarity: {
+                distanceScale: 1.2,
+                clusterBoost: 0.2,
+                categoryBoost: 0.1,
+                minScore: 0.15,
+            },
+            
+            // PWA
+            pwa: {
+                cacheVersion: 'v6.0.0',
+                storageKey: 'code-galaxy-state',
+            },
+        };
+        
+        // UI State Machine
+        const UI_STATE = {
+            LOADING: 'loading',
+            ERROR: 'error',
+            EMPTY: 'empty',
+            OFFLINE: 'offline',
+            READY: 'ready',
+        };
+        
+        // ═══════════════════════════════════════════════════════════════════════════════
         // CATEGORY COLORS — Vibrant, accessible palette
         // ═══════════════════════════════════════════════════════════════════════════════
         
@@ -818,10 +895,12 @@
         // ═══════════════════════════════════════════════════════════════════════════════
         
         const state = {
+            uiState: UI_STATE.LOADING,
             view: 'treemap',
             data: null,
             files: [],
             tree: null,
+            isOnline: navigator.onLine,
             
             treemap: {
                 path: [],
@@ -831,8 +910,8 @@
             },
             
             semantic: {
-                rotX: 0.4,
-                rotY: 0,
+                rotX: CONFIG.render.initialRotX,
+                rotY: CONFIG.render.initialRotY,
                 zoom: 1.0,
                 dragging: false,
                 lastX: 0,
@@ -847,6 +926,15 @@
             filter: null,
             query: '',
             tooltipTimer: null,
+            
+            // Derived stats (live-updating)
+            stats: {
+                totalFiles: 0,
+                visibleFiles: 0,
+                totalLines: 0,
+                visibleLines: 0,
+                categories: {},
+            },
         };
         
         // Global debug access
@@ -1227,9 +1315,9 @@
             }
             
             // Camera parameters for STRONG perspective
-            const fov = 1.2;
-            const cameraZ = 2.0;
-            const scale = Math.min(w, h) * 0.85 * state.semantic.zoom;
+            const fov = CONFIG.render.fov;
+            const cameraZ = CONFIG.render.cameraZ;
+            const scale = Math.min(w, h) * CONFIG.render.scaleMultiplier * state.semantic.zoom;
             
             // Project all files to 2D
             const projected = [];
@@ -1299,7 +1387,7 @@
             
             // Auto rotate
             if (state.semantic.autoRotate && !state.semantic.dragging) {
-                state.semantic.rotY += 0.003;
+                state.semantic.rotY += CONFIG.render.autoRotateSpeed;
             }
         }
         
@@ -1309,8 +1397,8 @@
             const rel = state.semantic.related.includes(file);
             
             // Size based on importance and depth
-            const baseSize = 3 + Math.sqrt(file.lines || 1) * 0.15 + (file.importance || 0) * 8;
-            const depthScale = 0.5 + depth * 0.8;
+            const baseSize = CONFIG.render.nodeBaseSize + Math.sqrt(file.lines || 1) * CONFIG.render.nodeSizeScale + (file.importance || 0) * CONFIG.render.importanceScale;
+            const depthScale = CONFIG.render.depthScaleMin + depth * CONFIG.render.depthScaleMax;
             let size = baseSize * depthScale;
             
             // Interactive states
@@ -1818,7 +1906,7 @@
             
             const sorted = Object.entries(counts)
                 .sort((a, b) => b[1] - a[1])
-                .slice(0, 12);
+                .slice(0, CONFIG.ui.maxLegendItems);
             
             const legend = document.getElementById('legend');
             legend.innerHTML = `
@@ -1884,7 +1972,7 @@
             if (file.summary) {
                 state.tooltipTimer = setTimeout(() => {
                     t.innerHTML += `<div class="tt-summary">${file.summary}</div>`;
-                }, 800);
+                }, CONFIG.ui.tooltipDelay);
             }
         }
         
@@ -1899,7 +1987,7 @@
             
             state.treemap.selected = file;
             state.semantic.selected = file;
-            state.semantic.related = findSimilar(file, 8);
+            state.semantic.related = findSimilar(file, CONFIG.ui.maxSimilarFiles);
             
             showPanel(file);
         }

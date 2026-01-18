@@ -2,34 +2,40 @@
 
 ## Overview
 
-Code Galaxy uses a combination of machine learning models and algorithms to create a semantic understanding of your codebase. Here's what powers the visualization:
+Code Galaxy uses a combination of neural embedding models and algorithms to create a semantic understanding of your codebase. Here's what powers the visualization:
 
 ## 1. Text Embeddings
 
-### TF-IDF (Term Frequency-Inverse Document Frequency)
+### Multi-Backend Neural Embeddings
 
-**Purpose:** Extract meaningful features from source code text.
+**Purpose:** Extract dense semantic features from source code text using modern neural models.
+
+**Supported backends (priority order):**
+
+1. **OpenAI text-embedding-3-small** (1536d) — Best quality
+2. **Voyage AI voyage-code-2** (1024d) — Code-optimized
+3. **Google Gemini embedding-001** (768d) — Good balance
+4. **SimHash fallback** (256d) — No external dependencies
 
 **How it works:**
-- Treats each file as a document
-- Extracts tokens from code (identifiers, keywords, comments)
-- Weights terms by how unique they are across the codebase
-- Files with shared rare terms cluster together
+- Builds semantic text from file path, docstrings, class/function names, concepts
+- Encodes text into dense vector embeddings via API calls
+- Embeddings capture semantic similarity (files doing similar things cluster together)
 
 **Parameters:**
 ```python
-vectorizer = TfidfVectorizer(
-    max_features=500,     # Top 500 most informative terms
-    stop_words='english', # Remove common words
-    ngram_range=(1, 2),   # Unigrams and bigrams
-)
+embedder = EmbeddingProvider()  # Auto-selects best available backend
+embeddings = embedder.encode(texts, batch_size=64)
 ```
 
-**Why TF-IDF for code:**
-- Fast computation (linear time)
-- Captures API patterns (`asyncio.gather`, `torch.nn`)
-- Works without GPU/internet
-- Interpretable features
+**Why neural embeddings for code:**
+- Captures semantic meaning beyond lexical matches
+- Understands code concepts ("authentication" relates to "login", "JWT", "OAuth")
+- Pre-trained on massive code corpora
+- State-of-the-art for similarity tasks
+
+**Fallback (SimHash):**
+When no API keys are available, uses a SimHash-style approach with MD5+SHA256 hash functions for deterministic, reproducible embeddings that still provide reasonable clustering.
 
 ---
 
@@ -173,14 +179,16 @@ score = 0.4 * (1 - embeddingDist/maxDist) +
 
 | Operation | Complexity | Typical Time (1000 files) |
 |-----------|------------|---------------------------|
-| TF-IDF vectorization | O(n × v) | ~2s |
+| Neural embeddings (API) | O(n × b) | ~30s (network) |
+| Hash fallback | O(n × v) | ~2s |
 | t-SNE projection | O(n²) | ~15s |
 | K-means clustering | O(n × k × i) | ~1s |
 | AST parsing | O(n × m) | ~5s |
-| Total analysis | — | ~25s |
+| Total analysis | — | ~60s |
 
 Where:
 - n = number of files
+- b = batch size for API calls
 - v = vocabulary size
 - k = number of clusters
 - i = iterations
@@ -191,10 +199,9 @@ Where:
 ## Future Improvements
 
 1. **UMAP** instead of t-SNE for better global structure
-2. **Code2Vec** or **CodeBERT** for semantic embeddings
-3. **Call graph analysis** for runtime relationships
-4. **Incremental updates** for large codebases
-5. **GPU acceleration** with cuML
+2. **Call graph analysis** for runtime relationships
+3. **Incremental updates** for large codebases
+4. **Cached embeddings** to avoid re-computation
 
 ---
 
