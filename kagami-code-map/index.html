@@ -1012,55 +1012,66 @@
             // Calculate corner radius safely
             const r = Math.max(0, Math.min(8, Math.min(w, h) / 4));
             
+            // Folders get more visible treatment
+            const isFolder = !node.isFile;
+            const baseAlpha = isFolder ? 0.55 : 0.85;
+            const endAlpha = isFolder ? 0.45 : 0.75;
+            
             // Fill with gradient
             const grad = ctx.createLinearGradient(x, y, x + w, y + h);
-            grad.addColorStop(0, `hsla(${c.h}, ${c.s}%, ${c.l + 8}%, ${node.isFile ? 0.8 : 0.4})`);
-            grad.addColorStop(1, `hsla(${c.h}, ${c.s}%, ${c.l - 5}%, ${node.isFile ? 0.7 : 0.3})`);
+            grad.addColorStop(0, `hsla(${c.h}, ${c.s}%, ${c.l + 10}%, ${baseAlpha})`);
+            grad.addColorStop(1, `hsla(${c.h}, ${c.s}%, ${c.l - 8}%, ${endAlpha})`);
             
             ctx.fillStyle = grad;
             ctx.beginPath();
             ctx.roundRect(x, y, w, h, r);
             ctx.fill();
             
+            // Always draw subtle border for definition
+            ctx.strokeStyle = `hsla(${c.h}, ${c.s}%, ${Math.min(90, c.l + 25)}%, ${isFolder ? 0.35 : 0.25})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
             // Hover/selection effects
             if (hov || sel) {
-                ctx.strokeStyle = sel ? '#f0c860' : 'rgba(255,255,255,0.6)';
-                ctx.lineWidth = sel ? 2.5 : 1.5;
+                ctx.strokeStyle = sel ? '#f0c860' : 'rgba(255,255,255,0.7)';
+                ctx.lineWidth = sel ? 3 : 2;
                 ctx.stroke();
                 
                 if (sel) {
-                    ctx.shadowColor = 'rgba(240, 200, 96, 0.5)';
-                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = 'rgba(240, 200, 96, 0.6)';
+                    ctx.shadowBlur = 24;
                     ctx.strokeStyle = '#f0c860';
                     ctx.stroke();
                     ctx.shadowBlur = 0;
                 }
             }
             
-            // Label
+            // Label - folders get folder icon
             if (w > 60 && h > 28) {
+                const prefix = isFolder ? '📁 ' : '';
                 ctx.fillStyle = '#f5f2eb';
-                ctx.font = '600 13px "IBM Plex Sans", sans-serif';
+                ctx.font = `600 ${isFolder && w > 150 ? 15 : 13}px "IBM Plex Sans", sans-serif`;
                 
-                const maxChars = Math.floor((w - 16) / 7);
-                let label = node.name;
+                const maxChars = Math.floor((w - 20) / 8);
+                let label = prefix + node.name;
                 if (label.length > maxChars) {
                     label = label.slice(0, maxChars - 1) + '…';
                 }
-                ctx.fillText(label, x + 10, y + 20);
+                ctx.fillText(label, x + 12, y + 22);
                 
                 // Lines count
                 if (h > 44) {
-                    ctx.fillStyle = '#9a978e';
+                    ctx.fillStyle = '#b0ada5';
                     ctx.font = '500 11px "IBM Plex Mono", monospace';
-                    ctx.fillText(formatNum(node.lines) + ' lines', x + 10, y + 36);
+                    ctx.fillText(formatNum(node.lines) + ' lines', x + 12, y + 40);
                 }
             } else if (w > 35 && h > 20) {
                 // Small label
-                ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                ctx.fillStyle = 'rgba(255,255,255,0.85)';
                 ctx.font = '500 10px "IBM Plex Sans", sans-serif';
                 const short = node.name.slice(0, 4);
-                ctx.fillText(short, x + 4, y + 13);
+                ctx.fillText(short, x + 4, y + 14);
             }
         }
         
