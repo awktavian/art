@@ -3,7 +3,7 @@
  * Provides offline caching and background sync
  */
 
-const CACHE_VERSION = 'code-galaxy-v4.0.0';
+const CACHE_VERSION = 'code-galaxy-v5.0.0';
 const STATIC_CACHE = CACHE_VERSION + '-static';
 const DATA_CACHE = CACHE_VERSION + '-data';
 
@@ -11,12 +11,10 @@ const DATA_CACHE = CACHE_VERSION + '-data';
 const STATIC_ASSETS = [
   './',
   './index.html',
-  './css/main.css',
-  './js/config.js',
-  './js/i18n.js',
-  './js/spatial.js',
-  './js/data.js',
   './manifest.json',
+  './icon.svg',
+  './icon-192.png',
+  './icon-512.png',
 ];
 
 // Data files that should be cached but updated when online
@@ -26,7 +24,7 @@ const DATA_ASSETS = [
 
 // Install event - cache static assets
 self.addEventListener('install', event => {
-  console.log('[SW] Installing...');
+  console.log('[SW] Installing v5.0.0...');
   
   event.waitUntil(
     caches.open(STATIC_CACHE)
@@ -73,8 +71,13 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   
+  // Only handle same-origin requests
+  if (url.origin !== location.origin) {
+    return;
+  }
+  
   // Handle data files with stale-while-revalidate
-  if (DATA_ASSETS.some(asset => url.pathname.endsWith(asset.replace('./', '')))) {
+  if (url.pathname.includes('codebase-analysis.json')) {
     event.respondWith(staleWhileRevalidate(event.request, DATA_CACHE));
     return;
   }
@@ -102,7 +105,7 @@ async function cacheFirst(request, cacheName) {
     
     return networkResponse;
   } catch (error) {
-    console.log('[SW] Network failed, no cache:', request.url);
+    console.log('[SW] Network failed:', request.url);
     
     // Return offline page for navigation requests
     if (request.mode === 'navigate') {
@@ -150,30 +153,4 @@ self.addEventListener('message', event => {
   if (event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
-  
-  if (event.data.type === 'FORCE_UPDATE') {
-    // Force update all data caches
-    caches.open(DATA_CACHE).then(cache => {
-      DATA_ASSETS.forEach(url => {
-        fetch(url, { cache: 'no-store' })
-          .then(response => {
-            if (response.ok) {
-              cache.put(url, response);
-            }
-          });
-      });
-    });
-  }
 });
-
-// Background sync for offline changes (future use)
-self.addEventListener('sync', event => {
-  if (event.tag === 'sync-annotations') {
-    event.waitUntil(syncAnnotations());
-  }
-});
-
-async function syncAnnotations() {
-  // Future: sync user annotations when back online
-  console.log('[SW] Syncing annotations...');
-}
