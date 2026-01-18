@@ -151,6 +151,116 @@
         
         .search input::placeholder { color: var(--text-500); }
         
+        /* Search Results Dropdown */
+        .search-results {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 8px;
+            max-height: 420px;
+            overflow-y: auto;
+            background: rgba(12, 12, 20, 0.98);
+            backdrop-filter: blur(24px);
+            border: 1px solid var(--border-2);
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            z-index: 200;
+        }
+        
+        .search-results.active { display: block; }
+        
+        .search-result {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-1);
+            transition: background 0.1s ease;
+        }
+        
+        .search-result:last-child { border-bottom: none; }
+        .search-result:hover, .search-result.selected { background: var(--void-600); }
+        
+        .search-result-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: grid;
+            place-items: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        
+        .search-result-content {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .search-result-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-100);
+            margin-bottom: 2px;
+        }
+        
+        .search-result-path {
+            font: 11px var(--font-mono);
+            color: var(--text-500);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .search-result-meta {
+            display: flex;
+            gap: 12px;
+            margin-top: 6px;
+            font-size: 11px;
+            color: var(--text-500);
+        }
+        
+        .search-result-meta span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        /* Token Highlighting */
+        .token-match {
+            background: linear-gradient(180deg, rgba(240, 200, 96, 0.35) 0%, rgba(240, 200, 96, 0.2) 100%);
+            color: var(--gold-400);
+            padding: 0 2px;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+        
+        .search-result-score {
+            font: 500 10px var(--font-mono);
+            color: var(--text-500);
+            opacity: 0.7;
+        }
+        
+        .search-empty {
+            padding: 24px;
+            text-align: center;
+            color: var(--text-500);
+            font-size: 13px;
+        }
+        
+        .search-header {
+            padding: 8px 16px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-500);
+            background: var(--void-700);
+            border-bottom: 1px solid var(--border-1);
+        }
+        
         .search::before {
             content: '⌘K';
             position: absolute;
@@ -207,15 +317,17 @@
            ═══════════════════════════════════════════════════════════════════════════════ */
         .legend {
             position: absolute;
-            top: 16px;
-            left: 16px;
-            width: 180px;
-            padding: 16px;
-            background: rgba(12, 12, 20, 0.95);
-            backdrop-filter: blur(24px);
+            top: 12px;
+            left: 12px;
+            width: 160px;
+            padding: 12px;
+            background: rgba(6, 6, 12, 0.85);
+            backdrop-filter: blur(20px);
             border: 1px solid var(--border-2);
-            border-radius: 16px;
+            border-radius: 12px;
             z-index: 50;
+            max-height: calc(100% - 24px);
+            overflow-y: auto;
         }
         
         .legend-title {
@@ -608,6 +720,7 @@
             
             <div class="search">
                 <input type="text" id="search" placeholder="Search files, classes, functions..." autocomplete="off">
+                <div class="search-results" id="search-results"></div>
             </div>
             
             <div class="stats">
@@ -892,10 +1005,9 @@
             const children = Object.values(node.children || {}).filter(c => c.lines > 0);
             if (!children.length) return;
             
-            // Layout with padding - account for legend width (200px) on left
-            const legendWidth = 200;
-            const pad = 8;
-            state.treemap.cells = squarify(children, legendWidth + pad, pad, w - legendWidth - pad * 2, h - pad * 2);
+            // Fill entire screen - legend floats on top
+            const pad = 4;
+            state.treemap.cells = squarify(children, pad, pad, w - pad * 2, h - pad * 2);
             
             // Draw cells
             for (const cell of state.treemap.cells) {
@@ -1063,10 +1175,7 @@
         // ═══════════════════════════════════════════════════════════════════════════════
         
         function renderSemantic() {
-            console.log('[3D] renderSemantic called', { filesCount: state.files?.length, view: state.view, hasCtx: !!semanticCtx });
-            window._debug3D = { filesCount: state.files?.length, view: state.view, hasCtx: !!semanticCtx };
-            if (!semanticCtx) { console.log('[3D] No semanticCtx'); return; }
-            if (!state.files.length) { console.log('[3D] No files'); return; }
+            if (!semanticCtx || !state.files.length) return;
             
             const w = semanticCanvas.width / dpr;
             const h = semanticCanvas.height / dpr;
@@ -1099,11 +1208,6 @@
                 f.x !== undefined && f.y !== undefined && f.z !== undefined &&
                 isFinite(f.x) && isFinite(f.y) && isFinite(f.z)
             );
-            console.log('[3D] Files with coords:', files.length, '/', state.files.length);
-            
-            if (files.length === 0 && state.files.length > 0) {
-                console.log('[3D] Sample file without coords:', state.files[0]);
-            }
             
             if (state.filter) {
                 files = files.filter(f => f.category === state.filter);
@@ -1115,7 +1219,6 @@
                     (f.name && f.name.toLowerCase().includes(q))
                 );
             }
-            console.log('[3D] After filter/query:', files.length);
             
             // Camera parameters for STRONG perspective
             const fov = 1.2;
@@ -1159,7 +1262,6 @@
             // Sort back to front for proper occlusion
             projected.sort((a, b) => a.sz - b.sz);
             state.semantic.projected = projected;
-            console.log('[3D] Projected:', projected.length, 'first:', projected[0]?.sx, projected[0]?.sy);
             
             // Draw connections for selected file
             if (state.semantic.selected && state.semantic.related.length) {
@@ -1306,11 +1408,228 @@
                 });
             });
             
-            // Search
+            // Deep Semantic Search
             const searchInput = document.getElementById('search');
+            const searchResults = document.getElementById('search-results');
+            let searchSelectedIdx = -1;
+            
             searchInput.addEventListener('input', debounce(e => {
-                state.query = e.target.value;
-            }, 150));
+                const query = e.target.value.trim();
+                state.query = query;
+                performSearch(query);
+            }, 100));
+            
+            searchInput.addEventListener('focus', () => {
+                if (searchInput.value.trim()) performSearch(searchInput.value.trim());
+            });
+            
+            searchInput.addEventListener('blur', () => {
+                setTimeout(() => searchResults.classList.remove('active'), 200);
+            });
+            
+            searchInput.addEventListener('keydown', e => {
+                const results = searchResults.querySelectorAll('.search-result');
+                if (!results.length) return;
+                
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    searchSelectedIdx = Math.min(searchSelectedIdx + 1, results.length - 1);
+                    updateSearchSelection(results);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    searchSelectedIdx = Math.max(searchSelectedIdx - 1, 0);
+                    updateSearchSelection(results);
+                } else if (e.key === 'Enter' && searchSelectedIdx >= 0) {
+                    e.preventDefault();
+                    results[searchSelectedIdx].click();
+                }
+            });
+            
+            function updateSearchSelection(results) {
+                results.forEach((r, i) => r.classList.toggle('selected', i === searchSelectedIdx));
+                if (searchSelectedIdx >= 0) results[searchSelectedIdx].scrollIntoView({ block: 'nearest' });
+            }
+            
+            function performSearch(query) {
+                if (!query || query.length < 2) {
+                    searchResults.classList.remove('active');
+                    return;
+                }
+                
+                const tokens = tokenize(query);
+                const scored = state.files.map(f => ({
+                    file: f,
+                    score: scoreFile(f, tokens),
+                    matches: findMatches(f, tokens)
+                })).filter(r => r.score > 0)
+                  .sort((a, b) => b.score - a.score)
+                  .slice(0, 50);
+                
+                if (!scored.length) {
+                    searchResults.innerHTML = '<div class="search-empty">No results for "' + escapeHtml(query) + '"</div>';
+                } else {
+                    const grouped = groupResults(scored);
+                    searchResults.innerHTML = renderSearchResults(grouped, tokens);
+                    
+                    searchResults.querySelectorAll('.search-result').forEach((el, i) => {
+                        el.addEventListener('click', () => {
+                            const file = scored[i].file;
+                            selectFile(file);
+                            searchResults.classList.remove('active');
+                            searchInput.blur();
+                        });
+                    });
+                }
+                
+                searchSelectedIdx = -1;
+                searchResults.classList.add('active');
+            }
+            
+            function tokenize(query) {
+                return query.toLowerCase()
+                    .split(/[\s\-_./\\]+/)
+                    .filter(t => t.length >= 2)
+                    .map(t => ({ text: t, regex: new RegExp('(' + escapeRegex(t) + ')', 'gi') }));
+            }
+            
+            function scoreFile(file, tokens) {
+                let score = 0;
+                const name = (file.name || '').toLowerCase();
+                const path = (file.path || '').toLowerCase();
+                const funcs = (file.functions || []).join(' ').toLowerCase();
+                const classes = (file.classes || []).join(' ').toLowerCase();
+                const keywords = (file.keywords || []).join(' ').toLowerCase();
+                const summary = (file.summary || '').toLowerCase();
+                
+                for (const { text } of tokens) {
+                    // Exact name match (highest)
+                    if (name === text) score += 100;
+                    // Name starts with token
+                    else if (name.startsWith(text)) score += 50;
+                    // Name contains token
+                    else if (name.includes(text)) score += 30;
+                    
+                    // Path match
+                    if (path.includes(text)) score += 15;
+                    
+                    // Function/class/keyword matches (semantic)
+                    if (funcs.includes(text)) score += 25;
+                    if (classes.includes(text)) score += 25;
+                    if (keywords.includes(text)) score += 20;
+                    if (summary.includes(text)) score += 10;
+                    
+                    // Category match
+                    if ((file.category || '').toLowerCase().includes(text)) score += 15;
+                }
+                
+                // Boost important files
+                score *= (1 + (file.importance || 0) * 0.5);
+                
+                // Boost by line count (more code = more relevant)
+                score *= (1 + Math.log10(Math.max(1, file.lines || 1)) * 0.1);
+                
+                return score;
+            }
+            
+            function findMatches(file, tokens) {
+                const matches = { name: [], path: [], funcs: [], classes: [], keywords: [] };
+                
+                for (const { text } of tokens) {
+                    if ((file.name || '').toLowerCase().includes(text)) matches.name.push(text);
+                    if ((file.path || '').toLowerCase().includes(text)) matches.path.push(text);
+                    
+                    (file.functions || []).forEach(f => {
+                        if (f.toLowerCase().includes(text)) matches.funcs.push(f);
+                    });
+                    (file.classes || []).forEach(c => {
+                        if (c.toLowerCase().includes(text)) matches.classes.push(c);
+                    });
+                    (file.keywords || []).forEach(k => {
+                        if (k.toLowerCase().includes(text)) matches.keywords.push(k);
+                    });
+                }
+                
+                return matches;
+            }
+            
+            function groupResults(scored) {
+                // Group by category for better UX
+                const groups = {};
+                for (const r of scored) {
+                    const cat = r.file.category || 'Other';
+                    if (!groups[cat]) groups[cat] = [];
+                    groups[cat].push(r);
+                }
+                return groups;
+            }
+            
+            function renderSearchResults(groups, tokens) {
+                let html = '';
+                let flatIdx = 0;
+                
+                for (const [cat, results] of Object.entries(groups)) {
+                    if (!results.length) continue;
+                    
+                    html += '<div class="search-header">' + escapeHtml(cat) + ' (' + results.length + ')</div>';
+                    
+                    for (const { file, score, matches } of results.slice(0, 10)) {
+                        const color = getHSL(cat);
+                        const icon = getCategoryIcon(cat);
+                        const highlighted = highlightTokens(file.name || '', tokens);
+                        const pathHighlighted = highlightTokens(file.path || '', tokens);
+                        
+                        html += '<div class="search-result" data-idx="' + flatIdx + '">';
+                        html += '<div class="search-result-icon" style="background: hsla(' + color.h + ', ' + color.s + '%, ' + color.l + '%, 0.2); color: hsl(' + color.h + ', ' + color.s + '%, ' + color.l + '%)">' + icon + '</div>';
+                        html += '<div class="search-result-content">';
+                        html += '<div class="search-result-name">' + highlighted + '</div>';
+                        html += '<div class="search-result-path">' + pathHighlighted + '</div>';
+                        
+                        // Show matched functions/classes/keywords
+                        const metaParts = [];
+                        if (matches.funcs.length) metaParts.push('<span>ƒ ' + matches.funcs.slice(0, 3).map(f => highlightTokens(f, tokens)).join(', ') + '</span>');
+                        if (matches.classes.length) metaParts.push('<span>◇ ' + matches.classes.slice(0, 2).map(c => highlightTokens(c, tokens)).join(', ') + '</span>');
+                        if (file.lines) metaParts.push('<span>' + formatNum(file.lines) + ' lines</span>');
+                        
+                        if (metaParts.length) {
+                            html += '<div class="search-result-meta">' + metaParts.join('') + '</div>';
+                        }
+                        
+                        html += '</div>';
+                        html += '<span class="search-result-score">' + Math.round(score) + '</span>';
+                        html += '</div>';
+                        flatIdx++;
+                    }
+                }
+                
+                return html;
+            }
+            
+            function highlightTokens(text, tokens) {
+                let result = escapeHtml(text);
+                for (const { regex } of tokens) {
+                    result = result.replace(regex, '<span class="token-match">$1</span>');
+                }
+                return result;
+            }
+            
+            function getCategoryIcon(cat) {
+                const icons = {
+                    Python: '🐍', JavaScript: '📜', TypeScript: '💠', Rust: '🦀',
+                    Swift: '🍎', Kotlin: '🎯', React: '⚛️', Web: '🌐',
+                    Test: '🧪', Config: '⚙️', Docs: '📚', Service: '🔧',
+                    API: '🔌', Model: '📊', Utility: '🛠️', Style: '🎨',
+                    Shell: '💻', C: '⚡', Other: '📄'
+                };
+                return icons[cat] || '📄';
+            }
+            
+            function escapeHtml(str) {
+                return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            }
+            
+            function escapeRegex(str) {
+                return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            }
             
             // Panel close
             document.getElementById('panel-close').addEventListener('click', closePanel);
@@ -1331,7 +1650,6 @@
         }
         
         function switchView(view) {
-            console.log('[VIEW] Switching to:', view);
             state.view = view;
             document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
             document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === view + '-view'));
@@ -1340,6 +1658,9 @@
             document.getElementById('controls').style.display = is3D ? 'flex' : 'none';
             document.getElementById('zoom').style.display = is3D ? 'flex' : 'none';
             document.getElementById('breadcrumbs').style.display = is3D ? 'none' : 'flex';
+            
+            // CRITICAL: Resize canvases after view switch since hidden elements have 0 dimensions
+            requestAnimationFrame(() => resize());
         }
         
         function onTreemapMove(e) {
