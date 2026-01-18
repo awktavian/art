@@ -1,0 +1,325 @@
+# KagamiOS Production Docker Compose Configuration
+# CRITICAL: This configuration enforces TLS for all services
+#
+# Prerequisites:
+#   1. Generate TLS certificates:
+#      - ./certs/cockroachdb/ca.crt, node.crt, node.key
+#      - ./certs/redis/ca.crt, redis.crt, redis.key
+#      - ./certs/etcd/ca.pem, server.pem, server-key.pem
+#   2. Generate secrets:
+#      python scripts/operations/generate_secrets.py --env production > .env.production
+#   3. Validate configuration:
+#      ENVIRONMENT=production python scripts/operations/validate_secrets.py
+#
+# Deploy:
+#   docker-compose -f docker-compose.production.yml up -d
+#
+# Health check:
+#   docker-compose -f docker-compose.production.yml ps
+#   docker-compose -f docker-compose.production.yml logs -f
+
+services:
+  # =============================================================================
+  # CockroachDB (Distributed SQL Database)
+  # =============================================================================
+  cockroachdb:
+    image: cockroachdb/cockroach:v23.1.11
+    container_name: kagami-cockroachdb
+    command: start-single-node --certs-dir=/certs --advertise-addr=cockroachdb
+    ports:
+      - "26257:26257"  # SQL port
+      - "8080:8080"    # Admin UI
+    volumes:
+      - cockroach_data:/cockroach/cockroach-data
+      - ./certs/cockroachdb:/certs:ro
+    environment:
+      - COCKROACH_SKIP_ENABLING_DIAGNOSTIC_REPORTING=true
+      - COCKROACH_MAX_OFFSET=500ms
+    healthcheck:
+      test: ["CMD", "/cockroach/cockroach", "sql", "--certs-dir=/certs", "--host=cockroachdb", "--execute=SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - kagami-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+
+  # =============================================================================
+  # Redis (Cache & Session Store)
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: kagami-redis
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --tls-port 6380
+      --port 0
+      --tls-cert-file /certs/redis.crt
+      --tls-key-file /certs/redis.key
+      --tls-ca-cert-file /certs/ca.crt
+      --tls-auth-clients no
+      --maxmemory 2gb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --appendonly yes
+      --appendfsync everysec
+    ports:
+      - "6380:6380"  # TLS port only (no plaintext 6379)
+    volumes:
+      - redis_data:/data
+      - ./certs/redis:/certs:ro
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--tls", "--cacert", "/certs/ca.crt", "-p", "6380", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - kagami-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # =============================================================================
+  # etcd (Distributed Coordination)
+  # =============================================================================
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.9
+    container_name: kagami-etcd
+    command:
+      - etcd
+      - --name=etcd1
+      - --data-dir=/etcd_data
+      - --advertise-client-urls=https://etcd:2379
+      - --listen-client-urls=https://0.0.0.0:2379
+      - --initial-advertise-peer-urls=https://etcd:2380
+      - --listen-peer-urls=https://0.0.0.0:2380
+      - --initial-cluster=etcd1=https://etcd:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=kagami-etcd-cluster
+      - --client-cert-auth
+      - --trusted-ca-file=/certs/ca.pem
+      - --cert-file=/certs/server.pem
+      - --key-file=/certs/server-key.pem
+      - --peer-client-cert-auth
+      - --peer-trusted-ca-file=/certs/ca.pem
+      - --peer-cert-file=/certs/server.pem
+      - --peer-key-file=/certs/server-key.pem
+      - --auto-compaction-retention=1
+      - --quota-backend-bytes=8589934592
+    ports:
+      - "2379:2379"  # Client port
+      - "2380:2380"  # Peer port
+    volumes:
+      - etcd_data:/etcd_data
+      - ./certs/etcd:/certs:ro
+    environment:
+      - ETCD_UNSUPPORTED_ARCH=arm64
+    healthcheck:
+      test: ["CMD", "etcdctl", "--cacert=/certs/ca.pem", "--cert=/certs/server.pem", "--key=/certs/server-key.pem", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - kagami-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # =============================================================================
+  # KagamiOS Application
+  # =============================================================================
+  kagami:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILD_ENV=production
+    container_name: kagami-app
+    command: python -m kagami.main
+    ports:
+      - "8000:8000"   # HTTP API
+      - "9090:9090"   # Metrics (Prometheus)
+    volumes:
+      - ./logs:/app/logs
+      - ./checkpoints:/app/checkpoints:ro
+    environment:
+      # Environment
+      - ENVIRONMENT=production
+      - KAGAMI_BOOT_MODE=full
+
+      # =================================================================
+      # UNIFIED CLUSTER CONFIGURATION
+      # All clustering coordinated via kagami.core.cluster.UnifiedClusterManager
+      # =================================================================
+      - KAGAMI_CLUSTER_NAME=kagami-production
+      - KAGAMI_NODE_ID=${HOSTNAME:-kagami-0}
+
+      # Database (CockroachDB - TLS enforced)
+      - DATABASE_URL=cockroachdb://root@cockroachdb:26257/kagami?sslmode=verify-full&sslrootcert=/certs/cockroachdb/ca.crt
+      - DB_POOL_SIZE=100
+      - DB_MAX_OVERFLOW=100
+
+      # Redis (Cache/Sessions/Pub-Sub - TLS enforced)
+      - REDIS_URL=rediss://:${REDIS_PASSWORD}@redis:6380/0?ssl_ca_certs=/certs/redis/ca.crt
+      - REDIS_MAX_CONNECTIONS=200
+
+      # etcd (Consensus/Leader Election - TLS enforced)
+      - ETCD_ENDPOINTS=https://etcd:2379
+      - ETCD_CA_CERT=/certs/etcd/ca.pem
+      - ETCD_CERT_CERT=/certs/etcd/server.pem
+      - ETCD_CERT_KEY=/certs/etcd/server-key.pem
+      - ETCD_TIMEOUT=5
+      - ETCD_PREFIX=/kagami
+
+      # Cluster behavior (auto-managed by UnifiedClusterManager)
+      - CLUSTER_AUTO_FAILOVER=true
+      - CLUSTER_AUTO_REBALANCE=true
+      - CLUSTER_HEARTBEAT_INTERVAL=10
+      - CLUSTER_HEALTH_CHECK_INTERVAL=30
+      - CLUSTER_LEADER_LEASE_TTL=30
+      - CLUSTER_STALE_NODE_TIMEOUT=60
+
+      # Secrets (from .env.production)
+      - JWT_SECRET=${JWT_SECRET}
+      - CSRF_SECRET=${CSRF_SECRET}
+      - KAGAMI_CACHE_SECRET=${KAGAMI_CACHE_SECRET}
+      - KAGAMI_ENCRYPTION_KEYS=${KAGAMI_ENCRYPTION_KEYS}
+      - API_KEYS=${API_KEYS}
+
+      # Observability
+      - LOG_LEVEL=INFO
+      - METRICS_PORT=9090
+    depends_on:
+      cockroachdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      etcd:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - kagami-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+
+  # =============================================================================
+  # Prometheus (Metrics Collection)
+  # =============================================================================
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: kagami-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9091:9090"  # Prometheus UI (offset to avoid conflict)
+    volumes:
+      - ./config/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - kagami-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  kagami-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  cockroach_data:
+    driver: local
+  redis_data:
+    driver: local
+  etcd_data:
+    driver: local
+  prometheus_data:
+    driver: local
+
+# =============================================================================
+# Production Deployment Checklist
+# =============================================================================
+# [ ] TLS certificates generated and placed in ./certs/
+# [ ] Secrets generated: python scripts/operations/generate_secrets.py --env production
+# [ ] Secrets validated: ENVIRONMENT=production python scripts/operations/validate_secrets.py
+# [ ] .env.production file created (DO NOT commit to git)
+# [ ] File permissions: chmod 600 .env.production
+# [ ] Firewall rules configured (expose only necessary ports)
+# [ ] Monitoring alerts configured (Prometheus)
+# [ ] Backup strategy implemented (volumes)
+# [ ] Disaster recovery plan documented
+# [ ] Security audit completed
+# [ ] Load testing completed
+# [ ] Incident response plan documented
+#
+# Deploy:
+#   docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+#
+# Monitor:
+#   docker-compose -f docker-compose.production.yml ps
+#   docker-compose -f docker-compose.production.yml logs -f kagami
+#   curl http://localhost:9090/health
+#
+# Stop:
+#   docker-compose -f docker-compose.production.yml down
+#
+# Backup volumes:
+#   docker run --rm -v kagami_cockroach_data:/data -v $(pwd)/backups:/backup alpine tar czf /backup/cockroach-$(date +%Y%m%d).tar.gz -C /data .

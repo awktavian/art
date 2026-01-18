@@ -1,0 +1,111 @@
+# Cloud Build Configuration for Kagami API
+#
+# Trigger with:
+#   gcloud builds submit --config=deploy/cloudrun/cloudbuild.yaml
+#
+# Or configure as a trigger on repository push.
+#
+# Created: January 4, 2026
+steps:
+  # Step 1: Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/kagami-api:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/kagami-api:latest'
+      - '-f'
+      - 'deploy/cloudrun/Dockerfile'
+      - '.'
+    timeout: '900s'
+
+  # Step 2: Push to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/kagami-api:$COMMIT_SHA'
+    waitFor:
+      - 'build'
+
+  # Step 3: Push latest tag
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-latest'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/kagami-api:latest'
+    waitFor:
+      - 'build'
+
+  # Step 4: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'kagami-api'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/kagami-api:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--min-instances'
+      - '1'
+      - '--max-instances'
+      - '10'
+      - '--cpu'
+      - '2'
+      - '--memory'
+      - '2Gi'
+      - '--timeout'
+      - '300'
+      - '--concurrency'
+      - '80'
+      - '--set-env-vars'
+      - 'KAGAMI_ENVIRONMENT=production,GCP_ENABLE_LOGGING=true,GCP_ENABLE_MONITORING=true,GCP_ENABLE_TRACING=true'
+      - '--service-account'
+      - 'kagami-api@$PROJECT_ID.iam.gserviceaccount.com'
+    waitFor:
+      - 'push'
+
+  # Step 5: Run integration tests against deployed service
+  - name: 'gcr.io/cloud-builders/curl'
+    id: 'smoke-test'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # Wait for deployment to stabilize
+        sleep 30
+        
+        # Get the service URL
+        SERVICE_URL=$(gcloud run services describe kagami-api --region=${_REGION} --format='value(status.url)')
+        
+        # Health check
+        curl -f "$${SERVICE_URL}/health" || exit 1
+        
+        echo "Smoke test passed!"
+    waitFor:
+      - 'deploy'
+
+# Substitution variables
+substitutions:
+  _REGION: 'us-west1'
+
+# Build options
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+
+# Images to store in Container Registry
+images:
+  - 'gcr.io/$PROJECT_ID/kagami-api:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/kagami-api:latest'
+
+# Build timeout
+timeout: '1800s'

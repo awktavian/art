@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz: The Home Stretch | Module 07 | Tool Time University</title>
+    <link rel="stylesheet" href="../assets/style.css">
+    <style>
+        .quiz-container { max-width: 800px; margin: 0 auto; padding: var(--space-4); }
+        .quiz-header { text-align: center; padding: var(--space-5) var(--space-4); background: linear-gradient(135deg, var(--binford-red) 0%, var(--binford-red-light) 100%); color: white; border-radius: var(--radius-lg); margin-bottom: var(--space-4); }
+        .quiz-header h1 { color: white; margin-bottom: var(--space-2); }
+        .points-badge { display: inline-block; background: var(--binford-gold); color: var(--stone-900); padding: var(--space-1) var(--space-3); border-radius: var(--radius-xl); font-weight: 600; font-family: var(--font-mono); }
+        .progress-bar { background: var(--stone-200); height: 8px; border-radius: 4px; margin-bottom: var(--space-4); overflow: hidden; }
+        .progress-fill { background: linear-gradient(90deg, var(--binford-red) 0%, var(--binford-gold) 100%); height: 100%; border-radius: 4px; transition: width var(--duration-normal) var(--ease-out); }
+        .progress-text { text-align: center; font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-3); }
+        .question-card { background: var(--white); border: 1px solid var(--border-light); border-radius: var(--radius-lg); padding: var(--space-4); margin-bottom: var(--space-4); display: none; }
+        .question-card.active { display: block; animation: fadeUp var(--duration-normal) var(--ease-out); }
+        .question-number { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--binford-red); margin-bottom: var(--space-2); }
+        .question-text { font-size: var(--text-lg); font-weight: 500; margin-bottom: var(--space-3); line-height: 1.4; }
+        .question-type { display: inline-block; font-size: var(--text-xs); background: var(--stone-100); color: var(--text-secondary); padding: 2px 8px; border-radius: var(--radius-sm); margin-bottom: var(--space-3); }
+        .options-list { list-style: none; padding: 0; margin: 0; }
+        .option-item { margin-bottom: var(--space-2); }
+        .option-btn { width: 100%; text-align: left; padding: var(--space-3); background: var(--stone-50); border: 2px solid var(--border-light); border-radius: var(--radius-md); cursor: pointer; transition: all var(--duration-fast) var(--ease-out); font-size: var(--text-base); }
+        .option-btn:hover:not(:disabled) { background: var(--stone-100); border-color: var(--stone-300); }
+        .option-btn.selected { background: #fef3c7; border-color: var(--binford-gold); }
+        .option-btn.correct { background: #dcfce7; border-color: #22c55e; }
+        .option-btn.incorrect { background: #fee2e2; border-color: #ef4444; }
+        .option-btn:disabled { cursor: not-allowed; }
+        .fill-blank-input { width: 100%; padding: var(--space-2) var(--space-3); font-size: var(--text-base); border: 2px solid var(--border-light); border-radius: var(--radius-md); margin-bottom: var(--space-3); }
+        .fill-blank-input:focus { outline: none; border-color: var(--binford-gold); }
+        .fill-blank-input.correct { border-color: #22c55e; background: #dcfce7; }
+        .fill-blank-input.incorrect { border-color: #ef4444; background: #fee2e2; }
+        .feedback { padding: var(--space-3); border-radius: var(--radius-md); margin-top: var(--space-3); display: none; }
+        .feedback.show { display: block; animation: fadeUp var(--duration-fast) var(--ease-out); }
+        .feedback.correct { background: #dcfce7; border: 1px solid #22c55e; color: #166534; }
+        .feedback.incorrect { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
+        .feedback-title { font-weight: 600; margin-bottom: var(--space-1); }
+        .btn-container { display: flex; justify-content: space-between; margin-top: var(--space-4); }
+        .submit-btn { background: var(--binford-red); color: white; padding: var(--space-2) var(--space-4); border: none; border-radius: var(--radius-md); font-weight: 600; cursor: pointer; transition: all var(--duration-fast) var(--ease-out); }
+        .submit-btn:hover:not(:disabled) { background: var(--binford-red-light); transform: translateY(-2px); }
+        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .next-btn { background: var(--binford-gold); color: var(--stone-900); }
+        .next-btn:hover:not(:disabled) { background: var(--binford-gold-light); }
+        .results-card { background: var(--white); border: 1px solid var(--border-light); border-radius: var(--radius-lg); padding: var(--space-5); text-align: center; display: none; }
+        .results-card.show { display: block; animation: fadeUp var(--duration-normal) var(--ease-out); }
+        .results-score { font-size: var(--text-4xl); font-family: var(--font-display); color: var(--binford-red); margin-bottom: var(--space-2); }
+        .results-equity { font-size: var(--text-2xl); font-family: var(--font-mono); color: var(--binford-gold); margin-bottom: var(--space-4); }
+        .results-title { font-size: var(--text-xl); font-weight: 600; margin-bottom: var(--space-2); }
+        .results-message { color: var(--text-secondary); margin-bottom: var(--space-4); }
+        .tool-time-break { background: var(--stone-900); color: white; padding: var(--space-3); border-radius: var(--radius-md); text-align: center; margin: var(--space-4) 0; }
+        .tool-time-break .catchphrase { font-size: var(--text-xl); color: var(--binford-gold); font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div class="quiz-container">
+        <div class="quiz-header">
+            <p class="label" style="color: var(--binford-gold-light);">MODULE 07</p>
+            <h1>The Home Stretch</h1>
+            <p style="opacity: 0.9; margin-bottom: var(--space-3);">10 Questions | Multiple Choice, True/False & Fill-in-the-Blank</p>
+            <div class="points-badge">75 Home Equity Dollars</div>
+        </div>
+
+        <div class="progress-text">Question <span id="currentQ">1</span> of 10</div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width: 10%;"></div></div>
+
+        <!-- Question 1 -->
+        <div class="question-card active" data-question="1" data-correct="costa rica" data-points="7.5" data-type="fillin">
+            <div class="question-number">Question 1 of 10 (7.5 HED)</div>
+            <div class="question-type">Fill in the Blank</div>
+            <div class="question-text">Randy's departure was written as him leaving to study the rainforest in _______ (country).</div>
+            <input type="text" class="fill-blank-input" placeholder="Enter country name..." autocomplete="off">
+            <p style="font-size: var(--text-sm); color: var(--text-muted);">Hint: A Central American country known for environmental programs</p>
+            <div class="feedback correct">
+                <div class="feedback-title">Environmental activism!</div>
+                <p>Randy's decision to spend a year in Costa Rica studying the rainforest represented the culmination of his character arc - from curious kid to principled young man willing to act on his beliefs.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different destination!</div>
+                <p>The correct answer is <strong>Costa Rica</strong>. The environmental program allowed for potential returns while respecting the actor's decision to leave.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 2 -->
+        <div class="question-card" data-question="2" data-correct="B" data-points="7.5">
+            <div class="question-number">Question 2 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What dramatic transformation did Mark undergo during Season 7?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) He became a star athlete</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) He went through a goth phase</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) He started a band</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) He became class president</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Dark transformation!</div>
+                <p>Mark's goth phase, while played for comedy, touched on genuine adolescent struggles with identity and belonging. Is it rebellion, identity exploration, or a cry for attention?</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different change!</div>
+                <p>The correct answer is <strong>He went through a goth phase</strong>. The youngest Taylor's dramatic transformation was a Season 7 highlight.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 3 -->
+        <div class="question-card" data-question="3" data-correct="true" data-points="7.5" data-type="truefalse">
+            <div class="question-number">Question 3 of 10 (7.5 HED)</div>
+            <div class="question-type">True or False</div>
+            <div class="question-text">Jonathan Taylor Thomas announced he would be leaving the show during Season 7 to focus on academics and other projects.</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="true">True</button></li>
+                <li class="option-item"><button class="option-btn" data-value="false">False</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">JTT departs!</div>
+                <p>Jonathan Taylor Thomas's departure was a significant loss. His Randy had evolved from middle-child jokester to the series' intellectual conscience. The writers honored his exit by making it meaningful.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">He really left!</div>
+                <p>This is <strong>True</strong>. JTT's decision to leave for academics was written respectfully into the show.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 4 -->
+        <div class="question-card" data-question="4" data-correct="C" data-points="7.5">
+            <div class="question-number">Question 4 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What was Brad's major Season 7 storyline?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) Getting married</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Dropping out of school</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) College preparation and applications</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Starting a business</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">College bound!</div>
+                <p>Brad's college application journey became a season-long arc, mirroring millions of American families dealing with the pressure, uncertainty, and emotional weight of a child leaving home.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different focus!</div>
+                <p>The correct answer is <strong>College preparation and applications</strong>. Brad heading to college was a major Season 7 theme.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 5 -->
+        <div class="question-card" data-question="5" data-correct="A" data-points="7.5">
+            <div class="question-number">Question 5 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">In "What a Drag," what challenge did Mark face that tested Tim's comfort levels?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) Playing a female role in a school play</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Joining a dance team</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Becoming a vegetarian</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Piercing his ear</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Gender exploration!</div>
+                <p>When Mark's school play required him to play a female role, Tim's discomfort revealed his lingering insecurities about masculinity. The episode navigated tricky territory with surprising grace.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different challenge!</div>
+                <p>The correct answer is <strong>Playing a female role in a school play</strong>. The episode was a standout in the series' treatment of gender.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <div class="tool-time-break" id="midBreak" style="display: none;">
+            <p>DOES EVERYBODY KNOW WHAT TIME IT IS?</p>
+            <p class="catchphrase">TOOL TIME!</p>
+            <p style="font-size: var(--text-sm); opacity: 0.7;">The home stretch continues!</p>
+        </div>
+
+        <!-- Question 6 -->
+        <div class="question-card" data-question="6" data-correct="B" data-points="7.5">
+            <div class="question-number">Question 6 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What philosopher did Wilson channel when discussing "I-Thou" relationships?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) Plato</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Martin Buber</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Aristotle</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Confucius</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Buber's wisdom!</div>
+                <p>Martin Buber spoke of "I-It" vs "I-Thou" relationships. Wilson applied this to Tim's fatherhood: what his boys need isn't someone who fixes things, but one who truly sees them.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different philosopher!</div>
+                <p>The correct answer is <strong>Martin Buber</strong>. His I-Thou philosophy was perfect for Tim's parenting journey.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 7 -->
+        <div class="question-card" data-question="7" data-correct="true" data-points="7.5" data-type="truefalse">
+            <div class="question-number">Question 7 of 10 (7.5 HED)</div>
+            <div class="question-type">True or False</div>
+            <div class="question-text">In "A Funny Valentine," Tim and Jill's romantic dinner was repeatedly interrupted by each of their sons' crises.</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="true">True</button></li>
+                <li class="option-item"><button class="option-btn" data-value="false">False</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Love through chaos!</div>
+                <p>The chaos became the point - their love is demonstrated not in perfect moments but in how they navigate imperfect ones together. A beautiful meditation on long-term partnership.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Romance interrupted!</div>
+                <p>This is <strong>True</strong>. The interruptions were the episode's message about real love.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 8 -->
+        <div class="question-card" data-question="8" data-correct="C" data-points="7.5">
+            <div class="question-number">Question 8 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What did Tim spend much of Season 7 reflecting on?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) His Tool Time legacy</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Retirement plans</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Fatherhood and what it means as his boys become men</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Buying a new house</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Father's reflection!</div>
+                <p>With his boys becoming men, what did it mean to be their father? Could he let go while staying connected? The man who built his identity on fixing things had to accept some things shouldn't be fixed.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Deeper reflection!</div>
+                <p>The correct answer is <strong>Fatherhood and what it means as his boys become men</strong>. Tim's parenting evolution was central to Season 7.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 9 -->
+        <div class="question-card" data-question="9" data-correct="randy" data-points="7.5" data-type="fillin">
+            <div class="question-number">Question 9 of 10 (7.5 HED)</div>
+            <div class="question-type">Fill in the Blank</div>
+            <div class="question-text">"The Write Stuff" was the farewell episode for which Taylor son?</div>
+            <input type="text" class="fill-blank-input" placeholder="Enter name..." autocomplete="off">
+            <div class="feedback correct">
+                <div class="feedback-title">Goodbye Randy!</div>
+                <p>"The Write Stuff" was written specifically to honor Jonathan Taylor Thomas's contributions to the series. Tim's struggle to support a choice he doesn't understand was the episode's emotional core.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different Taylor!</div>
+                <p>The correct answer is <strong>Randy</strong>. His farewell episode was a meaningful send-off for the character.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 10 -->
+        <div class="question-card" data-question="10" data-correct="D" data-points="7.5">
+            <div class="question-number">Question 10 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">According to Wilson's Buber-inspired wisdom, what do Tim's sons need from their father?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) More power tools</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Financial support</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Someone to solve their problems</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Someone who truly sees them, not tries to fix them</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">I-Thou parenting!</div>
+                <p>Tim must learn to encounter his sons as the adults they're becoming, not as the children he remembers or the problems he wants to solve. Seeing, not fixing.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Deeper need!</div>
+                <p>The correct answer is <strong>Someone who truly sees them, not tries to fix them</strong>. Wilson's wisdom cuts to the heart of parenting.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">See Results</button>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="results-card" id="results">
+            <h2 class="results-title" id="resultsTitle">Quiz Complete!</h2>
+            <div class="results-score" id="resultsScore">0/10</div>
+            <div class="results-equity" id="resultsEquity">0 HED Earned</div>
+            <p class="results-message" id="resultsMessage"></p>
+            <div style="margin-top: var(--space-4);">
+                <a href="index.html" class="btn btn--secondary" style="margin-right: var(--space-2);">Back to Module</a>
+                <button class="btn btn--primary" onclick="location.reload()">Retake Quiz</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const quizData = { currentQuestion: 1, totalQuestions: 10, score: 0, totalPoints: 0, maxPoints: 75, answered: new Set() };
+        document.addEventListener('DOMContentLoaded', function() { initQuiz(); });
+        function initQuiz() {
+            document.querySelectorAll('.option-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const card = this.closest('.question-card');
+                    card.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+                    this.classList.add('selected');
+                    card.querySelector('.submit-btn').disabled = false;
+                });
+            });
+            document.querySelectorAll('.fill-blank-input').forEach(input => {
+                input.addEventListener('input', function() {
+                    const card = this.closest('.question-card');
+                    card.querySelector('.submit-btn').disabled = this.value.trim() === '';
+                });
+            });
+            document.querySelectorAll('.submit-btn:not(.next-btn)').forEach(btn => { btn.addEventListener('click', function() { submitAnswer(this.closest('.question-card')); }); });
+            document.querySelectorAll('.next-btn').forEach(btn => { btn.addEventListener('click', function() { nextQuestion(); }); });
+        }
+        function submitAnswer(card) {
+            const questionNum = parseInt(card.dataset.question);
+            const correctAnswer = card.dataset.correct;
+            const points = parseFloat(card.dataset.points);
+            const type = card.dataset.type || 'multiple';
+            let userAnswer, isCorrect = false;
+            if (type === 'fillin') {
+                const input = card.querySelector('.fill-blank-input');
+                userAnswer = input.value.trim().toLowerCase();
+                isCorrect = userAnswer === correctAnswer.toLowerCase();
+                input.disabled = true;
+                input.classList.add(isCorrect ? 'correct' : 'incorrect');
+            } else {
+                const selected = card.querySelector('.option-btn.selected');
+                userAnswer = selected.dataset.value;
+                isCorrect = userAnswer === correctAnswer;
+                card.querySelectorAll('.option-btn').forEach(btn => {
+                    btn.disabled = true;
+                    if (btn.dataset.value === correctAnswer) btn.classList.add('correct');
+                    else if (btn.classList.contains('selected') && !isCorrect) btn.classList.add('incorrect');
+                });
+            }
+            if (isCorrect) { quizData.score++; quizData.totalPoints += points; card.querySelector('.feedback.correct').classList.add('show'); }
+            else { card.querySelector('.feedback.incorrect').classList.add('show'); }
+            quizData.answered.add(questionNum);
+            card.querySelector('.submit-btn:not(.next-btn)').style.display = 'none';
+            card.querySelector('.next-btn').style.display = 'inline-block';
+        }
+        function nextQuestion() {
+            const currentCard = document.querySelector('.question-card.active');
+            currentCard.classList.remove('active');
+            quizData.currentQuestion++;
+            if (quizData.currentQuestion === 6) { document.getElementById('midBreak').style.display = 'block'; setTimeout(() => { document.getElementById('midBreak').style.display = 'none'; }, 2000); }
+            if (quizData.currentQuestion <= quizData.totalQuestions) {
+                const nextCard = document.querySelector(`[data-question="${quizData.currentQuestion}"]`);
+                nextCard.classList.add('active');
+                document.getElementById('currentQ').textContent = quizData.currentQuestion;
+                document.getElementById('progressFill').style.width = (quizData.currentQuestion / quizData.totalQuestions * 100) + '%';
+            } else { showResults(); }
+        }
+        function showResults() {
+            document.getElementById('results').classList.add('show');
+            document.getElementById('resultsScore').textContent = `${quizData.score}/${quizData.totalQuestions}`;
+            document.getElementById('resultsEquity').textContent = `${quizData.totalPoints.toFixed(1)} HED Earned`;
+            const percentage = (quizData.score / quizData.totalQuestions) * 100;
+            let title, message;
+            if (percentage === 100) { title = 'Master Craftsman!'; message = 'Perfect! You\'ve mastered the home stretch!'; }
+            else if (percentage >= 80) { title = 'Journeyman Builder!'; message = 'Excellent! Randy would be proud of your knowledge.'; }
+            else if (percentage >= 60) { title = 'Apprentice!'; message = 'Passing! Mark\'s goth phase deserves another look.'; }
+            else if (percentage >= 40) { title = 'Weekend Warrior'; message = 'More I-Thou understanding needed!'; }
+            else { title = 'Tim After a Disaster'; message = 'Back to Season 7 - the home stretch awaits!'; }
+            document.getElementById('resultsTitle').textContent = title;
+            document.getElementById('resultsMessage').textContent = message;
+        }
+    </script>
+</body>
+</html>

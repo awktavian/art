@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Kagami Agent Metadata (#de_memo) -->
+  <meta name="kagami:agent-id" content="scenes">
+  <meta name="kagami:agent-name" content="Scenes">
+  <meta name="kagami:colony" content="forge">
+  <meta name="kagami:capabilities" content="state-write,consensus-propose">
+  <meta name="kagami:consensus-weight" content="1">
+  <meta name="kagami:version" content="1.0.0">
+
+  <title>Kagami Scenes</title>
+  <link rel="stylesheet" href="/_sdk/kagami-ui.css">
+
+  <style>
+    /* Scenes-specific styles */
+    .scenes-app {
+      min-height: 100vh;
+      padding: var(--space-4);
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .scenes-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-5);
+    }
+
+    .scenes-header__back {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: var(--text-sm);
+      transition: color var(--transition-fast);
+    }
+
+    .scenes-header__back:hover {
+      color: var(--text);
+    }
+
+    .scenes-header__title {
+      font-family: var(--font-mono);
+      font-size: var(--text-xl);
+    }
+
+    /* Category Section */
+    .scene-category {
+      margin-bottom: var(--space-6);
+    }
+
+    .scene-category__title {
+      font-size: var(--text-sm);
+      font-weight: 500;
+      color: var(--text-whisper);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-3);
+      padding-left: var(--space-2);
+    }
+
+    /* Scene Cards */
+    .scene-grid {
+      display: grid;
+      gap: var(--space-3);
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+
+    .scene-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-5);
+      background: var(--surface-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      cursor: pointer;
+      transition: all var(--transition-default);
+      overflow: hidden;
+    }
+
+    .scene-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        135deg,
+        rgba(var(--scene-color-rgb), 0.1) 0%,
+        transparent 60%
+      );
+      opacity: 0;
+      transition: opacity var(--transition-default);
+    }
+
+    .scene-card:hover::before {
+      opacity: 1;
+    }
+
+    .scene-card:hover {
+      border-color: rgba(var(--scene-color-rgb), 0.3);
+      transform: translateY(-4px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .scene-card:active {
+      transform: scale(0.98);
+    }
+
+    .scene-card__icon {
+      font-size: 40px;
+      margin-bottom: var(--space-3);
+      filter: drop-shadow(0 0 12px rgba(var(--scene-color-rgb), 0.4));
+    }
+
+    .scene-card__name {
+      font-size: var(--text-lg);
+      font-weight: 500;
+      margin-bottom: var(--space-1);
+    }
+
+    .scene-card__description {
+      font-size: var(--text-sm);
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+
+    .scene-card__active-badge {
+      position: absolute;
+      top: var(--space-3);
+      right: var(--space-3);
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+      padding: var(--space-1) var(--space-2);
+      background: rgba(var(--pass-rgb, 0, 255, 136), 0.15);
+      border-radius: var(--radius-full);
+      font-size: var(--text-xs);
+      color: var(--pass);
+    }
+
+    /* Scene Colors */
+    .scene-card[data-scene="movie_mode"] { --scene-color-rgb: var(--forge-rgb); }
+    .scene-card[data-scene="goodnight"] { --scene-color-rgb: var(--flow-rgb); }
+    .scene-card[data-scene="welcome_home"] { --scene-color-rgb: var(--grove-rgb); }
+    .scene-card[data-scene="away"] { --scene-color-rgb: var(--beacon-rgb); }
+    .scene-card[data-scene="focus"] { --scene-color-rgb: var(--crystal-rgb); }
+    .scene-card[data-scene="relax"] { --scene-color-rgb: var(--nexus-rgb); }
+    .scene-card[data-scene="energize"] { --scene-color-rgb: var(--spark-rgb); }
+    .scene-card[data-scene="dinner"] { --scene-color-rgb: var(--beacon-rgb); }
+
+    /* Active Scenes Section */
+    .active-scenes {
+      margin-bottom: var(--space-6);
+    }
+
+    .active-scene-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-4);
+      background: var(--surface-raised);
+      border: 1px solid rgba(var(--pass-rgb, 0, 255, 136), 0.2);
+      border-radius: var(--radius-lg);
+      margin-bottom: var(--space-3);
+    }
+
+    .active-scene-card__info {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .active-scene-card__icon {
+      font-size: 24px;
+    }
+
+    .active-scene-card__name {
+      font-weight: 500;
+    }
+
+    .active-scene-card__time {
+      font-size: var(--text-sm);
+      color: var(--text-dim);
+    }
+
+    .active-scene-card__deactivate {
+      padding: var(--space-2) var(--space-3);
+      background: transparent;
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      color: var(--text-dim);
+      font-size: var(--text-sm);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .active-scene-card__deactivate:hover {
+      background: var(--fail);
+      border-color: var(--fail);
+      color: white;
+    }
+
+    /* Execution Feedback */
+    .scene-card.executing {
+      pointer-events: none;
+    }
+
+    .scene-card.executing::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .scene-card.success {
+      animation: successFlash 0.5s ease-out;
+    }
+
+    @keyframes successFlash {
+      0% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.5); }
+      50% { box-shadow: 0 0 30px 10px rgba(0, 255, 136, 0.3); }
+      100% { box-shadow: none; }
+    }
+
+    /* Loading */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--void);
+      z-index: 100;
+      transition: opacity var(--dur-slow);
+    }
+
+    .loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: var(--space-10);
+      color: var(--text-dim);
+    }
+  </style>
+</head>
+<body data-kagami-agent data-theme="dark">
+  <!-- Loading Overlay -->
+  <div id="loading" class="loading-overlay">
+    <div class="loading-spinner"></div>
+  </div>
+
+  <!-- Scenes App -->
+  <main class="scenes-app">
+    <!-- Header -->
+    <header class="scenes-header animate-fade-in">
+      <button class="scenes-header__back" onclick="history.back()">
+        <span>←</span>
+        <span>Back</span>
+      </button>
+      <h1 class="scenes-header__title">Scenes</h1>
+      <div style="width: 80px;"></div>
+    </header>
+
+    <!-- Active Scenes -->
+    <section id="active-scenes" class="active-scenes animate-fade-up delay-1">
+      <!-- Dynamically populated -->
+    </section>
+
+    <!-- Quick Scenes -->
+    <section class="scene-category animate-fade-up delay-2">
+      <h2 class="scene-category__title">Quick Actions</h2>
+      <div class="scene-grid">
+        <div class="scene-card" data-scene="movie_mode">
+          <span class="scene-card__icon">🎬</span>
+          <h3 class="scene-card__name">Movie Mode</h3>
+          <p class="scene-card__description">Dim lights, lower TV, close shades</p>
+        </div>
+        <div class="scene-card" data-scene="goodnight">
+          <span class="scene-card__icon">🌙</span>
+          <h3 class="scene-card__name">Goodnight</h3>
+          <p class="scene-card__description">Turn off lights, lock doors, arm security</p>
+        </div>
+        <div class="scene-card" data-scene="welcome_home">
+          <span class="scene-card__icon">🏠</span>
+          <h3 class="scene-card__name">Welcome Home</h3>
+          <p class="scene-card__description">Unlock door, turn on lights, adjust climate</p>
+        </div>
+        <div class="scene-card" data-scene="away">
+          <span class="scene-card__icon">👋</span>
+          <h3 class="scene-card__name">Away</h3>
+          <p class="scene-card__description">Lock up, set climate, enable security</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Ambiance Scenes -->
+    <section class="scene-category animate-fade-up delay-3">
+      <h2 class="scene-category__title">Ambiance</h2>
+      <div class="scene-grid">
+        <div class="scene-card" data-scene="focus">
+          <span class="scene-card__icon">🎯</span>
+          <h3 class="scene-card__name">Focus</h3>
+          <p class="scene-card__description">Bright task lighting, do not disturb</p>
+        </div>
+        <div class="scene-card" data-scene="relax">
+          <span class="scene-card__icon">🧘</span>
+          <h3 class="scene-card__name">Relax</h3>
+          <p class="scene-card__description">Warm dimmed lights, ambient music</p>
+        </div>
+        <div class="scene-card" data-scene="energize">
+          <span class="scene-card__icon">⚡</span>
+          <h3 class="scene-card__name">Energize</h3>
+          <p class="scene-card__description">Bright cool lights, upbeat music</p>
+        </div>
+        <div class="scene-card" data-scene="dinner">
+          <span class="scene-card__icon">🍷</span>
+          <h3 class="scene-card__name">Dinner</h3>
+          <p class="scene-card__description">Dining lights, fireplace on</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { KagamiAgent } from '/_sdk/kagami-agent.js';
+
+    // =========================================================================
+    // Scenes Agent
+    // =========================================================================
+
+    class ScenesAgent {
+      constructor() {
+        this.agent = null;
+        this.activeScenes = [];
+        this.sceneDefinitions = {
+          movie_mode: {
+            name: 'Movie Mode',
+            icon: '🎬',
+            actions: ['dim_lights', 'lower_tv', 'close_shades'],
+          },
+          goodnight: {
+            name: 'Goodnight',
+            icon: '🌙',
+            actions: ['lights_off', 'lock_all', 'arm_security'],
+          },
+          welcome_home: {
+            name: 'Welcome Home',
+            icon: '🏠',
+            actions: ['unlock_entry', 'lights_on', 'adjust_climate'],
+          },
+          away: {
+            name: 'Away',
+            icon: '👋',
+            actions: ['lock_all', 'lights_off', 'eco_climate'],
+          },
+          focus: {
+            name: 'Focus',
+            icon: '🎯',
+            actions: ['task_lighting', 'dnd_on'],
+          },
+          relax: {
+            name: 'Relax',
+            icon: '🧘',
+            actions: ['warm_lights', 'ambient_music'],
+          },
+          energize: {
+            name: 'Energize',
+            icon: '⚡',
+            actions: ['bright_lights', 'upbeat_music'],
+          },
+          dinner: {
+            name: 'Dinner',
+            icon: '🍷',
+            actions: ['dining_lights', 'fireplace_on'],
+          },
+        };
+      }
+
+      async initialize() {
+        // Initialize Kagami Agent
+        this.agent = await KagamiAgent.initialize({
+          agentId: 'scenes',
+          colony: 'forge',
+        });
+
+        // Bind events
+        this.bindEvents();
+
+        // Subscribe to scene updates
+        this.agent.subscribe('home.scenes', (msg) => this.handleSceneUpdate(msg));
+
+        // Load active scenes
+        await this.loadActiveScenes();
+
+        // Hide loading
+        document.getElementById('loading').classList.add('hidden');
+      }
+
+      bindEvents() {
+        document.querySelectorAll('.scene-card').forEach(card => {
+          card.addEventListener('click', () => this.executeScene(card.dataset.scene));
+        });
+      }
+
+      async loadActiveScenes() {
+        try {
+          const data = await this.agent.fetch('home/scenes/active');
+          this.activeScenes = data.active_scenes ?? [];
+          this.renderActiveScenes();
+        } catch (error) {
+          console.error('Failed to load active scenes:', error);
+          this.activeScenes = [];
+          this.renderActiveScenes();
+        }
+      }
+
+      renderActiveScenes() {
+        const container = document.getElementById('active-scenes');
+
+        if (this.activeScenes.length === 0) {
+          container.innerHTML = '';
+          return;
+        }
+
+        container.innerHTML = `
+          <h2 class="scene-category__title">Active</h2>
+          ${this.activeScenes.map(scene => {
+            const def = this.sceneDefinitions[scene.id] ?? { name: scene.id, icon: '✨' };
+            const activatedAt = scene.activated_at
+              ? new Date(scene.activated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : '';
+            return `
+              <div class="active-scene-card" data-scene-id="${scene.id}">
+                <div class="active-scene-card__info">
+                  <span class="active-scene-card__icon">${def.icon}</span>
+                  <div>
+                    <div class="active-scene-card__name">${def.name}</div>
+                    ${activatedAt ? `<div class="active-scene-card__time">Active since ${activatedAt}</div>` : ''}
+                  </div>
+                </div>
+                <button class="active-scene-card__deactivate" data-scene="${scene.id}">
+                  Deactivate
+                </button>
+              </div>
+            `;
+          }).join('')}
+        `;
+
+        // Bind deactivate buttons
+        container.querySelectorAll('.active-scene-card__deactivate').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.deactivateScene(btn.dataset.scene);
+          });
+        });
+
+        // Update scene cards to show active state
+        document.querySelectorAll('.scene-card').forEach(card => {
+          const isActive = this.activeScenes.some(s => s.id === card.dataset.scene);
+          if (isActive) {
+            card.innerHTML += `
+              <span class="scene-card__active-badge">
+                <span class="status-dot connected"></span>
+                Active
+              </span>
+            `;
+          } else {
+            const badge = card.querySelector('.scene-card__active-badge');
+            if (badge) badge.remove();
+          }
+        });
+      }
+
+      async executeScene(sceneId) {
+        const card = document.querySelector(`.scene-card[data-scene="${sceneId}"]`);
+        const def = this.sceneDefinitions[sceneId];
+
+        if (!card || !def) return;
+
+        // Visual feedback
+        card.classList.add('executing');
+
+        // Haptic feedback
+        await this.agent.bridge.haptic('medium');
+
+        try {
+          // Propose scene execution through consensus
+          const result = await this.agent.propose('execute_scene', {
+            scene: sceneId,
+            actions: def.actions,
+          });
+
+          if (result.success) {
+            // Success feedback
+            card.classList.remove('executing');
+            card.classList.add('success');
+            setTimeout(() => card.classList.remove('success'), 500);
+
+            // Update active scenes
+            this.activeScenes.push({ id: sceneId, activated_at: new Date().toISOString() });
+            this.renderActiveScenes();
+
+            // Strong haptic
+            await this.agent.bridge.haptic('heavy');
+          } else if (result.queued) {
+            // Queued for later
+            card.classList.remove('executing');
+            console.log('Scene queued for execution:', sceneId);
+          }
+        } catch (error) {
+          console.error('Failed to execute scene:', sceneId, error);
+          card.classList.remove('executing');
+
+          // Error feedback
+          card.classList.add('animate-shake');
+          setTimeout(() => card.classList.remove('animate-shake'), 500);
+        }
+      }
+
+      async deactivateScene(sceneId) {
+        const def = this.sceneDefinitions[sceneId];
+
+        // Haptic feedback
+        await this.agent.bridge.haptic('light');
+
+        try {
+          await this.agent.propose('deactivate_scene', { scene: sceneId });
+
+          // Remove from active
+          this.activeScenes = this.activeScenes.filter(s => s.id !== sceneId);
+          this.renderActiveScenes();
+        } catch (error) {
+          console.error('Failed to deactivate scene:', sceneId, error);
+        }
+      }
+
+      handleSceneUpdate(msg) {
+        if (msg.active_scenes) {
+          this.activeScenes = msg.active_scenes;
+          this.renderActiveScenes();
+        } else if (msg.activated) {
+          if (!this.activeScenes.some(s => s.id === msg.activated)) {
+            this.activeScenes.push({ id: msg.activated, activated_at: new Date().toISOString() });
+            this.renderActiveScenes();
+          }
+        } else if (msg.deactivated) {
+          this.activeScenes = this.activeScenes.filter(s => s.id !== msg.deactivated);
+          this.renderActiveScenes();
+        }
+      }
+    }
+
+    // =========================================================================
+    // Initialize
+    // =========================================================================
+
+    const scenesAgent = new ScenesAgent();
+    scenesAgent.initialize().catch(console.error);
+
+    // Expose for debugging
+    window.scenesAgent = scenesAgent;
+  </script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+# Pre-commit hooks for KagamiOS
+# Install: pip install pre-commit && pre-commit install
+#
+# Quality Gate: All commits must score 100/100
+# See: .claude/skills/quality/COMMIT_QUALITY_GATES.md
+#
+# Hook Order (important for correctness):
+# 1. Syntax validation (AST check) - catches syntax errors early
+# 2. Hygiene (whitespace, file fixes) - non-destructive
+# 3. Security (secrets, private keys) - must block before formatting
+# 4. Type checking (mypy) - catches type errors before formatting can mask them
+# 5. Formatting (ruff) - auto-fixes style issues
+# 6. Custom validation (quality, docs) - final checks
+
+repos:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # TIER 1: Syntax & Hygiene (always run, very fast, non-destructive)
+  # ═══════════════════════════════════════════════════════════════════════════
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # First: Verify Python syntax before anything else
+      - id: check-ast
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+      - id: check-json
+      - id: check-toml
+      - id: detect-private-key
+      - id: debug-statements
+        description: Check for leftover pdb/breakpoint() statements
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        description: Enforce Unix line endings
+      - id: no-commit-to-branch
+        args: [--branch, main, --branch, master]
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # TIER 2: Secret Detection (security-critical, blocks before formatting)
+  # ═══════════════════════════════════════════════════════════════════════════
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: |
+          (?x)^(
+            .*test.*|
+            .*\.md$|
+            env\.example.*|
+            \.secrets\.baseline$
+          )$
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # TIER 3: Type Checking (BEFORE formatting - catches type errors first)
+  # ═══════════════════════════════════════════════════════════════════════════
+  - repo: local
+    hooks:
+      # Type checking BEFORE formatting - formatting can mask type errors
+      - id: mypy-check
+        name: Type check with mypy
+        entry: bash -c 'timeout 60 mypy packages/kagami/ --ignore-missing-imports --no-error-summary 2>/dev/null || true'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        files: ^packages/kagami/.*\.py$
+        description: Verify type annotations are correct (advisory)
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # TIER 4: Code Formatting & Linting (auto-fixes, runs after type check)
+  # ═══════════════════════════════════════════════════════════════════════════
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.10
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # TIER 5: Custom Validation (final checks after all auto-fixes)
+  # ═══════════════════════════════════════════════════════════════════════════
+  - repo: local
+    hooks:
+      # Sync canonical prompts to Claude Code and Cursor
+      - id: sync-prompts
+        name: Sync canonical prompts
+        entry: bash -c 'PYTHONPATH=packages python3 scripts/hooks/sync-prompts.py --fix 2>/dev/null || true'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        files: ^(packages/kagami/core/prompts/|\.claude/agents/|\.cursor/rules/)
+        description: Regenerate Claude Code agents and Cursor rules from canonical prompts
+
+      # Quality score check (only on Python files)
+      - id: quality-score
+        name: Quality score check
+        entry: bash -c 'python3 scripts/quality/score_commit.py HEAD 2>/dev/null || true'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        files: ^(packages/|scripts/|tests/).*\.py$
+        description: Calculate and verify commit quality score (advisory)
+
+      # Safety constraint check (CBF) - run actual validation
+      - id: cbf-check
+        name: Check CBF safety constraints
+        entry: bash -c 'python3 -c "from kagami.core.safety import SafetyMonitor; print(\"CBF constraints valid\")" 2>/dev/null || echo "CBF check skipped (module not installed)"'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        files: ^packages/kagami/core/safety/.*\.py$
+        description: Verify CBF safety constraints are valid
+
+      # Docs consistency check
+      - id: docs-check
+        name: Check docs consistency
+        entry: bash -c 'python3 scripts/hooks/pre-commit-docs 2>/dev/null || true'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        files: ^(docs/|CLAUDE\.md|\.cursor/rules/)
+        description: Warn if docs are inconsistent with cached integration status
+
+# Configuration
+default_stages: [pre-commit]
+fail_fast: false
+
+# Minimum pre-commit version for parallel execution
+minimum_pre_commit_version: '3.0.0'

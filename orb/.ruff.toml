@@ -1,0 +1,72 @@
+# Ruff configuration for K os
+# This overrides pyproject.toml settings for clearer control
+
+line-length = 100
+target-version = "py311"
+
+# Exclude archived code from linting
+exclude = [
+    "tools/.archive",
+]
+
+[lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "A",    # flake8-builtins
+    "S",    # flake8-bandit (security)
+    "N",    # pep8-naming
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "E402",  # Module imports not at top - Kagami uses lazy/conditional imports
+    "E501",  # Line too long - handled by black
+    "E741",  # Ambiguous variable names
+    "B008",  # FastAPI Depends() in default args is the standard pattern
+    "B023",  # Loop variable closure - intentional in some async patterns
+    "S101",  # Use of assert - legitimate in tests and internal assertions
+    "S104",  # Possible binding to all interfaces - intentional for dev servers
+    "S105",  # Possible hardcoded password - false positives on variable names
+    "S106",  # Possible hardcoded password - false positives on variable names
+    "S108",  # Probable insecure temp file - intentional for data pipelines
+    "S110",  # try-except-pass - intentional for optional features (OTel, metrics, state)
+    "S112",  # try-except-continue - intentional for graceful degradation
+    "S301",  # Pickle usage - intentional for model serialization
+    "S311",  # Standard pseudo-random generators - not crypto-sensitive contexts
+    "S324",  # Insecure hash (MD5/SHA1) - used for non-security checksums only
+    "S603",  # subprocess without shell=True - false positives
+    "S607",  # Starting process with partial path - false positives
+    "S608",  # SQL injection - using parameterized queries, false positives
+    "A001",  # Shadowing built-in - intentional for API compatibility (id, type, input)
+    "A002",  # Argument shadows built-in - intentional for API compatibility
+    "N801",  # Class name CapWords - some classes follow external conventions
+    "N802",  # Function name should be lowercase - conflicts with Pydantic validators
+    "N803",  # Argument name lowercase - math uses uppercase (X, A, B, etc.)
+    "N804",  # First arg not cls - intentional for some metaclasses
+    "N806",  # Variable in function should be lowercase - math variables use conventions
+    "N807",  # Function name ends with double underscore - dunder methods
+    "N811",  # Constant imported as non-constant - intentional aliasing
+    "N812",  # Lowercase imported as non-lowercase - torch.nn.functional as F is standard
+    "N813",  # CamelCase imported as lowercase - intentional aliasing
+    "N815",  # Variable in class scope mixedCase - Pydantic schema fields use camelCase for API
+    "N816",  # Variable in global scope mixedCase - configuration constants
+    "N817",  # CamelCase imported as acronym - intentional for common patterns (URF, etc.)
+    "N818",  # Exception name should end in Error - some exceptions use different conventions
+    "RUF001", # ambiguous-unicode-character-string - false positives in docstrings
+    "RUF002", # ambiguous-unicode-character-docstring - intentional use of mathematical symbols
+    "RUF003", # ambiguous-unicode-character-comment - mathematical notation (α, γ, ×) in comments
+    "RUF006", # asyncio.create_task without storing reference - fire-and-forget is intentional
+    "RUF012", # Mutable ClassVar - many class attrs are intentionally mutable singletons
+]
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]  # Unused imports OK in __init__ (public API)
+"tests/*" = ["F401", "F841", "F821", "S", "N", "RUF"]  # Relaxed rules in tests (unused vars, security, naming, ruff-specific)
+"**/lifespan*.py" = ["E402", "F401"]  # Lifecycle files use conditional imports
+"kagami/api/__init__.py" = ["F401"]  # App factory imports for side effects
+"kagami/vendor/*" = ["E402", "F401", "S", "N", "A"]  # Vendor code - all checks relaxed

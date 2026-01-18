@@ -1,0 +1,175 @@
+# Auto-Solver Workflow
+# Triggered by CI failures to create Linear issues and Slack alerts
+# Part of Nash equilibrium-optimized cross-service automation
+
+name: Auto-Solver
+
+on:
+  workflow_run:
+    workflows: ["ci", "Coverage Tracking"]
+    types:
+      - completed
+
+jobs:
+  analyze-failure:
+    name: Analyze and Route Failure
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install composio requests
+
+      - name: Create Linear Issue
+        env:
+          COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
+        run: |
+          python << 'EOF'
+          import os
+          import json
+          from composio import Composio
+
+          client = Composio()
+          accounts = client.connected_accounts.list()
+          linear_acc = next((a for a in accounts.items if a.toolkit.slug == "linear"), None)
+
+          if linear_acc:
+              # Get workflow details from GitHub event
+              workflow_name = "${{ github.event.workflow_run.name }}"
+              branch = "${{ github.event.workflow_run.head_branch }}"
+              sha = "${{ github.event.workflow_run.head_sha }}"[:8]
+              url = "${{ github.event.workflow_run.html_url }}"
+
+              result = client.tools.execute(
+                  slug="LINEAR_CREATE_LINEAR_ISSUE",
+                  arguments={
+                      "team_id": "e0d50215-abaa-452a-b2c4-791869719633",
+                      "title": f"[CI Failure] {workflow_name} failed on {branch}",
+                      "description": f"""## CI Failure Auto-Report
+
+          **Workflow:** {workflow_name}
+          **Branch:** {branch}
+          **Commit:** {sha}
+          **Link:** {url}
+
+          ---
+
+          **Colony:** 🌊 Flow
+          **Priority:** P1 (Auto-generated)
+
+          This issue was automatically created by the auto-solver workflow.
+          """,
+                      "priority": 1,
+                  },
+                  connected_account_id=linear_acc.id,
+                  dangerously_skip_version_check=True,
+              )
+
+              if result.get("successful"):
+                  data = result.get("data", {})
+                  issue = data.get("issueCreate", {}).get("issue", {})
+                  print(f"✅ Created Linear issue: {issue.get('identifier')}")
+              else:
+                  print(f"⚠️ Failed to create issue: {result.get('error')}")
+          EOF
+
+      - name: Send Slack Alert
+        env:
+          COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
+        run: |
+          python << 'EOF'
+          import os
+          from composio import Composio
+
+          client = Composio()
+          accounts = client.connected_accounts.list()
+          slack_acc = next((a for a in accounts.items if a.toolkit.slug == "slack"), None)
+
+          if slack_acc:
+              workflow_name = "${{ github.event.workflow_run.name }}"
+              branch = "${{ github.event.workflow_run.head_branch }}"
+              url = "${{ github.event.workflow_run.html_url }}"
+
+              result = client.tools.execute(
+                  slug="SLACK_SEND_MESSAGE",
+                  arguments={
+                      "channel": "general",  # or use a specific channel ID
+                      "text": f"🔴 *CI Failed*: {workflow_name} on `{branch}`\n<{url}|View Run>",
+                  },
+                  connected_account_id=slack_acc.id,
+                  dangerously_skip_version_check=True,
+              )
+
+              if result.get("successful"):
+                  print("✅ Sent Slack alert")
+              else:
+                  print(f"⚠️ Failed to send Slack: {result.get('error')}")
+          EOF
+
+  mark-success:
+    name: Log Success to Notion
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install composio requests
+
+      - name: Append to Notion Quality Log
+        env:
+          COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
+        run: |
+          python << 'EOF'
+          import os
+          from composio import Composio
+          from datetime import datetime
+
+          client = Composio()
+          accounts = client.connected_accounts.list()
+          notion_acc = next((a for a in accounts.items if a.toolkit.slug == "notion"), None)
+
+          if notion_acc:
+              workflow_name = "${{ github.event.workflow_run.name }}"
+              sha = "${{ github.event.workflow_run.head_sha }}"[:8]
+
+              result = client.tools.execute(
+                  slug="NOTION_APPEND_BLOCK_CHILDREN",
+                  arguments={
+                      "block_id": "27c75da1-e704-8012-9113-c74f1118bcef",
+                      "children": [{
+                          "object": "block",
+                          "type": "paragraph",
+                          "paragraph": {
+                              "rich_text": [{
+                                  "type": "text",
+                                  "text": {
+                                      "content": f"✅ [{datetime.now().strftime('%Y-%m-%d %H:%M')}] CI Pass: {workflow_name} ({sha})"
+                                  }
+                              }]
+                          }
+                      }]
+                  },
+                  connected_account_id=notion_acc.id,
+                  dangerously_skip_version_check=True,
+              )
+
+              if result.get("successful"):
+                  print("✅ Logged to Notion")
+              else:
+                  print(f"⚠️ Failed: {result.get('error')}")
+          EOF

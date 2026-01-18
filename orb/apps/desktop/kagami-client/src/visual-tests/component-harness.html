@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kagami Visual Test Harness</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Kagami Design System CSS -->
+  <link rel="stylesheet" href="../css/design-tokens.generated.css">
+  <link rel="stylesheet" href="../css/prism-tokens.css">
+  <link rel="stylesheet" href="../css/design-system.css">
+  <link rel="stylesheet" href="../css/prism-components.css">
+  <link rel="stylesheet" href="../css/prism-effects.css">
+  <link rel="stylesheet" href="../css/components/index.css">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --harness-bg: #07060B;
+      --harness-bg-light: #F5F5F7;
+      --harness-section-gap: 48px;
+      --harness-component-gap: 24px;
+    }
+
+    html.light {
+      --harness-bg: var(--harness-bg-light);
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--harness-bg);
+      color: var(--prism-text);
+      min-height: 100vh;
+      padding: 32px;
+    }
+
+    /* Controls Panel */
+    .controls {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 1000;
+      display: flex;
+      gap: 8px;
+      padding: 12px;
+      background: var(--prism-surface);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--prism-border);
+      border-radius: var(--prism-radius-lg);
+    }
+
+    .controls button {
+      padding: 8px 16px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      background: var(--prism-surface);
+      border: 1px solid var(--prism-border);
+      border-radius: var(--prism-radius-md);
+      color: var(--prism-text);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .controls button:hover {
+      background: var(--prism-surface-elevated);
+    }
+
+    .controls button.active {
+      background: var(--prism-beacon);
+      color: black;
+      border-color: var(--prism-beacon);
+    }
+
+    /* Test Section */
+    .test-section {
+      margin-bottom: var(--harness-section-gap);
+      padding-bottom: var(--harness-section-gap);
+      border-bottom: 1px solid var(--prism-border-subtle);
+    }
+
+    .test-section:last-child {
+      border-bottom: none;
+    }
+
+    .test-section__title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--prism-text);
+    }
+
+    .test-section__subtitle {
+      font-size: 0.875rem;
+      color: var(--prism-text-secondary);
+      margin-bottom: 24px;
+    }
+
+    /* Test Grid */
+    .test-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: var(--harness-component-gap);
+    }
+
+    .test-grid--wide {
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    }
+
+    /* Test Cell */
+    .test-cell {
+      padding: 24px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: var(--prism-radius-lg);
+    }
+
+    .test-cell__label {
+      font-size: 0.6875rem;
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--prism-text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 16px;
+    }
+
+    .test-cell__content {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .test-cell__content--col {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    /* State Rows */
+    .state-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .state-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .state-label {
+      min-width: 100px;
+      font-size: 0.75rem;
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--prism-text-tertiary);
+    }
+
+    /* Screenshot target markers */
+    [data-screenshot] {
+      position: relative;
+    }
+
+    [data-screenshot]::before {
+      content: attr(data-screenshot);
+      position: absolute;
+      top: -20px;
+      left: 0;
+      font-size: 0.625rem;
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--prism-beacon);
+      opacity: 0.5;
+    }
+
+    /* Inline state forcing */
+    .force-hover { }
+    .force-focus { }
+    .force-active { }
+    .force-disabled { opacity: 0.5; pointer-events: none; }
+
+    /* Brand colors demo */
+    .colony-swatch {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--prism-radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+    }
+
+    /* Spacing demo */
+    .spacing-demo {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+
+    .spacing-block {
+      background: var(--prism-beacon);
+      opacity: 0.6;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body class="prism-platform-desktop">
+
+  <!-- Controls -->
+  <div class="controls">
+    <button id="toggle-dark" class="active">Dark</button>
+    <button id="toggle-light">Light</button>
+    <button id="toggle-motion">Motion: On</button>
+  </div>
+
+  <!-- Header -->
+  <header style="margin-bottom: 48px; text-align: center;">
+    <h1 style="font-size: 2.5rem; font-weight: 700; margin-bottom: 8px;">
+      Kagami Visual Test Harness
+    </h1>
+    <p style="color: var(--prism-text-secondary);">
+      All components • All states • All variants • Screenshot-ready
+    </p>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SECTION: BUTTONS
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="test-section" id="buttons" data-screenshot="buttons">
+    <h2 class="test-section__title">Buttons</h2>
+    <p class="test-section__subtitle">Actions with 8 states × 4 variants × 5 sizes × 7 colors</p>
+
+    <!-- Default State -->
+    <div class="test-cell" data-screenshot="btn-default">
+      <div class="test-cell__label">Default State</div>
+      <div class="test-cell__content">
+        <button class="prism-btn">Default</button>
+        <button class="prism-btn prism-btn--solid">Solid</button>
+        <button class="prism-btn prism-btn--outline">Outline</button>
+        <button class="prism-btn prism-btn--ghost">Ghost</button>
+        <button class="prism-btn prism-btn--link">Link</button>
+      </div>
+    </div>
+
+    <!-- Sizes -->
+    <div class="test-cell" data-screenshot="btn-sizes">
+      <div class="test-cell__label">Sizes</div>
+      <div class="test-cell__content" style="align-items: center;">
+        <button class="prism-btn prism-btn--solid prism-btn--xs" data-colony="beacon">XS</button>
+        <button class="prism-btn prism-btn--solid prism-btn--sm" data-colony="beacon">Small</button>
+        <button class="prism-btn prism-btn--solid" data-colony="beacon">Medium</button>
+        <button class="prism-btn prism-btn--solid prism-btn--lg" data-colony="beacon">Large</button>
+        <button class="prism-btn prism-btn--solid prism-btn--xl" data-colony="beacon">Extra Large</button>
+      </div>
+    </div>
+
+    <!-- Brand Colors -->
+    <div class="test-cell" data-screenshot="btn-colonies">
+      <div class="test-cell__label">Brand Colors (Solid)</div>
+      <div class="test-cell__content">
+        <button class="prism-btn prism-btn--solid" data-colony="spark">🔥 Spark</button>
+        <button class="prism-btn prism-btn--solid" data-colony="forge">⚒️ Forge</button>
+        <button class="prism-btn prism-btn--solid" data-colony="flow">🌊 Flow</button>
+        <button class="prism-btn prism-btn--solid" data-colony="nexus">🔗 Nexus</button>
+        <button class="prism-btn prism-btn--solid" data-colony="beacon">🗼 Beacon</button>
+        <button class="prism-btn prism-btn--solid" data-colony="grove">🌿 Grove</button>
+        <button class="prism-btn prism-btn--solid" data-colony="crystal">💎 Crystal</button>
+      </div>
+    </div>
+
+    <!-- States -->
+    <div class="test-cell" data-screenshot="btn-states">
+      <div class="test-cell__label">States</div>
+      <div class="test-cell__content">
+        <button class="prism-btn prism-btn--solid" data-colony="beacon">Default</button>
+        <button class="prism-btn prism-btn--solid" data-colony="beacon" disabled>Disabled</button>
+        <button class="prism-btn prism-btn--solid prism-btn--loading" data-colony="beacon">
+          <span class="prism-btn__text">Loading</span>
+          <span class="prism-btn__spinner"></span>
+        </button>
+        <button class="prism-btn prism-btn--error">Error</button>
+        <button class="prism-btn prism-btn--success">Success</button>
+      </div>
+    </div>
+
+    <!-- With Icons -->
+    <div class="test-cell" data-screenshot="btn-icons">
+      <div class="test-cell__label">With Icons</div>
+      <div class="test-cell__content">
+        <button class="prism-btn prism-btn--solid prism-btn--icon-left" data-colony="beacon">
+          <span class="prism-btn__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </span>
+          <span class="prism-btn__text">Add Item</span>
+        </button>
+        <button class="prism-btn prism-btn--solid prism-btn--icon-right" data-colony="beacon">
+          <span class="prism-btn__text">Continue</span>
+          <span class="prism-btn__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </span>
+        </button>
+        <button class="prism-btn prism-btn--solid prism-btn--icon-only" data-colony="beacon">
+          <span class="prism-btn__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 11H5M19 11C20.1046 11 21 11.8954 21 13V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V13C3 11.8954 3.89543 11 5 11M19 11V9C19 7.89543 18.1046 7 17 7M5 11V9C5 7.89543 5.89543 7 7 7M7 7V5C7 3.89543 7.89543 3 9 3H15C16.1046 3 17 3.89543 17 5V7M7 7H17"/>
+            </svg>
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Button Group -->
+    <div class="test-cell" data-screenshot="btn-group">
+      <div class="test-cell__label">Button Group</div>
+      <div class="test-cell__content">
+        <div class="prism-btn-group">
+          <button class="prism-btn">Left</button>
+          <button class="prism-btn">Center</button>
+          <button class="prism-btn">Right</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SECTION: TEXT INPUTS
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="test-section" id="inputs" data-screenshot="inputs">
+    <h2 class="test-section__title">Text Inputs</h2>
+    <p class="test-section__subtitle">Form inputs with labels, helpers, states, and variants</p>
+
+    <div class="test-grid">
+      <!-- Default -->
+      <div class="test-cell" data-screenshot="input-default">
+        <div class="test-cell__label">Default</div>
+        <div class="test-cell__content test-cell__content--col">
+          <div class="prism-text-field">
+            <label class="prism-text-field__label">Email Address</label>
+            <div class="prism-text-field__container">
+              <input type="email" class="prism-text-field__input" placeholder="you@example.com">
+            </div>
+            <span class="prism-text-field__helper">We'll never share your email.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- With Icons -->
+      <div class="test-cell" data-screenshot="input-icons">
+        <div class="test-cell__label">With Icons</div>
+        <div class="test-cell__content test-cell__content--col">
+          <div class="prism-text-field">
+            <label class="prism-text-field__label">Search</label>
+            <div class="prism-text-field__container">
+              <span class="prism-text-field__prefix">
+                <span class="prism-text-field__icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="M21 21l-4.35-4.35"/>
+                  </svg>
+                </span>
+              </span>
+              <input type="text" class="prism-text-field__input" placeholder="Search...">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div class="test-cell" data-screenshot="input-error">
+        <div class="test-cell__label">Error State</div>
+        <div class="test-cell__content test-cell__content--col">
+          <div class="prism-text-field prism-text-field--error">
+            <label class="prism-text-field__label">Password</label>
+            <div class="prism-text-field__container">
+              <input type="password" class="prism-text-field__input" value="short">
+            </div>
+            <span class="prism-text-field__helper">Password must be at least 8 characters.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Success State -->
+      <div class="test-cell" data-screenshot="input-success">
+        <div class="test-cell__label">Success State</div>
+        <div class="test-cell__content test-cell__content--col">
+          <div class="prism-text-field prism-text-field--success">
+            <label class="prism-text-field__label">Username</label>
+            <div class="prism-text-field__container">
+              <input type="text" class="prism-text-field__input" value="timjacoby">
+            </div>
+            <span class="prism-text-field__helper">Username is available!</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Disabled -->
+      <div class="test-cell" data-screenshot="input-disabled">
+        <div class="test-cell__label">Disabled</div>
+        <div class="test-cell__content test-cell__content--col">
+          <div class="prism-text-field prism-text-field--disabled">
+            <label class="prism-text-field__label">Read Only</label>
+            <div class="prism-text-field__container prism-text-field__container--disabled">
+              <input type="text" class="prism-text-field__input" value="Cannot edit" disabled>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sizes -->
+      <div class="test-cell" data-screenshot="input-sizes">
+        <div class="test-cell__label">Sizes</div>
+        <div class="test-cell__content test-cell__content--col" style="gap: 16px;">
+          <div class="prism-text-field prism-text-field--sm">
+            <div class="prism-text-field__container">
+              <input type="text" class="prism-text-field__input" placeholder="Small">
+            </div>
+          </div>
+          <div class="prism-text-field">
+            <div class="prism-text-field__container">
+              <input type="text" class="prism-text-field__input" placeholder="Medium (default)">
+            </div>
+          </div>
+          <div class="prism-text-field prism-text-field--lg">
+            <div class="prism-text-field__container">
+              <input type="text" class="prism-text-field__input" placeholder="Large">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SECTION: FEEDBACK
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="test-section" id="feedback" data-screenshot="feedback">
+    <h2 class="test-section__title">Feedback Components</h2>
+    <p class="test-section__subtitle">Toasts, alerts, progress, and loading states</p>
+
+    <div class="test-grid test-grid--wide">
+      <!-- Toasts -->
+      <div class="test-cell" data-screenshot="toasts">
+        <div class="test-cell__label">Toasts</div>
+        <div class="test-cell__content test-cell__content--col" style="gap: 12px;">
+          <div class="prism-toast prism-toast--info" style="position: relative; width: 100%;">
+            <span class="prism-toast__icon">ℹ️</span>
+            <div class="prism-toast__content">
+              <p class="prism-toast__title">Information</p>
+              <p class="prism-toast__message">This is an info toast message.</p>
+            </div>
+          </div>
+          <div class="prism-toast prism-toast--success" style="position: relative; width: 100%;">
+            <span class="prism-toast__icon">✓</span>
+            <div class="prism-toast__content">
+              <p class="prism-toast__title">Success!</p>
+              <p class="prism-toast__message">Your changes have been saved.</p>
+            </div>
+          </div>
+          <div class="prism-toast prism-toast--warning" style="position: relative; width: 100%;">
+            <span class="prism-toast__icon">⚠️</span>
+            <div class="prism-toast__content">
+              <p class="prism-toast__title">Warning</p>
+              <p class="prism-toast__message">Please review before continuing.</p>
+            </div>
+          </div>
+          <div class="prism-toast prism-toast--error" style="position: relative; width: 100%;">
+            <span class="prism-toast__icon">✕</span>
+            <div class="prism-toast__content">
+              <p class="prism-toast__title">Error</p>
+              <p class="prism-toast__message">Something went wrong. Please try again.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alerts -->
+      <div class="test-cell" data-screenshot="alerts">
+        <div class="test-cell__label">Alerts (Inline)</div>
+        <div class="test-cell__content test-cell__content--col" style="gap: 12px;">
+          <div class="prism-alert prism-alert--info">
+            <span class="prism-alert__icon">ℹ️</span>
+            <div class="prism-alert__content">
+              <p class="prism-alert__title">Did you know?</p>
+              <p class="prism-alert__message">You can use keyboard shortcuts to navigate faster.</p>
+            </div>
+          </div>
+          <div class="prism-alert prism-alert--success">
+            <span class="prism-alert__icon">✓</span>
+            <div class="prism-alert__content">
+              <p class="prism-alert__message">Profile updated successfully.</p>
+            </div>
+          </div>
+          <div class="prism-alert prism-alert--warning">
+            <span class="prism-alert__icon">⚠️</span>
+            <div class="prism-alert__content">
+              <p class="prism-alert__message">Your session will expire in 5 minutes.</p>
+            </div>
+          </div>
+          <div class="prism-alert prism-alert--error">
+            <span class="prism-alert__icon">✕</span>
+            <div class="prism-alert__content">
+              <p class="prism-alert__message">Failed to connect to server.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress Bars -->
+    <div class="test-cell" style="margin-top: 24px;" data-screenshot="progress">
+      <div class="test-cell__label">Progress</div>
+      <div class="test-cell__content test-cell__content--col" style="gap: 16px;">
+        <div class="prism-progress">
+          <div class="prism-progress__bar" style="width: 25%;" data-colony="spark"></div>
+        </div>
+        <div class="prism-progress">
+          <div class="prism-progress__bar" style="width: 50%;" data-colony="beacon"></div>
+        </div>
+        <div class="prism-progress">
+          <div class="prism-progress__bar" style="width: 75%;" data-colony="nexus"></div>
+        </div>
+        <div class="prism-progress prism-progress--spectral">
+          <div class="prism-progress__bar" style="width: 100%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Spinners -->
+    <div class="test-cell" style="margin-top: 24px;" data-screenshot="spinners">
+      <div class="test-cell__label">Spinners & Loading</div>
+      <div class="test-cell__content" style="gap: 24px;">
+        <div class="prism-spinner prism-spinner--sm"></div>
+        <div class="prism-spinner"></div>
+        <div class="prism-spinner prism-spinner--lg"></div>
+        <div class="prism-spinner prism-spinner--spectral"></div>
+      </div>
+    </div>
+
+    <!-- Skeletons -->
+    <div class="test-cell" style="margin-top: 24px;" data-screenshot="skeletons">
+      <div class="test-cell__label">Skeletons</div>
+      <div class="test-cell__content" style="flex-direction: column; gap: 12px; width: 300px;">
+        <div class="prism-skeleton" style="height: 20px; width: 100%;"></div>
+        <div class="prism-skeleton" style="height: 16px; width: 80%;"></div>
+        <div class="prism-skeleton" style="height: 16px; width: 60%;"></div>
+        <div style="display: flex; gap: 12px; margin-top: 8px;">
+          <div class="prism-skeleton" style="height: 40px; width: 40px; border-radius: 50%;"></div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+            <div class="prism-skeleton" style="height: 14px; width: 100%;"></div>
+            <div class="prism-skeleton" style="height: 12px; width: 70%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SECTION: NAVIGATION
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="test-section" id="navigation" data-screenshot="navigation">
+    <h2 class="test-section__title">Navigation</h2>
+    <p class="test-section__subtitle">Tabs, breadcrumbs, pagination, and menus</p>
+
+    <div class="test-grid test-grid--wide">
+      <!-- Tabs -->
+      <div class="test-cell" data-screenshot="tabs">
+        <div class="test-cell__label">Tabs</div>
+        <div class="test-cell__content test-cell__content--col">
+          <div class="prism-tabs">
+            <button class="prism-tabs__tab prism-tabs__tab--active">Overview</button>
+            <button class="prism-tabs__tab">Settings</button>
+            <button class="prism-tabs__tab">Security</button>
+            <button class="prism-tabs__tab" disabled>Billing</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Breadcrumb -->
+      <div class="test-cell" data-screenshot="breadcrumb">
+        <div class="test-cell__label">Breadcrumb</div>
+        <div class="test-cell__content">
+          <nav class="prism-breadcrumb">
+            <a href="#" class="prism-breadcrumb__item">Home</a>
+            <span class="prism-breadcrumb__separator">/</span>
+            <a href="#" class="prism-breadcrumb__item">Settings</a>
+            <span class="prism-breadcrumb__separator">/</span>
+            <span class="prism-breadcrumb__item prism-breadcrumb__item--current">Profile</span>
+          </nav>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div class="test-cell" data-screenshot="pagination">
+        <div class="test-cell__label">Pagination</div>
+        <div class="test-cell__content">
+          <nav class="prism-pagination">
+            <button class="prism-pagination__btn prism-pagination__btn--prev" disabled>←</button>
+            <button class="prism-pagination__btn prism-pagination__btn--active">1</button>
+            <button class="prism-pagination__btn">2</button>
+            <button class="prism-pagination__btn">3</button>
+            <span class="prism-pagination__ellipsis">…</span>
+            <button class="prism-pagination__btn">10</button>
+            <button class="prism-pagination__btn prism-pagination__btn--next">→</button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- Nav Menu (Horizontal) -->
+      <div class="test-cell" data-screenshot="nav-horizontal">
+        <div class="test-cell__label">Navigation Menu</div>
+        <div class="test-cell__content">
+          <nav class="prism-nav">
+            <a href="#" class="prism-nav__item prism-nav__item--active">Home</a>
+            <a href="#" class="prism-nav__item">Products</a>
+            <a href="#" class="prism-nav__item">About</a>
+            <a href="#" class="prism-nav__item">Contact</a>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SECTION: CARDS
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="test-section" id="cards" data-screenshot="cards">
+    <h2 class="test-section__title">Cards</h2>
+    <p class="test-section__subtitle">Glass surfaces with chromatic dispersion</p>
+
+    <div class="test-grid">
+      <div class="prism-card" data-colony="spark" data-screenshot="card-spark">
+        <div class="prism-card__header">
+          <h3 class="prism-card__title">🔥 Spark</h3>
+          <p class="prism-card__subtitle">The Igniter</p>
+        </div>
+        <div class="prism-card__content">
+          <p>Ideation and creativity. Ideation and creativity.</p>
+        </div>
+      </div>
+
+      <div class="prism-card" data-colony="beacon" data-screenshot="card-beacon">
+        <div class="prism-card__header">
+          <h3 class="prism-card__title">🗼 Beacon</h3>
+          <p class="prism-card__subtitle">The Architect</p>
+        </div>
+        <div class="prism-card__content">
+          <p>Planning and design. Planning and design.</p>
+        </div>
+        <div class="prism-card__footer">
+          <button class="prism-btn prism-btn--ghost">Learn More</button>
+          <button class="prism-btn prism-btn--solid" data-colony="beacon">Get Started</button>
+        </div>
+      </div>
+
+      <div class="prism-card" data-colony="crystal" data-screenshot="card-crystal">
+        <div class="prism-card__header">
+          <h3 class="prism-card__title">💎 Crystal</h3>
+          <p class="prism-card__subtitle">The Judge</p>
+        </div>
+        <div class="prism-card__content">
+          <p>Verification and testing. Verification and testing.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SECTION: OVERLAYS
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="test-section" id="overlays" data-screenshot="overlays">
+    <h2 class="test-section__title">Overlays</h2>
+    <p class="test-section__subtitle">Modals, dialogs, tooltips, and popovers</p>
+
+    <div class="test-grid test-grid--wide">
+      <!-- Modal Preview -->
+      <div class="test-cell" data-screenshot="modal">
+        <div class="test-cell__label">Modal (Static Preview)</div>
+        <div class="test-cell__content">
+          <div class="prism-modal" style="position: relative; transform: none; max-width: 400px;">
+            <div class="prism-modal__header">
+              <h3 class="prism-modal__title">Confirm Action</h3>
+              <button class="prism-modal__close">×</button>
+            </div>
+            <div class="prism-modal__content">
+              <p>Are you sure you want to continue? This action cannot be undone.</p>
+            </div>
+            <div class="prism-modal__footer">
+              <button class="prism-btn prism-btn--ghost">Cancel</button>
+              <button class="prism-btn prism-btn--solid" data-colony="spark">Delete</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tooltip Preview -->
+      <div class="test-cell" data-screenshot="tooltip">
+        <div class="test-cell__label">Tooltips</div>
+        <div class="test-cell__content" style="gap: 48px; padding: 32px;">
+          <div style="position: relative;">
+            <button class="prism-btn">Hover me</button>
+            <div class="prism-tooltip prism-tooltip--visible" style="position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);">
+              This is a tooltip
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SECTION: FORM CONTROLS
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="test-section" id="form-controls" data-screenshot="form-controls">
+    <h2 class="test-section__title">Form Controls</h2>
+    <p class="test-section__subtitle">Checkboxes, radios, switches, and selects</p>
+
+    <div class="test-grid">
+      <!-- Checkboxes -->
+      <div class="test-cell" data-screenshot="checkboxes">
+        <div class="test-cell__label">Checkboxes</div>
+        <div class="test-cell__content test-cell__content--col" style="gap: 12px;">
+          <label class="prism-checkbox">
+            <input type="checkbox" class="prism-checkbox__input">
+            <span class="prism-checkbox__box"></span>
+            <span class="prism-checkbox__label">Unchecked</span>
+          </label>
+          <label class="prism-checkbox">
+            <input type="checkbox" class="prism-checkbox__input" checked>
+            <span class="prism-checkbox__box"></span>
+            <span class="prism-checkbox__label">Checked</span>
+          </label>
+          <label class="prism-checkbox prism-checkbox--disabled">
+            <input type="checkbox" class="prism-checkbox__input" disabled>
+            <span class="prism-checkbox__box"></span>
+            <span class="prism-checkbox__label">Disabled</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Radios -->
+      <div class="test-cell" data-screenshot="radios">
+        <div class="test-cell__label">Radio Buttons</div>
+        <div class="test-cell__content test-cell__content--col" style="gap: 12px;">
+          <label class="prism-radio">
+            <input type="radio" name="demo" class="prism-radio__input">
+            <span class="prism-radio__circle"></span>
+            <span class="prism-radio__label">Option A</span>
+          </label>
+          <label class="prism-radio">
+            <input type="radio" name="demo" class="prism-radio__input" checked>
+            <span class="prism-radio__circle"></span>
+            <span class="prism-radio__label">Option B (Selected)</span>
+          </label>
+          <label class="prism-radio prism-radio--disabled">
+            <input type="radio" name="demo" class="prism-radio__input" disabled>
+            <span class="prism-radio__circle"></span>
+            <span class="prism-radio__label">Option C (Disabled)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Switches -->
+      <div class="test-cell" data-screenshot="switches">
+        <div class="test-cell__label">Switches</div>
+        <div class="test-cell__content test-cell__content--col" style="gap: 12px;">
+          <label class="prism-switch">
+            <input type="checkbox" class="prism-switch__input">
+            <span class="prism-switch__track"></span>
+            <span class="prism-switch__label">Off</span>
+          </label>
+          <label class="prism-switch">
+            <input type="checkbox" class="prism-switch__input" checked>
+            <span class="prism-switch__track"></span>
+            <span class="prism-switch__label">On</span>
+          </label>
+          <label class="prism-switch prism-switch--disabled">
+            <input type="checkbox" class="prism-switch__input" disabled>
+            <span class="prism-switch__track"></span>
+            <span class="prism-switch__label">Disabled</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Select -->
+      <div class="test-cell" data-screenshot="select">
+        <div class="test-cell__label">Select</div>
+        <div class="test-cell__content test-cell__content--col">
+          <div class="prism-select">
+            <select class="prism-select__input">
+              <option value="">Choose an option...</option>
+              <option value="1">Option 1</option>
+              <option value="2">Option 2</option>
+              <option value="3">Option 3</option>
+            </select>
+            <span class="prism-select__icon">▼</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slider -->
+      <div class="test-cell" data-screenshot="slider">
+        <div class="test-cell__label">Slider</div>
+        <div class="test-cell__content test-cell__content--col" style="width: 100%;">
+          <div class="prism-slider">
+            <input type="range" class="prism-slider__input" min="0" max="100" value="50">
+            <div class="prism-slider__track">
+              <div class="prism-slider__fill" style="width: 50%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SECTION: COLONY COLORS
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="test-section" id="colors" data-screenshot="colors">
+    <h2 class="test-section__title">Brand Spectral Colors</h2>
+    <p class="test-section__subtitle">The 7 Fano plane colors mapped to wavelengths</p>
+
+    <div class="test-cell">
+      <div class="test-cell__label">Spectral Palette</div>
+      <div class="test-cell__content" style="gap: 16px;">
+        <div style="text-align: center;">
+          <div class="colony-swatch" style="background: var(--prism-spark);">🔥</div>
+          <div style="font-size: 0.75rem; margin-top: 8px; color: var(--prism-text-secondary);">Spark</div>
+          <div style="font-size: 0.625rem; color: var(--prism-text-tertiary);">620nm</div>
+        </div>
+        <div style="text-align: center;">
+          <div class="colony-swatch" style="background: var(--prism-forge);">⚒️</div>
+          <div style="font-size: 0.75rem; margin-top: 8px; color: var(--prism-text-secondary);">Forge</div>
+          <div style="font-size: 0.625rem; color: var(--prism-text-tertiary);">590nm</div>
+        </div>
+        <div style="text-align: center;">
+          <div class="colony-swatch" style="background: var(--prism-flow);">🌊</div>
+          <div style="font-size: 0.75rem; margin-top: 8px; color: var(--prism-text-secondary);">Flow</div>
+          <div style="font-size: 0.625rem; color: var(--prism-text-tertiary);">570nm</div>
+        </div>
+        <div style="text-align: center;">
+          <div class="colony-swatch" style="background: var(--prism-nexus);">🔗</div>
+          <div style="font-size: 0.75rem; margin-top: 8px; color: var(--prism-text-secondary);">Nexus</div>
+          <div style="font-size: 0.625rem; color: var(--prism-text-tertiary);">510nm</div>
+        </div>
+        <div style="text-align: center;">
+          <div class="colony-swatch" style="background: var(--prism-beacon);">🗼</div>
+          <div style="font-size: 0.75rem; margin-top: 8px; color: var(--prism-text-secondary);">Beacon</div>
+          <div style="font-size: 0.625rem; color: var(--prism-text-tertiary);">475nm</div>
+        </div>
+        <div style="text-align: center;">
+          <div class="colony-swatch" style="background: var(--prism-grove);">🌿</div>
+          <div style="font-size: 0.75rem; margin-top: 8px; color: var(--prism-text-secondary);">Grove</div>
+          <div style="font-size: 0.625rem; color: var(--prism-text-tertiary);">445nm</div>
+        </div>
+        <div style="text-align: center;">
+          <div class="colony-swatch" style="background: var(--prism-crystal);">💎</div>
+          <div style="font-size: 0.75rem; margin-top: 8px; color: var(--prism-text-secondary);">Crystal</div>
+          <div style="font-size: 0.625rem; color: var(--prism-text-tertiary);">400nm</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SECTION: DATA DISPLAY - BADGES
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="test-section" id="badges" data-screenshot="badges">
+    <h2 class="test-section__title">Badges</h2>
+    <p class="test-section__subtitle">Status indicators and labels with brand variants</p>
+
+    <div class="test-grid">
+      <!-- Solid Badges -->
+      <div class="test-cell" data-screenshot="badge-solid">
+        <div class="test-cell__label">Solid Badges</div>
+        <div class="test-cell__content">
+          <span class="prism-badge prism-badge--solid prism-badge--md">Default</span>
+          <span class="prism-badge prism-badge--solid prism-badge--md prism-badge--success">Success</span>
+          <span class="prism-badge prism-badge--solid prism-badge--md prism-badge--warning">Warning</span>
+          <span class="prism-badge prism-badge--solid prism-badge--md prism-badge--error">Error</span>
+          <span class="prism-badge prism-badge--solid prism-badge--md prism-badge--info">Info</span>
+        </div>
+      </div>
+
+      <!-- Subtle Badges -->
+      <div class="test-cell" data-screenshot="badge-subtle">
+        <div class="test-cell__label">Subtle Badges</div>
+        <div class="test-cell__content">
+          <span class="prism-badge prism-badge--subtle prism-badge--md">Default</span>
+          <span class="prism-badge prism-badge--subtle prism-badge--md prism-badge--success">Success</span>
+          <span class="prism-badge prism-badge--subtle prism-badge--md prism-badge--warning">Warning</span>
+          <span class="prism-badge prism-badge--subtle prism-badge--md prism-badge--error">Error</span>
+        </div>
+      </div>
+
+      <!-- Dot Badges -->
+      <div class="test-cell" data-screenshot="badge-dot">
+        <div class="test-cell__label">Status Dots</div>
+        <div class="test-cell__content" style="gap: 16px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="prism-badge prism-badge--dot prism-badge--success"></span>
+            <span style="font-size: 0.875rem;">Online</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="prism-badge prism-badge--dot prism-badge--warning"></span>
+            <span style="font-size: 0.875rem;">Away</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="prism-badge prism-badge--dot prism-badge--error"></span>
+            <span style="font-size: 0.875rem;">Busy</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="prism-badge prism-badge--dot"></span>
+            <span style="font-size: 0.875rem;">Offline</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Badge Sizes -->
+      <div class="test-cell" data-screenshot="badge-sizes">
+        <div class="test-cell__label">Sizes</div>
+        <div class="test-cell__content" style="align-items: center;">
+          <span class="prism-badge prism-badge--solid prism-badge--sm prism-badge--info">Small</span>
+          <span class="prism-badge prism-badge--solid prism-badge--md prism-badge--info">Medium</span>
+          <span class="prism-badge prism-badge--solid prism-badge--lg prism-badge--info">Large</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SECTION: DATA DISPLAY - AVATARS
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="test-section" id="avatars" data-screenshot="avatars">
+    <h2 class="test-section__title">Avatars</h2>
+    <p class="test-section__subtitle">User representations with status indicators</p>
+
+    <div class="test-grid">
+      <!-- Avatar Sizes -->
+      <div class="test-cell" data-screenshot="avatar-sizes">
+        <div class="test-cell__label">Sizes</div>
+        <div class="test-cell__content" style="align-items: center;">
+          <div class="prism-avatar prism-avatar--xs">
+            <span class="prism-avatar__initials">XS</span>
+          </div>
+          <div class="prism-avatar prism-avatar--sm">
+            <span class="prism-avatar__initials">SM</span>
+          </div>
+          <div class="prism-avatar prism-avatar--md">
+            <span class="prism-avatar__initials">MD</span>
+          </div>
+          <div class="prism-avatar prism-avatar--lg">
+            <span class="prism-avatar__initials">LG</span>
+          </div>
+          <div class="prism-avatar prism-avatar--xl">
+            <span class="prism-avatar__initials">XL</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Avatar with Status -->
+      <div class="test-cell" data-screenshot="avatar-status">
+        <div class="test-cell__label">With Status</div>
+        <div class="test-cell__content">
+          <div class="prism-avatar prism-avatar--md">
+            <span class="prism-avatar__initials">TJ</span>
+            <span class="prism-avatar__status prism-avatar__status--online"></span>
+          </div>
+          <div class="prism-avatar prism-avatar--md">
+            <span class="prism-avatar__initials">KJ</span>
+            <span class="prism-avatar__status prism-avatar__status--away"></span>
+          </div>
+          <div class="prism-avatar prism-avatar--md">
+            <span class="prism-avatar__initials">AB</span>
+            <span class="prism-avatar__status prism-avatar__status--busy"></span>
+          </div>
+          <div class="prism-avatar prism-avatar--md">
+            <span class="prism-avatar__initials">CD</span>
+            <span class="prism-avatar__status prism-avatar__status--offline"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Avatar Group -->
+      <div class="test-cell" data-screenshot="avatar-group">
+        <div class="test-cell__label">Avatar Group</div>
+        <div class="test-cell__content">
+          <div class="prism-avatar-group">
+            <div class="prism-avatar prism-avatar--md">
+              <span class="prism-avatar__initials">TJ</span>
+            </div>
+            <div class="prism-avatar prism-avatar--md">
+              <span class="prism-avatar__initials">KJ</span>
+            </div>
+            <div class="prism-avatar prism-avatar--md">
+              <span class="prism-avatar__initials">AB</span>
+            </div>
+            <div class="prism-avatar prism-avatar--md prism-avatar-group__overflow">
+              <span class="prism-avatar__initials">+3</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Colony Avatars -->
+      <div class="test-cell" data-screenshot="avatar-colony">
+        <div class="test-cell__label">Colony Colors</div>
+        <div class="test-cell__content">
+          <div class="prism-avatar prism-avatar--md" data-colony="spark">
+            <span class="prism-avatar__initials">S</span>
+          </div>
+          <div class="prism-avatar prism-avatar--md" data-colony="forge">
+            <span class="prism-avatar__initials">F</span>
+          </div>
+          <div class="prism-avatar prism-avatar--md" data-colony="nexus">
+            <span class="prism-avatar__initials">N</span>
+          </div>
+          <div class="prism-avatar prism-avatar--md" data-colony="beacon">
+            <span class="prism-avatar__initials">B</span>
+          </div>
+          <div class="prism-avatar prism-avatar--md" data-colony="crystal">
+            <span class="prism-avatar__initials">C</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SECTION: DATA DISPLAY - TABLES
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="test-section" id="tables" data-screenshot="tables">
+    <h2 class="test-section__title">Tables</h2>
+    <p class="test-section__subtitle">Data tables with glass effects</p>
+
+    <div class="test-cell" style="width: 100%;" data-screenshot="table-default">
+      <div class="test-cell__label">Default Table</div>
+      <div class="prism-table-container">
+        <table class="prism-table">
+          <thead class="prism-table__head">
+            <tr>
+              <th class="prism-table__header">Name</th>
+              <th class="prism-table__header">Status</th>
+              <th class="prism-table__header">Colony</th>
+              <th class="prism-table__header prism-table__header--right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="prism-table__body">
+            <tr class="prism-table__row">
+              <td class="prism-table__cell">Tim Jacoby</td>
+              <td class="prism-table__cell"><span class="prism-badge prism-badge--solid prism-badge--sm prism-badge--success">Active</span></td>
+              <td class="prism-table__cell">Beacon</td>
+              <td class="prism-table__cell prism-table__cell--right">Edit</td>
+            </tr>
+            <tr class="prism-table__row">
+              <td class="prism-table__cell">Kristi Jacoby</td>
+              <td class="prism-table__cell"><span class="prism-badge prism-badge--solid prism-badge--sm prism-badge--warning">Away</span></td>
+              <td class="prism-table__cell">Nexus</td>
+              <td class="prism-table__cell prism-table__cell--right">Edit</td>
+            </tr>
+            <tr class="prism-table__row">
+              <td class="prism-table__cell">Bella (Dog)</td>
+              <td class="prism-table__cell"><span class="prism-badge prism-badge--solid prism-badge--sm">Offline</span></td>
+              <td class="prism-table__cell">Grove</td>
+              <td class="prism-table__cell prism-table__cell--right">Edit</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SECTION: DATA DISPLAY - LISTS
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="test-section" id="lists" data-screenshot="lists">
+    <h2 class="test-section__title">Lists</h2>
+    <p class="test-section__subtitle">Interactive lists with glass effects</p>
+
+    <div class="test-grid">
+      <!-- Simple List -->
+      <div class="test-cell" data-screenshot="list-simple">
+        <div class="test-cell__label">Simple List</div>
+        <ul class="prism-list prism-list--divided prism-list--bordered" style="width: 100%;">
+          <li class="prism-list__item prism-list__item--interactive">
+            <div class="prism-list__content">
+              <p class="prism-list__primary">Living Room</p>
+              <p class="prism-list__secondary">Lights on, 72F</p>
+            </div>
+            <span class="prism-list__trailing">></span>
+          </li>
+          <li class="prism-list__item prism-list__item--interactive">
+            <div class="prism-list__content">
+              <p class="prism-list__primary">Kitchen</p>
+              <p class="prism-list__secondary">Lights off, 70F</p>
+            </div>
+            <span class="prism-list__trailing">></span>
+          </li>
+          <li class="prism-list__item prism-list__item--interactive prism-list__item--selected">
+            <div class="prism-list__content">
+              <p class="prism-list__primary">Office</p>
+              <p class="prism-list__secondary">Lights on, 68F (selected)</p>
+            </div>
+            <span class="prism-list__trailing">></span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- List with Avatars -->
+      <div class="test-cell" data-screenshot="list-avatars">
+        <div class="test-cell__label">List with Avatars</div>
+        <ul class="prism-list prism-list--glass" style="width: 100%;">
+          <li class="prism-list__item">
+            <div class="prism-avatar prism-avatar--sm prism-list__leading">
+              <span class="prism-avatar__initials">TJ</span>
+              <span class="prism-avatar__status prism-avatar__status--online"></span>
+            </div>
+            <div class="prism-list__content">
+              <p class="prism-list__primary">Tim Jacoby</p>
+              <p class="prism-list__secondary">Owner</p>
+            </div>
+          </li>
+          <li class="prism-list__item">
+            <div class="prism-avatar prism-avatar--sm prism-list__leading">
+              <span class="prism-avatar__initials">KJ</span>
+              <span class="prism-avatar__status prism-avatar__status--away"></span>
+            </div>
+            <div class="prism-list__content">
+              <p class="prism-list__primary">Kristi Jacoby</p>
+              <p class="prism-list__secondary">Guest</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SECTION: DIALOGS & OVERLAYS
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="test-section" id="dialogs" data-screenshot="dialogs">
+    <h2 class="test-section__title">Dialogs & Overlays</h2>
+    <p class="test-section__subtitle">Modal dialogs with spring animations and glass effects</p>
+
+    <div class="test-grid test-grid--wide">
+      <!-- Dialog Preview -->
+      <div class="test-cell" data-screenshot="dialog-preview">
+        <div class="test-cell__label">Dialog (Static Preview)</div>
+        <div class="test-cell__content">
+          <div class="prism-dialog" style="position: relative; opacity: 1; transform: none; max-width: 400px; --glow-intensity: 1;">
+            <div class="prism-dialog__header">
+              <div class="prism-dialog__header-content">
+                <h3 class="prism-dialog__title">Confirm Action</h3>
+                <p class="prism-dialog__description">This will save your changes.</p>
+              </div>
+              <button class="prism-dialog__close">
+                <svg class="prism-dialog__close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+            <div class="prism-dialog__content">
+              <p>Are you sure you want to continue? This action cannot be undone.</p>
+            </div>
+            <div class="prism-dialog__footer">
+              <button class="prism-btn prism-btn--ghost">Cancel</button>
+              <button class="prism-btn prism-btn--solid" data-colony="beacon">Confirm</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tooltip Preview -->
+      <div class="test-cell" data-screenshot="tooltip-preview">
+        <div class="test-cell__label">Tooltip</div>
+        <div class="test-cell__content" style="padding: 48px;">
+          <div style="position: relative; display: inline-block;">
+            <button class="prism-btn prism-btn--solid" data-colony="beacon">Hover for tooltip</button>
+            <div class="prism-tooltip prism-tooltip--visible" style="position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);">
+              Helpful tooltip text
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SECTION: SKELETONS
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="test-section" id="skeletons" data-screenshot="skeleton-section">
+    <h2 class="test-section__title">Skeletons</h2>
+    <p class="test-section__subtitle">Loading placeholders with spectral shimmer</p>
+
+    <div class="test-grid">
+      <!-- Text Skeletons -->
+      <div class="test-cell" data-screenshot="skeleton-text">
+        <div class="test-cell__label">Text Skeletons</div>
+        <div class="test-cell__content test-cell__content--col" style="gap: 12px; width: 300px;">
+          <div class="prism-skeleton prism-skeleton--heading"></div>
+          <div class="prism-skeleton prism-skeleton--text" style="width: 100%;"></div>
+          <div class="prism-skeleton prism-skeleton--text" style="width: 90%;"></div>
+          <div class="prism-skeleton prism-skeleton--text" style="width: 75%;"></div>
+        </div>
+      </div>
+
+      <!-- Avatar Skeletons -->
+      <div class="test-cell" data-screenshot="skeleton-avatar">
+        <div class="test-cell__label">Avatar Skeletons</div>
+        <div class="test-cell__content" style="gap: 16px;">
+          <div class="prism-skeleton prism-skeleton--avatar-sm"></div>
+          <div class="prism-skeleton prism-skeleton--avatar"></div>
+          <div class="prism-skeleton prism-skeleton--avatar-lg"></div>
+          <div class="prism-skeleton prism-skeleton--avatar-xl"></div>
+        </div>
+      </div>
+
+      <!-- Card Skeleton -->
+      <div class="test-cell" data-screenshot="skeleton-card">
+        <div class="test-cell__label">Card Skeleton</div>
+        <div class="prism-skeleton-card" style="width: 280px;">
+          <div class="prism-skeleton prism-skeleton-card__image"></div>
+          <div class="prism-skeleton-card__content">
+            <div class="prism-skeleton prism-skeleton-card__title"></div>
+            <div class="prism-skeleton prism-skeleton-card__text"></div>
+            <div class="prism-skeleton prism-skeleton-card__text"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- List Item Skeleton -->
+      <div class="test-cell" data-screenshot="skeleton-list">
+        <div class="test-cell__label">List Item Skeleton</div>
+        <div class="test-cell__content test-cell__content--col" style="gap: 8px; width: 100%;">
+          <div class="prism-skeleton-list-item">
+            <div class="prism-skeleton prism-skeleton--avatar"></div>
+            <div class="prism-skeleton-list-item__content">
+              <div class="prism-skeleton prism-skeleton-list-item__title"></div>
+              <div class="prism-skeleton prism-skeleton-list-item__subtitle"></div>
+            </div>
+          </div>
+          <div class="prism-skeleton-list-item">
+            <div class="prism-skeleton prism-skeleton--avatar"></div>
+            <div class="prism-skeleton-list-item__content">
+              <div class="prism-skeleton prism-skeleton-list-item__title"></div>
+              <div class="prism-skeleton prism-skeleton-list-item__subtitle"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Glow Variant -->
+      <div class="test-cell" data-screenshot="skeleton-glow">
+        <div class="test-cell__label">Glow Variant</div>
+        <div class="test-cell__content test-cell__content--col" style="gap: 12px; width: 300px;">
+          <div class="prism-skeleton prism-skeleton--glow prism-skeleton--heading"></div>
+          <div class="prism-skeleton prism-skeleton--glow prism-skeleton--text" style="width: 100%;"></div>
+          <div class="prism-skeleton prism-skeleton--glow prism-skeleton--text" style="width: 80%;"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       SECTION: PROGRESS BARS
+       ═══════════════════════════════════════════════════════════════════════════ -->
+  <section class="test-section" id="progress-bars" data-screenshot="progress-section">
+    <h2 class="test-section__title">Progress Bars</h2>
+    <p class="test-section__subtitle">Volumetric progress indicators with colony colors</p>
+
+    <div class="test-grid">
+      <!-- Default Progress -->
+      <div class="test-cell" data-screenshot="progress-default">
+        <div class="test-cell__label">Default Progress</div>
+        <div class="test-cell__content test-cell__content--col" style="gap: 16px; width: 100%;">
+          <div class="prism-progress-bar" style="--progress: 25%;">
+            <div class="prism-progress-bar__track">
+              <div class="prism-progress-bar__fill"></div>
+            </div>
+            <span class="prism-progress-bar__label">25%</span>
+          </div>
+          <div class="prism-progress-bar" style="--progress: 50%;">
+            <div class="prism-progress-bar__track">
+              <div class="prism-progress-bar__fill"></div>
+            </div>
+            <span class="prism-progress-bar__label">50%</span>
+          </div>
+          <div class="prism-progress-bar" style="--progress: 75%;">
+            <div class="prism-progress-bar__track">
+              <div class="prism-progress-bar__fill"></div>
+            </div>
+            <span class="prism-progress-bar__label">75%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Brand Colors -->
+      <div class="test-cell" data-screenshot="progress-colors">
+        <div class="test-cell__label">Colony Colors</div>
+        <div class="test-cell__content test-cell__content--col" style="gap: 12px; width: 100%;">
+          <div class="prism-progress-bar prism-progress-bar--spark" style="--progress: 60%;">
+            <div class="prism-progress-bar__track">
+              <div class="prism-progress-bar__fill"></div>
+            </div>
+          </div>
+          <div class="prism-progress-bar prism-progress-bar--forge" style="--progress: 60%;">
+            <div class="prism-progress-bar__track">
+              <div class="prism-progress-bar__fill"></div>
+            </div>
+          </div>
+          <div class="prism-progress-bar prism-progress-bar--nexus" style="--progress: 60%;">
+            <div class="prism-progress-bar__track">
+              <div class="prism-progress-bar__fill"></div>
+            </div>
+          </div>
+          <div class="prism-progress-bar prism-progress-bar--beacon" style="--progress: 60%;">
+            <div class="prism-progress-bar__track">
+              <div class="prism-progress-bar__fill"></div>
+            </div>
+          </div>
+          <div class="prism-progress-bar prism-progress-bar--crystal" style="--progress: 60%;">
+            <div class="prism-progress-bar__track">
+              <div class="prism-progress-bar__fill"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Spectral Gradient -->
+      <div class="test-cell" data-screenshot="progress-spectral">
+        <div class="test-cell__label">Spectral Gradient</div>
+        <div class="test-cell__content test-cell__content--col" style="width: 100%;">
+          <div class="prism-progress-bar prism-progress-bar--spectral" style="--progress: 80%;">
+            <div class="prism-progress-bar__track">
+              <div class="prism-progress-bar__fill"></div>
+            </div>
+            <span class="prism-progress-bar__label">80%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Indeterminate -->
+      <div class="test-cell" data-screenshot="progress-indeterminate">
+        <div class="test-cell__label">Indeterminate</div>
+        <div class="test-cell__content test-cell__content--col" style="width: 100%;">
+          <div class="prism-progress-bar prism-progress-bar--indeterminate prism-progress-bar--beacon">
+            <div class="prism-progress-bar__track">
+              <div class="prism-progress-bar__fill"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- With Glow -->
+      <div class="test-cell" data-screenshot="progress-glow">
+        <div class="test-cell__label">With Glow Effect</div>
+        <div class="test-cell__content test-cell__content--col" style="width: 100%;">
+          <div class="prism-progress-bar prism-progress-bar--glow prism-progress-bar--beacon" style="--progress: 65%;">
+            <div class="prism-progress-bar__track">
+              <div class="prism-progress-bar__fill"></div>
+            </div>
+            <span class="prism-progress-bar__label">65%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sizes -->
+      <div class="test-cell" data-screenshot="progress-sizes">
+        <div class="test-cell__label">Sizes</div>
+        <div class="test-cell__content test-cell__content--col" style="gap: 16px; width: 100%;">
+          <div class="prism-progress-bar prism-progress-bar--sm prism-progress-bar--beacon" style="--progress: 50%;">
+            <div class="prism-progress-bar__track">
+              <div class="prism-progress-bar__fill"></div>
+            </div>
+            <span class="prism-progress-bar__label">Small</span>
+          </div>
+          <div class="prism-progress-bar prism-progress-bar--beacon" style="--progress: 50%;">
+            <div class="prism-progress-bar__track">
+              <div class="prism-progress-bar__fill"></div>
+            </div>
+            <span class="prism-progress-bar__label">Default</span>
+          </div>
+          <div class="prism-progress-bar prism-progress-bar--lg prism-progress-bar--beacon" style="--progress: 50%;">
+            <div class="prism-progress-bar__track">
+              <div class="prism-progress-bar__fill"></div>
+            </div>
+            <span class="prism-progress-bar__label">Large</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- JavaScript -->
+  <script>
+    // Theme toggle
+    document.getElementById('toggle-dark').addEventListener('click', function() {
+      document.documentElement.classList.remove('light');
+      this.classList.add('active');
+      document.getElementById('toggle-light').classList.remove('active');
+    });
+
+    document.getElementById('toggle-light').addEventListener('click', function() {
+      document.documentElement.classList.add('light');
+      this.classList.add('active');
+      document.getElementById('toggle-dark').classList.remove('active');
+    });
+
+    // Motion toggle
+    let motionEnabled = true;
+    document.getElementById('toggle-motion').addEventListener('click', function() {
+      motionEnabled = !motionEnabled;
+      if (motionEnabled) {
+        document.documentElement.style.setProperty('--prism-dur-instant', '89ms');
+        document.documentElement.style.setProperty('--prism-dur-fast', '144ms');
+        document.documentElement.style.setProperty('--prism-dur-normal', '233ms');
+        document.documentElement.style.setProperty('--prism-dur-slow', '377ms');
+        this.textContent = 'Motion: On';
+      } else {
+        document.documentElement.style.setProperty('--prism-dur-instant', '0ms');
+        document.documentElement.style.setProperty('--prism-dur-fast', '0ms');
+        document.documentElement.style.setProperty('--prism-dur-normal', '0ms');
+        document.documentElement.style.setProperty('--prism-dur-slow', '0ms');
+        this.textContent = 'Motion: Off';
+      }
+    });
+
+    // Expose for screenshot testing
+    window.kagamiHarness = {
+      setTheme(theme) {
+        if (theme === 'light') {
+          document.documentElement.classList.add('light');
+        } else {
+          document.documentElement.classList.remove('light');
+        }
+      },
+      setMotion(enabled) {
+        motionEnabled = enabled;
+        if (enabled) {
+          document.documentElement.style.setProperty('--prism-dur-instant', '89ms');
+          document.documentElement.style.setProperty('--prism-dur-fast', '144ms');
+          document.documentElement.style.setProperty('--prism-dur-normal', '233ms');
+          document.documentElement.style.setProperty('--prism-dur-slow', '377ms');
+        } else {
+          document.documentElement.style.setProperty('--prism-dur-instant', '0ms');
+          document.documentElement.style.setProperty('--prism-dur-fast', '0ms');
+          document.documentElement.style.setProperty('--prism-dur-normal', '0ms');
+          document.documentElement.style.setProperty('--prism-dur-slow', '0ms');
+        }
+      },
+      getAllScreenshotTargets() {
+        return Array.from(document.querySelectorAll('[data-screenshot]')).map(el => ({
+          id: el.dataset.screenshot,
+          selector: `[data-screenshot="${el.dataset.screenshot}"]`
+        }));
+      }
+    };
+
+    console.log('%c🌈 Kagami Visual Test Harness', 'font-size: 16px; font-weight: bold;');
+    console.log('Use window.kagamiHarness for programmatic control');
+  </script>
+</body>
+</html>

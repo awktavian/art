@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Equity Leaderboard | Tool Time University</title>
+    <link rel="stylesheet" href="assets/style.css">
+    <meta name="description" content="Taylor Household Home Equity Standings - See who's leading the race to $50,000 in Tool Time University.">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Home Equity Leaderboard | Tool Time University">
+    <meta property="og:description" content="The race to $50,000 - Who will achieve Master Craftsman status first?">
+    <meta property="og:type" content="website">
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════════
+           LEADERBOARD-SPECIFIC STYLES
+           ═══════════════════════════════════════════════════════════════════════ */
+
+        /* Podium Section */
+        .podium {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            gap: var(--space-3);
+            padding: var(--space-5) 0;
+            margin-bottom: var(--space-5);
+        }
+
+        .podium__place {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            transition: transform var(--duration-normal) var(--ease-out);
+        }
+
+        .podium__place:hover {
+            transform: translateY(-8px);
+        }
+
+        .podium__avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            margin-bottom: var(--space-2);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .podium__name {
+            font-family: var(--font-display);
+            font-size: var(--text-lg);
+            font-weight: 600;
+            margin-bottom: var(--space-1);
+        }
+
+        .podium__equity {
+            font-family: var(--font-mono);
+            font-size: var(--text-xl);
+            font-weight: 700;
+            margin-bottom: var(--space-2);
+        }
+
+        .podium__badges {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 120px;
+        }
+
+        .podium__badge {
+            font-size: 1rem;
+        }
+
+        .podium__stand {
+            width: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-display);
+            font-size: var(--text-3xl);
+            font-weight: 700;
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        }
+
+        /* Gold - 1st place */
+        .podium__place--gold .podium__avatar {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            border: 4px solid #DAA520;
+        }
+        .podium__place--gold .podium__equity {
+            color: #DAA520;
+        }
+        .podium__place--gold .podium__stand {
+            background: linear-gradient(180deg, #FFD700 0%, #DAA520 100%);
+            color: var(--stone-800);
+            height: 120px;
+        }
+
+        /* Silver - 2nd place */
+        .podium__place--silver .podium__avatar {
+            background: linear-gradient(135deg, #E8E8E8 0%, #B8B8B8 100%);
+            border: 4px solid #A0A0A0;
+        }
+        .podium__place--silver .podium__equity {
+            color: #808080;
+        }
+        .podium__place--silver .podium__stand {
+            background: linear-gradient(180deg, #E8E8E8 0%, #A0A0A0 100%);
+            color: var(--stone-700);
+            height: 90px;
+        }
+
+        /* Bronze - 3rd place */
+        .podium__place--bronze .podium__avatar {
+            background: linear-gradient(135deg, #CD7F32 0%, #8B4513 100%);
+            border: 4px solid #8B4513;
+        }
+        .podium__place--bronze .podium__equity {
+            color: #8B4513;
+        }
+        .podium__place--bronze .podium__stand {
+            background: linear-gradient(180deg, #CD7F32 0%, #8B4513 100%);
+            color: white;
+            height: 60px;
+        }
+
+        @media (max-width: 768px) {
+            .podium {
+                flex-direction: column;
+                align-items: center;
+            }
+            .podium__place--gold { order: 1; }
+            .podium__place--silver { order: 2; }
+            .podium__place--bronze { order: 3; }
+            .podium__stand { display: none; }
+        }
+
+        /* Standings Table */
+        .standings-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+        }
+
+        .standings-table thead {
+            background: var(--binford-red);
+            color: white;
+        }
+
+        .standings-table th {
+            padding: var(--space-3) var(--space-2);
+            text-align: left;
+            font-family: var(--font-body);
+            font-size: var(--text-sm);
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            cursor: pointer;
+            user-select: none;
+            transition: background var(--duration-fast);
+        }
+
+        .standings-table th:hover {
+            background: var(--binford-red-light);
+        }
+
+        .standings-table th::after {
+            content: ' \2195';
+            opacity: 0.5;
+        }
+
+        .standings-table td {
+            padding: var(--space-2);
+            border-bottom: 1px solid var(--border-light);
+            vertical-align: middle;
+        }
+
+        .standings-table tbody tr {
+            transition: background var(--duration-fast);
+        }
+
+        .standings-table tbody tr:hover {
+            background: var(--stone-50);
+        }
+
+        .standings-table .rank {
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: var(--text-lg);
+            width: 50px;
+            text-align: center;
+        }
+
+        .standings-table .rank--top {
+            font-size: var(--text-xl);
+        }
+
+        .standings-table .student {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .standings-table .student__avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            background: var(--stone-100);
+        }
+
+        .standings-table .student__name {
+            font-weight: 600;
+        }
+
+        .standings-table .equity {
+            font-family: var(--font-mono);
+            font-weight: 600;
+        }
+
+        .standings-table .badges {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .standings-table .module {
+            font-size: var(--text-sm);
+            color: var(--text-secondary);
+        }
+
+        /* Grade threshold colors */
+        .grade-a { background: linear-gradient(90deg, rgba(34, 197, 94, 0.1) 0%, transparent 100%); }
+        .grade-b { background: linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%); }
+        .grade-c { background: linear-gradient(90deg, rgba(234, 179, 8, 0.1) 0%, transparent 100%); }
+        .grade-d { background: linear-gradient(90deg, rgba(249, 115, 22, 0.1) 0%, transparent 100%); }
+        .grade-f { background: linear-gradient(90deg, rgba(239, 68, 68, 0.1) 0%, transparent 100%); }
+
+        /* Badge Gallery */
+        .badge-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: var(--space-3);
+        }
+
+        .badge-card {
+            background: var(--white);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            padding: var(--space-3);
+            text-align: center;
+            transition: all var(--duration-normal) var(--ease-out);
+        }
+
+        .badge-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--binford-gold);
+        }
+
+        .badge-card__icon {
+            font-size: 2.5rem;
+            margin-bottom: var(--space-2);
+        }
+
+        .badge-card__name {
+            font-family: var(--font-display);
+            font-size: var(--text-base);
+            font-weight: 600;
+            margin-bottom: var(--space-1);
+            color: var(--text-primary);
+        }
+
+        .badge-card__description {
+            font-size: var(--text-sm);
+            color: var(--text-secondary);
+            margin: 0;
+        }
+
+        .badge-card--earned {
+            background: linear-gradient(135deg, #fffef5 0%, #fff 100%);
+            border-color: var(--binford-gold);
+        }
+
+        .badge-card--locked {
+            opacity: 0.5;
+            filter: grayscale(1);
+        }
+
+        /* Milestone Tracker */
+        .milestones {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            padding: var(--space-4) 0;
+            margin: var(--space-4) 0;
+        }
+
+        .milestones::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background: var(--stone-200);
+            border-radius: 4px;
+            transform: translateY(-50%);
+            z-index: 0;
+        }
+
+        .milestones__progress {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            height: 8px;
+            background: linear-gradient(90deg, var(--binford-red) 0%, var(--binford-gold) 100%);
+            border-radius: 4px;
+            transform: translateY(-50%);
+            z-index: 1;
+            transition: width var(--duration-slower) var(--ease-out);
+        }
+
+        .milestone {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .milestone__marker {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--stone-300);
+            border: 4px solid var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: var(--shadow-md);
+            transition: all var(--duration-normal);
+        }
+
+        .milestone--reached .milestone__marker {
+            background: linear-gradient(135deg, var(--binford-gold) 0%, var(--binford-gold-light) 100%);
+        }
+
+        .milestone__label {
+            margin-top: var(--space-2);
+            font-size: var(--text-xs);
+            font-weight: 600;
+            color: var(--text-muted);
+            max-width: 80px;
+        }
+
+        .milestone__value {
+            font-family: var(--font-mono);
+            font-size: var(--text-sm);
+            font-weight: 700;
+            color: var(--text-secondary);
+        }
+
+        .milestone--reached .milestone__label,
+        .milestone--reached .milestone__value {
+            color: var(--binford-gold);
+        }
+
+        @media (max-width: 768px) {
+            .milestones {
+                flex-direction: column;
+                gap: var(--space-3);
+                align-items: flex-start;
+            }
+            .milestones::before,
+            .milestones__progress {
+                width: 8px;
+                height: 100%;
+                left: 20px;
+                top: 0;
+                transform: none;
+            }
+            .milestone {
+                flex-direction: row;
+                gap: var(--space-2);
+            }
+        }
+
+        /* MVP Section */
+        .mvp-card {
+            background: linear-gradient(135deg, var(--stone-900) 0%, var(--stone-800) 100%);
+            border-radius: var(--radius-xl);
+            padding: var(--space-5);
+            color: white;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .mvp-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 215, 0, 0.1) 0%, transparent 50%);
+            animation: shimmer 3s ease-in-out infinite;
+        }
+
+        @keyframes shimmer {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(180deg); }
+        }
+
+        .mvp-card__crown {
+            font-size: 4rem;
+            margin-bottom: var(--space-2);
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .mvp-card__title {
+            font-family: var(--font-display);
+            font-size: var(--text-xl);
+            color: var(--binford-gold-light);
+            margin-bottom: var(--space-2);
+        }
+
+        .mvp-card__name {
+            font-family: var(--font-display);
+            font-size: var(--text-3xl);
+            margin-bottom: var(--space-2);
+        }
+
+        .mvp-card__stats {
+            display: flex;
+            justify-content: center;
+            gap: var(--space-5);
+            margin-top: var(--space-4);
+        }
+
+        .mvp-card__stat {
+            text-align: center;
+        }
+
+        .mvp-card__stat-value {
+            font-family: var(--font-mono);
+            font-size: var(--text-2xl);
+            color: var(--binford-gold-light);
+        }
+
+        .mvp-card__stat-label {
+            font-size: var(--text-sm);
+            color: var(--stone-400);
+        }
+
+        /* Navigation */
+        .nav-breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            font-size: var(--text-sm);
+            margin-bottom: var(--space-4);
+        }
+
+        .nav-breadcrumb a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color var(--duration-fast);
+        }
+
+        .nav-breadcrumb a:hover {
+            color: var(--binford-red);
+        }
+
+        .nav-breadcrumb__separator {
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     HERO SECTION
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="hero" style="min-height: 50vh; padding: var(--space-6) var(--space-4);">
+    <div class="hero__icon">🏆</div>
+    <h1 class="hero__title">Home Equity Leaderboard</h1>
+    <p class="hero__subtitle">Taylor Household Home Equity Standings</p>
+    <p class="lead" style="max-width: 600px;">
+        The race to $50,000 is on. Every challenge completed, every reflection written, every badge earned brings you closer to Master Craftsman status.
+    </p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     NAVIGATION
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="section" style="padding-top: var(--space-3); padding-bottom: 0;">
+    <div class="container">
+        <nav class="nav-breadcrumb">
+            <a href="index.html">Tool Time University</a>
+            <span class="nav-breadcrumb__separator">/</span>
+            <span>Leaderboard</span>
+        </nav>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TOP PERFORMERS - PODIUM
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="section" style="background: var(--stone-50);">
+    <div class="container">
+        <p class="label" style="color: var(--binford-gold); text-align: center;">Top Performers</p>
+        <h2 style="text-align: center; margin-bottom: var(--space-4);">The Podium of Power</h2>
+
+        <div class="podium">
+            <!-- 2nd Place - Silver -->
+            <div class="podium__place podium__place--silver fade-up">
+                <div class="podium__avatar">👨</div>
+                <p class="podium__name">Randy Taylor</p>
+                <p class="podium__equity">$42,500</p>
+                <div class="podium__badges">
+                    <span class="podium__badge" title="Wilson's Apprentice">🧙</span>
+                    <span class="podium__badge" title="I Don't Think So, Tim">🚫</span>
+                    <span class="podium__badge" title="Binford Approved">✅</span>
+                    <span class="podium__badge" title="Season Veteran S1">📺</span>
+                    <span class="podium__badge" title="Season Veteran S2">📺</span>
+                </div>
+                <div class="podium__stand">2</div>
+            </div>
+
+            <!-- 1st Place - Gold -->
+            <div class="podium__place podium__place--gold fade-up">
+                <div class="podium__avatar">👦</div>
+                <p class="podium__name">Brad Taylor</p>
+                <p class="podium__equity">$48,750</p>
+                <div class="podium__badges">
+                    <span class="podium__badge" title="Tool Belt Champion">🏅</span>
+                    <span class="podium__badge" title="More Power!">⚡</span>
+                    <span class="podium__badge" title="Flannel Master">👕</span>
+                    <span class="podium__badge" title="Perfect Safety Record">🦺</span>
+                    <span class="podium__badge" title="Binford Approved">✅</span>
+                    <span class="podium__badge" title="Hot Rod Perseverance">🏎️</span>
+                </div>
+                <div class="podium__stand">1</div>
+            </div>
+
+            <!-- 3rd Place - Bronze -->
+            <div class="podium__place podium__place--bronze fade-up">
+                <div class="podium__avatar">🧒</div>
+                <p class="podium__name">Mark Taylor</p>
+                <p class="podium__equity">$38,200</p>
+                <div class="podium__badges">
+                    <span class="podium__badge" title="Wilson's Apprentice">🧙</span>
+                    <span class="podium__badge" title="Hidey-Ho, Neighbor!">🏠</span>
+                    <span class="podium__badge" title="More Power!">⚡</span>
+                    <span class="podium__badge" title="Season Veteran S1">📺</span>
+                </div>
+                <div class="podium__stand">3</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     WEEKLY MVP
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="section">
+    <div class="container container--narrow">
+        <div class="mvp-card fade-up">
+            <div class="mvp-card__crown">👑</div>
+            <p class="mvp-card__title">Tool Time MVP of the Week</p>
+            <h3 class="mvp-card__name">Brad Taylor</h3>
+            <p style="color: var(--stone-300); max-width: 400px; margin: 0 auto;">
+                "Completed all Season 7 challenges in record time with perfect scores. That's what we call MORE POWER in the equity department!"
+            </p>
+            <div class="mvp-card__stats">
+                <div class="mvp-card__stat">
+                    <div class="mvp-card__stat-value">$6,250</div>
+                    <div class="mvp-card__stat-label">Earned This Week</div>
+                </div>
+                <div class="mvp-card__stat">
+                    <div class="mvp-card__stat-value">4</div>
+                    <div class="mvp-card__stat-label">Badges Unlocked</div>
+                </div>
+                <div class="mvp-card__stat">
+                    <div class="mvp-card__stat-value">98%</div>
+                    <div class="mvp-card__stat-label">Quiz Average</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     EQUITY MILESTONES
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="section" style="background: var(--stone-50);">
+    <div class="container">
+        <p class="label" style="color: var(--binford-gold); text-align: center;">Progress Tracker</p>
+        <h2 style="text-align: center; margin-bottom: var(--space-3);">Equity Milestones</h2>
+        <p class="lead" style="text-align: center; margin-bottom: var(--space-5);">
+            Build your way from a starter home to the Taylor Family Estate
+        </p>
+
+        <div class="milestones">
+            <div class="milestones__progress" style="width: 97.5%;"></div>
+
+            <div class="milestone milestone--reached">
+                <div class="milestone__marker">🏚️</div>
+                <p class="milestone__value">$5,000</p>
+                <p class="milestone__label">Starter Home</p>
+            </div>
+
+            <div class="milestone milestone--reached">
+                <div class="milestone__marker">🔧</div>
+                <p class="milestone__value">$15,000</p>
+                <p class="milestone__label">Handyman Special</p>
+            </div>
+
+            <div class="milestone milestone--reached">
+                <div class="milestone__marker">🏡</div>
+                <p class="milestone__value">$25,000</p>
+                <p class="milestone__label">Suburban Charmer</p>
+            </div>
+
+            <div class="milestone milestone--reached">
+                <div class="milestone__marker">🏠</div>
+                <p class="milestone__value">$35,000</p>
+                <p class="milestone__label">Dream Home</p>
+            </div>
+
+            <div class="milestone">
+                <div class="milestone__marker">🏰</div>
+                <p class="milestone__value">$50,000</p>
+                <p class="milestone__label">Taylor Family Estate</p>
+            </div>
+        </div>
+
+        <div class="al-tip" style="margin-top: var(--space-5);">
+            <div class="al-tip__icon">👔</div>
+            <div class="al-tip__content">
+                <p class="al-tip__title">Al's Milestone Tip</p>
+                <p class="al-tip__text">Each milestone unlocks special privileges! At $25,000, you can access bonus content. At $35,000, you can peer-review other students' work. At $50,000, you become a certified Tool Time Teaching Assistant.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     FULL STANDINGS TABLE
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="section">
+    <div class="container">
+        <p class="label" style="color: var(--binford-red); text-align: center;">Complete Rankings</p>
+        <h2 style="text-align: center; margin-bottom: var(--space-5);">Full Standings</h2>
+
+        <div style="overflow-x: auto;">
+            <table class="standings-table" id="standingsTable">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable(0)">Rank</th>
+                        <th onclick="sortTable(1)">Student</th>
+                        <th onclick="sortTable(2)">Home Equity</th>
+                        <th onclick="sortTable(3)">Badges</th>
+                        <th onclick="sortTable(4)">Current Module</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="grade-a">
+                        <td class="rank rank--top" style="color: var(--binford-gold);">🥇</td>
+                        <td class="student">
+                            <div class="student__avatar">👦</div>
+                            <span class="student__name">Brad Taylor</span>
+                        </td>
+                        <td class="equity" style="color: #22c55e;">$48,750</td>
+                        <td class="badges">
+                            <span title="Tool Belt Champion">🏅</span>
+                            <span title="More Power!">⚡</span>
+                            <span title="Flannel Master">👕</span>
+                            <span title="Perfect Safety Record">🦺</span>
+                            <span title="Binford Approved">✅</span>
+                            <span title="Hot Rod Perseverance">🏎️</span>
+                        </td>
+                        <td class="module">Module 8: The Final Inspection</td>
+                    </tr>
+                    <tr class="grade-a">
+                        <td class="rank rank--top" style="color: #A0A0A0;">🥈</td>
+                        <td class="student">
+                            <div class="student__avatar">👨</div>
+                            <span class="student__name">Randy Taylor</span>
+                        </td>
+                        <td class="equity" style="color: #22c55e;">$42,500</td>
+                        <td class="badges">
+                            <span title="Wilson's Apprentice">🧙</span>
+                            <span title="I Don't Think So, Tim">🚫</span>
+                            <span title="Binford Approved">✅</span>
+                            <span title="Season Veteran S1">📺</span>
+                            <span title="Season Veteran S2">📺</span>
+                        </td>
+                        <td class="module">Module 7: The Addition</td>
+                    </tr>
+                    <tr class="grade-b">
+                        <td class="rank rank--top" style="color: #8B4513;">🥉</td>
+                        <td class="student">
+                            <div class="student__avatar">🧒</div>
+                            <span class="student__name">Mark Taylor</span>
+                        </td>
+                        <td class="equity" style="color: #3b82f6;">$38,200</td>
+                        <td class="badges">
+                            <span title="Wilson's Apprentice">🧙</span>
+                            <span title="Hidey-Ho, Neighbor!">🏠</span>
+                            <span title="More Power!">⚡</span>
+                            <span title="Season Veteran S1">📺</span>
+                        </td>
+                        <td class="module">Module 6: Heavy Machinery</td>
+                    </tr>
+                    <tr class="grade-b">
+                        <td class="rank">4</td>
+                        <td class="student">
+                            <div class="student__avatar">👩</div>
+                            <span class="student__name">Heidi Keppert</span>
+                        </td>
+                        <td class="equity" style="color: #3b82f6;">$35,100</td>
+                        <td class="badges">
+                            <span title="More Power!">⚡</span>
+                            <span title="Binford Approved">✅</span>
+                            <span title="Perfect Safety Record">🦺</span>
+                        </td>
+                        <td class="module">Module 6: Heavy Machinery</td>
+                    </tr>
+                    <tr class="grade-b">
+                        <td class="rank">5</td>
+                        <td class="student">
+                            <div class="student__avatar">🧔</div>
+                            <span class="student__name">Benny Baroni</span>
+                        </td>
+                        <td class="equity" style="color: #3b82f6;">$31,400</td>
+                        <td class="badges">
+                            <span title="More Power!">⚡</span>
+                            <span title="Hot Rod Perseverance">🏎️</span>
+                        </td>
+                        <td class="module">Module 5: Rewiring the Sitcom</td>
+                    </tr>
+                    <tr class="grade-c">
+                        <td class="rank">6</td>
+                        <td class="student">
+                            <div class="student__avatar">👧</div>
+                            <span class="student__name">Lauren Taylor</span>
+                        </td>
+                        <td class="equity" style="color: #eab308;">$27,800</td>
+                        <td class="badges">
+                            <span title="More Power!">⚡</span>
+                            <span title="Hidey-Ho, Neighbor!">🏠</span>
+                        </td>
+                        <td class="module">Module 5: Rewiring the Sitcom</td>
+                    </tr>
+                    <tr class="grade-c">
+                        <td class="rank">7</td>
+                        <td class="student">
+                            <div class="student__avatar">👨‍🔧</div>
+                            <span class="student__name">Harry Turner</span>
+                        </td>
+                        <td class="equity" style="color: #eab308;">$23,500</td>
+                        <td class="badges">
+                            <span title="More Power!">⚡</span>
+                            <span title="Flannel Master">👕</span>
+                        </td>
+                        <td class="module">Module 4: Load-Bearing Walls</td>
+                    </tr>
+                    <tr class="grade-d">
+                        <td class="rank">8</td>
+                        <td class="student">
+                            <div class="student__avatar">👩‍🦰</div>
+                            <span class="student__name">Ilene Markham</span>
+                        </td>
+                        <td class="equity" style="color: #f97316;">$19,200</td>
+                        <td class="badges">
+                            <span title="Wilson's Apprentice">🧙</span>
+                            <span title="I Don't Think So, Tim">🚫</span>
+                        </td>
+                        <td class="module">Module 4: Load-Bearing Walls</td>
+                    </tr>
+                    <tr class="grade-d">
+                        <td class="rank">9</td>
+                        <td class="student">
+                            <div class="student__avatar">🧑</div>
+                            <span class="student__name">Jason Curtis</span>
+                        </td>
+                        <td class="equity" style="color: #f97316;">$14,750</td>
+                        <td class="badges">
+                            <span title="More Power!">⚡</span>
+                        </td>
+                        <td class="module">Module 3: Measure Twice, Cut Once</td>
+                    </tr>
+                    <tr class="grade-d">
+                        <td class="rank">10</td>
+                        <td class="student">
+                            <div class="student__avatar">👨‍🦱</div>
+                            <span class="student__name">Marty Taylor</span>
+                        </td>
+                        <td class="equity" style="color: #f97316;">$12,100</td>
+                        <td class="badges">
+                            <span title="More Power!">⚡</span>
+                        </td>
+                        <td class="module">Module 2: Assembly Required</td>
+                    </tr>
+                    <tr class="grade-f">
+                        <td class="rank">11</td>
+                        <td class="student">
+                            <div class="student__avatar">🧔‍♂️</div>
+                            <span class="student__name">Dwayne Hoover</span>
+                        </td>
+                        <td class="equity" style="color: #ef4444;">$8,300</td>
+                        <td class="badges">
+                            <span title="More Power!">⚡</span>
+                        </td>
+                        <td class="module">Module 2: Assembly Required</td>
+                    </tr>
+                    <tr class="grade-f">
+                        <td class="rank">12</td>
+                        <td class="student">
+                            <div class="student__avatar">🙂</div>
+                            <span class="student__name">Pete Bilker</span>
+                        </td>
+                        <td class="equity" style="color: #ef4444;">$4,500</td>
+                        <td class="badges">
+                            <span title="More Power!">⚡</span>
+                        </td>
+                        <td class="module">Module 1: Pilot Light</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="tim-grunt" style="margin-top: var(--space-4);">
+            <div class="tim-grunt__icon">🔧</div>
+            <div class="tim-grunt__content">
+                <p class="tim-grunt__title">Grade Thresholds</p>
+                <p class="tim-grunt__text">
+                    <strong style="color: #22c55e;">A ($40,000+)</strong> |
+                    <strong style="color: #3b82f6;">B ($30,000-$39,999)</strong> |
+                    <strong style="color: #eab308;">C ($20,000-$29,999)</strong> |
+                    <strong style="color: #f97316;">D ($10,000-$19,999)</strong> |
+                    <strong style="color: #ef4444;">F (Below $10,000)</strong>
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     ACHIEVEMENTS/BADGES SECTION
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="section" style="background: var(--stone-50);">
+    <div class="container">
+        <p class="label" style="color: var(--binford-gold); text-align: center;">Collect Them All</p>
+        <h2 style="text-align: center; margin-bottom: var(--space-2);">Tool Time Badges</h2>
+        <p class="lead" style="text-align: center; margin-bottom: var(--space-5);">
+            15 badges to earn. Each one proves your dedication to the art of home improvement.
+        </p>
+
+        <div class="badge-gallery stagger">
+            <!-- Badge 1: More Power! -->
+            <div class="badge-card badge-card--earned fade-up">
+                <div class="badge-card__icon">⚡</div>
+                <p class="badge-card__name">"More Power!"</p>
+                <p class="badge-card__description">Complete your first module</p>
+            </div>
+
+            <!-- Badge 2: I Don't Think So, Tim -->
+            <div class="badge-card fade-up">
+                <div class="badge-card__icon">🚫</div>
+                <p class="badge-card__name">"I Don't Think So, Tim"</p>
+                <p class="badge-card__description">Catch an error in course content</p>
+            </div>
+
+            <!-- Badge 3: Hidey-Ho, Neighbor! -->
+            <div class="badge-card fade-up">
+                <div class="badge-card__icon">🏠</div>
+                <p class="badge-card__name">"Hidey-Ho, Neighbor!"</p>
+                <p class="badge-card__description">Help another student succeed</p>
+            </div>
+
+            <!-- Badge 4: Flannel Master -->
+            <div class="badge-card fade-up">
+                <div class="badge-card__icon">👕</div>
+                <p class="badge-card__name">"Flannel Master"</p>
+                <p class="badge-card__description">Show Al Borland-level dedication</p>
+            </div>
+
+            <!-- Badge 5: Wilson's Apprentice -->
+            <div class="badge-card fade-up">
+                <div class="badge-card__icon">🧙</div>
+                <p class="badge-card__name">"Wilson's Apprentice"</p>
+                <p class="badge-card__description">Write the best philosophical reflection</p>
+            </div>
+
+            <!-- Badge 6: Tool Belt Champion -->
+            <div class="badge-card fade-up">
+                <div class="badge-card__icon">🏅</div>
+                <p class="badge-card__name">"Tool Belt Champion"</p>
+                <p class="badge-card__description">Complete all Tool Time Challenges</p>
+            </div>
+
+            <!-- Badge 7: Perfect Safety Record -->
+            <div class="badge-card fade-up">
+                <div class="badge-card__icon">🦺</div>
+                <p class="badge-card__name">"Perfect Safety Record"</p>
+                <p class="badge-card__description">Ace all safety-related content</p>
+            </div>
+
+            <!-- Badge 8: Hot Rod Perseverance -->
+            <div class="badge-card fade-up">
+                <div class="badge-card__icon">🏎️</div>
+                <p class="badge-card__name">"Hot Rod Perseverance"</p>
+                <p class="badge-card__description">Improve significantly after feedback</p>
+            </div>
+
+            <!-- Badge 9: Binford Approved -->
+            <div class="badge-card fade-up">
+                <div class="badge-card__icon">✅</div>
+                <p class="badge-card__name">"Binford Approved"</p>
+                <p class="badge-card__description">Score 100% on any quiz</p>
+            </div>
+
+            <!-- Badge 10: Season 1 Veteran -->
+            <div class="badge-card fade-up">
+                <div class="badge-card__icon">📺</div>
+                <p class="badge-card__name">"Season 1 Veteran"</p>
+                <p class="badge-card__description">Complete Module 1: Pilot Light</p>
+            </div>
+
+            <!-- Badge 11: Midseason MVP -->
+            <div class="badge-card fade-up">
+                <div class="badge-card__icon">⭐</div>
+                <p class="badge-card__name">"Midseason MVP"</p>
+                <p class="badge-card__description">Complete Modules 1-4 with B or higher</p>
+            </div>
+
+            <!-- Badge 12: Series Regular -->
+            <div class="badge-card fade-up">
+                <div class="badge-card__icon">🎬</div>
+                <p class="badge-card__name">"Series Regular"</p>
+                <p class="badge-card__description">Complete all 8 modules</p>
+            </div>
+
+            <!-- Badge 13: Master Craftsman -->
+            <div class="badge-card fade-up">
+                <div class="badge-card__icon">🏆</div>
+                <p class="badge-card__name">"Master Craftsman"</p>
+                <p class="badge-card__description">Pass the final exam with distinction</p>
+            </div>
+
+            <!-- Badge 14: Grunt Connoisseur -->
+            <div class="badge-card fade-up">
+                <div class="badge-card__icon">🔊</div>
+                <p class="badge-card__name">"Grunt Connoisseur"</p>
+                <p class="badge-card__description">Correctly identify all Tim grunts</p>
+            </div>
+
+            <!-- Badge 15: Taylor Estate Owner -->
+            <div class="badge-card fade-up">
+                <div class="badge-card__icon">🏰</div>
+                <p class="badge-card__name">"Taylor Estate Owner"</p>
+                <p class="badge-card__description">Reach $50,000 in home equity</p>
+            </div>
+        </div>
+
+        <div class="wilson-fence" style="margin-top: var(--space-5);">
+            <div class="wilson-fence__content">
+                <p class="wilson-fence__greeting">Hidey-ho, badge collector!</p>
+                <p class="wilson-fence__quote">
+                    You know, the ancient Greeks believed that excellence was not an act, but a habit.
+                    Aristotle called it 'arete' - the pursuit of being the best version of yourself.
+                    Each badge you earn is not just a reward, but a stepping stone on your journey of self-improvement.
+                </p>
+                <p class="wilson-fence__attribution">- Wilson W. Wilson Jr., Badge Philosophy Expert</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     CALL TO ACTION
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="section">
+    <div class="container container--narrow" style="text-align: center;">
+        <h2>Ready to Climb the Ranks?</h2>
+        <p class="lead" style="margin-bottom: var(--space-4);">
+            Every great craftsman started with a single nail. Your equity journey begins now.
+        </p>
+        <div style="display: flex; gap: var(--space-3); justify-content: center; flex-wrap: wrap;">
+            <a href="index.html" class="btn btn--primary">Back to Course Home</a>
+            <a href="module-01/01-module-overview.html" class="btn btn--gold">Start Module 1</a>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     FOOTER
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<footer style="background: var(--stone-900); color: var(--stone-400); padding: var(--space-6) var(--space-4); text-align: center;">
+    <div class="container">
+        <p style="font-family: var(--font-display); font-size: var(--text-xl); color: var(--white); margin-bottom: var(--space-2);">
+            Tool Time University
+        </p>
+        <p style="font-size: var(--text-sm); margin-bottom: var(--space-3);">
+            A Division of Binford Educational Services<br>
+            "If It Doesn't Say Binford, Someone Else Made It"
+        </p>
+        <p style="font-size: var(--text-xs); color: var(--stone-500);">
+            This course is a parody/fan creation for educational and entertainment purposes.<br>
+            Home Improvement is the property of Disney/ABC and Wind Dancer Productions.
+        </p>
+        <p style="font-size: var(--text-lg); margin-top: var(--space-4);">
+            ARUH ARUH ARUH! 🔧
+        </p>
+    </div>
+</footer>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     SCRIPTS
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Intersection Observer for fade-up elements
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+            }
+        });
+    }, {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    });
+
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+
+    // Smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function(e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+});
+
+// Table sorting function
+function sortTable(columnIndex) {
+    const table = document.getElementById('standingsTable');
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+
+    // Determine current sort direction
+    const currentDir = table.dataset.sortDir === 'asc' ? 'desc' : 'asc';
+    table.dataset.sortDir = currentDir;
+    table.dataset.sortCol = columnIndex;
+
+    rows.sort((a, b) => {
+        let aValue = a.cells[columnIndex].textContent.trim();
+        let bValue = b.cells[columnIndex].textContent.trim();
+
+        // Handle numeric values (rank and equity)
+        if (columnIndex === 0) {
+            // Rank column - extract number or use medal position
+            aValue = aValue.match(/\d+/) ? parseInt(aValue.match(/\d+/)[0]) : ['1', '2', '3'].indexOf(aValue[0]) + 1 || 99;
+            bValue = bValue.match(/\d+/) ? parseInt(bValue.match(/\d+/)[0]) : ['1', '2', '3'].indexOf(bValue[0]) + 1 || 99;
+        } else if (columnIndex === 2) {
+            // Equity column - parse dollar amount
+            aValue = parseInt(aValue.replace(/[$,]/g, ''));
+            bValue = parseInt(bValue.replace(/[$,]/g, ''));
+        } else if (columnIndex === 3) {
+            // Badges column - count badges
+            aValue = a.cells[columnIndex].querySelectorAll('span').length;
+            bValue = b.cells[columnIndex].querySelectorAll('span').length;
+        }
+
+        // Compare values
+        if (typeof aValue === 'number' && typeof bValue === 'number') {
+            return currentDir === 'asc' ? aValue - bValue : bValue - aValue;
+        }
+        return currentDir === 'asc'
+            ? aValue.toString().localeCompare(bValue.toString())
+            : bValue.toString().localeCompare(aValue.toString());
+    });
+
+    // Reorder rows
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// Animate milestone progress on scroll
+const milestonesProgress = document.querySelector('.milestones__progress');
+if (milestonesProgress) {
+    const milestonesObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                milestonesProgress.style.width = '97.5%';
+            }
+        });
+    }, { threshold: 0.5 });
+
+    milestonesObserver.observe(document.querySelector('.milestones'));
+}
+</script>
+
+</body>
+</html>

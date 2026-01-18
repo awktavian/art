@@ -1,0 +1,1140 @@
+/**
+ * =============================================================================
+ * COMPONENT: Slider
+ * Kagami Design System V2 - World-class range slider with spectral effects
+ *
+ * Features:
+ * - Elastic thumb with spring physics & momentum
+ * - Spectral fill with chromatic flow animation
+ * - Haptic tick marks that pulse as thumb passes
+ * - Bouncy tooltip with spring overshoot
+ * - Track glow that follows thumb position
+ * - Glass reflection on track surface
+ * - Inertia-based drag feel
+ *
+ * States: default, hover, focus, active, disabled, error, success
+ * Sizes: sm, md, lg
+ * =============================================================================
+ */
+
+/* =============================================================================
+   CSS CUSTOM PROPERTIES
+   ============================================================================= */
+
+.prism-slider {
+  /* Value (0-1, set via JS) */
+  --slider-value: 0.5;
+
+  /* Thumb elastic state */
+  --thumb-scale: 1;
+  --thumb-squish-x: 1;
+  --thumb-squish-y: 1;
+
+  /* Velocity for momentum effects (set via JS) */
+  --drag-velocity: 0;
+
+  /* Glow intensity (0-1) */
+  --glow-intensity: 0;
+
+  /* Tooltip state */
+  --tooltip-scale: 0;
+  --tooltip-y: 0;
+
+  /* Tick pulse (set via JS when passing a tick) */
+  --tick-pulse: 0;
+
+  /* Spectral fill animation offset */
+  --fill-offset: 0;
+}
+
+/* =============================================================================
+   BASE SLIDER
+   ============================================================================= */
+
+.prism-slider {
+  /* Layout */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  touch-action: none;
+}
+
+/* =============================================================================
+   LABEL ROW
+   ============================================================================= */
+
+.prism-slider__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.prism-slider__label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--prism-text);
+}
+
+.prism-slider__value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--colony-color, var(--prism-beacon));
+  font-variant-numeric: tabular-nums;
+
+  /* Number morphing support */
+  display: inline-flex;
+  overflow: hidden;
+}
+
+/* Individual digit for morphing animation */
+.prism-slider__digit {
+  display: inline-block;
+  transition: transform var(--prism-dur-fast) var(--prism-ease-spring);
+}
+
+.prism-slider__digit--changing {
+  animation: digit-morph 0.3s var(--prism-ease-spring);
+}
+
+@keyframes digit-morph {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  50% {
+    transform: translateY(10%);
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* =============================================================================
+   TRACK CONTAINER
+   ============================================================================= */
+
+.prism-slider__container {
+  /* Layout */
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+
+  /* Sizing (md default) */
+  height: 28px;
+  cursor: pointer;
+}
+
+/* =============================================================================
+   TRACK
+   ============================================================================= */
+
+.prism-slider__track {
+  /* Layout */
+  position: relative;
+  width: 100%;
+
+  /* Sizing - iOS standard 4px height */
+  height: 4px;
+
+  /* Visual - deep recessed glass effect */
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.12) 0%,
+    rgba(0, 0, 0, 0.06) 40%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation));
+  -webkit-backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation));
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--prism-radius-full);
+  overflow: visible; /* Allow glow to extend */
+
+  /* Multi-layer inset shadow for premium recessed feel */
+  box-shadow:
+    inset 0 1.5px 3px rgba(0, 0, 0, 0.25),
+    inset 0 0 1px rgba(0, 0, 0, 0.15),
+    inset 0 -0.5px 0 rgba(255, 255, 255, 0.08),
+    0 0.5px 0 rgba(255, 255, 255, 0.05);
+
+  /* GPU acceleration */
+  transform: translateZ(0);
+}
+
+/* Glass reflection sweep on track - premium highlight */
+.prism-slider__track::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.04) 30%,
+    transparent 50%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Track glow that follows thumb */
+.prism-slider__track::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: calc(var(--slider-value) * 100%);
+  width: 60px;
+  height: 20px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 60%, transparent) 0%,
+    color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 20%, transparent) 40%,
+    transparent 70%
+  );
+  filter: blur(8px);
+  opacity: var(--glow-intensity);
+  pointer-events: none;
+  z-index: -1;
+  transition: opacity 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Filled portion (progress) with vibrant spectral gradient */
+.prism-slider__fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: calc(var(--slider-value) * 100%);
+  border-radius: inherit;
+  overflow: hidden;
+
+  /* Vibrant gradient with luminous flow - iOS-style saturation */
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 85%, #000) 0%,
+      var(--colony-color, var(--prism-beacon)) 35%,
+      color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 100%, transparent) 50%,
+      color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 95%, #fff) 75%,
+      color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 80%, #fff) 100%
+    );
+
+  /* Inner glow for depth */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+
+  /* Material standard transition timing */
+  transition: width 150ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* GPU acceleration */
+  transform: translateZ(0);
+  will-change: width;
+}
+
+/* Spectral shimmer overlay on fill */
+.prism-slider__fill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 25%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.3) 75%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: fill-shimmer 3s ease-in-out infinite;
+  animation-play-state: paused;
+}
+
+.prism-slider:hover .prism-slider__fill::before,
+.prism-slider--dragging .prism-slider__fill::before {
+  animation-play-state: running;
+}
+
+@keyframes fill-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Glass reflection on fill */
+.prism-slider__fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.25) 0%,
+    transparent 100%
+  );
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Range fill (for dual thumbs) */
+.prism-slider--range .prism-slider__fill {
+  left: var(--slider-start, 0%);
+  width: calc(var(--slider-end, 100%) - var(--slider-start, 0%));
+}
+
+/* =============================================================================
+   THUMB
+   ============================================================================= */
+
+.prism-slider__thumb {
+  /* Layout */
+  position: absolute;
+  top: 50%;
+  left: calc(var(--slider-value) * 100%);
+
+  /* Sizing - iOS standard 28px diameter */
+  width: 28px;
+  height: 28px;
+  margin-left: -14px;
+  margin-top: -14px;
+
+  /* Visual - volumetric white with subtle gradient (darker at bottom like iOS) */
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #ffffff 45%,
+    #fafafa 70%,
+    #f5f5f5 100%
+  );
+  border: none;
+  border-radius: var(--prism-radius-full);
+  cursor: grab;
+
+  /* iOS-style multi-layer shadow system for premium depth */
+  box-shadow:
+    /* Soft ambient shadow */
+    0 3px 8px rgba(0, 0, 0, 0.15),
+    /* Contact shadow - tight */
+    0 1px 3px rgba(0, 0, 0, 0.12),
+    /* Depth shadow - diffuse */
+    0 6px 12px rgba(0, 0, 0, 0.08),
+    /* Subtle outer ring for definition */
+    0 0 0 0.5px rgba(0, 0, 0, 0.04);
+
+  /* Elastic transform with squish support */
+  transform:
+    translateZ(0)
+    scale(var(--thumb-scale))
+    scaleX(var(--thumb-squish-x))
+    scaleY(var(--thumb-squish-y));
+  transform-origin: center center;
+  will-change: transform, box-shadow, left;
+
+  /* Material standard transition timing */
+  transition:
+    transform 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    left 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Chromatic ring - rotating spectrum */
+.prism-slider__thumb::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--thumb-rotate, 0deg),
+    var(--prism-spark),
+    var(--prism-forge),
+    var(--prism-flow),
+    var(--prism-nexus),
+    var(--prism-beacon),
+    var(--prism-grove),
+    var(--prism-crystal),
+    var(--prism-spark)
+  );
+  z-index: -1;
+  opacity: 0;
+  filter: blur(8px);
+  pointer-events: none;
+  transition: opacity 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Animate chromatic ring rotation */
+@property --thumb-rotate {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.prism-slider:hover .prism-slider__thumb::before,
+.prism-slider--dragging .prism-slider__thumb::before {
+  animation: thumb-chromatic-spin 4s linear infinite;
+}
+
+@keyframes thumb-chromatic-spin {
+  from { --thumb-rotate: 0deg; }
+  to { --thumb-rotate: 360deg; }
+}
+
+/* Inset highlight at top of thumb - creates volumetric feel */
+.prism-slider__thumb::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 15%;
+  right: 15%;
+  height: 40%;
+  border-radius: 50% 50% 45% 45% / 60% 60% 40% 40%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+/* Inner dot indicator */
+.prism-slider__thumb-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  background: var(--colony-color, var(--prism-beacon));
+  border-radius: var(--prism-radius-full);
+  opacity: 0.6;
+  transition:
+    transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.prism-slider:hover .prism-slider__thumb-dot,
+.prism-slider--dragging .prism-slider__thumb-dot {
+  transform: scale(1.2);
+  opacity: 1;
+}
+
+/* Tooltip on thumb - bouncy appearance */
+.prism-slider__tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--prism-text);
+  white-space: nowrap;
+  pointer-events: none;
+
+  /* Glass surface */
+  background: var(--prism-surface-elevated);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid var(--prism-border);
+  border-radius: var(--prism-radius-md);
+
+  /* Rich shadow */
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.15),
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+
+  /* Bouncy transform - starts hidden below */
+  transform:
+    translateX(-50%)
+    translateY(calc(-8px + var(--tooltip-y, 0px)))
+    scale(var(--tooltip-scale, 0));
+  transform-origin: bottom center;
+  opacity: 0;
+
+  /* Material standard spring transition */
+  transition:
+    transform 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 100ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Tooltip arrow */
+.prism-slider__tooltip::before {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -6px;
+  border: 6px solid transparent;
+  border-top-color: var(--prism-surface-elevated);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.1));
+}
+
+/* Tooltip inner glow on value change */
+.prism-slider__tooltip::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 10%, transparent) 0%,
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 100ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.prism-slider--dragging .prism-slider__tooltip::after {
+  opacity: 1;
+}
+
+/* =============================================================================
+   INTERACTIVE STATES
+   ============================================================================= */
+
+/* Hover on container - activate glow */
+.prism-slider:hover {
+  --glow-intensity: 0.6;
+}
+
+.prism-slider__container:hover .prism-slider__thumb {
+  --thumb-scale: 1.05;
+  box-shadow:
+    /* Enhanced ambient on hover */
+    0 4px 12px rgba(0, 0, 0, 0.18),
+    /* Tighter contact shadow */
+    0 2px 4px rgba(0, 0, 0, 0.14),
+    /* Deeper depth shadow */
+    0 8px 16px rgba(0, 0, 0, 0.1),
+    /* Color ambient glow */
+    0 0 16px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 20%, transparent),
+    /* Definition ring */
+    0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+.prism-slider__container:hover .prism-slider__thumb::before {
+  opacity: 0.3;
+}
+
+/* Hover on track - elevate surface */
+.prism-slider__container:hover .prism-slider__track {
+  background: var(--prism-surface-elevated);
+  border-color: color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 30%, var(--prism-border));
+}
+
+/* Focus - accessibility ring with pulse */
+.prism-slider__thumb:focus-visible {
+  outline: none;
+}
+
+.prism-slider:focus-within .prism-slider__thumb {
+  box-shadow:
+    /* Base shadows maintained */
+    0 3px 8px rgba(0, 0, 0, 0.15),
+    0 1px 3px rgba(0, 0, 0, 0.12),
+    0 6px 12px rgba(0, 0, 0, 0.08),
+    /* Accessibility focus ring */
+    0 0 0 3px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 40%, transparent);
+}
+
+.prism-slider:focus-within .prism-slider__thumb::before {
+  opacity: 0.5;
+}
+
+/* Show tooltip on focus */
+.prism-slider:focus-within .prism-slider__tooltip {
+  --tooltip-scale: 1;
+  --tooltip-y: 0px;
+  opacity: 1;
+}
+
+/* Active/Dragging - full engagement */
+.prism-slider--dragging {
+  --glow-intensity: 1;
+}
+
+.prism-slider__thumb:active,
+.prism-slider--dragging .prism-slider__thumb {
+  cursor: grabbing;
+  --thumb-scale: 1.1;
+  box-shadow:
+    /* Elevated ambient during drag */
+    0 6px 16px rgba(0, 0, 0, 0.22),
+    /* Maintained contact shadow */
+    0 2px 6px rgba(0, 0, 0, 0.16),
+    /* Extended depth shadow */
+    0 12px 24px rgba(0, 0, 0, 0.12),
+    /* Vibrant color glow */
+    0 0 24px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 30%, transparent),
+    /* Crisp definition */
+    0 0 0 0.5px rgba(0, 0, 0, 0.05);
+}
+
+.prism-slider__thumb:active::before,
+.prism-slider--dragging .prism-slider__thumb::before {
+  opacity: 0.6;
+}
+
+/* Show tooltip when dragging with spring bounce entrance */
+.prism-slider--dragging .prism-slider__tooltip {
+  --tooltip-scale: 1;
+  --tooltip-y: 0px;
+  opacity: 1;
+  animation: tooltip-spring-bounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes tooltip-spring-bounce {
+  0% {
+    transform: translateX(-50%) translateY(8px) scale(0.3);
+    opacity: 0;
+  }
+  40% {
+    transform: translateX(-50%) translateY(-14px) scale(1.12);
+    opacity: 1;
+  }
+  55% {
+    transform: translateX(-50%) translateY(-6px) scale(0.95);
+  }
+  70% {
+    transform: translateX(-50%) translateY(-10px) scale(1.03);
+  }
+  85% {
+    transform: translateX(-50%) translateY(-7px) scale(0.99);
+  }
+  100% {
+    transform: translateX(-50%) translateY(-8px) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Thumb squish during fast drag (set via JS) */
+.prism-slider--fast-drag .prism-slider__thumb {
+  --thumb-squish-x: 1.15;
+  --thumb-squish-y: 0.9;
+}
+
+/* Momentum bounce at edges */
+.prism-slider--bounce-left .prism-slider__thumb {
+  animation: thumb-bounce-left 0.4s var(--prism-ease-spring);
+}
+
+.prism-slider--bounce-right .prism-slider__thumb {
+  animation: thumb-bounce-right 0.4s var(--prism-ease-spring);
+}
+
+@keyframes thumb-bounce-left {
+  0% { transform: translateX(-5px) translateZ(0) scale(var(--thumb-scale)); }
+  50% { transform: translateX(3px) translateZ(0) scale(calc(var(--thumb-scale) * 1.05)); }
+  100% { transform: translateX(0) translateZ(0) scale(var(--thumb-scale)); }
+}
+
+@keyframes thumb-bounce-right {
+  0% { transform: translateX(5px) translateZ(0) scale(var(--thumb-scale)); }
+  50% { transform: translateX(-3px) translateZ(0) scale(calc(var(--thumb-scale) * 1.05)); }
+  100% { transform: translateX(0) translateZ(0) scale(var(--thumb-scale)); }
+}
+
+/* Disabled */
+.prism-slider--disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.prism-slider--disabled .prism-slider__container {
+  cursor: not-allowed;
+}
+
+.prism-slider--disabled .prism-slider__thumb {
+  cursor: not-allowed;
+  --thumb-scale: 1;
+}
+
+.prism-slider--disabled .prism-slider__thumb::before {
+  display: none;
+}
+
+/* Error */
+.prism-slider--error .prism-slider__fill {
+  background: linear-gradient(90deg, var(--prism-spark), var(--prism-forge));
+}
+
+.prism-slider--error .prism-slider__thumb {
+  border-color: var(--prism-spark);
+}
+
+.prism-slider--error .prism-slider__thumb::before {
+  background: linear-gradient(135deg, var(--prism-spark), var(--prism-forge));
+}
+
+/* Success */
+.prism-slider--success .prism-slider__fill {
+  background: linear-gradient(90deg, var(--prism-nexus), var(--prism-beacon));
+}
+
+.prism-slider--success .prism-slider__thumb {
+  border-color: var(--prism-nexus);
+}
+
+.prism-slider--success .prism-slider__thumb::before {
+  background: linear-gradient(135deg, var(--prism-nexus), var(--prism-beacon));
+}
+
+/* =============================================================================
+   SIZE VARIANTS
+   ============================================================================= */
+
+/* Small */
+.prism-slider--sm .prism-slider__container {
+  height: 22px;
+}
+
+.prism-slider--sm .prism-slider__track {
+  height: 3px;
+}
+
+.prism-slider--sm .prism-slider__thumb {
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  margin-top: -11px;
+}
+
+.prism-slider--sm .prism-slider__label,
+.prism-slider--sm .prism-slider__value {
+  font-size: 0.8125rem;
+}
+
+/* Large */
+.prism-slider--lg .prism-slider__container {
+  height: 36px;
+}
+
+.prism-slider--lg .prism-slider__track {
+  height: 6px;
+}
+
+.prism-slider--lg .prism-slider__thumb {
+  width: 34px;
+  height: 34px;
+  margin-left: -17px;
+  margin-top: -17px;
+}
+
+.prism-slider--lg .prism-slider__label,
+.prism-slider--lg .prism-slider__value {
+  font-size: 0.9375rem;
+}
+
+/* =============================================================================
+   MARKS - Haptic tick marks that pulse as thumb passes
+   ============================================================================= */
+
+.prism-slider__marks {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 10px;
+  margin-top: 8px;
+}
+
+.prism-slider__mark {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Mark tick on the track */
+.prism-slider__mark-tick {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  width: 2px;
+  height: 8px;
+  background: var(--prism-border);
+  border-radius: 1px;
+  transform-origin: bottom center;
+  transition:
+    background 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.prism-slider__mark--active .prism-slider__mark-tick {
+  background: var(--colony-color, var(--prism-beacon));
+}
+
+/* Haptic pulse when thumb passes - satisfying spring animation */
+.prism-slider__mark--pulse .prism-slider__mark-tick {
+  animation: mark-haptic-pulse 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes mark-haptic-pulse {
+  0% {
+    transform: scaleY(1) scaleX(1);
+    background: var(--prism-border);
+    box-shadow: none;
+  }
+  25% {
+    transform: scaleY(1.8) scaleX(1.6);
+    background: var(--colony-color, var(--prism-beacon));
+    box-shadow: 0 0 8px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 50%, transparent);
+  }
+  50% {
+    transform: scaleY(0.7) scaleX(0.8);
+  }
+  70% {
+    transform: scaleY(1.15) scaleX(1.1);
+  }
+  100% {
+    transform: scaleY(1) scaleX(1);
+    background: var(--colony-color, var(--prism-beacon));
+    box-shadow: none;
+  }
+}
+
+/* Mark dot indicator */
+.prism-slider__mark-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--prism-surface);
+  border: 1.5px solid var(--prism-border);
+  border-radius: var(--prism-radius-full);
+  transition:
+    background 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.prism-slider__mark--active .prism-slider__mark-dot {
+  background: var(--colony-color, var(--prism-beacon));
+  border-color: var(--colony-color, var(--prism-beacon));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 40%, transparent);
+}
+
+/* Dot pulse animation when passing - satisfying pop */
+.prism-slider__mark--pulse .prism-slider__mark-dot {
+  animation: mark-dot-pulse 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes mark-dot-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 50%, transparent);
+  }
+  25% {
+    transform: scale(1.6);
+    box-shadow: 0 0 16px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 70%, transparent);
+  }
+  50% {
+    transform: scale(0.9);
+  }
+  70% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 40%, transparent);
+  }
+}
+
+/* Mark label */
+.prism-slider__mark-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--prism-text-secondary);
+  white-space: nowrap;
+  transition:
+    color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.prism-slider__mark--active .prism-slider__mark-label {
+  color: var(--colony-color, var(--prism-beacon));
+}
+
+/* Label pop animation when passing - satisfying bounce */
+.prism-slider__mark--pulse .prism-slider__mark-label {
+  animation: mark-label-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes mark-label-pop {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.2); }
+  50% { transform: scale(0.95); }
+  70% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Track-integrated tick marks (alternative style) */
+.prism-slider--ticks-on-track .prism-slider__track::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0%,
+      transparent calc(10% - 1px),
+      rgba(255, 255, 255, 0.1) calc(10% - 1px),
+      rgba(255, 255, 255, 0.1) calc(10% + 1px),
+      transparent calc(10% + 1px),
+      transparent 10%
+    );
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* =============================================================================
+   STEPPED SLIDER - Snappy steps with satisfying feedback
+   ============================================================================= */
+
+.prism-slider--stepped .prism-slider__fill {
+  transition: width 150ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.prism-slider--stepped .prism-slider__thumb {
+  transition:
+    left 150ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Snap animation when stepping */
+.prism-slider--stepped.prism-slider--snap .prism-slider__thumb {
+  animation: slider-step-snap 0.3s var(--prism-ease-spring);
+}
+
+@keyframes slider-step-snap {
+  0% {
+    transform: translateZ(0) scale(var(--thumb-scale));
+  }
+  30% {
+    transform: translateZ(0) scale(calc(var(--thumb-scale) * 1.2));
+  }
+  60% {
+    transform: translateZ(0) scale(calc(var(--thumb-scale) * 0.95));
+  }
+  100% {
+    transform: translateZ(0) scale(var(--thumb-scale));
+  }
+}
+
+/* Step indicator visual on track */
+.prism-slider--stepped .prism-slider__track {
+  overflow: visible;
+}
+
+/* Step dots on track */
+.prism-slider__steps {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 10px;
+  pointer-events: none;
+}
+
+.prism-slider__step {
+  width: 4px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: var(--prism-radius-full);
+  transition:
+    background 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.prism-slider__step--active {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.prism-slider__step--current {
+  transform: scale(1.5);
+  background: white;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.5);
+}
+
+/* =============================================================================
+   VERTICAL SLIDER
+   ============================================================================= */
+
+.prism-slider--vertical {
+  width: auto;
+  height: 200px;
+}
+
+.prism-slider--vertical .prism-slider__container {
+  width: 28px;
+  height: 100%;
+  flex-direction: column;
+}
+
+.prism-slider--vertical .prism-slider__track {
+  width: 4px;
+  height: 100%;
+}
+
+.prism-slider--vertical .prism-slider__fill {
+  top: auto;
+  bottom: 0;
+  width: 100%;
+  height: var(--slider-value, 0%);
+}
+
+.prism-slider--vertical .prism-slider__thumb {
+  left: 50%;
+  top: auto;
+  margin-left: -14px;
+  margin-top: 0;
+  margin-bottom: -14px;
+}
+
+/* =============================================================================
+   HELPER TEXT
+   ============================================================================= */
+
+.prism-slider__helper {
+  font-size: 0.75rem;
+  color: var(--prism-text-secondary);
+  margin-top: 4px;
+}
+
+.prism-slider--error .prism-slider__helper {
+  color: var(--prism-spark);
+}
+
+/* =============================================================================
+   NATIVE INPUT (For accessibility)
+   ============================================================================= */
+
+.prism-slider__input {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  margin: 0;
+}
+
+/* =============================================================================
+   COLONY COLOR VARIANTS
+   ============================================================================= */
+
+.prism-slider[data-colony="spark"] { --colony-color: var(--prism-spark); }
+.prism-slider[data-colony="forge"] { --colony-color: var(--prism-forge); }
+.prism-slider[data-colony="flow"] { --colony-color: var(--prism-flow); }
+.prism-slider[data-colony="nexus"] { --colony-color: var(--prism-nexus); }
+.prism-slider[data-colony="beacon"] { --colony-color: var(--prism-beacon); }
+.prism-slider[data-colony="grove"] { --colony-color: var(--prism-grove); }
+.prism-slider[data-colony="crystal"] { --colony-color: var(--prism-crystal); }
+
+/* =============================================================================
+   REDUCED MOTION
+   ============================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .prism-slider__fill {
+    transition: none;
+  }
+
+  .prism-slider__fill::before {
+    animation: none;
+  }
+
+  .prism-slider__thumb {
+    transition: none;
+    --thumb-squish-x: 1;
+    --thumb-squish-y: 1;
+  }
+
+  .prism-slider__thumb::before {
+    transition: none;
+    animation: none;
+  }
+
+  .prism-slider__tooltip {
+    transition: none;
+  }
+
+  .prism-slider--dragging .prism-slider__tooltip {
+    animation: none;
+  }
+
+  .prism-slider__mark-tick,
+  .prism-slider__mark-dot,
+  .prism-slider__mark-label {
+    transition: none;
+  }
+
+  .prism-slider__mark--pulse .prism-slider__mark-tick,
+  .prism-slider__mark--pulse .prism-slider__mark-dot,
+  .prism-slider__mark--pulse .prism-slider__mark-label {
+    animation: none;
+  }
+
+  .prism-slider--stepped.prism-slider--snap .prism-slider__thumb {
+    animation: none;
+  }
+
+  .prism-slider--bounce-left .prism-slider__thumb,
+  .prism-slider--bounce-right .prism-slider__thumb {
+    animation: none;
+  }
+
+  .prism-slider__digit--changing {
+    animation: none;
+  }
+}
+
+/* =============================================================================
+   TOUCH DEVICE OPTIMIZATIONS
+   ============================================================================= */
+
+@media (hover: none) and (pointer: coarse) {
+  /* Touch-friendly sizing - already 28px but ensure adequate tap target */
+  .prism-slider__thumb {
+    width: 32px;
+    height: 32px;
+    margin-left: -16px;
+    margin-top: -16px;
+  }
+
+  .prism-slider__container {
+    height: 48px;
+    min-height: 48px;
+  }
+
+  /* Disable chromatic effects on touch for performance */
+  .prism-slider__thumb::before {
+    display: none;
+  }
+
+  /* Simpler glow for performance */
+  .prism-slider__track::after {
+    display: none;
+  }
+
+  /* Touch feedback with haptic-style scale */
+  .prism-slider:active .prism-slider__thumb {
+    transform: scale(1.12) translateZ(0);
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.2),
+      0 2px 4px rgba(0, 0, 0, 0.15),
+      0 8px 20px rgba(0, 0, 0, 0.1);
+  }
+}

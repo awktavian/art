@@ -1,0 +1,588 @@
+/**
+ * =============================================================================
+ * COMPONENT: Search
+ * Kagami Design System V2 - Search input with icon and glass effects
+ *
+ * States: default, hover, focus, error, success, disabled, loading
+ * Sizes: sm, md, lg
+ * Features: search icon, clear button, voice input, suggestions
+ * =============================================================================
+ */
+
+/* =============================================================================
+   BASE SEARCH
+   ============================================================================= */
+
+.prism-search {
+  /* Layout */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+/* =============================================================================
+   SEARCH CONTAINER
+   ============================================================================= */
+
+.prism-search__container {
+  /* Layout */
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  /* VOLUMETRIC glass with noise texture */
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    var(--prism-surface);
+  background-blend-mode: overlay, normal;
+  backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+  -webkit-backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+
+  /* Glass edge beveling */
+  border: 1px solid transparent;
+  border-image: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.25) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(0, 0, 0, 0.02) 100%
+  ) 1;
+  border-radius: var(--prism-radius-full);
+
+  /* GPU acceleration */
+  transform: translateZ(0);
+
+  /* Transitions */
+  transition:
+    border-color var(--prism-dur-normal) var(--prism-ease-cusp),
+    box-shadow var(--prism-dur-normal) var(--prism-ease-cusp),
+    background var(--prism-dur-normal) var(--prism-ease-cusp),
+    width var(--prism-dur-slow) var(--prism-ease-spring);
+}
+
+/* Chromatic ring */
+.prism-search__container::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: var(--prism-gradient-spectrum);
+  z-index: -1;
+  opacity: 0;
+  filter: blur(4px);
+  transition: opacity var(--prism-dur-normal) var(--prism-ease-cusp);
+  pointer-events: none;
+}
+
+/* =============================================================================
+   SEARCH ICON
+   ============================================================================= */
+
+.prism-search__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 14px;
+  color: var(--prism-text-secondary);
+  flex-shrink: 0;
+  pointer-events: none;
+  transition: color var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-search__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* =============================================================================
+   INPUT ELEMENT
+   ============================================================================= */
+
+.prism-search__input {
+  /* Reset */
+  appearance: none;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: inherit;
+
+  /* Layout */
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+
+  /* Sizing (md default) */
+  height: 44px;
+  padding: 0 14px;
+
+  /* Typography */
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  color: var(--prism-text);
+}
+
+.prism-search__input::placeholder {
+  color: var(--prism-text-tertiary);
+}
+
+/* Remove default search styling */
+.prism-search__input::-webkit-search-decoration,
+.prism-search__input::-webkit-search-cancel-button,
+.prism-search__input::-webkit-search-results-button,
+.prism-search__input::-webkit-search-results-decoration {
+  display: none;
+}
+
+/* =============================================================================
+   ACTIONS (Clear, Voice, etc.)
+   ============================================================================= */
+
+.prism-search__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 8px;
+}
+
+/* Clear button */
+.prism-search__clear {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--prism-text-tertiary);
+  border-radius: var(--prism-radius-full);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--prism-dur-fast) var(--prism-ease-cusp),
+    color var(--prism-dur-fast) var(--prism-ease-cusp),
+    background var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-search__clear:hover {
+  color: var(--prism-text);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.prism-search__clear svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Show clear when input has value */
+.prism-search--has-value .prism-search__clear {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Voice input button */
+.prism-search__voice {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--prism-text-secondary);
+  border-radius: var(--prism-radius-full);
+  transition:
+    color var(--prism-dur-fast) var(--prism-ease-cusp),
+    background var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-search__voice:hover {
+  color: var(--prism-text);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.prism-search__voice svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Voice listening state */
+.prism-search__voice--listening {
+  color: var(--prism-spark);
+  animation: prism-search-pulse 1s ease-in-out infinite;
+}
+
+@keyframes prism-search-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* =============================================================================
+   LOADING SPINNER
+   ============================================================================= */
+
+.prism-search__spinner {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  border: 2px solid var(--prism-text-tertiary);
+  border-top-color: var(--colony-color, var(--prism-beacon));
+  border-radius: 50%;
+  animation: prism-search-spin 0.8s linear infinite;
+}
+
+@keyframes prism-search-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =============================================================================
+   INTERACTIVE STATES
+   ============================================================================= */
+
+/* Hover */
+.prism-search__container:hover:not(.prism-search__container--disabled) {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: var(--prism-surface-elevated);
+}
+
+.prism-search__container:hover:not(.prism-search__container--disabled) .prism-search__icon {
+  color: var(--prism-text);
+}
+
+/* Focus */
+.prism-search__container:focus-within:not(.prism-search__container--disabled) {
+  border-color: var(--colony-color, var(--prism-beacon));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 20%, transparent),
+    var(--prism-shadow-chromatic);
+}
+
+.prism-search__container:focus-within:not(.prism-search__container--disabled)::before {
+  opacity: 0.3;
+}
+
+.prism-search__container:focus-within:not(.prism-search__container--disabled) .prism-search__icon {
+  color: var(--colony-color, var(--prism-beacon));
+}
+
+/* Disabled */
+.prism-search--disabled .prism-search__container {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Loading */
+.prism-search--loading .prism-search__container {
+  pointer-events: none;
+}
+
+/* Error */
+.prism-search--error .prism-search__container {
+  border-color: var(--prism-spark);
+}
+
+.prism-search--error .prism-search__container:focus-within {
+  box-shadow: 0 0 0 3px var(--prism-e1-18);
+}
+
+.prism-search--error .prism-search__container::before {
+  background: linear-gradient(135deg, var(--prism-spark), var(--prism-forge));
+}
+
+/* Success */
+.prism-search--success .prism-search__container {
+  border-color: var(--prism-nexus);
+}
+
+.prism-search--success .prism-search__container:focus-within {
+  box-shadow: 0 0 0 3px var(--prism-e4-18);
+}
+
+/* =============================================================================
+   SIZE VARIANTS
+   ============================================================================= */
+
+/* Small */
+.prism-search--sm .prism-search__container {
+  border-radius: var(--prism-radius-full);
+}
+
+.prism-search--sm .prism-search__icon {
+  width: 16px;
+  height: 16px;
+  margin-left: 12px;
+}
+
+.prism-search--sm .prism-search__input {
+  height: 36px;
+  padding: 0 12px;
+  font-size: 0.875rem;
+}
+
+.prism-search--sm .prism-search__actions {
+  padding-right: 6px;
+}
+
+.prism-search--sm .prism-search__clear,
+.prism-search--sm .prism-search__voice {
+  padding: 4px;
+}
+
+/* Large */
+.prism-search--lg .prism-search__icon {
+  width: 20px;
+  height: 20px;
+  margin-left: 16px;
+}
+
+.prism-search--lg .prism-search__input {
+  height: 52px;
+  padding: 0 16px;
+  font-size: 1rem;
+}
+
+.prism-search--lg .prism-search__actions {
+  padding-right: 10px;
+}
+
+/* =============================================================================
+   SUGGESTIONS DROPDOWN
+   ============================================================================= */
+
+.prism-search__suggestions {
+  /* Reset */
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+
+  /* Positioning */
+  position: absolute;
+  z-index: var(--prism-z-tooltip);
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 8px;
+
+  /* Sizing */
+  max-height: 320px;
+  overflow-y: auto;
+
+  /* VOLUMETRIC glass with noise texture */
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    var(--prism-surface);
+  background-blend-mode: overlay, normal;
+  backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+  -webkit-backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+
+  /* Glass edge beveling */
+  border: 1px solid transparent;
+  border-image: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(0, 0, 0, 0.02) 100%
+  ) 1;
+  border-radius: var(--prism-radius-lg);
+
+  /* Volumetric shadow */
+  box-shadow:
+    0 12px 28px -6px rgba(0, 0, 0, 0.2),
+    0 4px 12px -4px rgba(0, 0, 0, 0.15),
+    inset 0 1px 1px rgba(255, 255, 255, 0.15),
+    var(--prism-shadow-chromatic);
+
+  /* Hidden by default */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition:
+    opacity var(--prism-dur-fast) var(--prism-ease-cusp),
+    transform var(--prism-dur-fast) var(--prism-ease-cusp),
+    visibility var(--prism-dur-fast);
+}
+
+/* Show suggestions */
+.prism-search--open .prism-search__suggestions {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* Suggestion item */
+.prism-search__suggestion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  font-size: 0.9375rem;
+  color: var(--prism-text);
+  border-radius: calc(var(--prism-radius-lg) - 6px);
+  cursor: pointer;
+  transition:
+    background var(--prism-dur-fast) var(--prism-ease-cusp),
+    color var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-search__suggestion:hover,
+.prism-search__suggestion--highlighted {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.prism-search__suggestion--highlighted {
+  color: var(--colony-color, var(--prism-beacon));
+}
+
+/* Suggestion icon */
+.prism-search__suggestion-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--prism-text-secondary);
+  flex-shrink: 0;
+}
+
+/* Suggestion text */
+.prism-search__suggestion-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Matched text highlight */
+.prism-search__match {
+  color: var(--colony-color, var(--prism-beacon));
+  font-weight: 600;
+}
+
+/* Suggestion category */
+.prism-search__suggestion-category {
+  font-size: 0.75rem;
+  color: var(--prism-text-tertiary);
+}
+
+/* Section headers */
+.prism-search__section {
+  padding: 8px 14px 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--prism-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* No results */
+.prism-search__no-results {
+  padding: 20px;
+  text-align: center;
+  color: var(--prism-text-secondary);
+  font-size: 0.875rem;
+}
+
+/* =============================================================================
+   EXPANDABLE VARIANT
+   ============================================================================= */
+
+.prism-search--expandable .prism-search__container {
+  width: 44px;
+  overflow: hidden;
+}
+
+.prism-search--expandable .prism-search__input {
+  opacity: 0;
+}
+
+.prism-search--expandable.prism-search--expanded .prism-search__container {
+  width: 100%;
+}
+
+.prism-search--expandable.prism-search--expanded .prism-search__input {
+  opacity: 1;
+}
+
+/* =============================================================================
+   COMPACT VARIANT
+   ============================================================================= */
+
+.prism-search--compact .prism-search__container {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: transparent;
+}
+
+.prism-search--compact .prism-search__container:hover:not(.prism-search__container--disabled) {
+  background: var(--prism-surface);
+  backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation));
+  -webkit-backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation));
+  border-color: var(--prism-border);
+}
+
+/* =============================================================================
+   COLONY COLOR VARIANTS
+   ============================================================================= */
+
+.prism-search[data-colony="spark"] { --colony-color: var(--prism-spark); }
+.prism-search[data-colony="forge"] { --colony-color: var(--prism-forge); }
+.prism-search[data-colony="flow"] { --colony-color: var(--prism-flow); }
+.prism-search[data-colony="nexus"] { --colony-color: var(--prism-nexus); }
+.prism-search[data-colony="beacon"] { --colony-color: var(--prism-beacon); }
+.prism-search[data-colony="grove"] { --colony-color: var(--prism-grove); }
+.prism-search[data-colony="crystal"] { --colony-color: var(--prism-crystal); }
+
+/* =============================================================================
+   KEYBOARD SHORTCUTS HINT
+   ============================================================================= */
+
+.prism-search__shortcut {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  font-size: 0.6875rem;
+  font-family: monospace;
+  color: var(--prism-text-tertiary);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--prism-border);
+  border-radius: 4px;
+  margin-right: 8px;
+}
+
+/* =============================================================================
+   REDUCED MOTION
+   ============================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .prism-search__container {
+    transition: none;
+  }
+
+  .prism-search__container::before {
+    transition: none;
+  }
+
+  .prism-search__icon {
+    transition: none;
+  }
+
+  .prism-search__clear {
+    transition: none;
+  }
+
+  .prism-search__suggestions {
+    transition: none;
+  }
+
+  .prism-search__spinner {
+    animation: none;
+  }
+
+  .prism-search__voice--listening {
+    animation: none;
+  }
+}

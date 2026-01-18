@@ -1,0 +1,278 @@
+name: GPU Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'satellites/math/**'
+      - '.github/workflows/gpu-tests.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'satellites/math/**'
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      run_benchmarks:
+        description: 'Run performance benchmarks'
+        required: false
+        default: 'false'
+
+jobs:
+  # CPU tests run on all PRs
+  test-cpu:
+    name: CPU Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          cd satellites/math
+          pip install -e ".[dev]"
+          pip install pytest-xdist pytest-cov
+
+      - name: Run CPU tests
+        run: |
+          cd satellites/math
+          pytest tests/gpu/ \
+            -v \
+            -m "not gpu and not cuda and not mps" \
+            --cov=kagami_math \
+            --cov-report=xml \
+            --cov-report=term \
+            -n auto
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: satellites/math/coverage.xml
+          flags: cpu-tests
+          name: cpu-${{ matrix.python-version }}
+
+  # CUDA tests (NVIDIA GPUs) - requires GPU runner
+  test-cuda:
+    name: CUDA Tests (NVIDIA GPU)
+    runs-on: [self-hosted, linux, gpu, cuda]
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[cuda]')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Check CUDA availability
+        run: |
+          nvidia-smi
+          python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}'); print(f'CUDA version: {torch.version.cuda}')"
+
+      - name: Install dependencies
+        run: |
+          cd satellites/math
+          pip install -e ".[dev]"
+          pip install pytest-xdist
+
+      - name: Run CUDA tests (correctness)
+        run: |
+          cd satellites/math
+          pytest tests/gpu/ \
+            -v \
+            -m "not benchmark and not slow" \
+            --device=cuda \
+            --tb=short \
+            --maxfail=3
+
+      - name: Run CUDA benchmarks (optional)
+        if: github.event.inputs.run_benchmarks == 'true' || github.event_name == 'schedule'
+        run: |
+          cd satellites/math
+          pytest tests/gpu/test_performance.py \
+            -v \
+            -m "benchmark" \
+            --device=cuda \
+            --tb=short
+
+      - name: Memory leak detection
+        run: |
+          cd satellites/math
+          pytest tests/gpu/ \
+            -v \
+            -m "memory" \
+            --device=cuda \
+            --tb=short
+
+  # MPS tests (Apple Silicon) - requires Mac GPU runner
+  test-mps:
+    name: MPS Tests (Apple Silicon)
+    runs-on: [self-hosted, macos, arm64, gpu]
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[mps]')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Check MPS availability
+        run: |
+          python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'MPS available: {torch.backends.mps.is_available() if hasattr(torch.backends, \"mps\") else False}')"
+
+      - name: Install dependencies
+        run: |
+          cd satellites/math
+          pip install -e ".[dev]"
+          pip install pytest-xdist
+
+      - name: Run MPS tests (correctness)
+        run: |
+          cd satellites/math
+          pytest tests/gpu/ \
+            -v \
+            -m "not benchmark and not slow" \
+            --device=mps \
+            --tb=short \
+            --maxfail=3
+
+      - name: Run MPS benchmarks (optional)
+        if: github.event.inputs.run_benchmarks == 'true' || github.event_name == 'schedule'
+        run: |
+          cd satellites/math
+          pytest tests/gpu/test_performance.py \
+            -v \
+            -m "benchmark" \
+            --device=mps \
+            --tb=short
+
+  # Performance regression detection
+  performance-regression:
+    name: Performance Regression Check
+    runs-on: [self-hosted, linux, gpu, cuda]
+    if: github.event_name == 'pull_request' && contains(github.event.head_commit.message, '[perf]')
+
+    steps:
+      - name: Checkout code (PR)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd satellites/math
+          pip install -e ".[dev]"
+
+      - name: Run benchmarks (PR)
+        run: |
+          cd satellites/math
+          pytest tests/gpu/test_performance.py \
+            -v \
+            -m "benchmark" \
+            --device=cuda \
+            --json-report \
+            --json-report-file=pr_results.json
+
+      - name: Checkout code (base)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          submodules: recursive
+          clean: false
+
+      - name: Run benchmarks (base)
+        run: |
+          cd satellites/math
+          pip install -e ".[dev]"
+          pytest tests/gpu/test_performance.py \
+            -v \
+            -m "benchmark" \
+            --device=cuda \
+            --json-report \
+            --json-report-file=base_results.json
+
+      - name: Compare performance
+        run: |
+          python - <<'EOF'
+          import json
+
+          with open('satellites/math/pr_results.json') as f:
+              pr_data = json.load(f)
+          with open('satellites/math/base_results.json') as f:
+              base_data = json.load(f)
+
+          # Simple comparison - in production, use proper statistical analysis
+          pr_time = pr_data.get('duration', 0)
+          base_time = base_data.get('duration', 0)
+
+          if base_time > 0:
+              regression = ((pr_time - base_time) / base_time) * 100
+              print(f"Performance change: {regression:+.2f}%")
+
+              if regression > 10:  # >10% slower
+                  print(f"⚠️ WARNING: Performance regression detected!")
+                  exit(1)
+              elif regression < -10:  # >10% faster
+                  print(f"✅ Performance improvement detected!")
+          EOF
+
+  # Aggregate results
+  gpu-tests-complete:
+    name: GPU Tests Complete
+    needs: [test-cpu, test-cuda, test-mps]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.test-cpu.result }}" != "success" ]; then
+            echo "❌ CPU tests failed"
+            exit 1
+          fi
+
+          # GPU tests may be skipped if no runners available
+          if [ "${{ needs.test-cuda.result }}" == "failure" ]; then
+            echo "❌ CUDA tests failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.test-mps.result }}" == "failure" ]; then
+            echo "❌ MPS tests failed"
+            exit 1
+          fi
+
+          echo "✅ All tests passed or skipped appropriately"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "GPU tests failed. Please check the logs above."

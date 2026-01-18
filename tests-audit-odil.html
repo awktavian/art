@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鏡 Test Suite Byzantine Audit — For Odil</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+        :root {
+            --bg: #0a0a0f;
+            --surface: #12121a;
+            --surface-2: #1a1a24;
+            --border: rgba(255,255,255,0.08);
+            --text: #e8e4dc;
+            --text-muted: rgba(232, 228, 220, 0.6);
+            --gold: #d4af37;
+            --cyan: #00e5cc;
+            --red: #ff4444;
+            --green: #44ff88;
+            --amber: #ffaa00;
+            --purple: #9d7aee;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            line-height: 1.7;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 60px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 60px;
+        }
+
+        .kanji {
+            font-size: 80px;
+            background: linear-gradient(135deg, var(--gold), var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 300;
+            letter-spacing: 0.1em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            letter-spacing: 0.2em;
+        }
+
+        .tldr {
+            background: linear-gradient(135deg, rgba(212,175,55,0.1), rgba(0,229,204,0.1));
+            border: 1px solid var(--gold);
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 60px;
+        }
+
+        .tldr h2 {
+            color: var(--gold);
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tldr-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .tldr-item {
+            background: var(--surface);
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .tldr-item h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-bottom: 8px;
+        }
+
+        .tldr-item p {
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .verdict {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .verdict.good { background: rgba(68,255,136,0.15); color: var(--green); }
+        .verdict.warn { background: rgba(255,170,0,0.15); color: var(--amber); }
+        .verdict.bad { background: rgba(255,68,68,0.15); color: var(--red); }
+
+        section {
+            margin-bottom: 60px;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 500;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        h2 span {
+            font-size: 1.5rem;
+        }
+
+        .question-block {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .question {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--gold);
+            margin-bottom: 20px;
+        }
+
+        .answer {
+            color: var(--text);
+        }
+
+        .answer p {
+            margin-bottom: 15px;
+        }
+
+        .highlight {
+            background: var(--surface-2);
+            border-left: 3px solid var(--cyan);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--surface-2);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        pre {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--surface-2);
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            margin: 15px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 500;
+        }
+
+        .pyramid-visual {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin: 30px 0;
+        }
+
+        .pyramid-tier {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .pyramid-tier.e2e {
+            width: 30%;
+            background: rgba(255,68,68,0.15);
+            border: 1px solid var(--red);
+        }
+
+        .pyramid-tier.integration {
+            width: 60%;
+            background: rgba(255,170,0,0.15);
+            border: 1px solid var(--amber);
+        }
+
+        .pyramid-tier.unit {
+            width: 90%;
+            background: rgba(68,255,136,0.15);
+            border: 1px solid var(--green);
+        }
+
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 30px 0;
+        }
+
+        .comparison-side {
+            background: var(--surface);
+            padding: 25px;
+            border-radius: 12px;
+        }
+
+        .comparison-side h4 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            color: var(--text-muted);
+        }
+
+        .metric-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+        }
+
+        ul {
+            margin: 15px 0;
+            padding-left: 25px;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 60px 0;
+            border-top: 1px solid var(--border);
+            margin-top: 60px;
+        }
+
+        .footer-kanji {
+            font-size: 48px;
+            background: linear-gradient(135deg, var(--cyan), var(--gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+        }
+
+        .footer p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .comparison {
+                grid-template-columns: 1fr;
+            }
+
+            .pyramid-tier {
+                width: 100% !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="kanji">鏡</div>
+            <h1>Test Suite Byzantine Audit</h1>
+            <p class="subtitle">For Odil — January 11, 2026</p>
+        </header>
+
+        <div class="tldr">
+            <h2><span>⚡</span> TL;DR — The Core Insight</h2>
+            <div class="tldr-grid">
+                <div class="tldr-item">
+                    <h3>Pyramid Shape</h3>
+                    <p><span class="verdict warn">INVERTED</span> but <strong>intentionally</strong></p>
+                </div>
+                <div class="tldr-item">
+                    <h3>Test Quality</h3>
+                    <p><span class="verdict good">A- GRADE</span> mature codebase</p>
+                </div>
+                <div class="tldr-item">
+                    <h3>Coverage Gaps</h3>
+                    <p><span class="verdict bad">CRITICAL</span> security at 15.8%</p>
+                </div>
+                <div class="tldr-item">
+                    <h3>The Real Issue</h3>
+                    <p><span class="verdict warn">399 ERRORS</span> blocking test collection</p>
+                </div>
+            </div>
+        </div>
+
+        <section>
+            <h2><span>🔺</span> Why The Pyramid Looks "Off"</h2>
+
+            <div class="question-block">
+                <div class="question">Q: The classic testing pyramid is Unit (70%) → Integration (20%) → E2E (10%). This codebase is Unit (24%) → Integration (61%) → E2E (2%). What's going on?</div>
+
+                <div class="answer">
+                    <p><strong>Short answer:</strong> This is a <em>domain-specific inversion</em>, not bad practice.</p>
+
+                    <div class="pyramid-visual">
+                        <div class="pyramid-tier e2e">
+                            <span style="color:var(--red)">E2E</span>
+                            <span>218 tests (2%)</span>
+                        </div>
+                        <div class="pyramid-tier integration">
+                            <span style="color:var(--amber)">Integration</span>
+                            <span>6,360 tests (61%)</span>
+                        </div>
+                        <div class="pyramid-tier unit">
+                            <span style="color:var(--green)">Unit</span>
+                            <span>2,554 tests (24%)</span>
+                        </div>
+                    </div>
+
+                    <div class="highlight">
+                        <p><strong>Why this makes sense for Kagami:</strong></p>
+                        <ul>
+                            <li><strong>Safety-critical system:</strong> CBF (Control Barrier Functions) require multi-component verification. A safety invariant like <code>h(x) ≥ 0</code> can't be tested in isolation — it needs the full constraint solver, world model, and actuator chain.</li>
+                            <li><strong>ML/AI codebase:</strong> Testing a neural network's forward pass in isolation (unit test) proves nothing. You need integration tests that verify the model works with real data pipelines.</li>
+                            <li><strong>Colony architecture:</strong> 7 colonies (Spark, Forge, Flow, etc.) are designed to work together via Fano plane routing. Unit tests for individual colonies miss the emergent behavior.</li>
+                        </ul>
+                    </div>
+
+                    <p><strong>The F1 racing analogy was apt:</strong> You don't just test the engine (unit) — you test the engine + chassis + aerodynamics together (integration) because that's where race performance lives.</p>
+                </div>
+            </div>
+
+            <div class="question-block">
+                <div class="question">Q: But doesn't this make the test suite slow?</div>
+
+                <div class="answer">
+                    <p><strong>Yes, and that's the tradeoff.</strong></p>
+
+                    <div class="comparison">
+                        <div class="comparison-side">
+                            <h4>Classic Pyramid (70/20/10)</h4>
+                            <div class="metric-row">
+                                <span class="metric-label">Unit tests</span>
+                                <span class="metric-value">&lt;1s each</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Full suite</span>
+                                <span class="metric-value">~15-30 min</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Feedback loop</span>
+                                <span class="metric-value">Fast</span>
+                            </div>
+                        </div>
+                        <div class="comparison-side">
+                            <h4>Kagami's Pyramid (24/61/2)</h4>
+                            <div class="metric-row">
+                                <span class="metric-label">Integration tests</span>
+                                <span class="metric-value">&lt;5s each</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Full suite</span>
+                                <span class="metric-value">~8-9 hours</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Feedback loop</span>
+                                <span class="metric-value">Tiered (CI strategy)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p>The solution is <strong>tiered CI</strong>: run unit tests on every commit (45 min), integration tests on PR merge (nightly), E2E tests weekly.</p>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2><span>🔬</span> Test Quality Deep Dive</h2>
+
+            <div class="question-block">
+                <div class="question">Q: Are these actually good tests, or just many tests?</div>
+
+                <div class="answer">
+                    <p><strong>Overall grade: A-</strong> — This is a mature, well-structured test suite.</p>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Quality Metric</th>
+                                <th>Score</th>
+                                <th>Finding</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Placeholder tests (<code>pass</code>, <code>assert True</code>)</td>
+                                <td><span class="verdict good">A-</span></td>
+                                <td>Only 3-4 in 835 tests analyzed</td>
+                            </tr>
+                            <tr>
+                                <td>Tests without assertions</td>
+                                <td><span class="verdict good">A</span></td>
+                                <td>&lt;0.5% — almost all have proper assertions</td>
+                            </tr>
+                            <tr>
+                                <td>Over-mocking</td>
+                                <td><span class="verdict good">A</span></td>
+                                <td>~5% over-mock, rest are disciplined</td>
+                            </tr>
+                            <tr>
+                                <td>Flaky patterns (sleep, time-dependent)</td>
+                                <td><span class="verdict warn">B+</span></td>
+                                <td>~8% have timing dependencies</td>
+                            </tr>
+                            <tr>
+                                <td>Fixture organization</td>
+                                <td><span class="verdict good">A+</span></td>
+                                <td>Excellent dependency injection</td>
+                            </tr>
+                            <tr>
+                                <td>Behavior vs implementation testing</td>
+                                <td><span class="verdict good">A</span></td>
+                                <td>Tests behavior, not internals</td>
+                            </tr>
+                            <tr>
+                                <td>Parameterization</td>
+                                <td><span class="verdict warn">B</span></td>
+                                <td>~25% could benefit from @pytest.mark.parametrize</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="highlight">
+                        <p><strong>Standout patterns:</strong></p>
+                        <ul>
+                            <li><strong>Property-based testing (Hypothesis):</strong> 190 tests verify mathematical invariants (Fano plane, E8 lattice)</li>
+                            <li><strong>Contract testing (Syrupy):</strong> 63 tests ensure API stability</li>
+                            <li><strong>Chaos engineering:</strong> 79 tests simulate failures (Redis down, network partition)</li>
+                            <li><strong>Formal verification:</strong> 24 tests with adversarial sampling for safety</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2><span>🚨</span> The Real Problems</h2>
+
+            <div class="question-block">
+                <div class="question">Q: So if the pyramid is intentional and tests are good, what's actually broken?</div>
+
+                <div class="answer">
+                    <p><strong>Three critical issues:</strong></p>
+
+                    <h3 style="color: var(--red); margin: 20px 0 15px;">1. Test Collection Is Broken (399 Errors)</h3>
+                    <p>When you run <code>pytest --collect-only</code>, 399 tests fail to even <em>load</em>:</p>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Error Type</th>
+                                <th>Count</th>
+                                <th>Root Cause</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Missing satellite packages</td>
+                                <td>390</td>
+                                <td>Packages exist but not installed (<code>pip install -e satellites/*</code>)</td>
+                            </tr>
+                            <tr>
+                                <td>Syntax errors</td>
+                                <td>3</td>
+                                <td>Mismatched brackets in test files</td>
+                            </tr>
+                            <tr>
+                                <td>Missing core modules</td>
+                                <td>6</td>
+                                <td>Modules referenced but don't exist</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3 style="color: var(--red); margin: 30px 0 15px;">2. Security Module Coverage: 15.8%</h3>
+                    <p>19 source files, only 3 have tests. <strong>Untested critical files:</strong></p>
+                    <ul>
+                        <li><code>encryption.py</code> — cryptographic operations</li>
+                        <li><code>jailbreak_detector.py</code> — adversarial detection</li>
+                        <li><code>secrets_manager.py</code> — credential handling</li>
+                        <li><code>anti_replication.py</code> — self-replication prevention</li>
+                    </ul>
+
+                    <h3 style="color: var(--amber); margin: 30px 0 15px;">3. Satellite Packages: Smoke Tests Only</h3>
+                    <p>All satellites except smarthome have only <code>test_imports.py</code>:</p>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Satellite</th>
+                                <th>Source Files</th>
+                                <th>Test Coverage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>kagami_api</td><td>150</td><td style="color:var(--red)">0.67%</td></tr>
+                            <tr><td>kagami_hal</td><td>133</td><td style="color:var(--red)">0.75%</td></tr>
+                            <tr><td>kagami_math</td><td>45</td><td style="color:var(--red)">2.22%</td></tr>
+                            <tr><td>kagami_observability</td><td>30</td><td style="color:var(--red)">3.33%</td></tr>
+                            <tr><td>kagami_smarthome</td><td>80</td><td style="color:var(--amber)">11.25%</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2><span>📋</span> Documentation vs Reality</h2>
+
+            <div class="question-block">
+                <div class="question">Q: Does the codebase do what ARCHITECTURE.md says?</div>
+
+                <div class="answer">
+                    <p><strong>Compliance: 62%</strong></p>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Claim</th>
+                                <th>Status</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Coverage gate ≥70%</td>
+                                <td><span class="verdict good">✓ Enforced</span></td>
+                                <td>In CI and pyproject.toml</td>
+                            </tr>
+                            <tr>
+                                <td>Performance regression &lt;10%</td>
+                                <td><span class="verdict bad">✗ Missing</span></td>
+                                <td>Configured but not in CI</td>
+                            </tr>
+                            <tr>
+                                <td>Mutation testing ≥80%</td>
+                                <td><span class="verdict bad">✗ Missing</span></td>
+                                <td>Tool configured, not running</td>
+                            </tr>
+                            <tr>
+                                <td>Tier markers (tier_unit, etc.)</td>
+                                <td><span class="verdict warn">⚠ Partial</span></td>
+                                <td>Mixed with legacy markers</td>
+                            </tr>
+                            <tr>
+                                <td>Property-based testing</td>
+                                <td><span class="verdict good">✓ Full</span></td>
+                                <td>190 Hypothesis tests</td>
+                            </tr>
+                            <tr>
+                                <td>Chaos engineering</td>
+                                <td><span class="verdict good">✓ Full</span></td>
+                                <td>79 chaos tests</td>
+                            </tr>
+                            <tr>
+                                <td>Formal verification (Z3)</td>
+                                <td><span class="verdict warn">⚠ Different</span></td>
+                                <td>Uses adversarial sampling instead</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2><span>🎯</span> Action Plan</h2>
+
+            <div class="question-block">
+                <div class="question">What needs to happen?</div>
+
+                <div class="answer">
+                    <h3 style="color: var(--red); margin-bottom: 15px;">P0 — Fix Blocking Issues (Today)</h3>
+                    <pre>
+# Install satellite packages to fix 390 collection errors
+pip install -e satellites/math
+pip install -e satellites/observability
+pip install -e satellites/api
+pip install -e satellites/hal
+pip install -e satellites/smarthome
+pip install -e satellites/integrations
+
+# Fix 3 syntax errors
+# - tests/core/hal/adapters/macos/test_camera_avfoundation.py:25
+# - tests/core/test_schema_property_based.py:8
+# - tests/integration/test_memory_guard_under_load.py:15</pre>
+
+                    <h3 style="color: var(--amber); margin: 30px 0 15px;">P1 — Critical Coverage Gaps (This Week)</h3>
+                    <ul>
+                        <li>Write tests for <code>kagami/core/security/</code> (encryption.py, secrets_manager.py)</li>
+                        <li>Write tests for <code>kagami/core/safety/formal_verification.py</code></li>
+                        <li>Expand satellite tests beyond import-only</li>
+                    </ul>
+
+                    <h3 style="color: var(--green); margin: 30px 0 15px;">P2 — Enforce Quality Gates (This Month)</h3>
+                    <ul>
+                        <li>Add <code>--benchmark-compare-fail=mean:10%</code> to CI</li>
+                        <li>Add mutation testing to nightly workflow</li>
+                        <li>Standardize on <code>tier_*</code> markers (deprecate <code>unit</code>, <code>integration</code>)</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2><span>💡</span> The Bottom Line for Odil</h2>
+
+            <div class="tldr">
+                <p style="font-size: 1.2rem; line-height: 1.8;">
+                    The <strong>inverted pyramid is a feature, not a bug</strong>. For a safety-critical AI system with emergent multi-agent behavior, integration tests <em>are</em> the foundation. The racing metaphor was correct — you don't just test the engine, you test the whole car under race conditions.
+                </p>
+                <p style="font-size: 1.2rem; line-height: 1.8; margin-top: 20px;">
+                    <strong>What's actually broken:</strong> 399 tests won't even load due to missing package installs, security coverage is dangerously low, and documented quality gates aren't enforced in CI.
+                </p>
+                <p style="font-size: 1.2rem; line-height: 1.8; margin-top: 20px;">
+                    <strong>The tests.html visualization was correct</strong> — it showed the real state. The confusion came from applying classic web-app testing heuristics to a safety-critical ML system. Different domain, different pyramid.
+                </p>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <div class="footer-kanji">鏡</div>
+            <p>Crystal (e₇) • Byzantine Audit Complete</p>
+            <p style="margin-top: 10px;">Generated: January 11, 2026</p>
+        </footer>
+    </div>
+</body>
+</html>

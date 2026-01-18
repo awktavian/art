@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鏡 Kagami Display</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #07060B;
+            --surface: #0f0e14;
+            --border: #1a1922;
+            --text: #e8e6f0;
+            --text-dim: #8b8898;
+            --accent: #67d4e4;
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --error: #f87171;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            padding: 48px;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        .kanji {
+            font-size: 96px;
+            opacity: 0.1;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* QR Code Display */
+        .qr-container {
+            background: white;
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .qr-container img {
+            display: block;
+            width: 256px;
+            height: 256px;
+        }
+
+        .qr-label {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .qr-sublabel {
+            margin-top: 8px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 12px;
+            color: var(--text-dim);
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Image Display */
+        .image-container {
+            max-width: 90vw;
+            max-height: 80vh;
+        }
+
+        .image-container img {
+            max-width: 100%;
+            max-height: 70vh;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .image-title {
+            margin-top: 16px;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .image-caption {
+            margin-top: 8px;
+            color: var(--text-dim);
+        }
+
+        /* Notifications */
+        .notification {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            padding: 16px 24px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease;
+            z-index: 1000;
+        }
+
+        .notification.success { border-color: var(--success); }
+        .notification.warning { border-color: var(--warning); }
+        .notification.error { border-color: var(--error); }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            animation: fadeUp 0.3s ease;
+            z-index: 1000;
+        }
+
+        @keyframes fadeUp {
+            from { transform: translate(-50%, 20px); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 480px;
+            width: 90%;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .modal-content {
+            color: var(--text-dim);
+            margin-bottom: 24px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .modal-btn:hover {
+            background: var(--border);
+        }
+
+        .modal-btn.primary {
+            background: var(--accent);
+            color: var(--bg);
+            border-color: var(--accent);
+        }
+
+        /* Progress */
+        .progress-container {
+            position: fixed;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 24px;
+            min-width: 300px;
+            z-index: 1000;
+        }
+
+        .progress-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .progress-message {
+            font-size: 13px;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            transition: width 0.3s ease;
+        }
+
+        /* Connection status */
+        .connection-status {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--error);
+        }
+
+        .connection-dot.connected {
+            background: var(--success);
+        }
+
+        /* Waiting state */
+        .waiting {
+            color: var(--text-dim);
+            font-size: 14px;
+        }
+
+        .waiting .dots::after {
+            content: '';
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+
+        /* Latency display */
+        .latency {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="kanji">鏡</div>
+
+    <div class="container" id="main-content">
+        <div class="waiting">
+            Waiting for display content<span class="dots"></span>
+        </div>
+    </div>
+
+    <div id="notifications"></div>
+    <div id="toasts"></div>
+    <div id="modals"></div>
+    <div id="progress"></div>
+
+    <div class="connection-status">
+        <div class="connection-dot" id="conn-dot"></div>
+        <span id="conn-text">Connecting...</span>
+        <span class="latency" id="latency"></span>
+    </div>
+
+    <script>
+        // WebSocket connection with auto-reconnect
+        class DisplayClient {
+            constructor() {
+                this.ws = null;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 10;
+                this.pingInterval = null;
+                this.lastPing = 0;
+                this.latency = 0;
+
+                this.connect();
+            }
+
+            connect() {
+                const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = protocol + '//' + location.host + '/ws';
+                console.log('Connecting to:', wsUrl);
+
+                this.ws = new WebSocket(wsUrl);
+
+                this.ws.onopen = () => {
+                    console.log('WebSocket connected');
+                    this.reconnectAttempts = 0;
+                    this.updateConnectionStatus(true);
+                    this.send({ type: 'client_ready' });
+                    this.startPing();
+                };
+
+                this.ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log('Received:', data.type, data);
+                        this.handleEvent(data);
+                    } catch (e) {
+                        console.error('Parse error:', e, event.data);
+                    }
+                };
+
+                this.ws.onclose = (event) => {
+                    console.log('WebSocket closed:', event.code, event.reason);
+                    this.updateConnectionStatus(false);
+                    this.stopPing();
+                    this.reconnect();
+                };
+
+                this.ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                };
+            }
+
+            reconnect() {
+                if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                    this.reconnectAttempts++;
+                    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+                    console.log('Reconnecting in ' + delay + 'ms (attempt ' + this.reconnectAttempts + ')');
+                    setTimeout(() => this.connect(), delay);
+                }
+            }
+
+            send(data) {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    const payload = {
+                        ...data,
+                        id: data.id || crypto.randomUUID(),
+                        timestamp: new Date().toISOString()
+                    };
+                    this.ws.send(JSON.stringify(payload));
+                }
+            }
+
+            startPing() {
+                this.pingInterval = setInterval(() => {
+                    this.lastPing = Date.now();
+                    this.send({ type: 'ping', id: 'ping-' + this.lastPing });
+                }, 5000);
+            }
+
+            stopPing() {
+                if (this.pingInterval) {
+                    clearInterval(this.pingInterval);
+                    this.pingInterval = null;
+                }
+            }
+
+            updateConnectionStatus(connected) {
+                const dot = document.getElementById('conn-dot');
+                const text = document.getElementById('conn-text');
+
+                if (connected) {
+                    dot.classList.add('connected');
+                    text.textContent = 'Connected';
+                } else {
+                    dot.classList.remove('connected');
+                    text.textContent = 'Disconnected';
+                }
+            }
+
+            handleEvent(event) {
+                switch (event.type) {
+                    case 'pong':
+                        this.latency = Date.now() - this.lastPing;
+                        document.getElementById('latency').textContent = this.latency + 'ms';
+                        break;
+
+                    case 'show_qr':
+                        this.showQR(event.data);
+                        break;
+
+                    case 'show_image':
+                        this.showImage(event.data);
+                        break;
+
+                    case 'show_notification':
+                        this.showNotification(event.data);
+                        break;
+
+                    case 'show_toast':
+                        this.showToast(event.data);
+                        break;
+
+                    case 'show_modal':
+                        this.showModal(event.id, event.data);
+                        break;
+
+                    case 'close_modal':
+                        this.closeModal(event.data.modal_id);
+                        break;
+
+                    case 'show_progress':
+                        this.showProgress(event.id, event.data);
+                        break;
+
+                    case 'update_progress':
+                        this.updateProgress(event.data);
+                        break;
+
+                    case 'hide_progress':
+                        this.hideProgress(event.data.progress_id);
+                        break;
+
+                    case 'stream_frame':
+                        this.streamFrame(event.data);
+                        break;
+
+                    case 'clear':
+                        this.clear();
+                        break;
+
+                    case 'state_sync':
+                        this.syncState(event.data);
+                        break;
+                }
+            }
+
+            showQR(data) {
+                console.log('Showing QR:', data);
+                const container = document.getElementById('main-content');
+                let html = '<div class="qr-container"><img src="' + data.qr_image + '" alt="QR Code"></div>';
+                if (data.label) {
+                    html += '<div class="qr-label">' + data.label + '</div>';
+                }
+                if (data.sublabel) {
+                    html += '<div class="qr-sublabel">' + data.sublabel + '</div>';
+                }
+                container.innerHTML = html;
+            }
+
+            showImage(data) {
+                const container = document.getElementById('main-content');
+                let html = '<div class="image-container"><img src="' + data.image + '" alt="' + (data.title || 'Image') + '">';
+                if (data.title) {
+                    html += '<div class="image-title">' + data.title + '</div>';
+                }
+                if (data.caption) {
+                    html += '<div class="image-caption">' + data.caption + '</div>';
+                }
+                html += '</div>';
+                container.innerHTML = html;
+            }
+
+            showNotification(data) {
+                const container = document.getElementById('notifications');
+                const id = 'notif-' + Date.now();
+                let html = '<div class="notification ' + (data.level || 'info') + '" id="' + id + '">';
+                if (data.title) {
+                    html += '<strong>' + data.title + '</strong>';
+                }
+                html += '<span>' + data.message + '</span></div>';
+                container.insertAdjacentHTML('beforeend', html);
+
+                const dismissMs = data.auto_dismiss_ms || 5000;
+                setTimeout(() => {
+                    const el = document.getElementById(id);
+                    if (el) el.remove();
+                }, dismissMs);
+            }
+
+            showToast(data) {
+                const container = document.getElementById('toasts');
+                const id = 'toast-' + Date.now();
+                container.innerHTML = '<div class="toast" id="' + id + '">' + data.message + '</div>';
+
+                setTimeout(() => {
+                    const el = document.getElementById(id);
+                    if (el) el.remove();
+                }, data.auto_dismiss_ms || 3000);
+            }
+
+            showModal(eventId, data) {
+                const container = document.getElementById('modals');
+                const actions = data.actions || [{ id: 'close', label: 'Close' }];
+
+                let actionsHtml = '';
+                for (let i = 0; i < actions.length; i++) {
+                    const a = actions[i];
+                    actionsHtml += '<button class="modal-btn ' + (a.variant || '') + '" onclick="display.handleModalAction(\'' + eventId + '\', \'' + a.id + '\')">' + a.label + '</button>';
+                }
+
+                container.innerHTML = '<div class="modal-overlay" id="modal-' + eventId + '"><div class="modal"><div class="modal-title">' + data.title + '</div><div class="modal-content">' + data.content + '</div><div class="modal-actions">' + actionsHtml + '</div></div></div>';
+            }
+
+            handleModalAction(modalId, actionId) {
+                this.send({
+                    type: 'modal_response',
+                    data: { modal_id: modalId, action: actionId }
+                });
+                this.closeModal(modalId);
+            }
+
+            closeModal(modalId) {
+                const modal = document.getElementById('modal-' + modalId);
+                if (modal) modal.remove();
+            }
+
+            showProgress(eventId, data) {
+                const container = document.getElementById('progress');
+                let html = '<div class="progress-container" id="progress-' + eventId + '"><div class="progress-title">' + data.title + '</div>';
+                if (data.message) {
+                    html += '<div class="progress-message">' + data.message + '</div>';
+                }
+                html += '<div class="progress-bar"><div class="progress-fill" style="width: ' + ((data.value || 0) * 100) + '%"></div></div></div>';
+                container.innerHTML = html;
+            }
+
+            updateProgress(data) {
+                const container = document.querySelector('#progress-' + data.progress_id);
+                if (container) {
+                    const fill = container.querySelector('.progress-fill');
+                    const msg = container.querySelector('.progress-message');
+                    if (fill) fill.style.width = (data.value * 100) + '%';
+                    if (msg && data.message) msg.textContent = data.message;
+                }
+            }
+
+            hideProgress(progressId) {
+                const el = document.querySelector('#progress-' + progressId);
+                if (el) el.remove();
+            }
+
+            streamFrame(data) {
+                const container = document.getElementById('main-content');
+                let canvas = container.querySelector('canvas');
+
+                if (!canvas) {
+                    container.innerHTML = '<canvas id="stream-canvas"></canvas>';
+                    canvas = document.getElementById('stream-canvas');
+                }
+
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                };
+                img.src = data.frame;
+            }
+
+            clear() {
+                document.getElementById('main-content').innerHTML = '<div class="waiting">Waiting for display content<span class="dots"></span></div>';
+                document.getElementById('notifications').innerHTML = '';
+                document.getElementById('toasts').innerHTML = '';
+                document.getElementById('modals').innerHTML = '';
+                document.getElementById('progress').innerHTML = '';
+            }
+
+            syncState(state) {
+                if (state.qr) this.showQR(state.qr);
+                if (state.image) this.showImage(state.image);
+                if (state.modal) this.showModal(state.modal.id, state.modal);
+                if (state.progress) this.showProgress(state.progress.id, state.progress);
+            }
+        }
+
+        // Initialize
+        const display = new DisplayClient();
+        window.display = display;
+
+        console.log('HAL Display Client initialized');
+    </script>
+</body>
+</html>

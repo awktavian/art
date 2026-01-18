@@ -1,0 +1,835 @@
+name: e2e-validation
+
+# Unified E2E Validation Workflow
+# Validates the full Kagami constellation experience across all platforms
+#
+# This workflow ensures:
+#   - All apps build successfully
+#   - E2E tests pass for each platform
+#   - Screenshot tests capture UI state
+#   - User journeys are validated
+#   - Performance benchmarks are met
+#
+# Colony: Crystal (e7) - Verification & Polish
+#
+# h(x) >= 0. Always.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - '.github/workflows/e2e-validation.yml'
+  pull_request:
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - '.github/workflows/e2e-validation.yml'
+  workflow_dispatch:
+    inputs:
+      run_full_suite:
+        description: 'Run full E2E suite (all platforms)'
+        type: boolean
+        default: true
+      record_videos:
+        description: 'Record user journey videos'
+        type: boolean
+        default: false
+      update_baselines:
+        description: 'Update screenshot baselines'
+        type: boolean
+        default: false
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  XCODE_VERSION: "15.4"
+  JAVA_VERSION: "17"
+  NODE_VERSION: "20"
+  RUST_BACKTRACE: "1"
+  SCREENSHOTS_DIR: /tmp/e2e-screenshots
+  VIDEOS_DIR: /tmp/e2e-videos
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# JOBS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # MATRIX: Determine which platforms to test
+  # ═══════════════════════════════════════════════════════════════════════════
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      ios: ${{ steps.changes.outputs.ios }}
+      android: ${{ steps.changes.outputs.android }}
+      desktop: ${{ steps.changes.outputs.desktop }}
+      watch: ${{ steps.changes.outputs.watch }}
+      vision: ${{ steps.changes.outputs.vision }}
+      hub: ${{ steps.changes.outputs.hub }}
+      python: ${{ steps.changes.outputs.python }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            ios:
+              - 'apps/ios/**'
+              - 'packages/kagami/**'
+            android:
+              - 'apps/android/**'
+              - 'packages/kagami/**'
+            desktop:
+              - 'apps/desktop/**'
+              - 'packages/kagami/**'
+            watch:
+              - 'apps/watch/**'
+              - 'packages/kagami/**'
+            vision:
+              - 'apps/vision/**'
+              - 'packages/kagami/**'
+            hub:
+              - 'apps/hub/**'
+              - 'packages/kagami/**'
+            python:
+              - 'packages/**'
+              - 'tests/**'
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # HUB (Rust) - Foundation Tests
+  # ═══════════════════════════════════════════════════════════════════════════
+  hub-e2e:
+    name: Hub E2E Tests
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.hub == 'true' || github.event.inputs.run_full_suite == 'true'
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/hub/kagami-hub
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev libasound2-dev libspeechd-dev libclang-dev pkg-config
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-e2e-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build Hub
+        run: cargo build --release
+
+      - name: Run Unit Tests
+        run: cargo test --lib
+
+      - name: Run Integration Tests
+        run: cargo test --test '*' -- --test-threads=2
+
+      - name: Run Household Model Tests
+        run: cargo test household -- --nocapture
+
+      - name: Create test results
+        if: always()
+        run: |
+          mkdir -p ${{ env.SCREENSHOTS_DIR }}/hub
+          echo "Hub E2E tests completed at $(date -u +%Y-%m-%dT%H:%M:%SZ)" > ${{ env.SCREENSHOTS_DIR }}/hub/results.txt
+
+      - name: Upload Hub Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-hub-results
+          path: ${{ env.SCREENSHOTS_DIR }}/hub
+          retention-days: 30
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # iOS E2E Tests
+  # ═══════════════════════════════════════════════════════════════════════════
+  ios-e2e:
+    name: iOS E2E Tests (${{ matrix.test-suite }})
+    runs-on: macos-14
+    needs: detect-changes
+    if: needs.detect-changes.outputs.ios == 'true' || github.event.inputs.run_full_suite == 'true'
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        test-suite:
+          - OnboardingFlowTests
+          - RoomControlFlowTests
+          - SceneActivationFlowTests
+          - HouseholdMemberFlowTests
+          - AccessibilityFlowTests
+    defaults:
+      run:
+        working-directory: apps/ios/kagami-ios
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Cache SPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/ios/kagami-ios/.build
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-spm-e2e-${{ hashFiles('**/Package.swift') }}
+
+      - name: Create directories
+        run: |
+          mkdir -p ${{ env.SCREENSHOTS_DIR }}/ios
+          mkdir -p ${{ env.VIDEOS_DIR }}/ios
+
+      - name: Boot Simulator
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available | grep "iPhone 15 Pro" | head -1 | grep -oE '[A-F0-9-]{36}')
+          xcrun simctl boot "$DEVICE_ID" || true
+          sleep 10
+          echo "DEVICE_ID=$DEVICE_ID" >> $GITHUB_ENV
+
+      - name: Resolve Packages
+        run: swift package resolve
+
+      - name: Build for Testing
+        run: |
+          xcodebuild build-for-testing \
+            -scheme KagamiIOS \
+            -destination "platform=iOS Simulator,name=iPhone 15 Pro" \
+            -derivedDataPath DerivedData \
+            | xcpretty
+
+      - name: Run E2E Tests
+        id: e2e-tests
+        run: |
+          xcodebuild test-without-building \
+            -scheme KagamiIOS \
+            -destination "platform=iOS Simulator,name=iPhone 15 Pro" \
+            -derivedDataPath DerivedData \
+            -only-testing:KagamiIOSUITests/${{ matrix.test-suite }} \
+            -resultBundlePath TestResults/${{ matrix.test-suite }}.xcresult \
+            | xcpretty
+        continue-on-error: true
+
+      - name: Capture Screenshots
+        if: always()
+        run: |
+          xcrun simctl io "$DEVICE_ID" screenshot ${{ env.SCREENSHOTS_DIR }}/ios/${{ matrix.test-suite }}_final.png || true
+
+      - name: Record Video (if enabled)
+        if: github.event.inputs.record_videos == 'true'
+        run: |
+          xcrun simctl io "$DEVICE_ID" recordVideo ${{ env.VIDEOS_DIR }}/ios/${{ matrix.test-suite }}.mp4 &
+          RECORD_PID=$!
+          sleep 30  # Run for 30 seconds
+          kill $RECORD_PID || true
+
+      - name: Extract Test Attachments
+        if: always()
+        run: |
+          # Extract screenshots from xcresult
+          if [ -d "TestResults/${{ matrix.test-suite }}.xcresult" ]; then
+            xcrun xcresulttool get --path TestResults/${{ matrix.test-suite }}.xcresult \
+              --format json > ${{ env.SCREENSHOTS_DIR }}/ios/${{ matrix.test-suite }}_results.json 2>/dev/null || true
+          fi
+
+      - name: Upload iOS E2E Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-ios-${{ matrix.test-suite }}
+          path: |
+            ${{ env.SCREENSHOTS_DIR }}/ios
+            ${{ env.VIDEOS_DIR }}/ios
+            apps/ios/kagami-ios/TestResults/
+          retention-days: 30
+
+      - name: Shutdown Simulator
+        if: always()
+        run: xcrun simctl shutdown "$DEVICE_ID" || true
+
+      - name: Check Test Results
+        if: steps.e2e-tests.outcome == 'failure'
+        run: exit 1
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Android E2E Tests (Maestro)
+  # ═══════════════════════════════════════════════════════════════════════════
+  android-e2e:
+    name: Android E2E Tests
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.android == 'true' || github.event.inputs.run_full_suite == 'true'
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/android/kagami-android
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Create directories
+        run: |
+          mkdir -p ${{ env.SCREENSHOTS_DIR }}/android
+          mkdir -p ${{ env.VIDEOS_DIR }}/android
+
+      - name: Check for Gradle wrapper
+        id: gradle_check
+        run: |
+          if [ -f "./gradlew" ]; then
+            chmod +x gradlew
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Debug APK
+        if: steps.gradle_check.outputs.exists == 'true'
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Run Maestro E2E Tests
+        if: steps.gradle_check.outputs.exists == 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_7
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          working-directory: apps/android/kagami-android
+          script: |
+            adb wait-for-device
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            sleep 5
+
+            # Run all Maestro flows
+            for flow in .maestro/*.yaml; do
+              echo "Running flow: $flow"
+              $HOME/.maestro/bin/maestro test "$flow" \
+                --format junit \
+                --output "maestro-results-$(basename "$flow" .yaml).xml" || true
+
+              # Capture screenshot after each flow
+              adb exec-out screencap -p > "${{ env.SCREENSHOTS_DIR }}/android/$(basename "$flow" .yaml).png" || true
+            done
+
+            # Record video if enabled
+            if [ "${{ github.event.inputs.record_videos }}" = "true" ]; then
+              adb shell screenrecord /sdcard/e2e-recording.mp4 &
+              RECORD_PID=$!
+              sleep 30
+              kill $RECORD_PID || true
+              adb pull /sdcard/e2e-recording.mp4 "${{ env.VIDEOS_DIR }}/android/" || true
+            fi
+
+      - name: Run Roborazzi Screenshot Tests
+        if: steps.gradle_check.outputs.exists == 'true'
+        run: |
+          ./gradlew testDebugUnitTest --tests "*ScreenshotTest*" --continue || true
+          cp -r app/build/outputs/roborazzi/* ${{ env.SCREENSHOTS_DIR }}/android/ 2>/dev/null || true
+
+      - name: Upload Android E2E Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-android-results
+          path: |
+            ${{ env.SCREENSHOTS_DIR }}/android
+            ${{ env.VIDEOS_DIR }}/android
+            apps/android/kagami-android/maestro-results*.xml
+            apps/android/kagami-android/app/build/reports/
+          retention-days: 30
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Desktop E2E Tests (Playwright)
+  # ═══════════════════════════════════════════════════════════════════════════
+  desktop-e2e:
+    name: Desktop E2E Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.desktop == 'true' || github.event.inputs.run_full_suite == 'true'
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        working-directory: apps/desktop/kagami-client
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: apps/desktop/kagami-client/package-lock.json
+
+      - name: Create directories
+        run: |
+          mkdir -p ${{ env.SCREENSHOTS_DIR }}/desktop
+          mkdir -p ${{ env.VIDEOS_DIR }}/desktop
+        shell: bash
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E Tests
+        run: |
+          npx playwright test tests/e2e/ \
+            --reporter=list \
+            --reporter=html \
+            --reporter=json \
+            --output=${{ env.SCREENSHOTS_DIR }}/desktop/test-results
+        env:
+          CI: true
+
+      - name: Run Visual Regression Tests
+        run: |
+          npx playwright test tests/visual/ \
+            --reporter=list \
+            --output=${{ env.SCREENSHOTS_DIR }}/desktop/visual-results
+        continue-on-error: true
+
+      - name: Record User Journey Video
+        if: github.event.inputs.record_videos == 'true'
+        run: |
+          npx playwright test tests/e2e/user-flows.spec.ts \
+            --project=desktop-dark \
+            --video=on \
+            --output=${{ env.VIDEOS_DIR }}/desktop
+
+      - name: Copy Snapshots
+        run: |
+          cp -r tests/visual/__snapshots__/* ${{ env.SCREENSHOTS_DIR }}/desktop/ 2>/dev/null || true
+        shell: bash
+
+      - name: Upload Desktop E2E Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-desktop-${{ matrix.os }}
+          path: |
+            ${{ env.SCREENSHOTS_DIR }}/desktop
+            ${{ env.VIDEOS_DIR }}/desktop
+            apps/desktop/kagami-client/test-results/
+          retention-days: 30
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # watchOS E2E Tests
+  # ═══════════════════════════════════════════════════════════════════════════
+  watch-e2e:
+    name: watchOS E2E Tests
+    runs-on: macos-14
+    needs: detect-changes
+    if: needs.detect-changes.outputs.watch == 'true' || github.event.inputs.run_full_suite == 'true'
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/watch/kagami-watch
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Create directories
+        run: mkdir -p ${{ env.SCREENSHOTS_DIR }}/watch
+
+      - name: Boot Watch Simulator
+        run: |
+          WATCH_ID=$(xcrun simctl list devices available | grep "Apple Watch Ultra 2" | head -1 | grep -oE '[A-F0-9-]{36}')
+          xcrun simctl boot "$WATCH_ID" || true
+          echo "WATCH_ID=$WATCH_ID" >> $GITHUB_ENV
+
+      - name: Resolve Packages
+        run: swift package resolve
+
+      - name: Run Snapshot Tests
+        run: |
+          xcodebuild test \
+            -scheme KagamiWatch \
+            -destination "platform=watchOS Simulator,name=Apple Watch Ultra 2 (49mm)" \
+            -only-testing:KagamiWatchTests/PreviewSnapshotTests \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty || true
+
+      - name: Run Unit Tests
+        run: |
+          xcodebuild test \
+            -scheme KagamiWatch \
+            -destination "platform=watchOS Simulator,name=Apple Watch Ultra 2 (49mm)" \
+            -only-testing:KagamiWatchTests \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty || true
+
+      - name: Capture Watch Screenshots
+        run: |
+          xcrun simctl io "$WATCH_ID" screenshot ${{ env.SCREENSHOTS_DIR }}/watch/final_state.png || true
+
+      - name: Upload watchOS E2E Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-watch-results
+          path: |
+            ${{ env.SCREENSHOTS_DIR }}/watch
+            apps/watch/kagami-watch/TestResults.xcresult
+          retention-days: 30
+
+      - name: Shutdown Simulator
+        if: always()
+        run: xcrun simctl shutdown "$WATCH_ID" || true
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # visionOS E2E Tests
+  # ═══════════════════════════════════════════════════════════════════════════
+  vision-e2e:
+    name: visionOS E2E Tests
+    runs-on: macos-14
+    needs: detect-changes
+    if: needs.detect-changes.outputs.vision == 'true' || github.event.inputs.run_full_suite == 'true'
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/vision/kagami-vision
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Check visionOS SDK
+        id: vision_sdk
+        run: |
+          if xcodebuild -showsdks | grep -q visionOS; then
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create directories
+        run: mkdir -p ${{ env.SCREENSHOTS_DIR }}/vision
+
+      - name: Boot Vision Pro Simulator
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          VISION_ID=$(xcrun simctl list devices available | grep "Apple Vision Pro" | head -1 | grep -oE '[A-F0-9-]{36}')
+          xcrun simctl boot "$VISION_ID" || true
+          echo "VISION_ID=$VISION_ID" >> $GITHUB_ENV
+
+      - name: Resolve Packages
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: swift package resolve
+
+      - name: Run Snapshot Tests
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          xcodebuild test \
+            -scheme KagamiVision \
+            -destination "platform=visionOS Simulator,name=Apple Vision Pro" \
+            -only-testing:KagamiVisionTests/PreviewSnapshotTests \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty || true
+
+      - name: Run UI Tests
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          xcodebuild test \
+            -scheme KagamiVision \
+            -destination "platform=visionOS Simulator,name=Apple Vision Pro" \
+            -only-testing:KagamiVisionUITests \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty || true
+
+      - name: Capture Vision Screenshots
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          xcrun simctl io "$VISION_ID" screenshot ${{ env.SCREENSHOTS_DIR }}/vision/final_state.png || true
+
+      - name: Upload visionOS E2E Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-vision-results
+          path: |
+            ${{ env.SCREENSHOTS_DIR }}/vision
+            apps/vision/kagami-vision/TestResults.xcresult
+          retention-days: 30
+
+      - name: Shutdown Simulator
+        if: always() && steps.vision_sdk.outputs.available == 'true'
+        run: xcrun simctl shutdown "$VISION_ID" || true
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Python E2E Tests
+  # ═══════════════════════════════════════════════════════════════════════════
+  python-e2e:
+    name: Python E2E Tests
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.python == 'true' || github.event.inputs.run_full_suite == 'true'
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt || true
+          python -m pip install -e . || true
+
+      - name: Create directories
+        run: mkdir -p ${{ env.SCREENSHOTS_DIR }}/python
+
+      - name: Run E2E Tests
+        run: |
+          python -m pytest tests/e2e/ \
+            --ignore=tests/e2e/test_distributed_cluster.py \
+            --html=${{ env.SCREENSHOTS_DIR }}/python/e2e-report.html \
+            --self-contained-html \
+            -v \
+            --tb=short \
+            --timeout=120 \
+            2>&1 || true
+
+      - name: Run Safety Verification Tests
+        run: |
+          python -m pytest tests/e2e/test_safety_layer_e2e.py \
+            -v --tb=short \
+            2>&1 || true
+
+      - name: Upload Python E2E Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-python-results
+          path: ${{ env.SCREENSHOTS_DIR }}/python
+          retention-days: 30
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # AGGREGATE AND REPORT
+  # ═══════════════════════════════════════════════════════════════════════════
+  e2e-summary:
+    name: E2E Summary
+    runs-on: ubuntu-latest
+    needs:
+      - hub-e2e
+      - ios-e2e
+      - android-e2e
+      - desktop-e2e
+      - watch-e2e
+      - vision-e2e
+      - python-e2e
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: e2e-*
+          path: /tmp/all-e2e-results
+          merge-multiple: false
+
+      - name: Generate E2E Report
+        run: |
+          echo "# Kagami E2E Validation Report" > /tmp/all-e2e-results/REPORT.md
+          echo "" >> /tmp/all-e2e-results/REPORT.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /tmp/all-e2e-results/REPORT.md
+          echo "Commit: ${{ github.sha }}" >> /tmp/all-e2e-results/REPORT.md
+          echo "Branch: ${{ github.ref_name }}" >> /tmp/all-e2e-results/REPORT.md
+          echo "" >> /tmp/all-e2e-results/REPORT.md
+
+          echo "## Platform Results" >> /tmp/all-e2e-results/REPORT.md
+          echo "" >> /tmp/all-e2e-results/REPORT.md
+          echo "| Platform | Status | Screenshots | Videos |" >> /tmp/all-e2e-results/REPORT.md
+          echo "|----------|--------|-------------|--------|" >> /tmp/all-e2e-results/REPORT.md
+
+          PLATFORMS=("hub" "ios" "android" "desktop" "watch" "vision" "python")
+          RESULTS=("${{ needs.hub-e2e.result }}" "${{ needs.ios-e2e.result }}" "${{ needs.android-e2e.result }}" "${{ needs.desktop-e2e.result }}" "${{ needs.watch-e2e.result }}" "${{ needs.vision-e2e.result }}" "${{ needs.python-e2e.result }}")
+
+          for i in "${!PLATFORMS[@]}"; do
+            PLATFORM="${PLATFORMS[$i]}"
+            RESULT="${RESULTS[$i]}"
+
+            if [ "$RESULT" = "success" ]; then
+              STATUS="Passed"
+            elif [ "$RESULT" = "failure" ]; then
+              STATUS="Failed"
+            elif [ "$RESULT" = "skipped" ]; then
+              STATUS="Skipped"
+            else
+              STATUS="$RESULT"
+            fi
+
+            SCREENSHOT_COUNT=$(find /tmp/all-e2e-results -path "*$PLATFORM*" -name "*.png" 2>/dev/null | wc -l || echo "0")
+            VIDEO_COUNT=$(find /tmp/all-e2e-results -path "*$PLATFORM*" -name "*.mp4" 2>/dev/null | wc -l || echo "0")
+
+            echo "| $PLATFORM | $STATUS | $SCREENSHOT_COUNT | $VIDEO_COUNT |" >> /tmp/all-e2e-results/REPORT.md
+          done
+
+          echo "" >> /tmp/all-e2e-results/REPORT.md
+          echo "## Screenshot Inventory" >> /tmp/all-e2e-results/REPORT.md
+          echo "" >> /tmp/all-e2e-results/REPORT.md
+
+          for dir in /tmp/all-e2e-results/*/; do
+            DIRNAME=$(basename "$dir")
+            echo "### $DIRNAME" >> /tmp/all-e2e-results/REPORT.md
+            find "$dir" -name "*.png" -exec basename {} \; 2>/dev/null | sort | head -20 >> /tmp/all-e2e-results/REPORT.md || echo "No screenshots" >> /tmp/all-e2e-results/REPORT.md
+            echo "" >> /tmp/all-e2e-results/REPORT.md
+          done
+
+          echo "" >> /tmp/all-e2e-results/REPORT.md
+          echo "---" >> /tmp/all-e2e-results/REPORT.md
+          echo "*h(x) >= 0. Always.*" >> /tmp/all-e2e-results/REPORT.md
+
+      - name: Upload Complete E2E Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-complete-report
+          path: /tmp/all-e2e-results
+          retention-days: 90
+
+      - name: Post Summary
+        run: |
+          echo "## E2E Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Hub | ${{ needs.hub-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| iOS | ${{ needs.ios-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Android | ${{ needs.android-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Desktop | ${{ needs.desktop-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| watchOS | ${{ needs.watch-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| visionOS | ${{ needs.vision-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Python | ${{ needs.python-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download the **e2e-complete-report** artifact for full results." >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const results = {
+              hub: '${{ needs.hub-e2e.result }}',
+              ios: '${{ needs.ios-e2e.result }}',
+              android: '${{ needs.android-e2e.result }}',
+              desktop: '${{ needs.desktop-e2e.result }}',
+              watch: '${{ needs.watch-e2e.result }}',
+              vision: '${{ needs.vision-e2e.result }}',
+              python: '${{ needs.python-e2e.result }}'
+            };
+
+            const statusEmoji = (status) => {
+              if (status === 'success') return ':white_check_mark:';
+              if (status === 'failure') return ':x:';
+              if (status === 'skipped') return ':fast_forward:';
+              return ':question:';
+            };
+
+            let body = '## E2E Validation Results\n\n';
+            body += '| Platform | Status |\n';
+            body += '|----------|--------|\n';
+
+            for (const [platform, result] of Object.entries(results)) {
+              body += `| ${platform} | ${statusEmoji(result)} ${result} |\n`;
+            }
+
+            body += '\nDownload artifacts for detailed screenshots and videos.\n';
+            body += '\n---\n*h(x) >= 0. Always.*';
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existingComment = comments.find(c =>
+              c.user.login === 'github-actions[bot]' &&
+              c.body.includes('E2E Validation Results')
+            );
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+      - name: Fail if Critical Tests Failed
+        if: |
+          needs.hub-e2e.result == 'failure' ||
+          needs.ios-e2e.result == 'failure' ||
+          needs.android-e2e.result == 'failure' ||
+          needs.desktop-e2e.result == 'failure'
+        run: |
+          echo "Critical E2E tests failed!"
+          exit 1

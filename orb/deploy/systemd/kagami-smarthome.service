@@ -1,0 +1,72 @@
+# Kagami Smart Home Daemon - SystemD Service
+#
+# This service runs the persistent smart home daemon that maintains continuous
+# integration between Kagami's organism state and the physical home environment.
+#
+# INSTALLATION:
+#   sudo cp deploy/systemd/kagami-smarthome.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable kagami-smarthome.service
+#   sudo systemctl start kagami-smarthome.service
+#
+# MONITORING:
+#   systemctl status kagami-smarthome
+#   journalctl -u kagami-smarthome -f
+#   sudo systemctl restart kagami-smarthome
+#
+# NOTE: Uses standard Linux paths. For macOS, use launchd plist instead.
+
+[Unit]
+Description=Kagami Smart Home Daemon - Organism Integration
+Documentation=https://github.com/awkronos/kagami
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=kagami
+Group=kagami
+WorkingDirectory=/opt/kagami
+Environment="PATH=/opt/kagami/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="KAGAMI_BOOT_MODE=full"
+Environment="KAGAMI_HOME_DAEMON_LOG_LEVEL=INFO"
+Environment="KAGAMI_HOME_DAEMON_SYNC_INTERVAL=2.0"
+Environment="KAGAMI_HOME_DAEMON_PID_FILE=/var/run/kagami/smarthome.pid"
+Environment="PYTHONPATH=/opt/kagami"
+EnvironmentFile=-/opt/kagami/.env
+
+# Service execution
+ExecStartPre=/bin/mkdir -p /var/run/kagami
+ExecStartPre=/bin/chown kagami:kagami /var/run/kagami
+ExecStart=/opt/kagami/.venv/bin/python3 /opt/kagami/scripts/smart_home_daemon.py --daemon --pid-file /var/run/kagami/smarthome.pid
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStop=/bin/kill -TERM $MAINPID
+
+# Process management
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+KillMode=process
+KillSignal=SIGTERM
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=32768
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/kagami /var/run/kagami /var/log/kagami /tmp
+PrivateDevices=false
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kagami-smarthome
+
+[Install]
+WantedBy=multi-user.target

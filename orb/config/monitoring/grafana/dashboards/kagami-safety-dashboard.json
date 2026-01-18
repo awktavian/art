@@ -1,0 +1,242 @@
+{
+  "dashboard": {
+    "title": "K os Safety Systems",
+    "tags": ["kagami", "safety"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "🛡️ Control Barrier Function (CBF) - The First Guardian",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(kagami_cbf_blocks_total[5m])",
+            "legendFormat": "CBF Blocks/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(kagami_cbf_fast_path_blocks_total[5m])",
+            "legendFormat": "Fast Path Blocks/sec",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, kagami_cbf_agent_safety_duration_seconds_bucket)",
+            "legendFormat": "p99 Safety Check Latency",
+            "refId": "C"
+          }
+        ],
+        "alert": {
+          "name": "High CBF Block Rate",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [10],
+                "type": "gt"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "60s",
+          "handler": 1,
+          "message": "⚠️ CBF blocking >10 operations/sec - potential attack or safety issue",
+          "noDataState": "no_data",
+          "executionErrorState": "alerting"
+        }
+      },
+      {
+        "id": 2,
+        "title": "👁️ Honesty Validator - The Truth Speaker",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "kagami_honesty_violations_total",
+            "legendFormat": "Total Violations",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(kagami_honesty_violations_total[1h])",
+            "legendFormat": "Violations/hour",
+            "refId": "B"
+          }
+        ],
+        "thresholds": [
+          {"value": 0, "color": "green"},
+          {"value": 1, "color": "yellow"},
+          {"value": 5, "color": "red"}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "🧠 Agent Memory Guard - Born from Tragedy",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "kagami_agent_memory_bytes",
+            "legendFormat": "{{agent_name}} Memory",
+            "refId": "A"
+          },
+          {
+            "expr": "kagami_agent_memory_violations_total",
+            "legendFormat": "Total Violations (800GB never again)",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.95, kagami_agent_memory_pressure_bucket)",
+            "legendFormat": "p95 Memory Pressure",
+            "refId": "C"
+          }
+        ],
+        "alert": {
+          "name": "Agent Memory Violation",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0],
+                "type": "gt"
+              },
+              "query": {
+                "params": ["B", "5m", "now"]
+              },
+              "reducer": {
+                "type": "diff"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "60s",
+          "handler": 1,
+          "message": "🚨 CRITICAL: Agent exceeded memory limits! Auto-killed to prevent 800GB crash.",
+          "noDataState": "no_data",
+          "executionErrorState": "alerting"
+        }
+      },
+      {
+        "id": 4,
+        "title": "⚔️ Ethical & Quality Gates",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(kagami_ethical_blocks_total[5m])",
+            "legendFormat": "Ethical Blocks - {{reason}}",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(kagami_quality_blocks_total[5m])",
+            "legendFormat": "Quality Blocks - {{type}}",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(kagami_model_phase_blocks_total[5m])",
+            "legendFormat": "MODEL Phase Blocks",
+            "refId": "C"
+          },
+          {
+            "expr": "rate(kagami_verify_phase_blocks_total[5m])",
+            "legendFormat": "VERIFY Phase Blocks",
+            "refId": "D"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "🧬 Agent Lifecycle - Birth & Death",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(kagami_agent_lifecycle_events_total{event='mitosis'}[5m])",
+            "legendFormat": "Mitosis Rate - {{colony}}",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(kagami_agent_lifecycle_events_total{event='apoptosis'}[5m])",
+            "legendFormat": "Apoptosis Rate - {{colony}}",
+            "refId": "B"
+          },
+          {
+            "expr": "kagami_colony_population",
+            "legendFormat": "Population - {{colony}}",
+            "refId": "C"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "📊 Safety Health Score",
+        "type": "gauge",
+        "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "1 - (rate(kagami_safety_violations_total[5m]) / (rate(kagami_request_count[5m]) + 1))",
+            "legendFormat": "Safety Score (1.0 = perfect)",
+            "refId": "A"
+          }
+        ],
+        "thresholds": [
+          {"value": 0.0, "color": "red"},
+          {"value": 0.95, "color": "yellow"},
+          {"value": 0.99, "color": "green"}
+        ],
+        "alert": {
+          "name": "Safety Score Degraded",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0.95],
+                "type": "lt"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "frequency": "60s",
+          "handler": 1,
+          "message": "⚠️ Safety score dropped below 95% - investigate violations",
+          "noDataState": "no_data",
+          "executionErrorState": "alerting"
+        }
+      },
+      {
+        "id": 7,
+        "title": "📈 Agent Fitness Evolution",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 24, "w": 24, "h": 8},
+        "targets": [
+          {
+            "expr": "kagami_agent_fitness",
+            "legendFormat": "{{domain}}:{{agent_id}}",
+            "refId": "A"
+          },
+          {
+            "expr": "avg(kagami_agent_fitness) by (domain)",
+            "legendFormat": "Avg {{domain}}",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(kagami_agent_fitness_history_total[5m])",
+            "legendFormat": "Fitness Growth Rate",
+            "refId": "C"
+          }
+        ]
+      }
+    ],
+    "refresh": "10s",
+    "schemaVersion": 38,
+    "version": 1
+  }
+}

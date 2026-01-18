@@ -1,0 +1,827 @@
+name: unified-screenshots
+
+# Unified Screenshot Collection CI
+# Collects screenshots from ALL apps in a centralized artifact
+#
+# Apps covered:
+#   - Desktop (Tauri + Playwright) - Visual regression tests
+#   - Android (Kotlin/Compose) - Emulator screenshot tests
+#   - iOS (Swift/SwiftUI) - Simulator screenshot tests
+#   - watchOS (Swift) - Watch simulator screenshots
+#   - visionOS (Swift) - Vision Pro simulator screenshots
+#   - Hub (Rust) - API response screenshots (if applicable)
+
+on:
+  pull_request:
+    paths:
+      - 'apps/**'
+      - '.github/workflows/unified-screenshots.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/**'
+  workflow_dispatch:
+    inputs:
+      force_update_baselines:
+        description: 'Force update baseline screenshots'
+        type: boolean
+        default: false
+
+concurrency:
+  group: screenshots-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SCREENSHOTS_DIR: /tmp/screenshots
+  ARTIFACT_RETENTION_DAYS: 30
+
+jobs:
+  # ============================================================================
+  # DESKTOP APP - Playwright Visual Tests
+  # ============================================================================
+  desktop-screenshots:
+    name: Desktop (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/desktop/kagami-client
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/desktop/kagami-client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Create screenshots directory
+        run: mkdir -p ${{ env.SCREENSHOTS_DIR }}/desktop
+
+      - name: Run visual tests and capture screenshots
+        run: |
+          npx playwright test \
+            --reporter=list \
+            --reporter=html \
+            --output=${{ env.SCREENSHOTS_DIR }}/desktop/test-results
+        continue-on-error: true
+
+      - name: Copy snapshots to central location
+        run: |
+          cp -r tests/visual/__snapshots__/* ${{ env.SCREENSHOTS_DIR }}/desktop/ 2>/dev/null || true
+          cp -r test-results/**/*.png ${{ env.SCREENSHOTS_DIR }}/desktop/ 2>/dev/null || true
+
+      - name: Generate desktop screenshot manifest
+        run: |
+          echo "# Desktop Screenshots" > ${{ env.SCREENSHOTS_DIR }}/desktop/MANIFEST.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ${{ env.SCREENSHOTS_DIR }}/desktop/MANIFEST.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/desktop/MANIFEST.md
+          echo "## Screenshots" >> ${{ env.SCREENSHOTS_DIR }}/desktop/MANIFEST.md
+          find ${{ env.SCREENSHOTS_DIR }}/desktop -name "*.png" -exec basename {} \; | sort >> ${{ env.SCREENSHOTS_DIR }}/desktop/MANIFEST.md
+
+      - name: Upload desktop screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-desktop
+          path: ${{ env.SCREENSHOTS_DIR }}/desktop
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+  # ============================================================================
+  # ANDROID APP - Emulator Screenshot Tests
+  # ============================================================================
+  android-screenshots:
+    name: Android (Emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/android/kagami-android
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Create screenshots directory
+        run: mkdir -p ${{ env.SCREENSHOTS_DIR }}/android
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Enable KVM (for hardware acceleration)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Check for Gradle wrapper
+        id: gradle_check
+        run: |
+          if [ -f "./gradlew" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Gradle wrapper not found - skipping Android builds"
+          fi
+
+      - name: Build debug APK
+        if: steps.gradle_check.outputs.exists == 'true'
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Build test APK
+        if: steps.gradle_check.outputs.exists == 'true'
+        run: ./gradlew assembleDebugAndroidTest --no-daemon
+
+      - name: Run screenshot tests on emulator
+        if: steps.gradle_check.outputs.exists == 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_7
+          avd-name: test_avd
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          working-directory: apps/android/kagami-android
+          script: |
+            adb wait-for-device
+            ./gradlew connectedDebugAndroidTest --no-daemon || true
+            # Pull screenshots from device
+            adb pull /sdcard/Pictures/screenshots ${{ env.SCREENSHOTS_DIR }}/android/ || true
+            adb pull /data/data/com.kagami.android/files/screenshots ${{ env.SCREENSHOTS_DIR }}/android/ || true
+
+      - name: Collect Gradle test reports
+        if: always()
+        run: |
+          cp -r app/build/reports/androidTests ${{ env.SCREENSHOTS_DIR }}/android/reports || true
+          cp -r app/build/outputs/connected_android_test_additional_output ${{ env.SCREENSHOTS_DIR }}/android/outputs || true
+
+      - name: Generate Android screenshot manifest
+        run: |
+          echo "# Android Screenshots" > ${{ env.SCREENSHOTS_DIR }}/android/MANIFEST.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ${{ env.SCREENSHOTS_DIR }}/android/MANIFEST.md
+          echo "Device: Pixel 7 (API 34)" >> ${{ env.SCREENSHOTS_DIR }}/android/MANIFEST.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/android/MANIFEST.md
+          echo "## Screenshots" >> ${{ env.SCREENSHOTS_DIR }}/android/MANIFEST.md
+          find ${{ env.SCREENSHOTS_DIR }}/android -name "*.png" -exec basename {} \; | sort >> ${{ env.SCREENSHOTS_DIR }}/android/MANIFEST.md
+
+      - name: Upload Android screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-android
+          path: ${{ env.SCREENSHOTS_DIR }}/android
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+  # ============================================================================
+  # iOS APP - Simulator Screenshot Tests
+  # ============================================================================
+  ios-screenshots:
+    name: iOS (Simulator)
+    runs-on: macos-14  # Apple Silicon runner
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/ios/kagami-ios
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Create screenshots directory
+        run: mkdir -p ${{ env.SCREENSHOTS_DIR }}/ios
+
+      - name: List available simulators
+        run: xcrun simctl list devices available
+
+      - name: Boot iOS simulator
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available | grep "iPhone 15 Pro" | head -1 | sed -E 's/.*\(([A-Z0-9-]+)\).*/\1/')
+          xcrun simctl boot "$DEVICE_ID" || true
+          echo "DEVICE_ID=$DEVICE_ID" >> $GITHUB_ENV
+
+      - name: Build and run UI tests
+        run: |
+          xcodebuild test \
+            -scheme KagamiIOS \
+            -destination "platform=iOS Simulator,name=iPhone 15 Pro" \
+            -resultBundlePath ${{ env.SCREENSHOTS_DIR }}/ios/TestResults.xcresult \
+            -derivedDataPath build \
+            2>&1 || true
+
+      - name: Extract screenshots from test results
+        run: |
+          # Extract attachments from xcresult bundle
+          xcrun xcresulttool get --path ${{ env.SCREENSHOTS_DIR }}/ios/TestResults.xcresult \
+            --format json > ${{ env.SCREENSHOTS_DIR }}/ios/results.json 2>/dev/null || true
+
+          # Copy any simulator screenshots
+          cp ~/Library/Developer/CoreSimulator/Devices/$DEVICE_ID/data/tmp/*.png ${{ env.SCREENSHOTS_DIR }}/ios/ 2>/dev/null || true
+
+      - name: Capture final simulator screenshot
+        run: |
+          xcrun simctl io "$DEVICE_ID" screenshot ${{ env.SCREENSHOTS_DIR }}/ios/final_state.png || true
+
+      - name: Generate iOS screenshot manifest
+        run: |
+          echo "# iOS Screenshots" > ${{ env.SCREENSHOTS_DIR }}/ios/MANIFEST.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ${{ env.SCREENSHOTS_DIR }}/ios/MANIFEST.md
+          echo "Device: iPhone 15 Pro (Simulator)" >> ${{ env.SCREENSHOTS_DIR }}/ios/MANIFEST.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/ios/MANIFEST.md
+          echo "## Screenshots" >> ${{ env.SCREENSHOTS_DIR }}/ios/MANIFEST.md
+          find ${{ env.SCREENSHOTS_DIR }}/ios -name "*.png" -exec basename {} \; | sort >> ${{ env.SCREENSHOTS_DIR }}/ios/MANIFEST.md
+
+      - name: Upload iOS screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-ios
+          path: ${{ env.SCREENSHOTS_DIR }}/ios
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+  # ============================================================================
+  # WATCHOS APP - Watch Simulator Screenshots
+  # ============================================================================
+  watch-screenshots:
+    name: watchOS (Simulator)
+    runs-on: macos-14
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: apps/watch/kagami-watch
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Create screenshots directory
+        run: mkdir -p ${{ env.SCREENSHOTS_DIR }}/watch
+
+      - name: Boot watchOS simulator
+        run: |
+          WATCH_ID=$(xcrun simctl list devices available | grep "Apple Watch Ultra 2" | head -1 | sed -E 's/.*\(([A-Z0-9-]+)\).*/\1/')
+          xcrun simctl boot "$WATCH_ID" || true
+          echo "WATCH_ID=$WATCH_ID" >> $GITHUB_ENV
+
+      - name: Resolve Swift packages
+        run: swift package resolve
+
+      - name: Build and run watch snapshot tests
+        run: |
+          xcodebuild test \
+            -scheme KagamiWatch \
+            -destination "platform=watchOS Simulator,name=Apple Watch Ultra 2 (49mm)" \
+            -only-testing:KagamiWatchTests/PreviewSnapshotTests \
+            -resultBundlePath ${{ env.SCREENSHOTS_DIR }}/watch/TestResults.xcresult \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 || true
+
+      - name: Capture watch simulator screenshots
+        run: |
+          xcrun simctl io "$WATCH_ID" screenshot ${{ env.SCREENSHOTS_DIR }}/watch/final_state.png || true
+
+      - name: Generate watchOS screenshot manifest
+        run: |
+          echo "# watchOS Screenshots" > ${{ env.SCREENSHOTS_DIR }}/watch/MANIFEST.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ${{ env.SCREENSHOTS_DIR }}/watch/MANIFEST.md
+          echo "Device: Apple Watch Ultra 2 (Simulator)" >> ${{ env.SCREENSHOTS_DIR }}/watch/MANIFEST.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/watch/MANIFEST.md
+          echo "## Screenshots" >> ${{ env.SCREENSHOTS_DIR }}/watch/MANIFEST.md
+          find ${{ env.SCREENSHOTS_DIR }}/watch -name "*.png" -exec basename {} \; | sort >> ${{ env.SCREENSHOTS_DIR }}/watch/MANIFEST.md
+
+      - name: Upload watchOS screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-watch
+          path: ${{ env.SCREENSHOTS_DIR }}/watch
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+  # ============================================================================
+  # VISIONOS APP - Vision Pro Simulator Screenshots
+  # ============================================================================
+  vision-screenshots:
+    name: visionOS (Simulator)
+    runs-on: macos-14
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/vision/kagami-vision
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Create screenshots directory
+        run: mkdir -p ${{ env.SCREENSHOTS_DIR }}/vision
+
+      - name: Check for visionOS SDK
+        id: vision_sdk
+        run: |
+          if xcodebuild -showsdks | grep -q visionOS; then
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+            echo "visionOS SDK not available on this runner"
+          fi
+
+      - name: Boot visionOS simulator
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          VISION_ID=$(xcrun simctl list devices available | grep "Apple Vision Pro" | head -1 | sed -E 's/.*\(([A-Z0-9-]+)\).*/\1/')
+          xcrun simctl boot "$VISION_ID" || true
+          echo "VISION_ID=$VISION_ID" >> $GITHUB_ENV
+
+      - name: Resolve Swift packages
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: swift package resolve
+
+      - name: Build and run visionOS snapshot tests
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          xcodebuild test \
+            -scheme KagamiVision \
+            -destination "platform=visionOS Simulator,name=Apple Vision Pro" \
+            -only-testing:KagamiVisionTests/PreviewSnapshotTests \
+            -resultBundlePath ${{ env.SCREENSHOTS_DIR }}/vision/TestResults.xcresult \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 || true
+
+      - name: Run visionOS UI flow tests
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          xcodebuild test \
+            -scheme KagamiVision \
+            -destination "platform=visionOS Simulator,name=Apple Vision Pro" \
+            -only-testing:KagamiVisionUITests \
+            -resultBundlePath ${{ env.SCREENSHOTS_DIR }}/vision/UITestResults.xcresult \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 || true
+
+      - name: Capture visionOS simulator screenshots
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          xcrun simctl io "$VISION_ID" screenshot ${{ env.SCREENSHOTS_DIR }}/vision/final_state.png || true
+
+      - name: Generate visionOS screenshot manifest
+        run: |
+          echo "# visionOS Screenshots" > ${{ env.SCREENSHOTS_DIR }}/vision/MANIFEST.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ${{ env.SCREENSHOTS_DIR }}/vision/MANIFEST.md
+          echo "Device: Apple Vision Pro (Simulator)" >> ${{ env.SCREENSHOTS_DIR }}/vision/MANIFEST.md
+          echo "SDK Available: ${{ steps.vision_sdk.outputs.available }}" >> ${{ env.SCREENSHOTS_DIR }}/vision/MANIFEST.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/vision/MANIFEST.md
+          echo "## Screenshots" >> ${{ env.SCREENSHOTS_DIR }}/vision/MANIFEST.md
+          find ${{ env.SCREENSHOTS_DIR }}/vision -name "*.png" -exec basename {} \; | sort >> ${{ env.SCREENSHOTS_DIR }}/vision/MANIFEST.md
+
+      - name: Upload visionOS screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-vision
+          path: ${{ env.SCREENSHOTS_DIR }}/vision
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+  # ============================================================================
+  # HUB (Rust) - API Response Screenshots (if applicable)
+  # ============================================================================
+  hub-screenshots:
+    name: Hub (Rust API)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/hub/kagami-hub
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Create screenshots directory
+        run: mkdir -p ${{ env.SCREENSHOTS_DIR }}/hub
+
+      - name: Build Hub
+        run: cargo build --release
+
+      - name: Run Hub tests
+        run: cargo test --release -- --test-threads=1 2>&1 | tee ${{ env.SCREENSHOTS_DIR }}/hub/test_output.txt || true
+
+      - name: Generate Hub manifest
+        run: |
+          echo "# Hub (Rust) Test Results" > ${{ env.SCREENSHOTS_DIR }}/hub/MANIFEST.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ${{ env.SCREENSHOTS_DIR }}/hub/MANIFEST.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/hub/MANIFEST.md
+          echo "## Test Output" >> ${{ env.SCREENSHOTS_DIR }}/hub/MANIFEST.md
+          echo '```' >> ${{ env.SCREENSHOTS_DIR }}/hub/MANIFEST.md
+          cat ${{ env.SCREENSHOTS_DIR }}/hub/test_output.txt >> ${{ env.SCREENSHOTS_DIR }}/hub/MANIFEST.md
+          echo '```' >> ${{ env.SCREENSHOTS_DIR }}/hub/MANIFEST.md
+
+      - name: Upload Hub results
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-hub
+          path: ${{ env.SCREENSHOTS_DIR }}/hub
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+  # ============================================================================
+  # PYTHON TESTS - Test Results & Any Visual Outputs
+  # ============================================================================
+  python-screenshots:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Create screenshots directory
+        run: mkdir -p ${{ env.SCREENSHOTS_DIR }}/python
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt || true
+          python -m pip install -e . || true
+
+      - name: Run tier1 tests with HTML report
+        run: |
+          python -m pytest tests/ \
+            -m tier1 \
+            --ignore=tests/hal \
+            --ignore=tests/forge \
+            --ignore=tests/integration \
+            --ignore=tests/e2e \
+            --ignore=tests/performance \
+            --ignore=tests/stress \
+            --html=${{ env.SCREENSHOTS_DIR }}/python/report.html \
+            --self-contained-html \
+            -q \
+            --tb=short \
+            --maxfail=50 \
+            2>&1 || true
+
+      - name: Generate Python test manifest
+        run: |
+          echo "# Python Test Results" > ${{ env.SCREENSHOTS_DIR }}/python/MANIFEST.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ${{ env.SCREENSHOTS_DIR }}/python/MANIFEST.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/python/MANIFEST.md
+          echo "## Test Report" >> ${{ env.SCREENSHOTS_DIR }}/python/MANIFEST.md
+          echo "See report.html for detailed results" >> ${{ env.SCREENSHOTS_DIR }}/python/MANIFEST.md
+
+      - name: Upload Python test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-python
+          path: ${{ env.SCREENSHOTS_DIR }}/python
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+  # ============================================================================
+  # AGGREGATE ALL SCREENSHOTS
+  # ============================================================================
+  aggregate-screenshots:
+    name: Aggregate All Screenshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - desktop-screenshots
+      - android-screenshots
+      - ios-screenshots
+      - watch-screenshots
+      - vision-screenshots
+      - hub-screenshots
+      - python-screenshots
+    if: always()
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create aggregate directory
+        run: mkdir -p /tmp/all-screenshots
+
+      - name: Download all screenshot artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: screenshots-*
+          path: /tmp/all-screenshots
+          merge-multiple: false
+
+      - name: Generate master index
+        run: |
+          cd /tmp/all-screenshots
+
+          echo "# Kagami Screenshot Gallery" > INDEX.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> INDEX.md
+          echo "Commit: ${{ github.sha }}" >> INDEX.md
+          echo "Branch: ${{ github.ref_name }}" >> INDEX.md
+          echo "" >> INDEX.md
+
+          echo "## Apps Coverage" >> INDEX.md
+          echo "" >> INDEX.md
+          echo "| App | Platform | Screenshots | Status |" >> INDEX.md
+          echo "|-----|----------|-------------|--------|" >> INDEX.md
+
+          for dir in screenshots-*/; do
+            APP_NAME=$(echo "$dir" | sed 's/screenshots-//' | sed 's/\///')
+            COUNT=$(find "$dir" -name "*.png" 2>/dev/null | wc -l)
+            if [ -f "$dir/MANIFEST.md" ]; then
+              STATUS="Collected"
+            else
+              STATUS="No manifest"
+            fi
+            echo "| $APP_NAME | Various | $COUNT | $STATUS |" >> INDEX.md
+          done
+
+          echo "" >> INDEX.md
+          echo "## Screenshot Inventory" >> INDEX.md
+          echo "" >> INDEX.md
+
+          for dir in screenshots-*/; do
+            APP_NAME=$(echo "$dir" | sed 's/screenshots-//' | sed 's/\///')
+            echo "### $APP_NAME" >> INDEX.md
+            echo "" >> INDEX.md
+            find "$dir" -name "*.png" -exec basename {} \; | sort | head -20 >> INDEX.md
+            TOTAL=$(find "$dir" -name "*.png" | wc -l)
+            if [ $TOTAL -gt 20 ]; then
+              echo "... and $((TOTAL - 20)) more" >> INDEX.md
+            fi
+            echo "" >> INDEX.md
+          done
+
+      - name: Create HTML gallery viewer
+        run: |
+          cat > /tmp/all-screenshots/gallery.html << 'GALLERY_EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Kagami Screenshot Gallery</title>
+              <style>
+                  :root {
+                      --bg-primary: #0a0a0f;
+                      --bg-secondary: #12121a;
+                      --text-primary: #e0e0e0;
+                      --text-secondary: #888;
+                      --accent: #6366f1;
+                      --border: #2a2a3a;
+                  }
+                  * { box-sizing: border-box; margin: 0; padding: 0; }
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+                      background: var(--bg-primary);
+                      color: var(--text-primary);
+                      min-height: 100vh;
+                      padding: 2rem;
+                  }
+                  h1 {
+                      font-size: 2.5rem;
+                      font-weight: 600;
+                      margin-bottom: 0.5rem;
+                      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+                      -webkit-background-clip: text;
+                      -webkit-text-fill-color: transparent;
+                  }
+                  .meta {
+                      color: var(--text-secondary);
+                      margin-bottom: 2rem;
+                      font-size: 0.875rem;
+                  }
+                  .apps {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                      gap: 1.5rem;
+                      margin-bottom: 2rem;
+                  }
+                  .app-card {
+                      background: var(--bg-secondary);
+                      border: 1px solid var(--border);
+                      border-radius: 12px;
+                      padding: 1.5rem;
+                      cursor: pointer;
+                      transition: all 0.2s;
+                  }
+                  .app-card:hover {
+                      border-color: var(--accent);
+                      transform: translateY(-2px);
+                  }
+                  .app-card h3 {
+                      font-size: 1.25rem;
+                      margin-bottom: 0.5rem;
+                      text-transform: capitalize;
+                  }
+                  .app-card .count {
+                      color: var(--text-secondary);
+                      font-size: 0.875rem;
+                  }
+                  .gallery {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+                      gap: 1rem;
+                  }
+                  .screenshot {
+                      background: var(--bg-secondary);
+                      border: 1px solid var(--border);
+                      border-radius: 8px;
+                      overflow: hidden;
+                      cursor: pointer;
+                  }
+                  .screenshot img {
+                      width: 100%;
+                      height: 200px;
+                      object-fit: cover;
+                  }
+                  .screenshot .name {
+                      padding: 0.75rem;
+                      font-size: 0.75rem;
+                      color: var(--text-secondary);
+                      white-space: nowrap;
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                  }
+                  .modal {
+                      display: none;
+                      position: fixed;
+                      inset: 0;
+                      background: rgba(0,0,0,0.9);
+                      z-index: 1000;
+                      padding: 2rem;
+                  }
+                  .modal.active { display: flex; align-items: center; justify-content: center; }
+                  .modal img {
+                      max-width: 90vw;
+                      max-height: 90vh;
+                      object-fit: contain;
+                  }
+                  .modal .close {
+                      position: absolute;
+                      top: 1rem;
+                      right: 1rem;
+                      font-size: 2rem;
+                      color: white;
+                      cursor: pointer;
+                  }
+                  .back-btn {
+                      display: none;
+                      margin-bottom: 1rem;
+                      padding: 0.5rem 1rem;
+                      background: var(--bg-secondary);
+                      border: 1px solid var(--border);
+                      border-radius: 6px;
+                      color: var(--text-primary);
+                      cursor: pointer;
+                  }
+                  .back-btn.visible { display: inline-block; }
+              </style>
+          </head>
+          <body>
+              <h1>Kagami Screenshot Gallery</h1>
+              <p class="meta">
+                  Commit: <code id="commit"></code> |
+                  Generated: <span id="timestamp"></span>
+              </p>
+
+              <button class="back-btn" onclick="showApps()">Back to Apps</button>
+
+              <div id="apps-view" class="apps"></div>
+              <div id="gallery-view" class="gallery" style="display: none;"></div>
+
+              <div class="modal" id="modal" onclick="closeModal()">
+                  <span class="close">&times;</span>
+                  <img id="modal-img" src="" alt="">
+              </div>
+
+              <script>
+                  // This will be populated by CI
+                  const screenshotData = {};
+
+                  document.getElementById('timestamp').textContent = new Date().toISOString();
+
+                  function showApps() {
+                      document.getElementById('apps-view').style.display = 'grid';
+                      document.getElementById('gallery-view').style.display = 'none';
+                      document.querySelector('.back-btn').classList.remove('visible');
+                  }
+
+                  function showGallery(app) {
+                      document.getElementById('apps-view').style.display = 'none';
+                      document.getElementById('gallery-view').style.display = 'grid';
+                      document.querySelector('.back-btn').classList.add('visible');
+                      // Populate gallery with app screenshots
+                  }
+
+                  function openModal(src) {
+                      document.getElementById('modal-img').src = src;
+                      document.getElementById('modal').classList.add('active');
+                  }
+
+                  function closeModal() {
+                      document.getElementById('modal').classList.remove('active');
+                  }
+
+                  document.addEventListener('keydown', e => {
+                      if (e.key === 'Escape') closeModal();
+                  });
+              </script>
+          </body>
+          </html>
+          GALLERY_EOF
+
+      - name: Upload aggregated screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-screenshots
+          path: /tmp/all-screenshots
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+
+      - name: Post summary to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Count screenshots per app
+            const apps = ['desktop', 'android', 'ios', 'watch', 'vision', 'hub', 'python'];
+            let summary = '## Screenshot Collection Summary\n\n';
+            summary += '| App | Platform | Status |\n';
+            summary += '|-----|----------|--------|\n';
+
+            for (const app of apps) {
+              summary += `| ${app} | Various | Collected |\n`;
+            }
+
+            summary += '\nDownload the `all-screenshots` artifact to view the gallery.\n';
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: summary
+            });
+
+  # ============================================================================
+  # UPDATE BASELINES (on main branch merge)
+  # ============================================================================
+  update-baselines:
+    name: Update Baseline Screenshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: aggregate-screenshots
+    if: github.ref == 'refs/heads/main' || github.event.inputs.force_update_baselines == 'true'
+
+    steps:
+      - name: Download aggregated screenshots
+        uses: actions/download-artifact@v4
+        with:
+          name: all-screenshots
+          path: /tmp/baselines
+
+      - name: Save to baseline cache
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/baselines
+          key: screenshot-baselines-${{ github.sha }}

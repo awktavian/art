@@ -1,0 +1,637 @@
+/**
+ * =============================================================================
+ * COMPONENT: Select
+ * Kagami Design System V2 - Dropdown select with glass effects
+ *
+ * States: default, hover, focus, error, success, disabled, loading
+ * Sizes: sm, md, lg
+ * Features: label, helper text, searchable, multi-select
+ * =============================================================================
+ */
+
+/* =============================================================================
+   BASE SELECT WRAPPER
+   ============================================================================= */
+
+.prism-select {
+  /* Layout */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+/* =============================================================================
+   LABEL
+   ============================================================================= */
+
+.prism-select__label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--prism-text);
+  line-height: 1.4;
+}
+
+.prism-select__label--required::after {
+  content: '*';
+  color: var(--prism-spark);
+  margin-left: 2px;
+}
+
+.prism-select__optional {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--prism-text-tertiary);
+}
+
+/* =============================================================================
+   TRIGGER (The clickable button)
+   ============================================================================= */
+
+.prism-select__trigger {
+  /* Reset */
+  appearance: none;
+  border: none;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+
+  /* Layout */
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+
+  /* Sizing (md default) */
+  height: 44px;
+  padding: 0 14px;
+
+  /* Typography */
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  color: var(--prism-text);
+
+  /* VOLUMETRIC glass with noise texture */
+  background:
+    /* Noise texture for frosted glass feel */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    var(--prism-surface);
+  background-blend-mode: overlay, normal;
+  backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+  -webkit-backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+
+  /* Glass edge beveling */
+  border: 1px solid transparent;
+  border-image: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.25) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(0, 0, 0, 0.02) 100%
+  ) 1;
+  border-radius: var(--prism-radius-md);
+
+  /* Volumetric shadow */
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.15),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.03);
+
+  /* GPU acceleration */
+  transform: translateZ(0);
+
+  /* Transitions */
+  transition:
+    border-color var(--prism-dur-normal) var(--prism-ease-cusp),
+    box-shadow var(--prism-dur-normal) var(--prism-ease-cusp),
+    background var(--prism-dur-normal) var(--prism-ease-cusp);
+}
+
+/* Chromatic ring */
+.prism-select__trigger::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: var(--prism-gradient-spectrum);
+  z-index: -1;
+  opacity: 0;
+  filter: blur(4px);
+  transition: opacity var(--prism-dur-normal) var(--prism-ease-cusp);
+  pointer-events: none;
+}
+
+/* Selected value */
+.prism-select__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Placeholder */
+.prism-select__placeholder {
+  color: var(--prism-text-tertiary);
+}
+
+/* Chevron icon */
+.prism-select__chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--prism-text-secondary);
+  flex-shrink: 0;
+  transition: transform var(--prism-dur-normal) var(--prism-ease-cusp);
+}
+
+.prism-select__chevron svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Open state chevron rotation */
+.prism-select--open .prism-select__chevron {
+  transform: rotate(180deg);
+}
+
+/* =============================================================================
+   DROPDOWN MENU
+   ============================================================================= */
+
+.prism-select__menu {
+  /* Reset */
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+
+  /* Positioning */
+  position: absolute;
+  z-index: var(--prism-z-tooltip);
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+
+  /* Sizing */
+  max-height: 280px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+
+  /* Visual - glass effect */
+  background: var(--prism-surface);
+  backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation));
+  -webkit-backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation));
+  border: 1px solid var(--prism-border);
+  border-radius: var(--prism-radius-md);
+  box-shadow: var(--prism-shadow-lg), var(--prism-shadow-chromatic);
+
+  /* Hidden by default */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition:
+    opacity var(--prism-dur-fast) var(--prism-ease-cusp),
+    transform var(--prism-dur-fast) var(--prism-ease-cusp),
+    visibility var(--prism-dur-fast);
+}
+
+/* Open state */
+.prism-select--open .prism-select__menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* Scrollbar styling */
+.prism-select__menu::-webkit-scrollbar {
+  width: 8px;
+}
+
+.prism-select__menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.prism-select__menu::-webkit-scrollbar-thumb {
+  background: var(--prism-border);
+  border-radius: 4px;
+}
+
+/* =============================================================================
+   MENU ITEM
+   ============================================================================= */
+
+.prism-select__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  font-size: 0.9375rem;
+  color: var(--prism-text);
+  border-radius: calc(var(--prism-radius-md) - 6px);
+  cursor: pointer;
+  transition:
+    background var(--prism-dur-fast) var(--prism-ease-cusp),
+    color var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-select__option:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.prism-select__option:focus-visible {
+  outline: 2px solid var(--colony-color, var(--prism-beacon));
+  outline-offset: -2px;
+}
+
+/* Selected option */
+.prism-select__option--selected {
+  background: color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 15%, transparent);
+  color: var(--colony-color, var(--prism-beacon));
+}
+
+.prism-select__option--selected:hover {
+  background: color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 20%, transparent);
+}
+
+/* Disabled option */
+.prism-select__option--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Check icon */
+.prism-select__check {
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  opacity: 0;
+}
+
+.prism-select__option--selected .prism-select__check {
+  opacity: 1;
+}
+
+/* Option icon */
+.prism-select__option-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* Option description */
+.prism-select__option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.prism-select__option-label {
+  font-size: 0.9375rem;
+}
+
+.prism-select__option-description {
+  font-size: 0.75rem;
+  color: var(--prism-text-secondary);
+}
+
+/* =============================================================================
+   GROUP
+   ============================================================================= */
+
+.prism-select__group {
+  padding: 4px 0;
+}
+
+.prism-select__group:not(:last-child) {
+  border-bottom: 1px solid var(--prism-border);
+  margin-bottom: 4px;
+}
+
+.prism-select__group-label {
+  padding: 8px 12px 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--prism-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* =============================================================================
+   SEARCHABLE
+   ============================================================================= */
+
+.prism-select__search {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--prism-border);
+  margin-bottom: 4px;
+}
+
+.prism-select__search-input {
+  appearance: none;
+  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  outline: none;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  color: var(--prism-text);
+  border-radius: var(--prism-radius-sm);
+}
+
+.prism-select__search-input::placeholder {
+  color: var(--prism-text-tertiary);
+}
+
+/* No results */
+.prism-select__no-results {
+  padding: 20px;
+  text-align: center;
+  color: var(--prism-text-secondary);
+  font-size: 0.875rem;
+}
+
+/* =============================================================================
+   HELPER TEXT
+   ============================================================================= */
+
+.prism-select__helper {
+  font-size: 0.75rem;
+  color: var(--prism-text-secondary);
+  line-height: 1.4;
+  padding-left: 2px;
+}
+
+/* =============================================================================
+   INTERACTIVE STATES
+   ============================================================================= */
+
+/* Hover */
+.prism-select__trigger:hover:not(:disabled):not([aria-disabled="true"]) {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: var(--prism-surface-elevated);
+}
+
+/* Focus */
+.prism-select__trigger:focus-visible {
+  outline: none;
+  border-color: var(--colony-color, var(--prism-beacon));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 20%, transparent),
+    var(--prism-shadow-chromatic);
+}
+
+.prism-select__trigger:focus-visible::before {
+  opacity: 0.3;
+}
+
+/* Open */
+.prism-select--open .prism-select__trigger {
+  border-color: var(--colony-color, var(--prism-beacon));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 20%, transparent);
+}
+
+.prism-select--open .prism-select__trigger::before {
+  opacity: 0.3;
+}
+
+/* Disabled */
+.prism-select--disabled .prism-select__label {
+  opacity: 0.5;
+}
+
+.prism-select__trigger:disabled,
+.prism-select__trigger[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Loading */
+.prism-select--loading .prism-select__trigger {
+  pointer-events: none;
+}
+
+.prism-select__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--prism-text-tertiary);
+  border-top-color: var(--colony-color, var(--prism-beacon));
+  border-radius: 50%;
+  animation: prism-select-spin 0.8s linear infinite;
+}
+
+@keyframes prism-select-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error */
+.prism-select--error .prism-select__trigger {
+  border-color: var(--prism-spark);
+}
+
+.prism-select--error .prism-select__trigger:focus-visible,
+.prism-select--error.prism-select--open .prism-select__trigger {
+  box-shadow: 0 0 0 3px var(--prism-e1-18);
+}
+
+.prism-select--error .prism-select__trigger::before {
+  background: linear-gradient(135deg, var(--prism-spark), var(--prism-forge));
+}
+
+.prism-select--error .prism-select__helper {
+  color: var(--prism-spark);
+}
+
+.prism-select--error .prism-select__label {
+  color: var(--prism-spark);
+}
+
+/* Success */
+.prism-select--success .prism-select__trigger {
+  border-color: var(--prism-nexus);
+}
+
+.prism-select--success .prism-select__trigger:focus-visible,
+.prism-select--success.prism-select--open .prism-select__trigger {
+  box-shadow: 0 0 0 3px var(--prism-e4-18);
+}
+
+.prism-select--success .prism-select__trigger::before {
+  background: linear-gradient(135deg, var(--prism-nexus), var(--prism-beacon));
+}
+
+.prism-select--success .prism-select__helper {
+  color: var(--prism-nexus);
+}
+
+/* =============================================================================
+   SIZE VARIANTS
+   ============================================================================= */
+
+/* Small */
+.prism-select--sm .prism-select__label {
+  font-size: 0.8125rem;
+}
+
+.prism-select--sm .prism-select__trigger {
+  height: 36px;
+  padding: 0 12px;
+  font-size: 0.875rem;
+  border-radius: var(--prism-radius-sm);
+}
+
+.prism-select--sm .prism-select__menu {
+  border-radius: var(--prism-radius-sm);
+  padding: 4px;
+}
+
+.prism-select--sm .prism-select__option {
+  padding: 8px 10px;
+  font-size: 0.875rem;
+}
+
+/* Large */
+.prism-select--lg .prism-select__label {
+  font-size: 0.9375rem;
+}
+
+.prism-select--lg .prism-select__trigger {
+  height: 52px;
+  padding: 0 16px;
+  font-size: 1rem;
+  border-radius: var(--prism-radius-lg);
+}
+
+.prism-select--lg .prism-select__chevron {
+  width: 20px;
+  height: 20px;
+}
+
+.prism-select--lg .prism-select__menu {
+  border-radius: var(--prism-radius-lg);
+  padding: 8px;
+}
+
+.prism-select--lg .prism-select__option {
+  padding: 12px 14px;
+  font-size: 1rem;
+}
+
+/* =============================================================================
+   MULTI-SELECT
+   ============================================================================= */
+
+.prism-select--multi .prism-select__trigger {
+  height: auto;
+  min-height: 44px;
+  padding: 6px 14px;
+  flex-wrap: wrap;
+}
+
+.prism-select--multi .prism-select__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.prism-select__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 0.8125rem;
+  background: color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 20%, transparent);
+  color: var(--colony-color, var(--prism-beacon));
+  border-radius: var(--prism-radius-sm);
+}
+
+.prism-select__tag-remove {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: inherit;
+  opacity: 0.7;
+  border-radius: var(--prism-radius-full);
+  transition: opacity var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-select__tag-remove:hover {
+  opacity: 1;
+}
+
+/* =============================================================================
+   NATIVE SELECT (Fallback)
+   ============================================================================= */
+
+.prism-select__native {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+/* =============================================================================
+   COLONY COLOR VARIANTS
+   ============================================================================= */
+
+.prism-select[data-colony="spark"] { --colony-color: var(--prism-spark); }
+.prism-select[data-colony="forge"] { --colony-color: var(--prism-forge); }
+.prism-select[data-colony="flow"] { --colony-color: var(--prism-flow); }
+.prism-select[data-colony="nexus"] { --colony-color: var(--prism-nexus); }
+.prism-select[data-colony="beacon"] { --colony-color: var(--prism-beacon); }
+.prism-select[data-colony="grove"] { --colony-color: var(--prism-grove); }
+.prism-select[data-colony="crystal"] { --colony-color: var(--prism-crystal); }
+
+/* =============================================================================
+   REDUCED MOTION
+   ============================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .prism-select__trigger {
+    transition: none;
+  }
+
+  .prism-select__trigger::before {
+    transition: none;
+  }
+
+  .prism-select__chevron {
+    transition: none;
+  }
+
+  .prism-select__menu {
+    transition: none;
+  }
+
+  .prism-select__option {
+    transition: none;
+  }
+
+  .prism-select__spinner {
+    animation: none;
+  }
+}

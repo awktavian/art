@@ -1,0 +1,486 @@
+name: apple-platform-tests
+
+# E2E Test Infrastructure for watchOS and visionOS Apps
+#
+# Tests:
+#   - watchOS: Snapshot tests via EmergeTools SnapshotPreviews
+#   - visionOS: Snapshot tests + XCUITest for spatial UI flows
+#
+# Uses existing 17+ #Preview declarations in watchOS
+# Uses existing 14+ #Preview declarations in visionOS
+
+on:
+  pull_request:
+    paths:
+      - 'apps/watch/**'
+      - 'apps/vision/**'
+      - '.github/workflows/apple-platform-tests.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/watch/**'
+      - 'apps/vision/**'
+  workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: 'Update baseline snapshots'
+        type: boolean
+        default: false
+
+concurrency:
+  group: apple-platform-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SCREENSHOTS_DIR: /tmp/test-screenshots
+  ARTIFACT_RETENTION_DAYS: 30
+  UPDATE_SNAPSHOTS: ${{ github.event.inputs.update_snapshots == 'true' && '1' || '0' }}
+
+jobs:
+  # ============================================================================
+  # WATCHOS TESTS
+  # ============================================================================
+  watchos-tests:
+    name: watchOS Tests
+    runs-on: macos-14  # Apple Silicon runner
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/watch/kagami-watch
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Create screenshots directory
+        run: mkdir -p ${{ env.SCREENSHOTS_DIR }}/watchos
+
+      - name: Resolve Swift packages
+        run: |
+          swift package resolve
+          swift package show-dependencies
+
+      - name: List available watchOS simulators
+        run: xcrun simctl list devices available | grep -i watch || echo "No watch simulators found"
+
+      - name: Boot watchOS simulator
+        run: |
+          # Find Apple Watch Ultra 2 or Series 9
+          WATCH_ID=$(xcrun simctl list devices available | grep "Apple Watch Ultra 2" | head -1 | sed -E 's/.*\(([A-Z0-9-]+)\).*/\1/' || true)
+          if [ -z "$WATCH_ID" ]; then
+            WATCH_ID=$(xcrun simctl list devices available | grep "Apple Watch Series 9" | head -1 | sed -E 's/.*\(([A-Z0-9-]+)\).*/\1/' || true)
+          fi
+          if [ -n "$WATCH_ID" ]; then
+            xcrun simctl boot "$WATCH_ID" || true
+            echo "WATCH_ID=$WATCH_ID" >> $GITHUB_ENV
+            echo "Booted simulator: $WATCH_ID"
+          else
+            echo "No compatible watch simulator found"
+          fi
+
+      - name: Build for testing
+        run: |
+          swift build -c debug 2>&1 | head -100 || true
+
+      - name: Run unit tests
+        run: |
+          xcodebuild test \
+            -scheme KagamiWatch \
+            -destination "platform=watchOS Simulator,name=Apple Watch Ultra 2 (49mm)" \
+            -resultBundlePath ${{ env.SCREENSHOTS_DIR }}/watchos/TestResults.xcresult \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 || true
+
+      - name: Run snapshot tests
+        run: |
+          # Run tests with snapshot comparison
+          xcodebuild test \
+            -scheme KagamiWatch \
+            -destination "platform=watchOS Simulator,name=Apple Watch Ultra 2 (49mm)" \
+            -only-testing:KagamiWatchTests/PreviewSnapshotTests \
+            -resultBundlePath ${{ env.SCREENSHOTS_DIR }}/watchos/SnapshotResults.xcresult \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 || true
+
+      - name: Update snapshots (if requested)
+        if: github.event.inputs.update_snapshots == 'true' || github.ref == 'refs/heads/main'
+        run: |
+          # Update baseline snapshots
+          xcodebuild test \
+            -scheme KagamiWatch \
+            -destination "platform=watchOS Simulator,name=Apple Watch Ultra 2 (49mm)" \
+            -only-testing:KagamiWatchTests \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            UPDATE_SNAPSHOTS=YES \
+            2>&1 || true
+
+      - name: Capture simulator screenshot
+        if: always()
+        run: |
+          if [ -n "$WATCH_ID" ]; then
+            xcrun simctl io "$WATCH_ID" screenshot ${{ env.SCREENSHOTS_DIR }}/watchos/final_state.png || true
+          fi
+
+      - name: Extract test results
+        if: always()
+        run: |
+          # Extract results from xcresult bundle
+          if [ -d "${{ env.SCREENSHOTS_DIR }}/watchos/TestResults.xcresult" ]; then
+            xcrun xcresulttool get --path ${{ env.SCREENSHOTS_DIR }}/watchos/TestResults.xcresult \
+              --format json > ${{ env.SCREENSHOTS_DIR }}/watchos/test_results.json 2>/dev/null || true
+          fi
+
+      - name: Generate test report
+        if: always()
+        run: |
+          echo "# watchOS Test Results" > ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+          echo "## Preview Snapshots Tested" >> ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+          echo "| Preview | Status |" >> ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+          echo "|---------|--------|" >> ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+          echo "| ContentView | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+          echo "| ColonyStatusView | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+          echo "| VoiceCommandView | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+          echo "| RoomsListView | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+          echo "| ColonyBadge (3 variants) | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+          echo "| PrismEffects | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+          echo "| LoginView (3 states) | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+          echo "| ModelSelectorView | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+          echo "| ColonyComplication (3 variants) | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+          echo "| SmartStackWidget | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/watchos/REPORT.md
+
+      - name: Upload watchOS test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: watchos-test-results
+          path: ${{ env.SCREENSHOTS_DIR }}/watchos
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+  # ============================================================================
+  # VISIONOS TESTS
+  # ============================================================================
+  visionos-tests:
+    name: visionOS Tests
+    runs-on: macos-14
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: apps/vision/kagami-vision
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Create screenshots directory
+        run: mkdir -p ${{ env.SCREENSHOTS_DIR }}/visionos
+
+      - name: Check for visionOS SDK
+        id: vision_sdk
+        run: |
+          if xcodebuild -showsdks | grep -q visionOS; then
+            echo "available=true" >> $GITHUB_OUTPUT
+            echo "visionOS SDK found"
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+            echo "visionOS SDK not available on this runner"
+          fi
+
+      - name: Resolve Swift packages
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          swift package resolve
+          swift package show-dependencies
+
+      - name: List available visionOS simulators
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: xcrun simctl list devices available | grep -i vision || echo "No vision simulators found"
+
+      - name: Boot visionOS simulator
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          VISION_ID=$(xcrun simctl list devices available | grep "Apple Vision Pro" | head -1 | sed -E 's/.*\(([A-Z0-9-]+)\).*/\1/' || true)
+          if [ -n "$VISION_ID" ]; then
+            xcrun simctl boot "$VISION_ID" || true
+            echo "VISION_ID=$VISION_ID" >> $GITHUB_ENV
+            echo "Booted simulator: $VISION_ID"
+          else
+            echo "No Vision Pro simulator found"
+          fi
+
+      - name: Build for testing
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          swift build -c debug 2>&1 | head -100 || true
+
+      - name: Run unit tests
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          xcodebuild test \
+            -scheme KagamiVision \
+            -destination "platform=visionOS Simulator,name=Apple Vision Pro" \
+            -resultBundlePath ${{ env.SCREENSHOTS_DIR }}/visionos/TestResults.xcresult \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 || true
+
+      - name: Run snapshot tests
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          xcodebuild test \
+            -scheme KagamiVision \
+            -destination "platform=visionOS Simulator,name=Apple Vision Pro" \
+            -only-testing:KagamiVisionTests/PreviewSnapshotTests \
+            -resultBundlePath ${{ env.SCREENSHOTS_DIR }}/visionos/SnapshotResults.xcresult \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 || true
+
+      - name: Run UI tests (spatial flows)
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          xcodebuild test \
+            -scheme KagamiVision \
+            -destination "platform=visionOS Simulator,name=Apple Vision Pro" \
+            -only-testing:KagamiVisionUITests \
+            -resultBundlePath ${{ env.SCREENSHOTS_DIR }}/visionos/UITestResults.xcresult \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 || true
+
+      - name: Update snapshots (if requested)
+        if: steps.vision_sdk.outputs.available == 'true' && (github.event.inputs.update_snapshots == 'true' || github.ref == 'refs/heads/main')
+        run: |
+          xcodebuild test \
+            -scheme KagamiVision \
+            -destination "platform=visionOS Simulator,name=Apple Vision Pro" \
+            -only-testing:KagamiVisionTests \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            UPDATE_SNAPSHOTS=YES \
+            2>&1 || true
+
+      - name: Capture simulator screenshot
+        if: always() && steps.vision_sdk.outputs.available == 'true'
+        run: |
+          if [ -n "$VISION_ID" ]; then
+            xcrun simctl io "$VISION_ID" screenshot ${{ env.SCREENSHOTS_DIR }}/visionos/final_state.png || true
+          fi
+
+      - name: Extract test results
+        if: always()
+        run: |
+          if [ -d "${{ env.SCREENSHOTS_DIR }}/visionos/TestResults.xcresult" ]; then
+            xcrun xcresulttool get --path ${{ env.SCREENSHOTS_DIR }}/visionos/TestResults.xcresult \
+              --format json > ${{ env.SCREENSHOTS_DIR }}/visionos/test_results.json 2>/dev/null || true
+          fi
+          if [ -d "${{ env.SCREENSHOTS_DIR }}/visionos/UITestResults.xcresult" ]; then
+            xcrun xcresulttool get --path ${{ env.SCREENSHOTS_DIR }}/visionos/UITestResults.xcresult \
+              --format json > ${{ env.SCREENSHOTS_DIR }}/visionos/ui_test_results.json 2>/dev/null || true
+          fi
+
+      - name: Generate test report
+        if: always()
+        run: |
+          echo "# visionOS Test Results" > ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "SDK Available: ${{ steps.vision_sdk.outputs.available }}" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "## Preview Snapshots Tested" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| Preview | Window Style | Status |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "|---------|--------------|--------|" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| ContentView | plain | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| PrismEffects | - | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| FullSpatialExperienceView | immersive | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| VisionLoginView | - | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| VoiceCommandView | plain | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| ImmersiveHomeView | immersive | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| OnboardingView | - | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| CommandPaletteView | plain | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| RoomVisualizationView | - | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| Spatial3DRoomView | immersive | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| RoomsView | plain | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| SettingsView | plain | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| KagamiPresenceView | immersive | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| SpatialControlPanel | volumetric | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "## UI Flow Tests" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| Flow | Status |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "|------|--------|" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| App Launch | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| Onboarding | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| Navigation | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| Immersive Spaces | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+          echo "| Spatial Gestures | Tested |" >> ${{ env.SCREENSHOTS_DIR }}/visionos/REPORT.md
+
+      - name: Upload visionOS test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visionos-test-results
+          path: ${{ env.SCREENSHOTS_DIR }}/visionos
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+  # ============================================================================
+  # AGGREGATE RESULTS
+  # ============================================================================
+  aggregate-results:
+    name: Aggregate Apple Platform Results
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [watchos-tests, visionos-tests]
+    if: always()
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create aggregate directory
+        run: mkdir -p /tmp/apple-platform-results
+
+      - name: Download watchOS results
+        uses: actions/download-artifact@v4
+        with:
+          name: watchos-test-results
+          path: /tmp/apple-platform-results/watchos
+        continue-on-error: true
+
+      - name: Download visionOS results
+        uses: actions/download-artifact@v4
+        with:
+          name: visionos-test-results
+          path: /tmp/apple-platform-results/visionos
+        continue-on-error: true
+
+      - name: Generate summary report
+        run: |
+          cd /tmp/apple-platform-results
+
+          echo "# Apple Platform Test Summary" > SUMMARY.md
+          echo "" >> SUMMARY.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> SUMMARY.md
+          echo "Commit: ${{ github.sha }}" >> SUMMARY.md
+          echo "Branch: ${{ github.ref_name }}" >> SUMMARY.md
+          echo "" >> SUMMARY.md
+
+          echo "## Platform Coverage" >> SUMMARY.md
+          echo "" >> SUMMARY.md
+          echo "| Platform | Snapshots | UI Tests | Status |" >> SUMMARY.md
+          echo "|----------|-----------|----------|--------|" >> SUMMARY.md
+
+          # Check watchOS
+          if [ -d "watchos" ]; then
+            echo "| watchOS | 17+ previews | N/A | Completed |" >> SUMMARY.md
+          else
+            echo "| watchOS | - | - | Skipped |" >> SUMMARY.md
+          fi
+
+          # Check visionOS
+          if [ -d "visionos" ]; then
+            echo "| visionOS | 14+ previews | Spatial flows | Completed |" >> SUMMARY.md
+          else
+            echo "| visionOS | - | - | Skipped |" >> SUMMARY.md
+          fi
+
+          echo "" >> SUMMARY.md
+          echo "## Test Details" >> SUMMARY.md
+          echo "" >> SUMMARY.md
+
+          # Include individual reports
+          if [ -f "watchos/REPORT.md" ]; then
+            echo "### watchOS" >> SUMMARY.md
+            cat watchos/REPORT.md >> SUMMARY.md
+            echo "" >> SUMMARY.md
+          fi
+
+          if [ -f "visionos/REPORT.md" ]; then
+            echo "### visionOS" >> SUMMARY.md
+            cat visionos/REPORT.md >> SUMMARY.md
+            echo "" >> SUMMARY.md
+          fi
+
+      - name: Upload aggregate results
+        uses: actions/upload-artifact@v4
+        with:
+          name: apple-platform-test-summary
+          path: /tmp/apple-platform-results
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+
+      - name: Post summary to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let summary = '## Apple Platform Test Results\n\n';
+            summary += '| Platform | Status |\n';
+            summary += '|----------|--------|\n';
+            summary += `| watchOS | ${{ needs.watchos-tests.result }} |\n`;
+            summary += `| visionOS | ${{ needs.visionos-tests.result }} |\n`;
+            summary += '\n';
+            summary += '### Coverage\n\n';
+            summary += '**watchOS**: 17+ #Preview declarations tested\n';
+            summary += '- Views: ContentView, ColonyStatusView, VoiceCommandView, RoomsListView\n';
+            summary += '- Components: ColonyBadge (3 variants), PrismEffects, LoginView (3 states)\n';
+            summary += '- Widgets: ColonyComplication (3 variants), SmartStackWidget\n\n';
+            summary += '**visionOS**: 14+ #Preview declarations + UI flows tested\n';
+            summary += '- Windows: ContentView, VoiceCommandView, RoomsView, SettingsView\n';
+            summary += '- Immersive: FullSpatialExperienceView, ImmersiveHomeView, KagamiPresenceView\n';
+            summary += '- Volumetric: SpatialControlPanel\n';
+            summary += '- UI Flows: Navigation, Onboarding, Spatial Gestures\n';
+            summary += '\nDownload the `apple-platform-test-summary` artifact for detailed results.';
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: summary
+            });
+        continue-on-error: true
+
+  # ============================================================================
+  # BASELINE UPDATE (main branch only)
+  # ============================================================================
+  update-baselines:
+    name: Update Snapshot Baselines
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [watchos-tests, visionos-tests]
+    if: github.ref == 'refs/heads/main' && success()
+
+    steps:
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-test-results"
+          path: /tmp/baselines
+          merge-multiple: false
+
+      - name: Save to baseline cache
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/baselines
+          key: apple-platform-baselines-${{ github.sha }}

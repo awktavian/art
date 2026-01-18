@@ -1,0 +1,742 @@
+/**
+ * =============================================================================
+ * COMPONENT: Toast
+ * Kagami Design System V2 - World-class toast notifications
+ *
+ * Features:
+ * - Glass surface with spectral effects
+ * - Swipe-to-dismiss physics
+ * - Attention pulse animation
+ * - Auto-dismiss with progress bar
+ * - Stacking with perspective effect
+ * - Position variants (6 positions)
+ * - Spring-based entry/exit animations
+ *
+ * Usage:
+ *   <div class="prism-toast-container prism-toast-container--top-right">
+ *     <div class="prism-toast prism-toast--success" data-swipe-dismiss>
+ *       <span class="prism-toast__icon">...</span>
+ *       <div class="prism-toast__content">
+ *         <p class="prism-toast__title">Success!</p>
+ *         <p class="prism-toast__message">Action completed.</p>
+ *       </div>
+ *       <button class="prism-toast__dismiss">...</button>
+ *       <div class="prism-toast__progress"></div>
+ *     </div>
+ *   </div>
+ * =============================================================================
+ */
+
+/* =============================================================================
+   CSS CUSTOM PROPERTIES
+   ============================================================================= */
+
+.prism-toast {
+  /* Swipe offset (set via JS) */
+  --swipe-x: 0px;
+  --swipe-opacity: 1;
+
+  /* Attention scale */
+  --attention-scale: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * TOAST CONTAINER
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-toast-container {
+  position: fixed;
+  z-index: calc(var(--prism-z-modal) + 10);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  pointer-events: none;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+/* Position variants */
+.prism-toast-container--top-left {
+  top: 0;
+  left: 0;
+  align-items: flex-start;
+}
+
+.prism-toast-container--top-center {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
+}
+
+.prism-toast-container--top-right {
+  top: 0;
+  right: 0;
+  align-items: flex-end;
+}
+
+.prism-toast-container--bottom-left {
+  bottom: 0;
+  left: 0;
+  align-items: flex-start;
+  flex-direction: column-reverse;
+}
+
+.prism-toast-container--bottom-center {
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
+  flex-direction: column-reverse;
+}
+
+.prism-toast-container--bottom-right {
+  bottom: 0;
+  right: 0;
+  align-items: flex-end;
+  flex-direction: column-reverse;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * BASE TOAST
+ * WORLD-CLASS glass with swipe-to-dismiss support
+ * Premium material feel matching Apple HIG standards
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-toast {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 360px;
+  max-width: calc(100vw - 40px);
+  padding: 14px 16px;
+
+  /* Visual - PREMIUM glass effect with multiple layers */
+  background:
+    /* Subtle noise texture for glass materiality */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E"),
+    /* Top highlight bevel */
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.15) 0%,
+      rgba(255, 255, 255, 0.05) 10%,
+      transparent 30%
+    ),
+    /* Main glass surface */
+    var(--prism-surface);
+  backdrop-filter: blur(var(--prism-blur-lg)) saturate(var(--prism-saturation-vivid));
+  -webkit-backdrop-filter: blur(var(--prism-blur-lg)) saturate(var(--prism-saturation-vivid));
+  border: 1px solid var(--prism-border);
+  border-radius: var(--prism-radius-lg);
+  color: var(--prism-text);
+
+  /* Multi-layer shadow system for depth */
+  box-shadow:
+    /* Outer glow for floating effect */
+    0 8px 32px -8px rgba(0, 0, 0, 0.15),
+    /* Medium shadow for depth */
+    0 4px 16px -4px rgba(0, 0, 0, 0.1),
+    /* Contact shadow */
+    0 2px 4px -1px rgba(0, 0, 0, 0.08),
+    /* Top inner highlight for glass edge */
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    /* Bottom inner shadow for concave feel */
+    inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+  pointer-events: auto;
+  overflow: hidden;
+
+  /* Swipe-to-dismiss transform */
+  transform:
+    translateX(var(--swipe-x))
+    scale(var(--attention-scale))
+    translateZ(0);
+  opacity: var(--swipe-opacity);
+
+  /* GPU acceleration */
+  will-change: transform, opacity;
+
+  /* Touch action for swipe */
+  touch-action: pan-y;
+  cursor: grab;
+
+  /* Smooth return when not swiping - spring physics */
+  transition:
+    transform var(--prism-dur-normal) var(--prism-ease-spring),
+    opacity var(--prism-dur-normal) var(--prism-ease-cusp),
+    box-shadow var(--prism-dur-normal) var(--prism-ease-cusp);
+}
+
+/* Active swiping - disable transitions for direct manipulation */
+.prism-toast--swiping {
+  transition: none;
+  cursor: grabbing;
+}
+
+/* Tinted overlay */
+.prism-toast::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0.06;
+  pointer-events: none;
+}
+
+/* Chromatic accent glow */
+.prism-toast::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  opacity: 0.8;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * TOAST VARIANTS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Info - Beacon (Cyan) */
+.prism-toast--info {
+  --toast-color: var(--prism-beacon);
+}
+
+.prism-toast--info::before {
+  background: var(--prism-beacon);
+}
+
+.prism-toast--info::after {
+  background: linear-gradient(
+    90deg,
+    var(--prism-beacon) 0%,
+    var(--prism-grove) 50%,
+    transparent 100%
+  );
+}
+
+.prism-toast--info .prism-toast__icon {
+  color: var(--prism-beacon);
+}
+
+.prism-toast--info .prism-toast__progress-bar {
+  background: linear-gradient(90deg, var(--prism-beacon), var(--prism-grove));
+}
+
+/* Success - Nexus (Green) */
+.prism-toast--success {
+  --toast-color: var(--prism-nexus);
+}
+
+.prism-toast--success::before {
+  background: var(--prism-nexus);
+}
+
+.prism-toast--success::after {
+  background: linear-gradient(
+    90deg,
+    var(--prism-nexus) 0%,
+    var(--prism-beacon) 50%,
+    transparent 100%
+  );
+}
+
+.prism-toast--success .prism-toast__icon {
+  color: var(--prism-nexus);
+}
+
+.prism-toast--success .prism-toast__progress-bar {
+  background: linear-gradient(90deg, var(--prism-nexus), var(--prism-beacon));
+}
+
+/* Warning - Forge (Orange) */
+.prism-toast--warning {
+  --toast-color: var(--prism-forge);
+}
+
+.prism-toast--warning::before {
+  background: var(--prism-forge);
+}
+
+.prism-toast--warning::after {
+  background: linear-gradient(
+    90deg,
+    var(--prism-flow) 0%,
+    var(--prism-forge) 50%,
+    transparent 100%
+  );
+}
+
+.prism-toast--warning .prism-toast__icon {
+  color: var(--prism-forge);
+}
+
+.prism-toast--warning .prism-toast__progress-bar {
+  background: linear-gradient(90deg, var(--prism-flow), var(--prism-forge));
+}
+
+/* Error - Spark (Red) */
+.prism-toast--error {
+  --toast-color: var(--prism-spark);
+}
+
+.prism-toast--error::before {
+  background: var(--prism-spark);
+}
+
+.prism-toast--error::after {
+  background: linear-gradient(
+    90deg,
+    var(--prism-spark) 0%,
+    var(--prism-forge) 50%,
+    transparent 100%
+  );
+}
+
+.prism-toast--error .prism-toast__icon {
+  color: var(--prism-spark);
+}
+
+.prism-toast--error .prism-toast__progress-bar {
+  background: linear-gradient(90deg, var(--prism-spark), var(--prism-forge));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * TOAST PARTS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-toast__icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+}
+
+.prism-toast__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.prism-toast__title {
+  margin: 0 0 2px 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--prism-text);
+  line-height: 1.4;
+}
+
+.prism-toast__message {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--prism-text-secondary);
+  line-height: 1.4;
+}
+
+.prism-toast__dismiss {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin: -2px -4px -2px 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--prism-radius-sm);
+  color: var(--prism-text-tertiary);
+  cursor: pointer;
+  transition:
+    background var(--prism-dur-fast) var(--prism-ease-cusp),
+    color var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-toast__dismiss:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--prism-text-secondary);
+}
+
+.prism-toast__dismiss:focus-visible {
+  outline: 2px solid var(--toast-color, var(--prism-beacon));
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PROGRESS BAR
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-toast__progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.prism-toast__progress-bar {
+  height: 100%;
+  width: 100%;
+  transform-origin: left;
+  animation: toast-progress linear forwards;
+}
+
+@keyframes toast-progress {
+  0% {
+    transform: scaleX(1);
+  }
+  100% {
+    transform: scaleX(0);
+  }
+}
+
+/* Progress with spectral gradient */
+.prism-toast__progress--spectral .prism-toast__progress-bar {
+  background: var(--prism-gradient-spectrum);
+  background-size: 200% 100%;
+  animation:
+    toast-progress linear forwards,
+    spectral-flow 2s linear infinite;
+}
+
+@keyframes spectral-flow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * ENTRY/EXIT ANIMATIONS
+ * Spring-based with overshoot for satisfying feel
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* From right (default) - WORLD-CLASS spring physics */
+.prism-toast--entering {
+  animation: toast-enter-right 0.6s var(--prism-ease-spring) forwards;
+}
+
+@keyframes toast-enter-right {
+  0% {
+    opacity: 0;
+    transform: translateX(120%) scale(0.85) translateZ(0);
+    filter: blur(4px);
+  }
+  40% {
+    opacity: 1;
+    transform: translateX(-12px) scale(1.03) translateZ(0);
+    filter: blur(0px);
+  }
+  55% {
+    transform: translateX(6px) scale(0.98) translateZ(0);
+  }
+  70% {
+    transform: translateX(-3px) scale(1.01) translateZ(0);
+  }
+  85% {
+    transform: translateX(1px) scale(0.995) translateZ(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1) translateZ(0);
+    filter: blur(0px);
+  }
+}
+
+/* From left - WORLD-CLASS spring physics */
+.prism-toast-container--top-left .prism-toast--entering,
+.prism-toast-container--bottom-left .prism-toast--entering {
+  animation-name: toast-enter-left;
+}
+
+@keyframes toast-enter-left {
+  0% {
+    opacity: 0;
+    transform: translateX(-120%) scale(0.85) translateZ(0);
+    filter: blur(4px);
+  }
+  40% {
+    opacity: 1;
+    transform: translateX(12px) scale(1.03) translateZ(0);
+    filter: blur(0px);
+  }
+  55% {
+    transform: translateX(-6px) scale(0.98) translateZ(0);
+  }
+  70% {
+    transform: translateX(3px) scale(1.01) translateZ(0);
+  }
+  85% {
+    transform: translateX(-1px) scale(0.995) translateZ(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1) translateZ(0);
+    filter: blur(0px);
+  }
+}
+
+/* From top (center positions) - WORLD-CLASS spring physics */
+.prism-toast-container--top-center .prism-toast--entering {
+  animation-name: toast-enter-top;
+}
+
+@keyframes toast-enter-top {
+  0% {
+    opacity: 0;
+    transform: translateY(-100%) scale(0.85) translateZ(0);
+    filter: blur(4px);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(12px) scale(1.03) translateZ(0);
+    filter: blur(0px);
+  }
+  55% {
+    transform: translateY(-6px) scale(0.98) translateZ(0);
+  }
+  70% {
+    transform: translateY(3px) scale(1.01) translateZ(0);
+  }
+  85% {
+    transform: translateY(-1px) scale(0.995) translateZ(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) translateZ(0);
+    filter: blur(0px);
+  }
+}
+
+/* From bottom (center positions) - WORLD-CLASS spring physics */
+.prism-toast-container--bottom-center .prism-toast--entering {
+  animation-name: toast-enter-bottom;
+}
+
+@keyframes toast-enter-bottom {
+  0% {
+    opacity: 0;
+    transform: translateY(100%) scale(0.85) translateZ(0);
+    filter: blur(4px);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-12px) scale(1.03) translateZ(0);
+    filter: blur(0px);
+  }
+  55% {
+    transform: translateY(6px) scale(0.98) translateZ(0);
+  }
+  70% {
+    transform: translateY(-3px) scale(1.01) translateZ(0);
+  }
+  85% {
+    transform: translateY(1px) scale(0.995) translateZ(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) translateZ(0);
+    filter: blur(0px);
+  }
+}
+
+/* Exit animation - smooth shrink */
+.prism-toast--exiting {
+  animation: toast-exit var(--prism-dur-normal) var(--prism-ease-cusp) forwards;
+}
+
+@keyframes toast-exit {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateZ(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.85) translateY(-10px) translateZ(0);
+  }
+}
+
+/* Swipe exit - flies off in direction of swipe */
+.prism-toast--swipe-exit-right {
+  animation: toast-swipe-right 0.3s var(--prism-ease-cusp) forwards;
+}
+
+@keyframes toast-swipe-right {
+  0% {
+    opacity: var(--swipe-opacity);
+    transform: translateX(var(--swipe-x)) translateZ(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(150%) translateZ(0);
+  }
+}
+
+.prism-toast--swipe-exit-left {
+  animation: toast-swipe-left 0.3s var(--prism-ease-cusp) forwards;
+}
+
+@keyframes toast-swipe-left {
+  0% {
+    opacity: var(--swipe-opacity);
+    transform: translateX(var(--swipe-x)) translateZ(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-150%) translateZ(0);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * ATTENTION PULSE
+ * Use when toast needs user attention (e.g., error, urgent)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-toast--attention {
+  animation: toast-attention 0.5s var(--prism-ease-spring);
+}
+
+@keyframes toast-attention {
+  0%, 100% {
+    transform: translateX(0) scale(1) translateZ(0);
+    box-shadow: var(--prism-shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+  20% {
+    transform: translateX(-4px) scale(1.02) translateZ(0);
+  }
+  40% {
+    transform: translateX(4px) scale(1.02) translateZ(0);
+  }
+  60% {
+    transform: translateX(-2px) scale(1.01) translateZ(0);
+    box-shadow: var(--prism-shadow-xl), 0 0 20px var(--toast-color, var(--prism-beacon)), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+  80% {
+    transform: translateX(2px) scale(1) translateZ(0);
+  }
+}
+
+/* Urgent pulse - continuous gentle pulse for critical toasts */
+.prism-toast--urgent {
+  animation: toast-urgent-pulse 2s var(--prism-ease-cusp) infinite;
+}
+
+@keyframes toast-urgent-pulse {
+  0%, 100% {
+    box-shadow:
+      var(--prism-shadow-lg),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 0 0 0 var(--toast-color, var(--prism-spark));
+  }
+  50% {
+    box-shadow:
+      var(--prism-shadow-lg),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 0 0 4px color-mix(in srgb, var(--toast-color, var(--prism-spark)) 30%, transparent);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * STACKING BEHAVIOR
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Stacked toasts get progressively smaller/faded */
+.prism-toast-container[data-stacked="true"] .prism-toast:nth-child(n+2) {
+  transform: scale(0.95) translateZ(0);
+  opacity: 0.8;
+}
+
+.prism-toast-container[data-stacked="true"] .prism-toast:nth-child(n+3) {
+  transform: scale(0.9) translateZ(0);
+  opacity: 0.6;
+}
+
+.prism-toast-container[data-stacked="true"] .prism-toast:nth-child(n+4) {
+  transform: scale(0.85) translateZ(0);
+  opacity: 0.4;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * COMPACT VARIANT
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-toast--compact {
+  width: auto;
+  min-width: 200px;
+  padding: 10px 14px;
+  gap: 10px;
+}
+
+.prism-toast--compact .prism-toast__icon {
+  width: 18px;
+  height: 18px;
+}
+
+.prism-toast--compact .prism-toast__title {
+  font-size: 0.8125rem;
+}
+
+.prism-toast--compact .prism-toast__message {
+  font-size: 0.75rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * ACTIONS IN TOAST
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-toast__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.prism-toast__action {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--toast-color, var(--prism-beacon));
+  background: color-mix(in srgb, var(--toast-color, var(--prism-beacon)) 15%, transparent);
+  border: none;
+  border-radius: var(--prism-radius-sm);
+  cursor: pointer;
+  transition:
+    background var(--prism-dur-fast) var(--prism-ease-cusp),
+    transform var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-toast__action:hover {
+  background: color-mix(in srgb, var(--toast-color, var(--prism-beacon)) 25%, transparent);
+}
+
+.prism-toast__action:active {
+  transform: scale(0.97);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * REDUCED MOTION
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .prism-toast--entering,
+  .prism-toast--exiting {
+    animation: none;
+  }
+
+  .prism-toast--entering {
+    opacity: 1;
+    transform: translateZ(0);
+  }
+
+  .prism-toast--exiting {
+    opacity: 0;
+  }
+
+  .prism-toast__progress-bar {
+    animation: toast-progress linear forwards;
+  }
+
+  .prism-toast__progress--spectral .prism-toast__progress-bar {
+    animation: toast-progress linear forwards;
+  }
+}

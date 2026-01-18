@@ -1,0 +1,547 @@
+/**
+ * =============================================================================
+ * COMPONENT: Hover Card
+ * Kagami Design System V2 - Interactive cards with depth parallax
+ *
+ * Features:
+ * - 3D tilt effect following cursor
+ * - Multi-layer parallax depth
+ * - Chromatic edge highlighting
+ * - Glass reflection that moves with tilt
+ * - Magnetic content alignment
+ * - Spectral glow on hover
+ *
+ * Usage:
+ *   <div class="prism-hover-card" data-tilt>
+ *     <div class="prism-hover-card__glow"></div>
+ *     <div class="prism-hover-card__content">
+ *       <div class="prism-hover-card__layer" data-depth="0.1">Background</div>
+ *       <div class="prism-hover-card__layer" data-depth="0.3">Midground</div>
+ *       <div class="prism-hover-card__layer" data-depth="0.5">Foreground</div>
+ *     </div>
+ *   </div>
+ * =============================================================================
+ */
+
+/* =============================================================================
+   CSS CUSTOM PROPERTIES
+   ============================================================================= */
+
+.prism-hover-card {
+  /* Tilt angles (set via JS) */
+  --tilt-x: 0deg;
+  --tilt-y: 0deg;
+
+  /* Tilt values as numbers for calculations (set via JS) */
+  --tilt-x-num: 0;
+  --tilt-y-num: 0;
+
+  /* Shadow offsets based on tilt (set via JS) */
+  --shadow-x: 0px;
+  --shadow-y: 4px;
+
+  /* Cursor position (0-1, set via JS) */
+  --cursor-x: 0.5;
+  --cursor-y: 0.5;
+
+  /* Reflection position (opposite to tilt, set via JS) */
+  --reflect-x: 0.5;
+  --reflect-y: 0.3;
+
+  /* Max tilt angle */
+  --max-tilt: 15deg;
+
+  /* Transition speed */
+  --tilt-speed: 0.4s;
+
+  /* Glow intensity */
+  --glow-intensity: 0;
+
+  /* Lift amount on hover */
+  --lift-amount: 0;
+
+  /* Scale on hover */
+  --hover-scale: 1;
+}
+
+/* =============================================================================
+   BASE HOVER CARD
+   ============================================================================= */
+
+.prism-hover-card {
+  /* Layout */
+  position: relative;
+  display: block;
+
+  /* 3D perspective container */
+  perspective: 1000px;
+  transform-style: preserve-3d;
+
+  /* Cursor feedback */
+  cursor: default;
+}
+
+/* =============================================================================
+   CARD BODY (The tilting element)
+   ============================================================================= */
+
+.prism-hover-card__body {
+  /* Layout */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  /* Visual - glass effect */
+  background: var(--prism-surface);
+  backdrop-filter: blur(calc(var(--prism-blur) + var(--lift-amount) * 4px)) saturate(calc(var(--prism-saturation) + var(--lift-amount) * 0.2));
+  -webkit-backdrop-filter: blur(calc(var(--prism-blur) + var(--lift-amount) * 4px)) saturate(calc(var(--prism-saturation) + var(--lift-amount) * 0.2));
+  border: 1px solid var(--prism-border);
+  border-radius: var(--prism-radius-xl);
+
+  /* Multi-layer dynamic shadow system */
+  /* Layer 1: Contact shadow (tight, dark, directly under card) */
+  /* Layer 2: Ambient shadow (soft, medium spread) */
+  /* Layer 3: Directional shadow (follows opposite of tilt for realism) */
+  box-shadow:
+    /* Contact shadow - stays close */
+    0 2px 4px rgba(0, 0, 0, 0.08),
+    /* Ambient shadow - medium spread */
+    0 8px 16px rgba(0, 0, 0, 0.06),
+    /* Directional shadow - follows tilt */
+    var(--shadow-x) var(--shadow-y) 24px rgba(0, 0, 0, 0.1);
+
+  /* 3D transform with lift and scale */
+  transform:
+    rotateX(var(--tilt-x))
+    rotateY(var(--tilt-y))
+    translateZ(calc(var(--lift-amount) * 20px))
+    scale(var(--hover-scale));
+  transform-style: preserve-3d;
+  will-change: transform, box-shadow;
+
+  /* Smooth return to neutral */
+  transition:
+    transform var(--tilt-speed) var(--prism-ease-spring),
+    box-shadow var(--tilt-speed) var(--prism-ease-cusp),
+    backdrop-filter var(--tilt-speed) var(--prism-ease-cusp);
+}
+
+/* =============================================================================
+   CHROMATIC EDGE GLOW
+   ============================================================================= */
+
+.prism-hover-card__glow {
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+
+  /* Radial glow that follows cursor */
+  background: radial-gradient(
+    600px circle at
+      calc(var(--cursor-x) * 100%)
+      calc(var(--cursor-y) * 100%),
+    color-mix(in srgb, var(--prism-beacon) 40%, transparent) 0%,
+    color-mix(in srgb, var(--prism-crystal) 20%, transparent) 25%,
+    transparent 50%
+  );
+
+  opacity: var(--glow-intensity);
+  filter: blur(20px);
+  transition: opacity var(--tilt-speed) var(--prism-ease-cusp);
+}
+
+/* Spectral ring border */
+.prism-hover-card__body::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    color-mix(in srgb, var(--prism-beacon) calc(var(--glow-intensity) * 100%), transparent) 25%,
+    color-mix(in srgb, var(--prism-crystal) calc(var(--glow-intensity) * 100%), transparent) 50%,
+    color-mix(in srgb, var(--prism-spark) calc(var(--glow-intensity) * 100%), transparent) 75%,
+    transparent 100%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: calc(var(--glow-intensity) * 0.8);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* =============================================================================
+   GLASS REFLECTION - Primary Layer
+   Moves opposite to tilt for realistic glass effect
+   ============================================================================= */
+
+.prism-hover-card__body::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+
+  /* Multi-layer reflection system:
+     1. Top edge highlight (simulates overhead light)
+     2. Moving specular highlight (follows opposite of tilt)
+     3. Secondary reflection sweep
+  */
+  background:
+    /* Top edge highlight - simulates overhead ambient light */
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.15) 0%,
+      rgba(255, 255, 255, 0.05) 10%,
+      transparent 25%
+    ),
+    /* Primary specular highlight - moves opposite to tilt */
+    radial-gradient(
+      ellipse 80% 50% at
+        calc(var(--reflect-x) * 100%)
+        calc(var(--reflect-y) * 100%),
+      rgba(255, 255, 255, 0.25) 0%,
+      rgba(255, 255, 255, 0.1) 30%,
+      transparent 70%
+    ),
+    /* Secondary sweep reflection - diagonal highlight bar */
+    linear-gradient(
+      calc(105deg + var(--tilt-y-num) * 2deg),
+      transparent 0%,
+      transparent calc(35% + var(--reflect-x) * 20%),
+      rgba(255, 255, 255, 0.04) calc(42% + var(--reflect-x) * 20%),
+      rgba(255, 255, 255, 0.12) calc(50% + var(--reflect-x) * 20%),
+      rgba(255, 255, 255, 0.04) calc(58% + var(--reflect-x) * 20%),
+      transparent calc(65% + var(--reflect-x) * 20%),
+      transparent 100%
+    );
+
+  opacity: calc(0.4 + var(--glow-intensity) * 0.6);
+  transition:
+    opacity var(--tilt-speed) var(--prism-ease-cusp),
+    background var(--tilt-speed) var(--prism-ease-cusp);
+}
+
+/* =============================================================================
+   SECONDARY REFLECTION LAYER
+   Cursor-following specular for extra depth
+   ============================================================================= */
+
+.prism-hover-card__reflection {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 2;
+  overflow: hidden;
+
+  /* Cursor-following specular hotspot */
+  background: radial-gradient(
+    circle 120px at
+      calc(var(--cursor-x) * 100%)
+      calc(var(--cursor-y) * 100%),
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.05) 40%,
+    transparent 70%
+  );
+
+  opacity: calc(var(--glow-intensity) * 0.8);
+  mix-blend-mode: overlay;
+  transition: opacity var(--tilt-speed) var(--prism-ease-cusp);
+}
+
+/* =============================================================================
+   CONTENT CONTAINER
+   ============================================================================= */
+
+.prism-hover-card__content {
+  position: relative;
+  padding: 24px;
+  transform-style: preserve-3d;
+}
+
+/* =============================================================================
+   PARALLAX LAYERS
+   Different elements move at different rates for depth perception
+   ============================================================================= */
+
+.prism-hover-card__layer {
+  transform-style: preserve-3d;
+  transition: transform var(--tilt-speed) var(--prism-ease-spring);
+  will-change: transform;
+}
+
+/* Depth levels - each moves at different Z depth AND has XY parallax offset
+   The parallax offset is calculated from cursor position for convincing depth */
+.prism-hover-card__layer[data-depth="0.1"] {
+  transform:
+    translateZ(12px)
+    translateX(calc((var(--cursor-x) - 0.5) * -4px))
+    translateY(calc((var(--cursor-y) - 0.5) * -4px));
+}
+
+.prism-hover-card__layer[data-depth="0.2"] {
+  transform:
+    translateZ(24px)
+    translateX(calc((var(--cursor-x) - 0.5) * -8px))
+    translateY(calc((var(--cursor-y) - 0.5) * -8px));
+}
+
+.prism-hover-card__layer[data-depth="0.3"] {
+  transform:
+    translateZ(36px)
+    translateX(calc((var(--cursor-x) - 0.5) * -14px))
+    translateY(calc((var(--cursor-y) - 0.5) * -14px));
+}
+
+.prism-hover-card__layer[data-depth="0.4"] {
+  transform:
+    translateZ(48px)
+    translateX(calc((var(--cursor-x) - 0.5) * -20px))
+    translateY(calc((var(--cursor-y) - 0.5) * -20px));
+}
+
+.prism-hover-card__layer[data-depth="0.5"] {
+  transform:
+    translateZ(60px)
+    translateX(calc((var(--cursor-x) - 0.5) * -28px))
+    translateY(calc((var(--cursor-y) - 0.5) * -28px));
+}
+
+/* Additional depth levels for more dramatic parallax */
+.prism-hover-card__layer[data-depth="0.6"] {
+  transform:
+    translateZ(72px)
+    translateX(calc((var(--cursor-x) - 0.5) * -36px))
+    translateY(calc((var(--cursor-y) - 0.5) * -36px));
+}
+
+.prism-hover-card__layer[data-depth="0.7"] {
+  transform:
+    translateZ(84px)
+    translateX(calc((var(--cursor-x) - 0.5) * -44px))
+    translateY(calc((var(--cursor-y) - 0.5) * -44px));
+}
+
+/* =============================================================================
+   HOVER STATES
+   ============================================================================= */
+
+.prism-hover-card:hover {
+  --glow-intensity: 1;
+  --lift-amount: 1;
+  --hover-scale: 1.02;
+}
+
+.prism-hover-card:hover .prism-hover-card__body {
+  /* Enhanced multi-layer shadow on hover - creates "floating" sensation */
+  box-shadow:
+    /* Tight contact shadow - provides grounding */
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    /* Close ambient shadow */
+    0 4px 8px rgba(0, 0, 0, 0.06),
+    /* Medium spread shadow */
+    0 12px 24px rgba(0, 0, 0, 0.08),
+    /* Dynamic directional shadow - follows opposite of tilt */
+    calc(var(--shadow-x) * 1.5) calc(var(--shadow-y) * 1.5 + 8px) 40px rgba(0, 0, 0, 0.12),
+    /* Far ambient shadow for depth */
+    calc(var(--shadow-x) * 2) calc(var(--shadow-y) * 2 + 20px) 80px rgba(0, 0, 0, 0.08);
+}
+
+/* =============================================================================
+   FOCUS STATE (keyboard navigation)
+   ============================================================================= */
+
+.prism-hover-card:focus-visible .prism-hover-card__body {
+  outline: 2px solid var(--prism-beacon);
+  outline-offset: 4px;
+}
+
+.prism-hover-card:focus-visible {
+  --glow-intensity: 0.8;
+}
+
+/* =============================================================================
+   SIZE VARIANTS
+   ============================================================================= */
+
+.prism-hover-card--sm .prism-hover-card__content {
+  padding: 16px;
+}
+
+.prism-hover-card--lg .prism-hover-card__content {
+  padding: 32px;
+}
+
+/* =============================================================================
+   TILT INTENSITY VARIANTS
+   ============================================================================= */
+
+.prism-hover-card--subtle {
+  --max-tilt: 8deg;
+}
+
+.prism-hover-card--dramatic {
+  --max-tilt: 25deg;
+}
+
+/* =============================================================================
+   COLOR VARIANTS (Brand colors)
+   ============================================================================= */
+
+.prism-hover-card[data-colony="spark"] .prism-hover-card__glow {
+  background: radial-gradient(
+    600px circle at
+      calc(var(--cursor-x) * 100%)
+      calc(var(--cursor-y) * 100%),
+    color-mix(in srgb, var(--prism-spark) 40%, transparent) 0%,
+    color-mix(in srgb, var(--prism-forge) 20%, transparent) 25%,
+    transparent 50%
+  );
+}
+
+.prism-hover-card[data-colony="beacon"] .prism-hover-card__glow {
+  background: radial-gradient(
+    600px circle at
+      calc(var(--cursor-x) * 100%)
+      calc(var(--cursor-y) * 100%),
+    color-mix(in srgb, var(--prism-beacon) 40%, transparent) 0%,
+    color-mix(in srgb, var(--prism-grove) 20%, transparent) 25%,
+    transparent 50%
+  );
+}
+
+.prism-hover-card[data-colony="nexus"] .prism-hover-card__glow {
+  background: radial-gradient(
+    600px circle at
+      calc(var(--cursor-x) * 100%)
+      calc(var(--cursor-y) * 100%),
+    color-mix(in srgb, var(--prism-nexus) 40%, transparent) 0%,
+    color-mix(in srgb, var(--prism-beacon) 20%, transparent) 25%,
+    transparent 50%
+  );
+}
+
+.prism-hover-card[data-colony="crystal"] .prism-hover-card__glow {
+  background: radial-gradient(
+    600px circle at
+      calc(var(--cursor-x) * 100%)
+      calc(var(--cursor-y) * 100%),
+    color-mix(in srgb, var(--prism-crystal) 40%, transparent) 0%,
+    color-mix(in srgb, var(--prism-spark) 20%, transparent) 25%,
+    transparent 50%
+  );
+}
+
+/* =============================================================================
+   SPECIAL: IMAGE CARD
+   ============================================================================= */
+
+.prism-hover-card--image .prism-hover-card__body {
+  overflow: hidden;
+}
+
+.prism-hover-card--image .prism-hover-card__image {
+  position: relative;
+  overflow: hidden;
+  transform-style: preserve-3d;
+}
+
+.prism-hover-card--image .prism-hover-card__image img {
+  width: 100%;
+  height: auto;
+  display: block;
+  transform: scale(1.05);
+  transition: transform var(--tilt-speed) var(--prism-ease-cusp);
+}
+
+.prism-hover-card--image:hover .prism-hover-card__image img {
+  transform: scale(1.1);
+}
+
+/* =============================================================================
+   SPECIAL: FLIP CARD
+   ============================================================================= */
+
+.prism-hover-card--flip {
+  perspective: 1000px;
+}
+
+.prism-hover-card--flip .prism-hover-card__body {
+  transition: transform 0.6s var(--prism-ease-spring);
+  transform-style: preserve-3d;
+}
+
+.prism-hover-card--flip .prism-hover-card__front,
+.prism-hover-card--flip .prism-hover-card__back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.prism-hover-card--flip .prism-hover-card__back {
+  transform: rotateY(180deg);
+}
+
+.prism-hover-card--flip:hover .prism-hover-card__body {
+  transform: rotateY(180deg);
+}
+
+/* =============================================================================
+   REDUCED MOTION
+   ============================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .prism-hover-card__body {
+    transition: box-shadow var(--prism-dur-fast) var(--prism-ease-cusp);
+    transform: none !important;
+  }
+
+  .prism-hover-card__layer {
+    transform: none !important;
+    transition: none;
+  }
+
+  .prism-hover-card--flip:hover .prism-hover-card__body {
+    transform: none;
+  }
+
+  .prism-hover-card--image .prism-hover-card__image img {
+    transform: none;
+  }
+
+  .prism-hover-card--image:hover .prism-hover-card__image img {
+    transform: none;
+  }
+}
+
+/* =============================================================================
+   TOUCH DEVICE OPTIMIZATIONS
+   ============================================================================= */
+
+@media (hover: none) and (pointer: coarse) {
+  .prism-hover-card__body {
+    transform: none;
+  }
+
+  .prism-hover-card__glow {
+    display: none;
+  }
+
+  .prism-hover-card:active .prism-hover-card__body {
+    transform: scale(0.98);
+  }
+}

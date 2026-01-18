@@ -1,0 +1,108 @@
+# Reusable Gradle Job Template
+# Use this template for consistent Android/JVM build jobs
+#
+# Usage:
+#   jobs:
+#     lint:
+#       uses: ./.github/workflows/_reusable-gradle-job.yml
+#       with:
+#         working-directory: apps/android/kagami-android
+#         gradle-task: lintDebug
+#         artifact-name: lint-results
+#         artifact-path: app/build/reports/lint-results-debug.html
+
+name: Reusable Gradle Job
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: 'Working directory for Gradle commands'
+        required: true
+        type: string
+      gradle-task:
+        description: 'Gradle task to run'
+        required: true
+        type: string
+      java-version:
+        description: 'Java version to use'
+        required: false
+        type: string
+        default: '17'
+      timeout-minutes:
+        description: 'Job timeout in minutes'
+        required: false
+        type: number
+        default: 20
+      artifact-name:
+        description: 'Name for uploaded artifact'
+        required: false
+        type: string
+        default: ''
+      artifact-path:
+        description: 'Path to upload as artifact (relative to working-directory)'
+        required: false
+        type: string
+        default: ''
+      retry-count:
+        description: 'Number of retry attempts for flaky tasks'
+        required: false
+        type: number
+        default: 1
+      continue-on-error:
+        description: 'Continue workflow if this job fails'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  gradle-job:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    continue-on-error: ${{ inputs.continue-on-error }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.java-version }}
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run Gradle task
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: ${{ inputs.retry-count }}
+          retry_wait_seconds: 10
+          timeout_minutes: ${{ inputs.timeout-minutes }}
+          command: |
+            cd ${{ inputs.working-directory }}
+            ./gradlew ${{ inputs.gradle-task }} --no-daemon
+
+      - name: Upload artifact
+        if: inputs.artifact-name != '' && inputs.artifact-path != '' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ inputs.working-directory }}/${{ inputs.artifact-path }}
+          retention-days: 30
+          if-no-files-found: warn

@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<!--
+  Kagami Hub Web Interface
+
+  Visual interface for deaf/hard-of-hearing users.
+  Shows visual alerts, status indicators, and controls
+  without relying on audio feedback.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Kagami Hub - Visual smart home control">
+    <title>Kagami Hub</title>
+    <style>
+        :root {
+            /* Colors */
+            --color-bg: #0a0a0b;
+            --color-surface: #12121a;
+            --color-surface-raised: #1a1a24;
+            --color-primary: #0ea5e9;
+            --color-secondary: #64748b;
+            --color-success: #22c55e;
+            --color-warning: #f59e0b;
+            --color-error: #ef4444;
+            --color-text: #f8fafc;
+            --color-text-muted: #94a3b8;
+
+            /* Spacing */
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 16px;
+            --space-lg: 24px;
+            --space-xl: 32px;
+
+            /* Border radius */
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+
+            /* Animation */
+            --animation-fast: 150ms;
+            --animation-normal: 300ms;
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--color-bg);
+            color: var(--color-text);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        /* Header */
+        header {
+            padding: var(--space-md) var(--space-lg);
+            background: var(--color-surface);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .logo-icon {
+            font-size: 1.75rem;
+        }
+
+        /* Connection status */
+        .status {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--color-error);
+        }
+
+        .status-dot.connected {
+            background: var(--color-success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Main content */
+        main {
+            padding: var(--space-lg);
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Visual alert banner */
+        .alert-banner {
+            display: none;
+            padding: var(--space-md) var(--space-lg);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-lg);
+            font-weight: 500;
+            animation: flash 0.5s ease-in-out;
+        }
+
+        .alert-banner.visible {
+            display: block;
+        }
+
+        .alert-banner.info {
+            background: var(--color-primary);
+            border: 2px solid var(--color-primary);
+        }
+
+        .alert-banner.warning {
+            background: var(--color-warning);
+            color: var(--color-bg);
+            border: 2px solid var(--color-warning);
+        }
+
+        .alert-banner.error {
+            background: var(--color-error);
+            border: 2px solid var(--color-error);
+        }
+
+        @keyframes flash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* Section */
+        section {
+            margin-bottom: var(--space-xl);
+        }
+
+        h2 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--color-text-muted);
+            margin-bottom: var(--space-md);
+        }
+
+        /* Room grid */
+        .room-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: var(--space-md);
+        }
+
+        .room-card {
+            background: var(--color-surface);
+            border-radius: var(--radius-lg);
+            padding: var(--space-lg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform var(--animation-fast), box-shadow var(--animation-fast);
+        }
+
+        .room-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .room-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-md);
+        }
+
+        .room-name {
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+
+        .room-status {
+            display: flex;
+            gap: var(--space-xs);
+        }
+
+        .room-status span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--color-secondary);
+        }
+
+        .room-status span.active {
+            background: var(--color-success);
+        }
+
+        /* Device controls */
+        .device-controls {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-sm);
+        }
+
+        .device-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-sm) 0;
+        }
+
+        .device-label {
+            color: var(--color-text-muted);
+            font-size: 0.875rem;
+        }
+
+        .device-value {
+            font-weight: 500;
+        }
+
+        /* Slider control */
+        .slider-control {
+            width: 100%;
+            margin-top: var(--space-sm);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: var(--color-surface-raised);
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--color-primary);
+            cursor: pointer;
+        }
+
+        /* Button */
+        .btn {
+            padding: var(--space-sm) var(--space-md);
+            border-radius: var(--radius-sm);
+            border: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background var(--animation-fast), transform var(--animation-fast);
+            min-height: 44px;
+            min-width: 44px;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0284c7;
+        }
+
+        .btn-secondary {
+            background: var(--color-surface-raised);
+            color: var(--color-text);
+        }
+
+        .btn-secondary:hover {
+            background: #252530;
+        }
+
+        /* Scene buttons */
+        .scene-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: var(--space-md);
+        }
+
+        .scene-btn {
+            background: var(--color-surface);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: var(--radius-md);
+            padding: var(--space-lg);
+            text-align: center;
+            cursor: pointer;
+            transition: background var(--animation-fast), transform var(--animation-fast);
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-sm);
+        }
+
+        .scene-btn:hover {
+            background: var(--color-surface-raised);
+        }
+
+        .scene-btn:active {
+            transform: scale(0.98);
+        }
+
+        .scene-icon {
+            font-size: 2rem;
+        }
+
+        .scene-label {
+            font-size: 0.875rem;
+            color: var(--color-text-muted);
+        }
+
+        /* Visual feedback area */
+        .feedback-area {
+            position: fixed;
+            bottom: var(--space-lg);
+            left: 50%;
+            transform: translateX(-50%);
+            padding: var(--space-md) var(--space-xl);
+            background: var(--color-surface);
+            border-radius: var(--radius-lg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: none;
+            align-items: center;
+            gap: var(--space-md);
+            animation: slideUp var(--animation-normal) ease-out;
+        }
+
+        .feedback-area.visible {
+            display: flex;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        .feedback-icon {
+            font-size: 1.5rem;
+        }
+
+        .feedback-text {
+            font-weight: 500;
+        }
+
+        /* Accessibility - Focus styles */
+        *:focus-visible {
+            outline: 2px solid var(--color-primary);
+            outline-offset: 2px;
+        }
+
+        /* Skip link */
+        .skip-link {
+            position: absolute;
+            top: -100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: var(--space-md);
+            background: var(--color-primary);
+            color: white;
+            z-index: 1000;
+            border-radius: var(--radius-sm);
+        }
+
+        .skip-link:focus {
+            top: var(--space-md);
+        }
+
+        /* High contrast mode */
+        @media (prefers-contrast: high) {
+            :root {
+                --color-bg: #000;
+                --color-surface: #1a1a1a;
+                --color-text: #fff;
+            }
+
+            .room-card,
+            .scene-btn {
+                border-width: 2px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="#main" class="skip-link">Skip to main content</a>
+
+    <header>
+        <div class="logo">
+            <span class="logo-icon">🏠</span>
+            <span>Kagami Hub</span>
+        </div>
+        <div class="status" aria-live="polite">
+            <span class="status-dot" id="connectionDot"></span>
+            <span id="connectionText">Connecting...</span>
+        </div>
+    </header>
+
+    <div class="alert-banner" id="alertBanner" role="alert" aria-live="assertive">
+        <span id="alertText"></span>
+    </div>
+
+    <main id="main">
+        <!-- Quick Scenes -->
+        <section aria-labelledby="scenes-heading">
+            <h2 id="scenes-heading">Quick Scenes</h2>
+            <div class="scene-grid">
+                <button class="scene-btn" data-scene="movie_mode" aria-label="Activate Movie Mode">
+                    <span class="scene-icon">🎬</span>
+                    <span class="scene-label">Movie</span>
+                </button>
+                <button class="scene-btn" data-scene="goodnight" aria-label="Activate Goodnight">
+                    <span class="scene-icon">🌙</span>
+                    <span class="scene-label">Goodnight</span>
+                </button>
+                <button class="scene-btn" data-scene="welcome_home" aria-label="Activate Welcome Home">
+                    <span class="scene-icon">🏡</span>
+                    <span class="scene-label">Welcome</span>
+                </button>
+                <button class="scene-btn" data-scene="away" aria-label="Activate Away Mode">
+                    <span class="scene-icon">🔒</span>
+                    <span class="scene-label">Away</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Rooms -->
+        <section aria-labelledby="rooms-heading">
+            <h2 id="rooms-heading">Rooms</h2>
+            <div class="room-grid" id="roomGrid">
+                <!-- Rooms will be populated by JavaScript -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Visual feedback toast -->
+    <div class="feedback-area" id="feedback" role="status" aria-live="polite">
+        <span class="feedback-icon" id="feedbackIcon">✓</span>
+        <span class="feedback-text" id="feedbackText"></span>
+    </div>
+
+    <script>
+        // Kagami Hub Web Interface JavaScript
+        const API_URL = 'http://localhost:8080';
+        let ws = null;
+
+        // State
+        const state = {
+            connected: false,
+            rooms: [],
+            alert: null
+        };
+
+        // DOM Elements
+        const elements = {
+            connectionDot: document.getElementById('connectionDot'),
+            connectionText: document.getElementById('connectionText'),
+            alertBanner: document.getElementById('alertBanner'),
+            alertText: document.getElementById('alertText'),
+            roomGrid: document.getElementById('roomGrid'),
+            feedback: document.getElementById('feedback'),
+            feedbackIcon: document.getElementById('feedbackIcon'),
+            feedbackText: document.getElementById('feedbackText')
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setupSceneButtons();
+            connectWebSocket();
+            fetchRooms();
+        });
+
+        // WebSocket connection
+        function connectWebSocket() {
+            ws = new WebSocket(`ws://${window.location.hostname}:8080/ws`);
+
+            ws.onopen = () => {
+                updateConnectionStatus(true);
+            };
+
+            ws.onclose = () => {
+                updateConnectionStatus(false);
+                // Reconnect after 3 seconds
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onerror = () => {
+                updateConnectionStatus(false);
+            };
+
+            ws.onmessage = (event) => {
+                handleMessage(JSON.parse(event.data));
+            };
+        }
+
+        // Handle incoming messages
+        function handleMessage(message) {
+            switch (message.type) {
+                case 'state_update':
+                    updateRoomState(message.room_id, message.state);
+                    break;
+                case 'alert':
+                    showAlert(message.severity, message.message);
+                    break;
+                case 'visual_alert':
+                    showVisualAlert(message);
+                    break;
+            }
+        }
+
+        // Update connection status
+        function updateConnectionStatus(connected) {
+            state.connected = connected;
+            elements.connectionDot.classList.toggle('connected', connected);
+            elements.connectionText.textContent = connected ? 'Connected' : 'Disconnected';
+        }
+
+        // Show alert banner
+        function showAlert(severity, message) {
+            elements.alertBanner.className = `alert-banner visible ${severity}`;
+            elements.alertText.textContent = message;
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                elements.alertBanner.classList.remove('visible');
+            }, 5000);
+        }
+
+        // Show visual alert (for deaf users)
+        function showVisualAlert(alert) {
+            // Flash screen border
+            document.body.style.boxShadow = `inset 0 0 20px ${alert.color || '#ef4444'}`;
+            setTimeout(() => {
+                document.body.style.boxShadow = 'none';
+            }, 500);
+
+            // Show feedback
+            showFeedback(alert.message, '⚠️');
+        }
+
+        // Fetch rooms from API
+        async function fetchRooms() {
+            try {
+                const response = await fetch(`${API_URL}/api/home/rooms`);
+                if (response.ok) {
+                    const data = await response.json();
+                    state.rooms = data.rooms || [];
+                    renderRooms();
+                }
+            } catch (error) {
+                console.error('Failed to fetch rooms:', error);
+            }
+        }
+
+        // Render rooms
+        function renderRooms() {
+            elements.roomGrid.innerHTML = state.rooms.map(room => `
+                <div class="room-card" data-room-id="${room.id}">
+                    <div class="room-header">
+                        <span class="room-name">${room.name}</span>
+                        <div class="room-status">
+                            ${room.lights?.length ? '<span class="active" title="Lights"></span>' : ''}
+                            ${room.shades?.length ? '<span title="Shades"></span>' : ''}
+                        </div>
+                    </div>
+                    <div class="device-controls">
+                        ${room.lights?.length ? `
+                            <div class="device-row">
+                                <span class="device-label">Lights</span>
+                                <span class="device-value">${room.lights[0]?.level || 0}%</span>
+                            </div>
+                            <div class="slider-control">
+                                <input type="range"
+                                       min="0" max="100"
+                                       value="${room.lights[0]?.level || 0}"
+                                       aria-label="${room.name} light brightness"
+                                       onchange="setLights('${room.name}', this.value)">
+                            </div>
+                        ` : ''}
+                        ${room.shades?.length ? `
+                            <div class="device-row">
+                                <span class="device-label">Shades</span>
+                                <div>
+                                    <button class="btn btn-secondary" onclick="controlShades('${room.name}', 'open')" aria-label="Open ${room.name} shades">Open</button>
+                                    <button class="btn btn-secondary" onclick="controlShades('${room.name}', 'close')" aria-label="Close ${room.name} shades">Close</button>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Update room state
+        function updateRoomState(roomId, newState) {
+            const roomIndex = state.rooms.findIndex(r => r.id === roomId);
+            if (roomIndex !== -1) {
+                state.rooms[roomIndex] = { ...state.rooms[roomIndex], ...newState };
+                renderRooms();
+            }
+        }
+
+        // Setup scene buttons
+        function setupSceneButtons() {
+            document.querySelectorAll('.scene-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const scene = btn.dataset.scene;
+                    executeScene(scene);
+                });
+            });
+        }
+
+        // Execute scene
+        async function executeScene(scene) {
+            try {
+                const response = await fetch(`${API_URL}/api/home/scenes/${scene}`, {
+                    method: 'POST'
+                });
+                if (response.ok) {
+                    showFeedback('Scene activated', '✓');
+                }
+            } catch (error) {
+                showFeedback('Failed to activate scene', '✕');
+            }
+        }
+
+        // Set lights
+        async function setLights(room, level) {
+            try {
+                await fetch(`${API_URL}/api/home/lights`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ level: parseInt(level), rooms: [room] })
+                });
+                showFeedback(`${room} lights set to ${level}%`, '💡');
+            } catch (error) {
+                showFeedback('Failed to set lights', '✕');
+            }
+        }
+
+        // Control shades
+        async function controlShades(room, action) {
+            try {
+                await fetch(`${API_URL}/api/home/shades`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, rooms: [room] })
+                });
+                showFeedback(`${room} shades ${action === 'open' ? 'opening' : 'closing'}`, '🪟');
+            } catch (error) {
+                showFeedback('Failed to control shades', '✕');
+            }
+        }
+
+        // Show feedback toast
+        function showFeedback(text, icon = '✓') {
+            elements.feedbackIcon.textContent = icon;
+            elements.feedbackText.textContent = text;
+            elements.feedback.classList.add('visible');
+
+            setTimeout(() => {
+                elements.feedback.classList.remove('visible');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

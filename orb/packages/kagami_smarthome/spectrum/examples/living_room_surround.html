@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spectrum Engine — Living Room Surround Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0f;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 300;
+            letter-spacing: 0.1em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+
+        .room-container {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .room-view {
+            background: linear-gradient(135deg, #1a1a25 0%, #0d0d12 100%);
+            border-radius: 20px;
+            padding: 30px;
+            position: relative;
+            min-height: 500px;
+            overflow: hidden;
+        }
+
+        .room-label {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 0.8rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        /* Room layout - top-down view */
+        .room-layout {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            margin-top: 30px;
+        }
+
+        /* Lake is on the left (west) */
+        .lake {
+            position: absolute;
+            left: -40px;
+            top: 0;
+            width: 60px;
+            height: 100%;
+            background: linear-gradient(90deg,
+                rgba(0,100,200,0.3) 0%,
+                rgba(0,100,200,0.1) 70%,
+                transparent 100%);
+            border-radius: 0 20px 20px 0;
+        }
+
+        .lake::before {
+            content: 'GREEN LAKE';
+            position: absolute;
+            left: -30px;
+            top: 50%;
+            transform: rotate(-90deg) translateX(-50%);
+            font-size: 0.7rem;
+            color: rgba(100,180,255,0.5);
+            letter-spacing: 0.2em;
+            white-space: nowrap;
+        }
+
+        /* Living room floor */
+        .floor {
+            position: absolute;
+            left: 40px;
+            top: 20px;
+            right: 20px;
+            bottom: 20px;
+            background: rgba(40,40,50,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+
+        /* Speaker positions - 5.1.4 Atmos */
+        .speaker {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: #333;
+            border: 2px solid #555;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            color: #888;
+            transition: all 0.3s ease;
+        }
+
+        .speaker.active {
+            border-color: var(--speaker-color, #0af);
+            box-shadow: 0 0 20px var(--speaker-glow, rgba(0,170,255,0.5));
+        }
+
+        /* Speaker positions */
+        .speaker.fl { left: 80px; top: 40px; }
+        .speaker.fr { right: 80px; top: 40px; }
+        .speaker.c { left: 50%; top: 30px; transform: translateX(-50%); }
+        .speaker.sl { left: 50px; top: 50%; transform: translateY(-50%); }
+        .speaker.sr { right: 50px; top: 50%; transform: translateY(-50%); }
+        .speaker.sub { right: 60px; bottom: 40px; background: #222; }
+
+        /* Height speakers */
+        .speaker.height {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            opacity: 0.7;
+        }
+        .speaker.tfl { left: 100px; top: 80px; }
+        .speaker.tfr { right: 100px; top: 80px; }
+        .speaker.trl { left: 100px; bottom: 80px; }
+        .speaker.trr { right: 100px; bottom: 80px; }
+
+        /* Outdoor lights on lake side (LEFT) */
+        .light-strip {
+            position: absolute;
+            left: 30px;
+            top: 10px;
+            bottom: 10px;
+            width: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .light {
+            flex: 1;
+            border-radius: 4px;
+            transition: all 0.15s ease;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        /* Listening position */
+        .listening-pos {
+            position: absolute;
+            left: 50%;
+            top: 55%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 40px;
+            background: rgba(60,60,70,0.5);
+            border: 1px dashed rgba(255,255,255,0.2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            color: #666;
+        }
+
+        /* Controls panel */
+        .controls {
+            background: rgba(20,20,30,0.8);
+            border-radius: 15px;
+            padding: 25px;
+        }
+
+        .control-group {
+            margin-bottom: 25px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 0.75rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 10px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        select {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        .value-display {
+            text-align: right;
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-top: 5px;
+        }
+
+        /* Spectrum visualization */
+        .spectrum-viz {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+        }
+
+        .spectrum-bars {
+            display: flex;
+            gap: 4px;
+            height: 100px;
+            align-items: flex-end;
+        }
+
+        .bar {
+            flex: 1;
+            background: linear-gradient(to top, var(--bar-color, #0af), transparent);
+            border-radius: 3px 3px 0 0;
+            transition: height 0.1s ease;
+        }
+
+        .bar-labels {
+            display: flex;
+            gap: 4px;
+            margin-top: 8px;
+        }
+
+        .bar-labels span {
+            flex: 1;
+            text-align: center;
+            font-size: 0.6rem;
+            color: #666;
+        }
+
+        /* Output display */
+        .output {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            font-family: 'Monaco', monospace;
+            font-size: 0.75rem;
+        }
+
+        .output-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .output-key { color: #888; }
+        .output-value { color: #fff; }
+
+        /* Play button */
+        .play-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #1a5f7a 0%, #0d3d4d 100%);
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .play-btn:hover {
+            background: linear-gradient(135deg, #2a7f9a 0%, #1d5d6d 100%);
+        }
+
+        .play-btn.playing {
+            background: linear-gradient(135deg, #7a1a1a 0%, #4d0d0d 100%);
+        }
+
+        /* Info section */
+        .info {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(20,20,30,0.5);
+            border-radius: 15px;
+            border-left: 3px solid rgba(100,180,255,0.5);
+        }
+
+        .info h3 {
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-bottom: 10px;
+        }
+
+        .info p {
+            font-size: 0.85rem;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        /* Ambient glow effect */
+        .ambient-glow {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.3;
+            transition: background 0.5s ease;
+            z-index: -1;
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-glow" id="ambientGlow"></div>
+
+    <div class="container">
+        <header>
+            <h1>SPECTRUM ENGINE</h1>
+            <div class="subtitle">Light is Music is Spectrum</div>
+        </header>
+
+        <div class="room-container">
+            <div class="room-view">
+                <div class="room-label">Living Room — Top-Down View</div>
+
+                <div class="room-layout">
+                    <!-- Lake on left side -->
+                    <div class="lake"></div>
+
+                    <!-- Floor area -->
+                    <div class="floor">
+                        <!-- 5.1.4 Atmos speakers -->
+                        <div class="speaker fl active" title="Front Left">FL</div>
+                        <div class="speaker c active" title="Center">C</div>
+                        <div class="speaker fr active" title="Front Right">FR</div>
+                        <div class="speaker sl active" title="Surround Left">SL</div>
+                        <div class="speaker sr active" title="Surround Right">SR</div>
+                        <div class="speaker sub" title="Subwoofer">SW</div>
+
+                        <!-- Height speakers -->
+                        <div class="speaker height tfl active" title="Top Front Left"></div>
+                        <div class="speaker height tfr active" title="Top Front Right"></div>
+                        <div class="speaker height trl active" title="Top Rear Left"></div>
+                        <div class="speaker height trr active" title="Top Rear Right"></div>
+
+                        <!-- Listening position -->
+                        <div class="listening-pos">YOU</div>
+                    </div>
+
+                    <!-- Oelo/Govee lights on lake side -->
+                    <div class="light-strip" id="lightStrip">
+                        <div class="light" id="light1"></div>
+                        <div class="light" id="light2"></div>
+                        <div class="light" id="light3"></div>
+                        <div class="light" id="light4"></div>
+                        <div class="light" id="light5"></div>
+                        <div class="light" id="light6"></div>
+                        <div class="light" id="light7"></div>
+                        <div class="light" id="light8"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <div class="control-group">
+                    <label>Tempo (BPM)</label>
+                    <input type="range" id="tempo" min="40" max="200" value="120">
+                    <div class="value-display" id="tempoValue">120 BPM</div>
+                </div>
+
+                <div class="control-group">
+                    <label>Dynamics</label>
+                    <input type="range" id="dynamics" min="0" max="100" value="60">
+                    <div class="value-display" id="dynamicsValue">mf</div>
+                </div>
+
+                <div class="control-group">
+                    <label>Key</label>
+                    <select id="key">
+                        <option value="C">C Major</option>
+                        <option value="Am">A Minor</option>
+                        <option value="G">G Major</option>
+                        <option value="Em">E Minor</option>
+                        <option value="D">D Major</option>
+                        <option value="Bm">B Minor</option>
+                        <option value="F">F Major</option>
+                        <option value="Dm">D Minor</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Mood</label>
+                    <select id="mood">
+                        <option value="neutral">Neutral</option>
+                        <option value="peaceful">Peaceful</option>
+                        <option value="gentle">Gentle</option>
+                        <option value="energetic">Energetic</option>
+                        <option value="dramatic">Dramatic</option>
+                        <option value="intense">Intense</option>
+                    </select>
+                </div>
+
+                <div class="spectrum-viz">
+                    <div class="spectrum-bars" id="spectrumBars">
+                        <div class="bar" id="bar-sub"></div>
+                        <div class="bar" id="bar-bass"></div>
+                        <div class="bar" id="bar-low"></div>
+                        <div class="bar" id="bar-mid"></div>
+                        <div class="bar" id="bar-upper"></div>
+                        <div class="bar" id="bar-pres"></div>
+                        <div class="bar" id="bar-brill"></div>
+                    </div>
+                    <div class="bar-labels">
+                        <span>SUB</span>
+                        <span>BASS</span>
+                        <span>LOW</span>
+                        <span>MID</span>
+                        <span>HIGH</span>
+                        <span>PRES</span>
+                        <span>AIR</span>
+                    </div>
+                </div>
+
+                <button class="play-btn" id="playBtn">SIMULATE PLAYBACK</button>
+
+                <div class="output" id="output">
+                    <div class="output-row">
+                        <span class="output-key">Hue</span>
+                        <span class="output-value" id="outHue">120°</span>
+                    </div>
+                    <div class="output-row">
+                        <span class="output-key">Pattern</span>
+                        <span class="output-value" id="outPattern">FADE</span>
+                    </div>
+                    <div class="output-row">
+                        <span class="output-key">Speed</span>
+                        <span class="output-value" id="outSpeed">5</span>
+                    </div>
+                    <div class="output-row">
+                        <span class="output-key">Brightness</span>
+                        <span class="output-value" id="outBright">0.6</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="info">
+            <h3>Spatial Audio + Light Synchronization</h3>
+            <p>
+                The lights on the lake side (left) respond to the surround channel content.
+                When audio pans left toward the lake, the outdoor lights intensify.
+                Bass frequencies pulse red, mids glow green, highs shimmer violet.
+                The 5.1.4 Atmos system routes through Denon → Neural:X → KEF Reference speakers.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Spectrum Engine simulation (mirrors Python implementation)
+        const BAND_HUE_MAP = {
+            sub_bass: 0,
+            bass: 20,
+            low_mid: 40,
+            mid: 120,
+            upper_mid: 180,
+            presence: 220,
+            brilliance: 270
+        };
+
+        const KEY_COLOR_SHIFT = {
+            'C': 0, 'Am': 270,
+            'G': 210, 'Em': 120,
+            'D': 60, 'Bm': 330,
+            'F': 150, 'Dm': 60
+        };
+
+        const MODE_SHIFT = {
+            major: -20,
+            minor: 40
+        };
+
+        const MOOD_SHIFT = {
+            peaceful: 30,
+            gentle: 15,
+            neutral: 0,
+            energetic: -20,
+            dramatic: -30,
+            intense: -40
+        };
+
+        const PATTERNS = ['STATIONARY', 'FADE', 'MARCH', 'CHASE', 'TWINKLE', 'RIVER', 'BOLT', 'SPARKLE'];
+
+        let isPlaying = false;
+        let animationFrame;
+        let time = 0;
+
+        // Elements
+        const tempoSlider = document.getElementById('tempo');
+        const dynamicsSlider = document.getElementById('dynamics');
+        const keySelect = document.getElementById('key');
+        const moodSelect = document.getElementById('mood');
+        const playBtn = document.getElementById('playBtn');
+        const lights = Array.from(document.querySelectorAll('.light'));
+        const speakers = Array.from(document.querySelectorAll('.speaker'));
+        const ambientGlow = document.getElementById('ambientGlow');
+
+        // Simulate frequency bands based on parameters
+        function simulateFrequencyBands(tempo, dynamics, t) {
+            const beatPhase = (t * tempo / 60) % 1;
+            const pulse = Math.sin(beatPhase * Math.PI * 2) * 0.5 + 0.5;
+
+            return {
+                sub_bass: 0.3 + pulse * 0.4 * dynamics,
+                bass: 0.4 + pulse * 0.3 * dynamics,
+                low_mid: 0.5 + Math.sin(t * 2) * 0.2,
+                mid: 0.6 + Math.sin(t * 3) * 0.15,
+                upper_mid: 0.4 + Math.sin(t * 5) * 0.2,
+                presence: 0.3 + Math.sin(t * 7) * 0.25,
+                brilliance: 0.2 + Math.sin(t * 11) * 0.2
+            };
+        }
+
+        // Calculate centroid hue from frequency bands
+        function centroidHue(bands) {
+            const hues = Object.values(BAND_HUE_MAP);
+            const weights = Object.values(bands);
+            const sum = weights.reduce((a, b) => a + b, 0);
+
+            let x = 0, y = 0;
+            hues.forEach((h, i) => {
+                const w = weights[i] / sum;
+                x += w * Math.cos(h * Math.PI / 180);
+                y += w * Math.sin(h * Math.PI / 180);
+            });
+
+            return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+        }
+
+        // Compute spectrum output
+        function computeSpectrum(tempo, dynamics, key, mood, t) {
+            const bands = simulateFrequencyBands(tempo, dynamics, t);
+
+            // Base hue from frequency centroid
+            let hue = centroidHue(bands);
+
+            // Apply key shift
+            const isMinor = key.includes('m');
+            const rootKey = key.replace('m', '');
+            hue = (hue + (KEY_COLOR_SHIFT[key] || 0)) % 360;
+            hue = (hue + (isMinor ? MODE_SHIFT.minor : MODE_SHIFT.major)) % 360;
+
+            // Apply mood shift
+            hue = (hue + (MOOD_SHIFT[mood] || 0)) % 360;
+
+            // Saturation from dynamics
+            const saturation = 0.5 + dynamics * 0.5;
+
+            // Brightness from dynamics
+            const brightness = 0.2 + dynamics * 0.8;
+
+            // Pattern from tempo and mood
+            let pattern;
+            if (tempo < 70) pattern = 'FADE';
+            else if (tempo < 100) pattern = 'RIVER';
+            else if (tempo < 130) pattern = 'MARCH';
+            else pattern = 'CHASE';
+
+            if (mood === 'intense') pattern = 'BOLT';
+            if (mood === 'peaceful') pattern = 'FADE';
+
+            // Speed from tempo
+            const speed = Math.min(20, Math.max(1, Math.floor((tempo - 40) / 8) + 1));
+
+            return { hue, saturation, brightness, pattern, speed, bands };
+        }
+
+        // HSV to RGB conversion
+        function hsvToRgb(h, s, v) {
+            h = h / 360;
+            let r, g, b;
+            const i = Math.floor(h * 6);
+            const f = h * 6 - i;
+            const p = v * (1 - s);
+            const q = v * (1 - f * s);
+            const t = v * (1 - (1 - f) * s);
+
+            switch (i % 6) {
+                case 0: r = v; g = t; b = p; break;
+                case 1: r = q; g = v; b = p; break;
+                case 2: r = p; g = v; b = t; break;
+                case 3: r = p; g = q; b = v; break;
+                case 4: r = t; g = p; b = v; break;
+                case 5: r = v; g = p; b = q; break;
+            }
+
+            return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+        }
+
+        // Update visualization
+        function updateVisualization(output) {
+            const { hue, saturation, brightness, pattern, speed, bands } = output;
+            const rgb = hsvToRgb(hue, saturation, brightness);
+            const color = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+
+            // Update lights with spatial variation (lake side = surround left channel emphasis)
+            lights.forEach((light, i) => {
+                const bandNames = Object.keys(bands);
+                const bandIndex = Math.floor(i * bandNames.length / lights.length);
+                const bandName = bandNames[bandIndex];
+                const bandValue = bands[bandName];
+                const bandHue = BAND_HUE_MAP[bandName];
+
+                const lightRgb = hsvToRgb(bandHue, saturation, brightness * bandValue);
+                light.style.backgroundColor = `rgb(${lightRgb[0]}, ${lightRgb[1]}, ${lightRgb[2]})`;
+                light.style.boxShadow = `0 0 ${20 * bandValue}px rgb(${lightRgb[0]}, ${lightRgb[1]}, ${lightRgb[2]})`;
+            });
+
+            // Update speaker colors based on channel activity
+            const bassEnergy = bands.sub_bass + bands.bass;
+            const midEnergy = bands.mid + bands.upper_mid;
+            const highEnergy = bands.presence + bands.brilliance;
+
+            speakers.forEach(speaker => {
+                let energy = midEnergy;
+                if (speaker.classList.contains('sub')) energy = bassEnergy;
+                if (speaker.classList.contains('height')) energy = highEnergy;
+
+                const speakerRgb = hsvToRgb(hue, saturation * 0.7, energy * 0.5);
+                speaker.style.setProperty('--speaker-color', `rgb(${speakerRgb[0]}, ${speakerRgb[1]}, ${speakerRgb[2]})`);
+                speaker.style.setProperty('--speaker-glow', `rgba(${speakerRgb[0]}, ${speakerRgb[1]}, ${speakerRgb[2]}, 0.5)`);
+            });
+
+            // Update spectrum bars
+            const bandEntries = Object.entries(bands);
+            const barIds = ['bar-sub', 'bar-bass', 'bar-low', 'bar-mid', 'bar-upper', 'bar-pres', 'bar-brill'];
+            bandEntries.forEach(([name, value], i) => {
+                const bar = document.getElementById(barIds[i]);
+                if (bar) {
+                    const barHue = BAND_HUE_MAP[name];
+                    bar.style.height = `${value * 100}%`;
+                    bar.style.setProperty('--bar-color', `hsl(${barHue}, 80%, 50%)`);
+                }
+            });
+
+            // Update ambient glow
+            ambientGlow.style.background = `radial-gradient(ellipse at 20% 50%, rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.2) 0%, transparent 50%)`;
+
+            // Update output display
+            document.getElementById('outHue').textContent = `${Math.round(hue)}°`;
+            document.getElementById('outPattern').textContent = pattern;
+            document.getElementById('outSpeed').textContent = speed;
+            document.getElementById('outBright').textContent = brightness.toFixed(2);
+        }
+
+        // Animation loop
+        function animate() {
+            if (!isPlaying) return;
+
+            const tempo = parseInt(tempoSlider.value);
+            const dynamics = parseInt(dynamicsSlider.value) / 100;
+            const key = keySelect.value;
+            const mood = moodSelect.value;
+
+            time += 0.016; // ~60fps
+
+            const output = computeSpectrum(tempo, dynamics, key, mood, time);
+            updateVisualization(output);
+
+            animationFrame = requestAnimationFrame(animate);
+        }
+
+        // Event listeners
+        tempoSlider.addEventListener('input', () => {
+            document.getElementById('tempoValue').textContent = `${tempoSlider.value} BPM`;
+            if (!isPlaying) updateStatic();
+        });
+
+        dynamicsSlider.addEventListener('input', () => {
+            const d = parseInt(dynamicsSlider.value);
+            let label = 'mf';
+            if (d < 20) label = 'pp';
+            else if (d < 40) label = 'p';
+            else if (d < 60) label = 'mp';
+            else if (d < 80) label = 'f';
+            else label = 'ff';
+            document.getElementById('dynamicsValue').textContent = label;
+            if (!isPlaying) updateStatic();
+        });
+
+        keySelect.addEventListener('change', () => { if (!isPlaying) updateStatic(); });
+        moodSelect.addEventListener('change', () => { if (!isPlaying) updateStatic(); });
+
+        playBtn.addEventListener('click', () => {
+            isPlaying = !isPlaying;
+            playBtn.textContent = isPlaying ? 'STOP SIMULATION' : 'SIMULATE PLAYBACK';
+            playBtn.classList.toggle('playing', isPlaying);
+
+            if (isPlaying) {
+                time = 0;
+                animate();
+            } else {
+                cancelAnimationFrame(animationFrame);
+            }
+        });
+
+        // Static update for when not playing
+        function updateStatic() {
+            const tempo = parseInt(tempoSlider.value);
+            const dynamics = parseInt(dynamicsSlider.value) / 100;
+            const key = keySelect.value;
+            const mood = moodSelect.value;
+
+            const output = computeSpectrum(tempo, dynamics, key, mood, 0);
+            updateVisualization(output);
+        }
+
+        // Initial render
+        updateStatic();
+    </script>
+</body>
+</html>

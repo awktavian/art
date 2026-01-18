@@ -1,0 +1,103 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# KAGAMI HUB SYSTEMD SERVICE
+# Colony: Forge (e₂) — Deployment infrastructure
+#
+# This service runs the Kagami Hub voice assistant on Raspberry Pi.
+# Provides wake word detection, speech recognition, and smart home control.
+#
+# Installation:
+#   sudo cp kagami-hub.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable kagami-hub
+#   sudo systemctl start kagami-hub
+#
+# Check status:
+#   sudo systemctl status kagami-hub
+#   journalctl -u kagami-hub -f
+# ═══════════════════════════════════════════════════════════════════════════
+
+[Unit]
+Description=Kagami Hub — Voice-First Smart Home Assistant
+Documentation=https://github.com/kagami/kagami-hub
+After=network-online.target sound.target
+Wants=network-online.target
+Requires=sound.target
+
+# Restart if network becomes available
+After=NetworkManager.service
+After=systemd-resolved.service
+
+[Service]
+Type=simple
+User=kagami
+Group=kagami
+WorkingDirectory=/opt/kagami-hub
+
+# Environment configuration
+Environment="RUST_LOG=info"
+Environment="KAGAMI_HUB_CONFIG=/opt/kagami-hub/config/hub.toml"
+Environment="KAGAMI_API_URL=http://kagami.local:8001"
+Environment="HUB_WEB_PORT=8080"
+
+# Additional environment for audio/GPIO
+Environment="ALSA_CARD=default"
+Environment="PULSE_SERVER=/run/user/1000/pulse/native"
+
+# The main process
+ExecStart=/usr/local/bin/kagami-hub
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Restart policy
+Restart=on-failure
+RestartSec=10s
+TimeoutStartSec=30s
+TimeoutStopSec=30s
+
+# Resource limits
+LimitNOFILE=65536
+LimitMEMLOCK=infinity
+
+# Security hardening (but allow GPIO/audio access)
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=false
+RestrictSUIDSGID=true
+RemoveIPC=true
+PrivateDevices=false
+
+# Required for audio and GPIO
+SupplementaryGroups=audio gpio spi i2c video
+
+# Bind mounts for configuration
+ReadWritePaths=/opt/kagami-hub/config
+ReadWritePaths=/opt/kagami-hub/logs
+ReadWritePaths=/tmp
+
+# Device access for LEDs and audio
+DeviceAllow=/dev/spidev* rw
+DeviceAllow=/dev/snd/* rw
+DeviceAllow=/dev/gpiomem rw
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kagami-hub
+
+# Capability bounding
+CapabilityBoundingSet=CAP_SYS_RAWIO CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_SYS_RAWIO
+
+[Install]
+WantedBy=multi-user.target
+Alias=hub.service
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 鏡
+# The Hub listens. The Hub speaks.
+# h(x) ≥ 0. Always.
+# ═══════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,134 @@
+# Cloud Run Service with Tailscale Sidecar
+#
+# Provides secure tunnel to home network via Tailscale mesh VPN.
+# Deploy with: gcloud run services replace service-tailscale.yaml
+#
+# Prerequisites:
+# 1. Tailscale subnet router running at home
+# 2. tailscale-authkey secret in Secret Manager
+# 3. Subnet routes approved in Tailscale admin
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: kagami-smarthome
+  labels:
+    app: kagami
+    component: smarthome
+  annotations:
+    run.googleapis.com/launch-stage: BETA
+    run.googleapis.com/description: "Smart Home controller with Tailscale VPN tunnel"
+spec:
+  template:
+    metadata:
+      annotations:
+        # Always keep 1 instance warm
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "3"
+        # Don't throttle CPU (needed for real-time control)
+        run.googleapis.com/cpu-throttling: "false"
+        run.googleapis.com/startup-cpu-boost: "true"
+        # Gen2 execution environment (required for sidecars)
+        run.googleapis.com/execution-environment: gen2
+        # Container dependencies - tailscale must start first
+        run.googleapis.com/container-dependencies: '{"kagami-smarthome":["tailscale"]}'
+    spec:
+      containerConcurrency: 100
+      timeoutSeconds: 300
+      serviceAccountName: kagami-smarthome@gen-lang-client-0509316009.iam.gserviceaccount.com
+      
+      containers:
+        # Main application container
+        - name: kagami-smarthome
+          image: gcr.io/gen-lang-client-0509316009/kagami-smarthome:latest
+          ports:
+            - name: http1
+              containerPort: 8080
+          resources:
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          env:
+            - name: KAGAMI_ENVIRONMENT
+              value: "production"
+            - name: KAGAMI_LOG_LEVEL
+              value: "INFO"
+            # Use Tailscale IP addresses for home devices
+            - name: CONTROL4_HOST
+              value: "192.168.1.100"  # Control4 local IP
+            - name: UNIFI_HOST
+              value: "192.168.1.1"    # UniFi controller IP
+            - name: DENON_HOST
+              value: "192.168.1.101"  # Denon AVR IP
+          # Secrets from Secret Manager
+          env:
+            - name: CONTROL4_BEARER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: kagami-control4-token
+                  key: latest
+            - name: UNIFI_LOCAL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: kagami-unifi-username
+                  key: latest
+            - name: UNIFI_LOCAL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kagami-unifi-password
+                  key: latest
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 3
+
+        # Tailscale sidecar - provides VPN tunnel
+        - name: tailscale
+          image: ghcr.io/tailscale/tailscale:latest
+          resources:
+            limits:
+              cpu: "0.5"
+              memory: "256Mi"
+          env:
+            - name: TS_AUTHKEY
+              valueFrom:
+                secretKeyRef:
+                  name: tailscale-authkey
+                  key: latest
+            - name: TS_STATE_DIR
+              value: "/var/lib/tailscale"
+            - name: TS_USERSPACE
+              value: "true"
+            - name: TS_ACCEPT_DNS
+              value: "false"
+            # Tag for ACL rules
+            - name: TS_EXTRA_ARGS
+              value: "--hostname=kagami-cloudrun"
+          # Tailscale needs to persist state between requests
+          volumeMounts:
+            - name: tailscale-state
+              mountPath: /var/lib/tailscale
+
+      volumes:
+        - name: tailscale-state
+          emptyDir:
+            sizeLimit: 100Mi
+
+  traffic:
+    - percent: 100
+      latestRevision: true

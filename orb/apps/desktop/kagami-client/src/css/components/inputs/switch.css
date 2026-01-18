@@ -1,0 +1,595 @@
+/**
+ * =============================================================================
+ * COMPONENT: Switch
+ * Kagami Design System V2 - iOS-quality toggle with exact Apple specifications
+ *
+ * iOS Design Specifications:
+ * - Track: 51x31px with 15.5px border-radius (pill shape)
+ * - Knob: 27px diameter, pure white with volumetric shadows
+ * - OFF color: #E9E9EB (light gray)
+ * - ON color: #34C759 (iOS green)
+ *
+ * Features:
+ * - Elastic overshoot on toggle (250ms spring physics)
+ * - Volumetric white knob with multi-layer shadows
+ * - Knob stretches to ~33px when pressed (iOS behavior)
+ * - Recessed track with inner shadow for depth
+ * - Glass highlight on track top edge
+ * - Smooth 200ms color transitions
+ * - Focus ring for accessibility
+ *
+ * States: default, hover, focus, active, disabled, error, success, checked
+ * Sizes: sm (42x26), md (51x31 - iOS default), lg (61x37)
+ * =============================================================================
+ */
+
+/* =============================================================================
+   CSS CUSTOM PROPERTIES
+   ============================================================================= */
+
+.prism-switch {
+  /* Thumb position (0 = off, 1 = on) */
+  --switch-progress: 0;
+
+  /* Thumb squish during drag - grows horizontally when pressed */
+  --thumb-squish: 1;
+  --thumb-width: 27px;
+
+  /* iOS exact dimensions */
+  --track-width: 51px;
+  --track-height: 31px;
+  --thumb-size: 27px;
+  --thumb-inset: 2px;
+  --thumb-travel: calc(var(--track-width) - var(--thumb-width) - var(--thumb-inset) * 2);
+
+  /* iOS colors */
+  --ios-off-bg: #E9E9EB;
+  --ios-on-bg: #34C759;
+  --ios-on-bg-hover: #2DB84E;
+}
+
+/* =============================================================================
+   BASE SWITCH
+   ============================================================================= */
+
+.prism-switch {
+  /* Layout */
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Hide native input */
+.prism-switch__input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* =============================================================================
+   SWITCH TRACK
+   Enhanced glass with inner shadows and reflection sweep
+   ============================================================================= */
+
+.prism-switch__track {
+  /* Layout */
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+
+  /* iOS exact sizing (51x31) */
+  width: var(--track-width);
+  height: var(--track-height);
+
+  /* OFF state: iOS light gray with recessed pill effect */
+  background: var(--ios-off-bg);
+  border: none;
+  border-radius: calc(var(--track-height) / 2);
+
+  /* Recessed pill inner shadow - creates depth */
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 0, 0, 0.04),
+    inset 0 2px 4px rgba(0, 0, 0, 0.06),
+    inset 0 1px 1px rgba(0, 0, 0, 0.08);
+
+  /* GPU acceleration */
+  transform: translateZ(0);
+  will-change: background, box-shadow;
+
+  /* Smooth color transition - 200ms */
+  transition:
+    background 200ms ease-out,
+    box-shadow 200ms ease-out;
+}
+
+/* Glass highlight on track top edge */
+.prism-switch__track::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  border-radius: calc(var(--track-height) / 2) calc(var(--track-height) / 2) 0 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 200ms ease-out;
+}
+
+/* Focus ring (only visible on keyboard focus) */
+.prism-switch__track::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: calc(var(--track-height) / 2 + 3px);
+  box-shadow: 0 0 0 3px rgba(0, 125, 250, 0.6);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+
+/* =============================================================================
+   SWITCH THUMB (The sliding circle)
+   Elastic physics with squish on drag
+   ============================================================================= */
+
+.prism-switch__thumb {
+  /* Layout */
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* iOS exact sizing: 27px diameter knob */
+  width: var(--thumb-width);
+  height: var(--thumb-size);
+  left: var(--thumb-inset);
+  top: 50%;
+  margin-top: calc(var(--thumb-size) / -2);
+
+  /* Pure white with subtle vertical gradient for volume */
+  background: linear-gradient(
+    180deg,
+    #FFFFFF 0%,
+    #FDFDFD 50%,
+    #F8F8F8 100%
+  );
+  border-radius: 50%;
+
+  /* iOS multi-layer shadow for volumetric feel:
+     1. Ambient shadow - soft diffuse
+     2. Contact shadow - tight under knob
+     3. Subtle outer ring
+     4. Top highlight inset */
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.15),
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 0 0 0.5px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+
+  /* GPU acceleration */
+  transform: translateZ(0);
+  will-change: transform, box-shadow, width;
+
+  /* ELASTIC spring animation - 250ms with overshoot */
+  transition:
+    transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    width 200ms cubic-bezier(0.34, 1.2, 0.64, 1),
+    box-shadow 200ms ease-out;
+}
+
+/* Top highlight inset for volumetric feel */
+.prism-switch__thumb::before {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 15%;
+  right: 15%;
+  height: 40%;
+  border-radius: 50%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.8) 0%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  pointer-events: none;
+}
+
+/* Icon inside thumb */
+.prism-switch__icon {
+  width: 12px;
+  height: 12px;
+  color: var(--prism-text-tertiary);
+  opacity: 0;
+  transition:
+    opacity var(--prism-dur-fast) var(--prism-ease-cusp),
+    color var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-switch__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* =============================================================================
+   LABEL & CONTENT
+   ============================================================================= */
+
+.prism-switch__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.prism-switch__label {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--prism-text);
+}
+
+.prism-switch__description {
+  font-size: 0.8125rem;
+  color: var(--prism-text-secondary);
+  line-height: 1.4;
+}
+
+/* Label on left variant */
+.prism-switch--label-left {
+  flex-direction: row-reverse;
+}
+
+/* =============================================================================
+   INTERACTIVE STATES
+   Elastic physics with squish feedback
+   ============================================================================= */
+
+/* Hover - slightly elevated thumb shadow */
+.prism-switch:hover:not(.prism-switch--disabled) .prism-switch__thumb {
+  box-shadow:
+    0 4px 10px rgba(0, 0, 0, 0.18),
+    0 2px 4px rgba(0, 0, 0, 0.22),
+    0 0 0 0.5px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+/* Focus - show iOS-style blue ring */
+.prism-switch__input:focus-visible ~ .prism-switch__track {
+  outline: none;
+}
+
+.prism-switch__input:focus-visible ~ .prism-switch__track::after {
+  opacity: 1;
+}
+
+/* Active/Pressing - thumb grows horizontally to ~33px (iOS behavior) */
+.prism-switch:active:not(.prism-switch--disabled) .prism-switch__thumb {
+  --thumb-width: 33px;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.18),
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 0 0 0.5px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+/* Checked state - thumb slides to right with elastic overshoot */
+.prism-switch__input:checked ~ .prism-switch__track .prism-switch__thumb {
+  transform: translateX(var(--thumb-travel)) translateZ(0);
+}
+
+/* Active + Checked - stretched thumb anchored to right edge */
+.prism-switch:active:not(.prism-switch--disabled) .prism-switch__input:checked ~ .prism-switch__track .prism-switch__thumb {
+  --thumb-width: 33px;
+  /* Adjust translation to keep right edge aligned */
+  transform: translateX(calc(var(--thumb-travel) - 6px)) translateZ(0);
+}
+
+/* =============================================================================
+   CHECKED STATE
+   Vibrant iOS green (#34C759) with subtle inner shadow
+   ============================================================================= */
+
+.prism-switch__input:checked ~ .prism-switch__track {
+  /* iOS vibrant green - solid, not gradient */
+  background: var(--ios-on-bg);
+
+  /* Subtle inner shadow for depth + outer glow */
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 0, 0, 0.04),
+    0 0 8px rgba(52, 199, 89, 0.3);
+}
+
+/* Glass highlight dims slightly when checked */
+.prism-switch__input:checked ~ .prism-switch__track::before {
+  opacity: 0.8;
+}
+
+/* Icon visible when checked */
+.prism-switch__input:checked ~ .prism-switch__track .prism-switch__icon {
+  opacity: 1;
+  color: var(--ios-on-bg);
+}
+
+/* Hover on checked - slightly brighter */
+.prism-switch:hover:not(.prism-switch--disabled) .prism-switch__input:checked ~ .prism-switch__track {
+  background: var(--ios-on-bg-hover);
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 0, 0, 0.04),
+    0 0 12px rgba(52, 199, 89, 0.4);
+}
+
+/* =============================================================================
+   DISABLED STATE
+   ============================================================================= */
+
+.prism-switch--disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.prism-switch--disabled .prism-switch__track,
+.prism-switch--disabled .prism-switch__thumb {
+  pointer-events: none;
+}
+
+/* =============================================================================
+   LOADING STATE
+   ============================================================================= */
+
+.prism-switch--loading .prism-switch__track {
+  pointer-events: none;
+}
+
+.prism-switch--loading .prism-switch__thumb::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--prism-text-tertiary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: prism-switch-spin 0.8s linear infinite;
+}
+
+@keyframes prism-switch-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =============================================================================
+   ERROR STATE
+   ============================================================================= */
+
+.prism-switch--error .prism-switch__track {
+  background: #FFCCCC;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 59, 48, 0.15),
+    inset 0 2px 4px rgba(255, 59, 48, 0.1);
+}
+
+.prism-switch--error .prism-switch__input:checked ~ .prism-switch__track {
+  background: #FF3B30; /* iOS red */
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 0, 0, 0.04),
+    0 0 8px rgba(255, 59, 48, 0.3);
+}
+
+.prism-switch--error .prism-switch__label {
+  color: #FF3B30;
+}
+
+/* =============================================================================
+   SUCCESS STATE
+   ============================================================================= */
+
+.prism-switch--success .prism-switch__track {
+  background: #D4F5E9;
+  box-shadow:
+    inset 0 0 0 2px rgba(52, 199, 89, 0.15),
+    inset 0 2px 4px rgba(52, 199, 89, 0.1);
+}
+
+.prism-switch--success .prism-switch__input:checked ~ .prism-switch__track {
+  background: var(--ios-on-bg);
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 0, 0, 0.04),
+    0 0 10px rgba(52, 199, 89, 0.4);
+}
+
+/* =============================================================================
+   SIZE VARIANTS
+   All sizes maintain iOS proportions
+   ============================================================================= */
+
+/* Small (scaled down iOS proportions) */
+.prism-switch--sm {
+  --track-width: 42px;
+  --track-height: 26px;
+  --thumb-size: 22px;
+  --thumb-width: 22px;
+  --thumb-inset: 2px;
+  --thumb-travel: calc(var(--track-width) - var(--thumb-width) - var(--thumb-inset) * 2);
+}
+
+.prism-switch--sm .prism-switch__icon {
+  width: 10px;
+  height: 10px;
+}
+
+.prism-switch--sm .prism-switch__label {
+  font-size: 0.875rem;
+}
+
+.prism-switch--sm .prism-switch__description {
+  font-size: 0.75rem;
+}
+
+/* Small active state - stretched thumb */
+.prism-switch--sm:active:not(.prism-switch--disabled) .prism-switch__thumb {
+  --thumb-width: 27px;
+}
+
+.prism-switch--sm:active:not(.prism-switch--disabled) .prism-switch__input:checked ~ .prism-switch__track .prism-switch__thumb {
+  --thumb-width: 27px;
+  transform: translateX(calc(var(--thumb-travel) - 5px)) translateZ(0);
+}
+
+/* Large (scaled up iOS proportions) */
+.prism-switch--lg {
+  --track-width: 61px;
+  --track-height: 37px;
+  --thumb-size: 33px;
+  --thumb-width: 33px;
+  --thumb-inset: 2px;
+  --thumb-travel: calc(var(--track-width) - var(--thumb-width) - var(--thumb-inset) * 2);
+}
+
+.prism-switch--lg .prism-switch__icon {
+  width: 14px;
+  height: 14px;
+}
+
+.prism-switch--lg .prism-switch__label {
+  font-size: 1rem;
+}
+
+/* Large active state - stretched thumb */
+.prism-switch--lg:active:not(.prism-switch--disabled) .prism-switch__thumb {
+  --thumb-width: 40px;
+}
+
+.prism-switch--lg:active:not(.prism-switch--disabled) .prism-switch__input:checked ~ .prism-switch__track .prism-switch__thumb {
+  --thumb-width: 40px;
+  transform: translateX(calc(var(--thumb-travel) - 7px)) translateZ(0);
+}
+
+/* =============================================================================
+   WITH ON/OFF LABELS INSIDE
+   ============================================================================= */
+
+.prism-switch--labeled .prism-switch__track {
+  padding: 0 8px;
+}
+
+.prism-switch--labeled .prism-switch__on,
+.prism-switch--labeled .prism-switch__off {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  transition: opacity var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-switch--labeled .prism-switch__on {
+  color: white;
+  margin-right: auto;
+  opacity: 0;
+}
+
+.prism-switch--labeled .prism-switch__off {
+  color: var(--prism-text-secondary);
+  margin-left: auto;
+}
+
+.prism-switch--labeled .prism-switch__input:checked ~ .prism-switch__track .prism-switch__on {
+  opacity: 0.9;
+}
+
+.prism-switch--labeled .prism-switch__input:checked ~ .prism-switch__track .prism-switch__off {
+  opacity: 0;
+}
+
+/* =============================================================================
+   COLONY COLOR VARIANTS
+   Override iOS green with brand colors
+   ============================================================================= */
+
+.prism-switch[data-colony="spark"] { --ios-on-bg: var(--prism-spark); --ios-on-bg-hover: var(--prism-spark); }
+.prism-switch[data-colony="forge"] { --ios-on-bg: var(--prism-forge); --ios-on-bg-hover: var(--prism-forge); }
+.prism-switch[data-colony="flow"] { --ios-on-bg: var(--prism-flow); --ios-on-bg-hover: var(--prism-flow); }
+.prism-switch[data-colony="nexus"] { --ios-on-bg: var(--prism-nexus); --ios-on-bg-hover: var(--prism-nexus); }
+.prism-switch[data-colony="beacon"] { --ios-on-bg: var(--prism-beacon); --ios-on-bg-hover: var(--prism-beacon); }
+.prism-switch[data-colony="grove"] { --ios-on-bg: var(--prism-grove); --ios-on-bg-hover: var(--prism-grove); }
+.prism-switch[data-colony="crystal"] { --ios-on-bg: var(--prism-crystal); --ios-on-bg-hover: var(--prism-crystal); }
+
+/* =============================================================================
+   DARK MODE
+   Adjust OFF state for dark backgrounds
+   ============================================================================= */
+
+@media (prefers-color-scheme: dark) {
+  .prism-switch {
+    --ios-off-bg: rgba(120, 120, 128, 0.32);
+  }
+
+  .prism-switch__track {
+    box-shadow:
+      inset 0 0 0 2px rgba(255, 255, 255, 0.04),
+      inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .prism-switch__thumb {
+    background: linear-gradient(
+      180deg,
+      #FFFFFF 0%,
+      #F8F8F8 100%
+    );
+  }
+}
+
+/* Dark mode class override */
+.dark .prism-switch,
+[data-theme="dark"] .prism-switch {
+  --ios-off-bg: rgba(120, 120, 128, 0.32);
+}
+
+.dark .prism-switch__track,
+[data-theme="dark"] .prism-switch__track {
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.04),
+    inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* =============================================================================
+   REDUCED MOTION
+   ============================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .prism-switch__track {
+    transition: background 0s, box-shadow 0s;
+  }
+
+  .prism-switch__track::before,
+  .prism-switch__track::after {
+    transition: none;
+  }
+
+  .prism-switch__thumb {
+    /* Keep minimal transition for position */
+    transition: transform 100ms ease-out, width 100ms ease-out;
+  }
+
+  .prism-switch__icon {
+    transition: none;
+  }
+
+  .prism-switch--loading .prism-switch__thumb::after {
+    animation: none;
+  }
+}

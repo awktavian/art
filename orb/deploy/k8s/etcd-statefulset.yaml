@@ -1,0 +1,161 @@
+# =============================================================================
+# etcd StatefulSet for Kagami Unified Cluster (Byzantine Fault Tolerant)
+# =============================================================================
+# Provides: Consensus, Leader Election, Distributed Locks, Config Sync
+# Used by: kagami.core.cluster.UnifiedClusterManager
+#
+# Byzantine Fault Tolerance:
+#   - 4 nodes = 3f+1 where f=1 (tolerates 1 Byzantine node)
+#   - Minimum quorum: 3 nodes (2f+1)
+#   - With PBFT overlay: true Byzantine consensus
+#
+# Deploy:
+#   kubectl apply -f etcd-statefulset.yaml
+#
+# Verify:
+#   kubectl exec -n kagami etcd-0 -- etcdctl endpoint health
+#   kubectl exec -n kagami etcd-0 -- etcdctl member list
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd
+  namespace: kagami
+  labels:
+    app.kubernetes.io/name: etcd
+    app.kubernetes.io/component: consensus
+    app.kubernetes.io/part-of: kagami
+spec:
+  clusterIP: None
+  ports:
+    - name: client
+      port: 2379
+      targetPort: 2379
+    - name: peer
+      port: 2380
+      targetPort: 2380
+    - name: metrics
+      port: 2381
+      targetPort: 2381
+  selector:
+    app.kubernetes.io/name: etcd
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: etcd
+  namespace: kagami
+  labels:
+    app.kubernetes.io/name: etcd
+    app.kubernetes.io/component: consensus
+    app.kubernetes.io/part-of: kagami
+spec:
+  serviceName: etcd
+  replicas: 4  # 3f+1 for f=1 Byzantine tolerance
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: etcd
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: etcd
+        app.kubernetes.io/component: consensus
+        app.kubernetes.io/part-of: kagami
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "2381"
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: etcd
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: etcd
+          image: quay.io/coreos/etcd:v3.5.11
+          imagePullPolicy: IfNotPresent
+          command:
+            - /usr/local/bin/etcd
+          args:
+            - --name=$(POD_NAME)
+            - --data-dir=/var/lib/etcd
+            # Client TLS configuration
+            - --listen-client-urls=https://0.0.0.0:2379
+            - --advertise-client-urls=https://$(POD_NAME).etcd.kagami.svc.cluster.local:2379
+            - --client-cert-auth=true
+            - --trusted-ca-file=/etc/etcd/pki/ca.crt
+            - --cert-file=/etc/etcd/pki/server.crt
+            - --key-file=/etc/etcd/pki/server.key
+            # Peer TLS configuration
+            - --listen-peer-urls=https://0.0.0.0:2380
+            - --initial-advertise-peer-urls=https://$(POD_NAME).etcd.kagami.svc.cluster.local:2380
+            - --peer-client-cert-auth=true
+            - --peer-trusted-ca-file=/etc/etcd/pki/ca.crt
+            - --peer-cert-file=/etc/etcd/pki/server.crt
+            - --peer-key-file=/etc/etcd/pki/server.key
+            # Cluster configuration (4 nodes for Byzantine tolerance)
+            - --initial-cluster-token=kagami-etcd-cluster
+            - --initial-cluster=etcd-0=https://etcd-0.etcd.kagami.svc.cluster.local:2380,etcd-1=https://etcd-1.etcd.kagami.svc.cluster.local:2380,etcd-2=https://etcd-2.etcd.kagami.svc.cluster.local:2380,etcd-3=https://etcd-3.etcd.kagami.svc.cluster.local:2380
+            - --initial-cluster-state=new
+            # Performance tuning (for UnifiedClusterManager)
+            - --auto-compaction-mode=periodic
+            - --auto-compaction-retention=1h
+            - --quota-backend-bytes=8589934592
+            - --max-request-bytes=10485760
+            - --heartbeat-interval=100
+            - --election-timeout=1000
+            # Metrics endpoint
+            - --listen-metrics-urls=http://0.0.0.0:2381
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          ports:
+            - containerPort: 2379
+              name: client
+            - containerPort: 2380
+              name: peer
+            - containerPort: 2381
+              name: metrics
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/etcd
+            - name: certs
+              mountPath: /etc/etcd/pki
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 2381
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 2381
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: certs
+          secret:
+            secretName: etcd-certificates
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: ""  # Use default storage class
+        resources:
+          requests:
+            storage: 50Gi

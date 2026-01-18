@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz: Finale & Legacy | Module 08 | Tool Time University</title>
+    <link rel="stylesheet" href="../assets/style.css">
+    <style>
+        .quiz-container { max-width: 800px; margin: 0 auto; padding: var(--space-4); }
+        .quiz-header { text-align: center; padding: var(--space-5) var(--space-4); background: linear-gradient(135deg, var(--binford-red) 0%, var(--binford-red-light) 100%); color: white; border-radius: var(--radius-lg); margin-bottom: var(--space-4); }
+        .quiz-header h1 { color: white; margin-bottom: var(--space-2); }
+        .points-badge { display: inline-block; background: var(--binford-gold); color: var(--stone-900); padding: var(--space-1) var(--space-3); border-radius: var(--radius-xl); font-weight: 600; font-family: var(--font-mono); }
+        .progress-bar { background: var(--stone-200); height: 8px; border-radius: 4px; margin-bottom: var(--space-4); overflow: hidden; }
+        .progress-fill { background: linear-gradient(90deg, var(--binford-red) 0%, var(--binford-gold) 100%); height: 100%; border-radius: 4px; transition: width var(--duration-normal) var(--ease-out); }
+        .progress-text { text-align: center; font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-3); }
+        .question-card { background: var(--white); border: 1px solid var(--border-light); border-radius: var(--radius-lg); padding: var(--space-4); margin-bottom: var(--space-4); display: none; }
+        .question-card.active { display: block; animation: fadeUp var(--duration-normal) var(--ease-out); }
+        .question-number { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--binford-red); margin-bottom: var(--space-2); }
+        .question-text { font-size: var(--text-lg); font-weight: 500; margin-bottom: var(--space-3); line-height: 1.4; }
+        .question-type { display: inline-block; font-size: var(--text-xs); background: var(--stone-100); color: var(--text-secondary); padding: 2px 8px; border-radius: var(--radius-sm); margin-bottom: var(--space-3); }
+        .options-list { list-style: none; padding: 0; margin: 0; }
+        .option-item { margin-bottom: var(--space-2); }
+        .option-btn { width: 100%; text-align: left; padding: var(--space-3); background: var(--stone-50); border: 2px solid var(--border-light); border-radius: var(--radius-md); cursor: pointer; transition: all var(--duration-fast) var(--ease-out); font-size: var(--text-base); }
+        .option-btn:hover:not(:disabled) { background: var(--stone-100); border-color: var(--stone-300); }
+        .option-btn.selected { background: #fef3c7; border-color: var(--binford-gold); }
+        .option-btn.correct { background: #dcfce7; border-color: #22c55e; }
+        .option-btn.incorrect { background: #fee2e2; border-color: #ef4444; }
+        .option-btn:disabled { cursor: not-allowed; }
+        .fill-blank-input { width: 100%; padding: var(--space-2) var(--space-3); font-size: var(--text-base); border: 2px solid var(--border-light); border-radius: var(--radius-md); margin-bottom: var(--space-3); }
+        .fill-blank-input:focus { outline: none; border-color: var(--binford-gold); }
+        .fill-blank-input.correct { border-color: #22c55e; background: #dcfce7; }
+        .fill-blank-input.incorrect { border-color: #ef4444; background: #fee2e2; }
+        .feedback { padding: var(--space-3); border-radius: var(--radius-md); margin-top: var(--space-3); display: none; }
+        .feedback.show { display: block; animation: fadeUp var(--duration-fast) var(--ease-out); }
+        .feedback.correct { background: #dcfce7; border: 1px solid #22c55e; color: #166534; }
+        .feedback.incorrect { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
+        .feedback-title { font-weight: 600; margin-bottom: var(--space-1); }
+        .btn-container { display: flex; justify-content: space-between; margin-top: var(--space-4); }
+        .submit-btn { background: var(--binford-red); color: white; padding: var(--space-2) var(--space-4); border: none; border-radius: var(--radius-md); font-weight: 600; cursor: pointer; transition: all var(--duration-fast) var(--ease-out); }
+        .submit-btn:hover:not(:disabled) { background: var(--binford-red-light); transform: translateY(-2px); }
+        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .next-btn { background: var(--binford-gold); color: var(--stone-900); }
+        .next-btn:hover:not(:disabled) { background: var(--binford-gold-light); }
+        .results-card { background: var(--white); border: 1px solid var(--border-light); border-radius: var(--radius-lg); padding: var(--space-5); text-align: center; display: none; }
+        .results-card.show { display: block; animation: fadeUp var(--duration-normal) var(--ease-out); }
+        .results-score { font-size: var(--text-4xl); font-family: var(--font-display); color: var(--binford-red); margin-bottom: var(--space-2); }
+        .results-equity { font-size: var(--text-2xl); font-family: var(--font-mono); color: var(--binford-gold); margin-bottom: var(--space-4); }
+        .results-title { font-size: var(--text-xl); font-weight: 600; margin-bottom: var(--space-2); }
+        .results-message { color: var(--text-secondary); margin-bottom: var(--space-4); }
+        .tool-time-break { background: var(--stone-900); color: white; padding: var(--space-3); border-radius: var(--radius-md); text-align: center; margin: var(--space-4) 0; }
+        .tool-time-break .catchphrase { font-size: var(--text-xl); color: var(--binford-gold); font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div class="quiz-container">
+        <div class="quiz-header">
+            <p class="label" style="color: var(--binford-gold-light);">MODULE 08</p>
+            <h1>Finale & Legacy</h1>
+            <p style="opacity: 0.9; margin-bottom: var(--space-3);">10 Questions | Multiple Choice, True/False & Fill-in-the-Blank</p>
+            <div class="points-badge">75 Home Equity Dollars</div>
+        </div>
+
+        <div class="progress-text">Question <span id="currentQ">1</span> of 10</div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width: 10%;"></div></div>
+
+        <!-- Question 1 -->
+        <div class="question-card active" data-question="1" data-correct="C" data-points="7.5">
+            <div class="question-number">Question 1 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">How much money did Tim Allen and Patricia Richardson reportedly turn down COMBINED to do a ninth season?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) $25 million</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) $50 million</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) $75 million</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) $100 million</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">$75 million turned down!</div>
+                <p>Tim Allen was offered $50 million, Patricia Richardson $25 million. Both said no, choosing artistic integrity over another massive payday. Remarkable in television history.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Even more money!</div>
+                <p>The correct answer is <strong>$75 million</strong> combined - $50M for Tim Allen, $25M for Patricia Richardson. They both said no.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 2 -->
+        <div class="question-card" data-question="2" data-correct="204" data-points="7.5" data-type="fillin">
+            <div class="question-number">Question 2 of 10 (7.5 HED)</div>
+            <div class="question-type">Fill in the Blank</div>
+            <div class="question-text">Over its 8-season run, Home Improvement produced a total of _______ episodes.</div>
+            <input type="text" class="fill-blank-input" placeholder="Enter number..." autocomplete="off">
+            <div class="feedback correct">
+                <div class="feedback-title">Episode count master!</div>
+                <p>204 episodes of Tool Time disasters, Wilson's wisdom, and Taylor family growth. Every project reaches its final inspection - and this one passed with flying colors.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different count!</div>
+                <p>The correct answer is <strong>204</strong> episodes across 8 seasons.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 3 -->
+        <div class="question-card" data-question="3" data-correct="true" data-points="7.5" data-type="truefalse">
+            <div class="question-number">Question 3 of 10 (7.5 HED)</div>
+            <div class="question-type">True or False</div>
+            <div class="question-text">Wilson's full face was finally revealed during the series finale's final curtain call.</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="true">True</button></li>
+                <li class="option-item"><button class="option-btn" data-value="false">False</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Face reveal!</div>
+                <p>After 8 seasons of being hidden behind the fence, Earl Hindman's full face was finally shown during the final curtain call. A perfect farewell gift to the audience.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">He was revealed!</div>
+                <p>This is <strong>True</strong>. The finale's curtain call gave fans what they'd waited 8 years to see.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 4 -->
+        <div class="question-card" data-question="4" data-correct="B" data-points="7.5">
+            <div class="question-number">Question 4 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What was the two-part series finale titled?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) "Goodbye Tool Time"</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) "The Long and Winding Road"</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) "The Final Project"</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) "More Power Forever"</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">The road ends!</div>
+                <p>"The Long and Winding Road" brought back beloved characters, settled long-running storylines, and gave Wilson his most extended fence appearance. The final moments - the family driving away, Wilson waving goodbye - remain genuinely moving.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different title!</div>
+                <p>The correct answer is <strong>"The Long and Winding Road"</strong> (Parts 1 & 2). A Beatles reference for the final journey.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 5 -->
+        <div class="question-card" data-question="5" data-correct="C" data-points="7.5">
+            <div class="question-number">Question 5 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What decision faced the Taylors in the series finale?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) Whether to sell Tool Time</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Whether to have another child</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Whether to relocate for Tim's job offer</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Whether to retire</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Moving decision!</div>
+                <p>When Tim receives a job offer that would require relocating the family, the Taylors must decide what matters most. The finale used this to explore their values and relationships.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different choice!</div>
+                <p>The correct answer is <strong>Whether to relocate for Tim's job offer</strong>. A fitting way to make the family consider their priorities.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <div class="tool-time-break" id="midBreak" style="display: none;">
+            <p>DOES EVERYBODY KNOW WHAT TIME IT IS?</p>
+            <p class="catchphrase">TOOL TIME!</p>
+            <p style="font-size: var(--text-sm); opacity: 0.7;">Final inspection in progress!</p>
+        </div>
+
+        <!-- Question 6 -->
+        <div class="question-card" data-question="6" data-correct="A" data-points="7.5">
+            <div class="question-number">Question 6 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">How many viewers watched the series finale?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) 35.5 million</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) 20 million</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) 10 million</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) 50 million</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Massive finale audience!</div>
+                <p>The finale drew 35.5 million viewers, making it one of the most-watched series finales of the 1990s. Audiences showed up to say goodbye - a testament to how deeply the show connected with American families.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Bigger audience!</div>
+                <p>The correct answer is <strong>35.5 million</strong>. America tuned in to say goodbye to the Taylors.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 7 -->
+        <div class="question-card" data-question="7" data-correct="eliot" data-points="7.5" data-type="fillin">
+            <div class="question-number">Question 7 of 10 (7.5 HED)</div>
+            <div class="question-type">Fill in the Blank</div>
+            <div class="question-text">Wilson quotes the poet T.S. _______ in the finale, who wrote about endings being beginnings.</div>
+            <input type="text" class="fill-blank-input" placeholder="Enter last name..." autocomplete="off">
+            <div class="feedback correct">
+                <div class="feedback-title">Four Quartets wisdom!</div>
+                <p>T.S. Eliot wrote, "What we call the beginning is often the end. And to make an end is to make a beginning." Wilson's final wisdom speaks not just to the Taylors but to the audience closing this chapter.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different poet!</div>
+                <p>The correct answer is <strong>Eliot</strong>. T.S. Eliot's "Four Quartets" provided Wilson's final philosophical insight.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 8 -->
+        <div class="question-card" data-question="8" data-correct="true" data-points="7.5" data-type="truefalse">
+            <div class="question-number">Question 8 of 10 (7.5 HED)</div>
+            <div class="question-type">True or False</div>
+            <div class="question-text">In "Dead Weight," Tim confronts mortality in ways he'd avoided throughout the series after a friend passes away.</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="true">True</button></li>
+                <li class="option-item"><button class="option-btn" data-value="false">False</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Facing mortality!</div>
+                <p>One of the series' most emotionally powerful episodes. It strips away the comedy to reveal the vulnerable man beneath the grunts - earned because we've spent eight years getting to know him.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Heavy episode!</div>
+                <p>This is <strong>True</strong>. "Dead Weight" was a profound Season 8 episode about mortality and loss.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 9 -->
+        <div class="question-card" data-question="9" data-correct="D" data-points="7.5">
+            <div class="question-number">Question 9 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What was Home Improvement's influence on sitcom format?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) It invented the laugh track</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) It created the first family sitcom</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) It pioneered streaming television</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Its "show within a show" structure influenced countless series</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Format innovation!</div>
+                <p>The Tool Time segments created a "show within a show" structure that became a template for workplace-comedy integration into family sitcom formats. Many shows followed this model.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different influence!</div>
+                <p>The correct answer is <strong>Its "show within a show" structure influenced countless series</strong>. Tool Time became a template for the format.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 10 -->
+        <div class="question-card" data-question="10" data-correct="B" data-points="7.5">
+            <div class="question-number">Question 10 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">Why did Tim Allen and Patricia Richardson turn down the Season 9 money?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) They didn't get along</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) To end the show on their own terms with artistic integrity</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) ABC canceled it anyway</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) They were contractually obligated to leave</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Artistic integrity!</div>
+                <p>In an industry where money often dictates creative decisions, both leads chose to end the story properly rather than extend it for profit. Their decision preserved the show's legacy and demonstrated rare artistic integrity in network television.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Noble reason!</div>
+                <p>The correct answer is <strong>To end the show on their own terms with artistic integrity</strong>. A remarkable decision in television history.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">See Results</button>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="results-card" id="results">
+            <h2 class="results-title" id="resultsTitle">Quiz Complete!</h2>
+            <div class="results-score" id="resultsScore">0/10</div>
+            <div class="results-equity" id="resultsEquity">0 HED Earned</div>
+            <p class="results-message" id="resultsMessage"></p>
+            <div style="margin-top: var(--space-4);">
+                <a href="index.html" class="btn btn--secondary" style="margin-right: var(--space-2);">Back to Module</a>
+                <a href="../final-exam/index.html" class="btn btn--gold">Take Final Exam</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const quizData = { currentQuestion: 1, totalQuestions: 10, score: 0, totalPoints: 0, maxPoints: 75, answered: new Set() };
+        document.addEventListener('DOMContentLoaded', function() { initQuiz(); });
+        function initQuiz() {
+            document.querySelectorAll('.option-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const card = this.closest('.question-card');
+                    card.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+                    this.classList.add('selected');
+                    card.querySelector('.submit-btn').disabled = false;
+                });
+            });
+            document.querySelectorAll('.fill-blank-input').forEach(input => {
+                input.addEventListener('input', function() {
+                    const card = this.closest('.question-card');
+                    card.querySelector('.submit-btn').disabled = this.value.trim() === '';
+                });
+            });
+            document.querySelectorAll('.submit-btn:not(.next-btn)').forEach(btn => { btn.addEventListener('click', function() { submitAnswer(this.closest('.question-card')); }); });
+            document.querySelectorAll('.next-btn').forEach(btn => { btn.addEventListener('click', function() { nextQuestion(); }); });
+        }
+        function submitAnswer(card) {
+            const questionNum = parseInt(card.dataset.question);
+            const correctAnswer = card.dataset.correct;
+            const points = parseFloat(card.dataset.points);
+            const type = card.dataset.type || 'multiple';
+            let userAnswer, isCorrect = false;
+            if (type === 'fillin') {
+                const input = card.querySelector('.fill-blank-input');
+                userAnswer = input.value.trim().toLowerCase();
+                isCorrect = userAnswer === correctAnswer.toLowerCase();
+                input.disabled = true;
+                input.classList.add(isCorrect ? 'correct' : 'incorrect');
+            } else {
+                const selected = card.querySelector('.option-btn.selected');
+                userAnswer = selected.dataset.value;
+                isCorrect = userAnswer === correctAnswer;
+                card.querySelectorAll('.option-btn').forEach(btn => {
+                    btn.disabled = true;
+                    if (btn.dataset.value === correctAnswer) btn.classList.add('correct');
+                    else if (btn.classList.contains('selected') && !isCorrect) btn.classList.add('incorrect');
+                });
+            }
+            if (isCorrect) { quizData.score++; quizData.totalPoints += points; card.querySelector('.feedback.correct').classList.add('show'); }
+            else { card.querySelector('.feedback.incorrect').classList.add('show'); }
+            quizData.answered.add(questionNum);
+            card.querySelector('.submit-btn:not(.next-btn)').style.display = 'none';
+            card.querySelector('.next-btn').style.display = 'inline-block';
+        }
+        function nextQuestion() {
+            const currentCard = document.querySelector('.question-card.active');
+            currentCard.classList.remove('active');
+            quizData.currentQuestion++;
+            if (quizData.currentQuestion === 6) { document.getElementById('midBreak').style.display = 'block'; setTimeout(() => { document.getElementById('midBreak').style.display = 'none'; }, 2000); }
+            if (quizData.currentQuestion <= quizData.totalQuestions) {
+                const nextCard = document.querySelector(`[data-question="${quizData.currentQuestion}"]`);
+                nextCard.classList.add('active');
+                document.getElementById('currentQ').textContent = quizData.currentQuestion;
+                document.getElementById('progressFill').style.width = (quizData.currentQuestion / quizData.totalQuestions * 100) + '%';
+            } else { showResults(); }
+        }
+        function showResults() {
+            document.getElementById('results').classList.add('show');
+            document.getElementById('resultsScore').textContent = `${quizData.score}/${quizData.totalQuestions}`;
+            document.getElementById('resultsEquity').textContent = `${quizData.totalPoints.toFixed(1)} HED Earned`;
+            const percentage = (quizData.score / quizData.totalQuestions) * 100;
+            let title, message;
+            if (percentage === 100) { title = 'Master Craftsman!'; message = 'Perfect! You\'ve mastered 8 seasons and 204 episodes! Ready for the Final Exam!'; }
+            else if (percentage >= 80) { title = 'Journeyman Builder!'; message = 'Excellent work on the finale! The Final Exam awaits!'; }
+            else if (percentage >= 60) { title = 'Apprentice!'; message = 'Passing! You\'re ready to attempt the Final Exam.'; }
+            else if (percentage >= 40) { title = 'Weekend Warrior'; message = 'More study needed before the Final Exam!'; }
+            else { title = 'Tim After a Disaster'; message = 'Back to Season 8 - then tackle the Final Exam!'; }
+            document.getElementById('resultsTitle').textContent = title;
+            document.getElementById('resultsMessage').textContent = message;
+        }
+    </script>
+</body>
+</html>

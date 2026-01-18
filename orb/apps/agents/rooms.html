@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Kagami Agent Metadata (#de_memo) -->
+  <meta name="kagami:agent-id" content="rooms">
+  <meta name="kagami:agent-name" content="Rooms">
+  <meta name="kagami:colony" content="beacon">
+  <meta name="kagami:capabilities" content="state-read,state-write,consensus-propose">
+  <meta name="kagami:consensus-weight" content="1">
+  <meta name="kagami:version" content="1.0.0">
+
+  <title>Kagami Rooms</title>
+  <link rel="stylesheet" href="/_sdk/kagami-ui.css">
+
+  <style>
+    /* Rooms-specific styles */
+    .rooms-app {
+      min-height: 100vh;
+      padding: var(--space-4);
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .rooms-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-5);
+    }
+
+    .rooms-header__back {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: var(--text-sm);
+      transition: color var(--transition-fast);
+    }
+
+    .rooms-header__back:hover {
+      color: var(--text);
+    }
+
+    .rooms-header__title {
+      font-family: var(--font-mono);
+      font-size: var(--text-xl);
+    }
+
+    /* Floor Tabs */
+    .floor-tabs {
+      display: flex;
+      gap: var(--space-2);
+      margin-bottom: var(--space-4);
+      overflow-x: auto;
+      padding-bottom: var(--space-2);
+    }
+
+    .floor-tab {
+      padding: var(--space-2) var(--space-4);
+      background: var(--surface-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-full);
+      color: var(--text-dim);
+      font-size: var(--text-sm);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all var(--transition-fast);
+    }
+
+    .floor-tab:hover {
+      background: var(--interactive-hover);
+    }
+
+    .floor-tab.active {
+      background: var(--accent-primary);
+      color: var(--void);
+      border-color: var(--accent-primary);
+    }
+
+    /* Room Grid */
+    .rooms-grid {
+      display: grid;
+      gap: var(--space-4);
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+
+    /* Room Card */
+    .room-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      transition: all var(--transition-default);
+    }
+
+    .room-card:hover {
+      border-color: var(--border-default);
+      box-shadow: var(--shadow-md);
+    }
+
+    .room-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-4);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .room-card__name {
+      font-size: var(--text-lg);
+      font-weight: 500;
+    }
+
+    .room-card__status {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .room-card__occupied-badge {
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+      padding: var(--space-1) var(--space-2);
+      background: rgba(var(--grove-rgb), 0.15);
+      border-radius: var(--radius-full);
+      font-size: var(--text-xs);
+      color: var(--grove);
+    }
+
+    .room-card__occupied-badge.empty {
+      background: var(--surface-overlay);
+      color: var(--text-ghost);
+    }
+
+    /* Device Controls */
+    .room-card__controls {
+      padding: var(--space-4);
+    }
+
+    .device-control {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-3);
+      background: var(--surface-base);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-2);
+    }
+
+    .device-control:last-child {
+      margin-bottom: 0;
+    }
+
+    .device-control__info {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .device-control__icon {
+      font-size: 20px;
+    }
+
+    .device-control__name {
+      font-size: var(--text-sm);
+      color: var(--text);
+    }
+
+    .device-control__value {
+      font-size: var(--text-xs);
+      color: var(--text-dim);
+    }
+
+    /* Slider */
+    .slider-control {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .slider {
+      -webkit-appearance: none;
+      width: 100px;
+      height: 4px;
+      background: var(--surface-overlay);
+      border-radius: var(--radius-full);
+      outline: none;
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--accent-primary);
+      border-radius: 50%;
+      cursor: pointer;
+      transition: transform var(--transition-micro);
+    }
+
+    .slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .slider-value {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--text-dim);
+      min-width: 40px;
+      text-align: right;
+    }
+
+    /* Toggle */
+    .toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: var(--surface-overlay);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      transition: background var(--transition-fast);
+    }
+
+    .toggle.active {
+      background: var(--accent-primary);
+    }
+
+    .toggle__thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      transition: transform var(--transition-fast);
+    }
+
+    .toggle.active .toggle__thumb {
+      transform: translateX(20px);
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: var(--space-10);
+      color: var(--text-dim);
+    }
+
+    .empty-state__icon {
+      font-size: 48px;
+      margin-bottom: var(--space-4);
+      opacity: 0.5;
+    }
+
+    /* Loading */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--void);
+      z-index: 100;
+      transition: opacity var(--dur-slow);
+    }
+
+    .loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body data-kagami-agent data-theme="dark">
+  <!-- Loading Overlay -->
+  <div id="loading" class="loading-overlay">
+    <div class="loading-spinner"></div>
+  </div>
+
+  <!-- Rooms App -->
+  <main class="rooms-app">
+    <!-- Header -->
+    <header class="rooms-header animate-fade-in">
+      <button class="rooms-header__back" onclick="history.back()">
+        <span>←</span>
+        <span>Back</span>
+      </button>
+      <h1 class="rooms-header__title">Rooms</h1>
+      <div style="width: 80px;"></div>
+    </header>
+
+    <!-- Floor Tabs -->
+    <nav id="floor-tabs" class="floor-tabs animate-fade-in delay-1">
+      <!-- Dynamically populated -->
+    </nav>
+
+    <!-- Rooms Grid -->
+    <div id="rooms-grid" class="rooms-grid">
+      <!-- Dynamically populated -->
+    </div>
+  </main>
+
+  <script type="module">
+    import { KagamiAgent } from '/_sdk/kagami-agent.js';
+
+    // =========================================================================
+    // Rooms Agent
+    // =========================================================================
+
+    class RoomsAgent {
+      constructor() {
+        this.agent = null;
+        this.rooms = [];
+        this.floors = [];
+        this.activeFloor = null;
+        this.pendingChanges = new Map();
+      }
+
+      async initialize() {
+        // Initialize Kagami Agent
+        this.agent = await KagamiAgent.initialize({
+          agentId: 'rooms',
+          colony: 'beacon',
+        });
+
+        // Subscribe to updates
+        this.agent.subscribe('home.rooms', (msg) => this.handleRoomsUpdate(msg));
+        this.agent.subscribe('device.state', (msg) => this.handleDeviceUpdate(msg));
+
+        // Load initial data
+        await this.loadRooms();
+
+        // Check URL params for specific room
+        const params = new URLSearchParams(window.location.search);
+        const roomId = params.get('room');
+        if (roomId) {
+          this.scrollToRoom(roomId);
+        }
+
+        // Hide loading
+        document.getElementById('loading').classList.add('hidden');
+      }
+
+      async loadRooms() {
+        try {
+          const data = await this.agent.fetch('home/rooms');
+          this.rooms = data.rooms ?? [];
+
+          // Extract unique floors
+          this.floors = [...new Set(this.rooms.map(r => r.floor))].sort();
+          this.activeFloor = this.floors[0] ?? null;
+
+          this.renderFloorTabs();
+          this.renderRooms();
+        } catch (error) {
+          console.error('Failed to load rooms:', error);
+          this.renderEmpty();
+        }
+      }
+
+      renderFloorTabs() {
+        const container = document.getElementById('floor-tabs');
+
+        if (this.floors.length <= 1) {
+          container.style.display = 'none';
+          return;
+        }
+
+        container.innerHTML = this.floors.map(floor => `
+          <button
+            class="floor-tab ${floor === this.activeFloor ? 'active' : ''}"
+            data-floor="${floor}"
+          >
+            ${floor}
+          </button>
+        `).join('');
+
+        // Bind events
+        container.querySelectorAll('.floor-tab').forEach(tab => {
+          tab.addEventListener('click', () => {
+            this.activeFloor = tab.dataset.floor;
+            this.renderFloorTabs();
+            this.renderRooms();
+          });
+        });
+      }
+
+      renderRooms() {
+        const container = document.getElementById('rooms-grid');
+        const filteredRooms = this.activeFloor
+          ? this.rooms.filter(r => r.floor === this.activeFloor)
+          : this.rooms;
+
+        if (filteredRooms.length === 0) {
+          this.renderEmpty();
+          return;
+        }
+
+        container.innerHTML = filteredRooms.map((room, index) => `
+          <article class="room-card animate-fade-up delay-${Math.min(index + 1, 5)}" data-room-id="${room.id}">
+            <div class="room-card__header">
+              <h2 class="room-card__name">${room.name}</h2>
+              <div class="room-card__status">
+                <span class="room-card__occupied-badge ${room.occupied ? '' : 'empty'}">
+                  ${room.occupied ? '👤 Occupied' : '○ Empty'}
+                </span>
+              </div>
+            </div>
+            <div class="room-card__controls">
+              ${this.renderLightControl(room)}
+              ${this.renderShadeControl(room)}
+            </div>
+          </article>
+        `).join('');
+
+        this.bindControlEvents();
+      }
+
+      renderLightControl(room) {
+        const lightLevel = room.avg_light_level ?? 0;
+        return `
+          <div class="device-control" data-device="lights" data-room="${room.id}">
+            <div class="device-control__info">
+              <span class="device-control__icon">💡</span>
+              <div>
+                <div class="device-control__name">Lights</div>
+                <div class="device-control__value">${lightLevel > 0 ? `${lightLevel}%` : 'Off'}</div>
+              </div>
+            </div>
+            <div class="slider-control">
+              <input
+                type="range"
+                class="slider"
+                min="0"
+                max="100"
+                value="${lightLevel}"
+                data-room="${room.id}"
+                data-device="lights"
+              >
+              <span class="slider-value">${lightLevel}%</span>
+            </div>
+          </div>
+        `;
+      }
+
+      renderShadeControl(room) {
+        const hasShades = room.shades_count > 0;
+        if (!hasShades) return '';
+
+        const shadeOpen = room.shades_open ?? false;
+        return `
+          <div class="device-control" data-device="shades" data-room="${room.id}">
+            <div class="device-control__info">
+              <span class="device-control__icon">🪟</span>
+              <div>
+                <div class="device-control__name">Shades</div>
+                <div class="device-control__value">${shadeOpen ? 'Open' : 'Closed'}</div>
+              </div>
+            </div>
+            <div
+              class="toggle ${shadeOpen ? 'active' : ''}"
+              data-room="${room.id}"
+              data-device="shades"
+            >
+              <div class="toggle__thumb"></div>
+            </div>
+          </div>
+        `;
+      }
+
+      renderEmpty() {
+        const container = document.getElementById('rooms-grid');
+        container.innerHTML = `
+          <div class="empty-state" style="grid-column: 1 / -1;">
+            <div class="empty-state__icon">🏠</div>
+            <h2>No Rooms Found</h2>
+            <p>Connect to your Kagami hub to see rooms.</p>
+          </div>
+        `;
+      }
+
+      bindControlEvents() {
+        // Sliders
+        document.querySelectorAll('.slider').forEach(slider => {
+          const valueDisplay = slider.parentElement.querySelector('.slider-value');
+
+          slider.addEventListener('input', (e) => {
+            valueDisplay.textContent = `${e.target.value}%`;
+          });
+
+          slider.addEventListener('change', (e) => {
+            const roomId = e.target.dataset.room;
+            const device = e.target.dataset.device;
+            const value = parseInt(e.target.value, 10);
+            this.setDeviceState(roomId, device, value);
+          });
+        });
+
+        // Toggles
+        document.querySelectorAll('.toggle').forEach(toggle => {
+          toggle.addEventListener('click', () => {
+            const roomId = toggle.dataset.room;
+            const device = toggle.dataset.device;
+            const isActive = toggle.classList.contains('active');
+
+            toggle.classList.toggle('active');
+            this.setDeviceState(roomId, device, !isActive);
+          });
+        });
+      }
+
+      async setDeviceState(roomId, device, value) {
+        // Haptic feedback
+        await this.agent.bridge.haptic('light');
+
+        try {
+          if (device === 'lights') {
+            // Propose light level change
+            await this.agent.propose('set_lights', {
+              level: value,
+              rooms: [this.getRoomName(roomId)],
+            });
+          } else if (device === 'shades') {
+            // Propose shade state change
+            const action = value ? 'open' : 'close';
+            await this.agent.propose('set_shades', {
+              action,
+              rooms: [this.getRoomName(roomId)],
+            });
+          }
+        } catch (error) {
+          console.error('Failed to set device state:', error);
+          // Revert UI change
+          this.loadRooms();
+        }
+      }
+
+      getRoomName(roomId) {
+        const room = this.rooms.find(r => String(r.id) === String(roomId));
+        return room?.name ?? roomId;
+      }
+
+      scrollToRoom(roomId) {
+        setTimeout(() => {
+          const card = document.querySelector(`[data-room-id="${roomId}"]`);
+          if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card.classList.add('animate-pulse');
+            setTimeout(() => card.classList.remove('animate-pulse'), 2000);
+          }
+        }, 300);
+      }
+
+      handleRoomsUpdate(msg) {
+        if (msg.rooms) {
+          this.rooms = msg.rooms;
+          this.renderRooms();
+        }
+      }
+
+      handleDeviceUpdate(msg) {
+        // Update specific device in UI without full re-render
+        const { roomId, device, value } = msg;
+        const control = document.querySelector(
+          `.device-control[data-room="${roomId}"][data-device="${device}"]`
+        );
+        if (control) {
+          // Update value display
+          const valueEl = control.querySelector('.device-control__value');
+          if (device === 'lights') {
+            valueEl.textContent = value > 0 ? `${value}%` : 'Off';
+            const slider = control.querySelector('.slider');
+            if (slider) slider.value = value;
+            const sliderValue = control.querySelector('.slider-value');
+            if (sliderValue) sliderValue.textContent = `${value}%`;
+          } else if (device === 'shades') {
+            valueEl.textContent = value ? 'Open' : 'Closed';
+            const toggle = control.querySelector('.toggle');
+            if (toggle) {
+              toggle.classList.toggle('active', value);
+            }
+          }
+        }
+      }
+    }
+
+    // =========================================================================
+    // Initialize
+    // =========================================================================
+
+    const roomsAgent = new RoomsAgent();
+    roomsAgent.initialize().catch(console.error);
+
+    // Expose for debugging
+    window.roomsAgent = roomsAgent;
+  </script>
+</body>
+</html>

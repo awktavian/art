@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz: Season 2 Knowledge | Module 02 | Tool Time University</title>
+    <link rel="stylesheet" href="../assets/style.css">
+    <style>
+        .quiz-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: var(--space-4);
+        }
+        .quiz-header {
+            text-align: center;
+            padding: var(--space-5) var(--space-4);
+            background: linear-gradient(135deg, var(--binford-red) 0%, var(--binford-red-light) 100%);
+            color: white;
+            border-radius: var(--radius-lg);
+            margin-bottom: var(--space-4);
+        }
+        .quiz-header h1 { color: white; margin-bottom: var(--space-2); }
+        .points-badge {
+            display: inline-block;
+            background: var(--binford-gold);
+            color: var(--stone-900);
+            padding: var(--space-1) var(--space-3);
+            border-radius: var(--radius-xl);
+            font-weight: 600;
+            font-family: var(--font-mono);
+        }
+        .progress-bar {
+            background: var(--stone-200);
+            height: 8px;
+            border-radius: 4px;
+            margin-bottom: var(--space-4);
+            overflow: hidden;
+        }
+        .progress-fill {
+            background: linear-gradient(90deg, var(--binford-red) 0%, var(--binford-gold) 100%);
+            height: 100%;
+            border-radius: 4px;
+            transition: width var(--duration-normal) var(--ease-out);
+        }
+        .progress-text {
+            text-align: center;
+            font-size: var(--text-sm);
+            color: var(--text-secondary);
+            margin-bottom: var(--space-3);
+        }
+        .question-card {
+            background: var(--white);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4);
+            margin-bottom: var(--space-4);
+            display: none;
+        }
+        .question-card.active { display: block; animation: fadeUp var(--duration-normal) var(--ease-out); }
+        .question-number { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--binford-red); margin-bottom: var(--space-2); }
+        .question-text { font-size: var(--text-lg); font-weight: 500; margin-bottom: var(--space-3); line-height: 1.4; }
+        .question-type { display: inline-block; font-size: var(--text-xs); background: var(--stone-100); color: var(--text-secondary); padding: 2px 8px; border-radius: var(--radius-sm); margin-bottom: var(--space-3); }
+        .options-list { list-style: none; padding: 0; margin: 0; }
+        .option-item { margin-bottom: var(--space-2); }
+        .option-btn {
+            width: 100%; text-align: left; padding: var(--space-3);
+            background: var(--stone-50); border: 2px solid var(--border-light);
+            border-radius: var(--radius-md); cursor: pointer;
+            transition: all var(--duration-fast) var(--ease-out); font-size: var(--text-base);
+        }
+        .option-btn:hover:not(:disabled) { background: var(--stone-100); border-color: var(--stone-300); }
+        .option-btn.selected { background: #fef3c7; border-color: var(--binford-gold); }
+        .option-btn.correct { background: #dcfce7; border-color: #22c55e; }
+        .option-btn.incorrect { background: #fee2e2; border-color: #ef4444; }
+        .option-btn:disabled { cursor: not-allowed; }
+        .fill-blank-input {
+            width: 100%; padding: var(--space-2) var(--space-3); font-size: var(--text-base);
+            border: 2px solid var(--border-light); border-radius: var(--radius-md); margin-bottom: var(--space-3);
+        }
+        .fill-blank-input:focus { outline: none; border-color: var(--binford-gold); }
+        .fill-blank-input.correct { border-color: #22c55e; background: #dcfce7; }
+        .fill-blank-input.incorrect { border-color: #ef4444; background: #fee2e2; }
+        .feedback { padding: var(--space-3); border-radius: var(--radius-md); margin-top: var(--space-3); display: none; }
+        .feedback.show { display: block; animation: fadeUp var(--duration-fast) var(--ease-out); }
+        .feedback.correct { background: #dcfce7; border: 1px solid #22c55e; color: #166534; }
+        .feedback.incorrect { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
+        .feedback-title { font-weight: 600; margin-bottom: var(--space-1); }
+        .btn-container { display: flex; justify-content: space-between; margin-top: var(--space-4); }
+        .submit-btn {
+            background: var(--binford-red); color: white; padding: var(--space-2) var(--space-4);
+            border: none; border-radius: var(--radius-md); font-weight: 600; cursor: pointer;
+            transition: all var(--duration-fast) var(--ease-out);
+        }
+        .submit-btn:hover:not(:disabled) { background: var(--binford-red-light); transform: translateY(-2px); }
+        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .next-btn { background: var(--binford-gold); color: var(--stone-900); }
+        .next-btn:hover:not(:disabled) { background: var(--binford-gold-light); }
+        .results-card {
+            background: var(--white); border: 1px solid var(--border-light);
+            border-radius: var(--radius-lg); padding: var(--space-5); text-align: center; display: none;
+        }
+        .results-card.show { display: block; animation: fadeUp var(--duration-normal) var(--ease-out); }
+        .results-score { font-size: var(--text-4xl); font-family: var(--font-display); color: var(--binford-red); margin-bottom: var(--space-2); }
+        .results-equity { font-size: var(--text-2xl); font-family: var(--font-mono); color: var(--binford-gold); margin-bottom: var(--space-4); }
+        .results-title { font-size: var(--text-xl); font-weight: 600; margin-bottom: var(--space-2); }
+        .results-message { color: var(--text-secondary); margin-bottom: var(--space-4); }
+        .tool-time-break { background: var(--stone-900); color: white; padding: var(--space-3); border-radius: var(--radius-md); text-align: center; margin: var(--space-4) 0; }
+        .tool-time-break .catchphrase { font-size: var(--text-xl); color: var(--binford-gold); font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div class="quiz-container">
+        <div class="quiz-header">
+            <p class="label" style="color: var(--binford-gold-light);">MODULE 02</p>
+            <h1>Season 2 Knowledge</h1>
+            <p style="opacity: 0.9; margin-bottom: var(--space-3);">10 Questions | Multiple Choice, True/False & Fill-in-the-Blank</p>
+            <div class="points-badge">75 Home Equity Dollars</div>
+        </div>
+
+        <div class="progress-text">Question <span id="currentQ">1</span> of 10</div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 10%;"></div>
+        </div>
+
+        <!-- Question 1 -->
+        <div class="question-card active" data-question="1" data-correct="lisa" data-points="7.5" data-type="fillin">
+            <div class="question-number">Question 1 of 10 (7.5 HED)</div>
+            <div class="question-type">Fill in the Blank</div>
+            <div class="question-text">During Season 2, the Tool Time Girl was _______, played by Pamela Anderson. This was her final full season before leaving for Baywatch.</div>
+            <input type="text" class="fill-blank-input" placeholder="Enter first name..." autocomplete="off">
+            <p style="font-size: var(--text-sm); color: var(--text-muted);">Hint: This actress later starred in Baywatch</p>
+            <div class="feedback correct">
+                <div class="feedback-title">TOOL TIME! Correct!</div>
+                <p>Lisa, played by Pamela Anderson, was the original Tool Time Girl for Seasons 1-2. She left to star in Baywatch and was replaced by Heidi (Debbe Dunning) starting in Season 3.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Time for a rewatch!</div>
+                <p>The correct answer is <strong>Lisa</strong>. Lisa was Tool Time's assistant during Seasons 1-2, played by Pamela Anderson.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 2 -->
+        <div class="question-card" data-question="2" data-correct="C" data-points="7.5">
+            <div class="question-number">Question 2 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">Which real-life TV host became Tim's rival in Season 2, appearing in the legendary episode "The Great Race"?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) Norm Abram</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Bob Ross</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Bob Vila</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Steve Thomas</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Rivalry confirmed!</div>
+                <p>Bob Vila played himself as Tim's nemesis. The competition to build a doghouse faster became an instant classic, and real-world awkwardness between the hosts added authentic tension.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Wrong handyman!</div>
+                <p>The correct answer is <strong>Bob Vila</strong>, the host of This Old House who became Tim's on-screen rival.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 3 -->
+        <div class="question-card" data-question="3" data-correct="true" data-points="7.5" data-type="truefalse">
+            <div class="question-number">Question 3 of 10 (7.5 HED)</div>
+            <div class="question-type">True or False</div>
+            <div class="question-text">Season 2 finished as the #2 rated program in America, establishing Home Improvement as a cultural force.</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="true">True</button></li>
+                <li class="option-item"><button class="option-btn" data-value="false">False</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Ratings champion!</div>
+                <p>After a stellar debut season, Season 2 continued the momentum and finished as the #2 show in America.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Check those Nielsen ratings!</div>
+                <p>This is <strong>True</strong>. Season 2 was a massive success, cementing the show's place in TV history.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 4 -->
+        <div class="question-card" data-question="4" data-correct="D" data-points="7.5">
+            <div class="question-number">Question 4 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">In the Season 2 episode "Bye Bye Birdie," the Taylor family must navigate what difficult situation?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) Tim's mother moves in</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) The boys get expelled from school</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Tool Time gets canceled</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) A family pet dies</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Tissues needed! Correct!</div>
+                <p>A family pet dies, and the Taylors must navigate genuine grief. Mark's emotional response drives the episode, with Tim struggling to be the supportive father he wants to be.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different kind of drama!</div>
+                <p>The correct answer is <strong>A family pet dies</strong>. This emotional episode showed the show could handle serious topics with grace.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 5 -->
+        <div class="question-card" data-question="5" data-correct="B" data-points="7.5">
+            <div class="question-number">Question 5 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What major storyline deepened Tim and Jill's marriage during Season 2?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) They consider divorce</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Communication issues and career tensions</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Jill has an affair</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Tim loses his job</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Marriage 101! Correct!</div>
+                <p>Season 2 challenged the Taylor marriage with real conflicts including communication issues, career tensions, and the balance of parenting three boys.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Not quite the drama!</div>
+                <p>The correct answer is <strong>Communication issues and career tensions</strong>. The show handled serious marriage topics with grace.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <div class="tool-time-break" id="midBreak" style="display: none;">
+            <p>DOES EVERYBODY KNOW WHAT TIME IT IS?</p>
+            <p class="catchphrase">TOOL TIME!</p>
+            <p style="font-size: var(--text-sm); opacity: 0.7;">Halfway through Season 2!</p>
+        </div>
+
+        <!-- Question 6 -->
+        <div class="question-card" data-question="6" data-correct="true" data-points="7.5" data-type="truefalse">
+            <div class="question-number">Question 6 of 10 (7.5 HED)</div>
+            <div class="question-type">True or False</div>
+            <div class="question-text">In "Howard's End," Tim faces real consequences when a Tool Time accident sends a stagehand to the hospital.</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="true">True</button></li>
+                <li class="option-item"><button class="option-btn" data-value="false">False</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Safety first! Correct!</div>
+                <p>This surprisingly sobering episode proved the show could handle serious moments without losing its comedic heart. Tim had to face real consequences for his "more power" philosophy.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Al says read the safety manual!</div>
+                <p>This is <strong>True</strong>. The episode showed Tim facing actual consequences for his reckless behavior.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 7 -->
+        <div class="question-card" data-question="7" data-correct="doghouse" data-points="7.5" data-type="fillin">
+            <div class="question-number">Question 7 of 10 (7.5 HED)</div>
+            <div class="question-type">Fill in the Blank</div>
+            <div class="question-text">In "The Great Race," Tim and Bob Vila compete to build a _______ faster than the other.</div>
+            <input type="text" class="fill-blank-input" placeholder="Enter what they built..." autocomplete="off">
+            <div class="feedback correct">
+                <div class="feedback-title">Race to the finish!</div>
+                <p>The legendary doghouse-building competition became an instant classic, pitting Tim's chaotic enthusiasm against Bob Vila's methodical expertise.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Wrong project!</div>
+                <p>The correct answer is <strong>doghouse</strong>. The doghouse race became one of the show's most memorable moments.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 8 -->
+        <div class="question-card" data-question="8" data-correct="C" data-points="7.5">
+            <div class="question-number">Question 8 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What began to happen with Al Borland's character during Season 2?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) He quit Tool Time</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) He became Tim's rival</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) He got more screen time and deeper characterization</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) He moved away</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">The flannel develops layers!</div>
+                <p>Al got more screen time and deeper characterization. His mother, his dating life, and his quiet competence all became storylines. The flannel-clad sidekick showed real depth.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Al deserves more credit!</div>
+                <p>The correct answer is <strong>He got more screen time and deeper characterization</strong>. Season 2 let Al be more than just Tim's straight man.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 9 -->
+        <div class="question-card" data-question="9" data-correct="B" data-points="7.5">
+            <div class="question-number">Question 9 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">Why did celebrities begin lining up to appear on Tool Time during Season 2?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) They were paid millions per appearance</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) It was good for ratings and genuinely fun</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Their contracts required it</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) ABC mandated it</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Star power!</div>
+                <p>Hollywood discovered that appearing on Tool Time was good for ratings and genuinely fun. From Penn & Teller to various celebrities, guest appearances became a show staple.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different motivation!</div>
+                <p>The correct answer is <strong>It was good for ratings and genuinely fun</strong>. Celebrities enjoyed the show's atmosphere.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 10 -->
+        <div class="question-card" data-question="10" data-correct="A" data-points="7.5">
+            <div class="question-number">Question 10 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">According to Wilson's Season 2 wisdom about the scarab beetle, what does marriage sometimes require?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) Rolling with what life gives you, even when it seems like dung</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Building a stronger shell</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Flying away from problems</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Burying your troubles</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Wilson's wisdom strikes again!</div>
+                <p>The ancient Egyptians believed that the scarab beetle represented transformation and rebirth. Wilson used this to explain that marriage requires rolling with what life gives you - even the difficult parts.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Back to the fence!</div>
+                <p>The correct answer is <strong>Rolling with what life gives you, even when it seems like dung</strong>. Classic Wilson wisdom!</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">See Results</button>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="results-card" id="results">
+            <h2 class="results-title" id="resultsTitle">Quiz Complete!</h2>
+            <div class="results-score" id="resultsScore">0/10</div>
+            <div class="results-equity" id="resultsEquity">0 HED Earned</div>
+            <p class="results-message" id="resultsMessage"></p>
+            <div style="margin-top: var(--space-4);">
+                <a href="index.html" class="btn btn--secondary" style="margin-right: var(--space-2);">Back to Module</a>
+                <button class="btn btn--primary" onclick="location.reload()">Retake Quiz</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const quizData = { currentQuestion: 1, totalQuestions: 10, score: 0, totalPoints: 0, maxPoints: 75, answered: new Set() };
+
+        document.addEventListener('DOMContentLoaded', function() { initQuiz(); });
+
+        function initQuiz() {
+            document.querySelectorAll('.option-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const card = this.closest('.question-card');
+                    card.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+                    this.classList.add('selected');
+                    card.querySelector('.submit-btn').disabled = false;
+                });
+            });
+            document.querySelectorAll('.fill-blank-input').forEach(input => {
+                input.addEventListener('input', function() {
+                    const card = this.closest('.question-card');
+                    card.querySelector('.submit-btn').disabled = this.value.trim() === '';
+                });
+            });
+            document.querySelectorAll('.submit-btn:not(.next-btn)').forEach(btn => {
+                btn.addEventListener('click', function() { submitAnswer(this.closest('.question-card')); });
+            });
+            document.querySelectorAll('.next-btn').forEach(btn => {
+                btn.addEventListener('click', function() { nextQuestion(); });
+            });
+        }
+
+        function submitAnswer(card) {
+            const questionNum = parseInt(card.dataset.question);
+            const correctAnswer = card.dataset.correct;
+            const points = parseFloat(card.dataset.points);
+            const type = card.dataset.type || 'multiple';
+            let userAnswer, isCorrect = false;
+
+            if (type === 'fillin') {
+                const input = card.querySelector('.fill-blank-input');
+                userAnswer = input.value.trim().toLowerCase();
+                isCorrect = userAnswer === correctAnswer.toLowerCase();
+                input.disabled = true;
+                input.classList.add(isCorrect ? 'correct' : 'incorrect');
+            } else {
+                const selected = card.querySelector('.option-btn.selected');
+                userAnswer = selected.dataset.value;
+                isCorrect = userAnswer === correctAnswer;
+                card.querySelectorAll('.option-btn').forEach(btn => {
+                    btn.disabled = true;
+                    if (btn.dataset.value === correctAnswer) btn.classList.add('correct');
+                    else if (btn.classList.contains('selected') && !isCorrect) btn.classList.add('incorrect');
+                });
+            }
+
+            if (isCorrect) { quizData.score++; quizData.totalPoints += points; card.querySelector('.feedback.correct').classList.add('show'); }
+            else { card.querySelector('.feedback.incorrect').classList.add('show'); }
+            quizData.answered.add(questionNum);
+            card.querySelector('.submit-btn:not(.next-btn)').style.display = 'none';
+            card.querySelector('.next-btn').style.display = 'inline-block';
+        }
+
+        function nextQuestion() {
+            const currentCard = document.querySelector('.question-card.active');
+            currentCard.classList.remove('active');
+            quizData.currentQuestion++;
+            if (quizData.currentQuestion === 6) {
+                document.getElementById('midBreak').style.display = 'block';
+                setTimeout(() => { document.getElementById('midBreak').style.display = 'none'; }, 2000);
+            }
+            if (quizData.currentQuestion <= quizData.totalQuestions) {
+                const nextCard = document.querySelector(`[data-question="${quizData.currentQuestion}"]`);
+                nextCard.classList.add('active');
+                document.getElementById('currentQ').textContent = quizData.currentQuestion;
+                document.getElementById('progressFill').style.width = (quizData.currentQuestion / quizData.totalQuestions * 100) + '%';
+            } else { showResults(); }
+        }
+
+        function showResults() {
+            document.getElementById('results').classList.add('show');
+            document.getElementById('resultsScore').textContent = `${quizData.score}/${quizData.totalQuestions}`;
+            document.getElementById('resultsEquity').textContent = `${quizData.totalPoints.toFixed(1)} HED Earned`;
+            const percentage = (quizData.score / quizData.totalQuestions) * 100;
+            let title, message;
+            if (percentage === 100) { title = 'Master Craftsman!'; message = 'Perfect score! You dominated Season 2 like Tim dominated... well, like Tim TRIED to dominate Bob Vila!'; }
+            else if (percentage >= 80) { title = 'Journeyman Builder!'; message = 'Great work! Your Season 2 knowledge rivals Al\'s flannel collection.'; }
+            else if (percentage >= 60) { title = 'Apprentice!'; message = 'Passing! But maybe rewatch "The Great Race" a few more times.'; }
+            else if (percentage >= 40) { title = 'Weekend Warrior'; message = 'Keep studying! Season 2 has more secrets to reveal.'; }
+            else { title = 'Tim After a Disaster'; message = 'Time for a Season 2 marathon! The Great Race awaits.'; }
+            document.getElementById('resultsTitle').textContent = title;
+            document.getElementById('resultsMessage').textContent = message;
+        }
+    </script>
+</body>
+</html>

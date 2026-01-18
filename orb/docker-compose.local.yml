@@ -1,0 +1,108 @@
+# KagamiOS Local Development Docker Compose
+#
+# Simplified setup for local development - NO TLS required.
+# Uses in-memory/local storage where possible.
+#
+# Usage:
+#   docker-compose -f docker-compose.local.yml up -d
+#   docker-compose -f docker-compose.local.yml logs -f
+#   docker-compose -f docker-compose.local.yml down
+#
+# For bare-metal (no Docker), just run:
+#   python scripts/kagami_api_launcher.py --port 8001
+#
+# The API works standalone without Redis/etcd/CockroachDB in local mode.
+
+services:
+  # =============================================================================
+  # Redis (Optional - for distributed caching)
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: kagami-redis-local
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_local_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    networks:
+      - kagami-local
+    restart: unless-stopped
+
+  # =============================================================================
+  # PostgreSQL (Simpler than CockroachDB for local dev)
+  # =============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: kagami-postgres-local
+    environment:
+      POSTGRES_USER: kagami
+      POSTGRES_PASSWORD: kagami_local_dev  # pragma: allowlist secret
+      POSTGRES_DB: kagami
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_local_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kagami"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    networks:
+      - kagami-local
+    restart: unless-stopped
+
+  # =============================================================================
+  # KagamiOS API (Optional - can run bare-metal)
+  # =============================================================================
+  kagami:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILD_ENV=development
+    container_name: kagami-api-local
+    command: python scripts/kagami_api_launcher.py --port 8001 --log-level DEBUG
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./:/app
+      - ~/.kagami:/kagami
+    environment:
+      - ENVIRONMENT=development
+      - KAGAMI_LOCAL_MODE=1
+      - KAGAMI_SKIP_DISTRIBUTED=1
+      - KAGAMI_HOME=/kagami
+      - DATABASE_URL=postgresql://kagami:kagami_local_dev@postgres:5432/kagami
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app:/app/packages/kagami_api:/app/packages/kagami_smarthome:/app/packages/kagami_hal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - kagami-local
+    restart: unless-stopped
+
+networks:
+  kagami-local:
+    driver: bridge
+
+volumes:
+  redis_local_data:
+    driver: local
+  postgres_local_data:
+    driver: local

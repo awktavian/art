@@ -1,0 +1,140 @@
+# Model Cache Configuration
+#
+# This file configures the model cache system for K os.
+# All parameters can be overridden via environment variables.
+#
+# Environment Variable Overrides:
+#   KAGAMI_MODEL_CACHE_DIR: Override cache directory
+#   KAGAMI_MODEL_CACHE_MAX_SIZE_GB: Override maximum cache size
+#   KAGAMI_MODEL_CACHE_MAX_MODELS: Override maximum model count
+#   KAGAMI_MODEL_CACHE_ENABLED: Disable caching if "0"
+#   KAGAMI_MODEL_CACHE_WARM: Enable/disable warm cache
+#   KAGAMI_MODEL_CACHE_SCAN_HF: Scan HF cache on startup
+#   KAGAMI_MODEL_CACHE_METRICS: Enable/disable metrics
+#   MODEL_CACHE_PATH: Legacy cache directory (lower priority)
+#   HF_HOME: Hugging Face cache directory
+#   XDG_CACHE_HOME: XDG base cache directory
+#
+# Environment variables in this file are expanded using:
+#   ${VAR_NAME} or ${VAR_NAME:-default_value}
+
+version: "1.0"
+
+model_cache:
+  # Cache Directory
+  # ---------------
+  # Primary storage location for cached models
+  # Supports environment variable expansion
+  # Default: ${XDG_CACHE_HOME:-~/.cache}/kagami/models
+  cache_dir: "${XDG_CACHE_HOME:-~/.cache}/kagami/models"
+
+  # Cache Size Limits
+  # -----------------
+  # max_size_gb: Maximum total cache size in gigabytes
+  # max_models: Maximum number of models to keep in cache
+  #
+  # When limits are exceeded, the eviction_policy determines which models are removed
+  max_size_gb: 100.0
+  max_models: 10
+
+  # Eviction Policy
+  # ---------------
+  # Strategy for removing models when cache is full
+  #
+  # Available policies:
+  #   - lru: Least Recently Used (default, recommended)
+  #   - lfu: Least Frequently Used (better for stable workloads)
+  #   - fifo: First In First Out (simple, predictable)
+  eviction_policy: lru
+
+  # Time-to-Live
+  # ------------
+  # How long models stay in cache before being considered stale (in hours)
+  # Stale models are evicted first during cleanup
+  # Default: 168 hours (1 week)
+  ttl_hours: 168
+
+  # Hugging Face Integration
+  # ------------------------
+  # hf_cache_dir: Location of Hugging Face cache
+  # scan_hf_on_startup: Scan HF cache for existing models on startup
+  #
+  # If scan_hf_on_startup is enabled, the system will detect models
+  # already downloaded by Hugging Face and avoid re-downloading
+  hf_cache_dir: "${HF_HOME:-~/.cache/huggingface/hub}"
+  scan_hf_on_startup: true
+
+  # Warm Cache Configuration
+  # ------------------------
+  # Pre-load models on system startup for faster first access
+  warm_cache:
+    # Enable warm cache feature
+    enabled: true
+
+    # Models to pre-load
+    # Priority: high (load first), medium, low (load last)
+    models:
+      # Example: Production world model
+      - model_id: "Qwen/Qwen3-14B"
+        priority: high
+        config:
+          device: "auto"
+          dtype: "float16"
+          torch_dtype: "float16"
+
+      # Example: Smaller model for rapid inference
+      # - model_id: "facebook/opt-1.3b"
+      #   priority: medium
+      #   config:
+      #     device: "cpu"
+      #     dtype: "float32"
+
+      # Example: Local model
+      # - model_id: "/path/to/local/model"
+      #   priority: low
+      #   config:
+      #     device: "auto"
+
+  # Metrics Configuration
+  # ---------------------
+  # Enable Prometheus metrics for monitoring cache performance
+  metrics:
+    enabled: true
+    prometheus_namespace: "kagami_model_cache"
+
+  # Safety Features
+  # ---------------
+  # verify_checksums: Verify model integrity on load
+  # atomic_writes: Use atomic writes to prevent corruption
+  #
+  # Both are highly recommended for production
+  verify_checksums: true
+  atomic_writes: true
+
+# Configuration Profiles
+# ----------------------
+#
+# Development (small cache, fast iteration):
+#   max_size_gb: 20.0
+#   max_models: 3
+#   eviction_policy: lru
+#   warm_cache.enabled: false
+#
+# Production (large cache, stable workload):
+#   max_size_gb: 200.0
+#   max_models: 20
+#   eviction_policy: lfu
+#   warm_cache.enabled: true
+#   warm_cache.models: [list of production models]
+#
+# Testing (minimal cache, fast cleanup):
+#   max_size_gb: 5.0
+#   max_models: 2
+#   eviction_policy: fifo
+#   ttl_hours: 24
+#
+# Resource-Constrained (low memory/disk):
+#   max_size_gb: 10.0
+#   max_models: 2
+#   eviction_policy: lru
+#   verify_checksums: false  # Slight performance gain

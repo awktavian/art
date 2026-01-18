@@ -1,0 +1,39 @@
+# Tailscale Subnet Router for Kagami
+#
+# Runs Tailscale in Docker to create a secure tunnel from
+# Google Cloud Run to your home network.
+#
+# Start: docker compose up -d
+# Logs:  docker compose logs -f tailscale
+# Stop:  docker compose down
+
+services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: kagami-tailscale
+    hostname: kagami-home-router
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      # Auth key from Tailscale admin console
+      # Generate at: https://login.tailscale.com/admin/settings/keys
+      - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
+      # Advertise your home subnet
+      - TS_EXTRA_ARGS=--advertise-routes=192.168.1.0/24 --accept-dns=false
+      # Persist state
+      - TS_STATE_DIR=/var/lib/tailscale
+      # Run as subnet router
+      - TS_USERSPACE=false
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    network_mode: host
+    labels:
+      - "com.kagami.service=tunnel"
+      - "com.kagami.description=Tailscale VPN tunnel to home network"
+
+volumes:
+  tailscale-state:
+    name: kagami-tailscale-state

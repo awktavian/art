@@ -1,0 +1,129 @@
+# Reusable Rust Job Template
+# Use this template for consistent Rust build/test jobs
+#
+# Usage:
+#   jobs:
+#     lint:
+#       uses: ./.github/workflows/_reusable-rust-job.yml
+#       with:
+#         working-directory: apps/hub/kagami-hub
+#         command: fmt --all -- --check
+
+name: Reusable Rust Job
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: 'Working directory for Cargo commands'
+        required: true
+        type: string
+      command:
+        description: 'Cargo command to run (without "cargo" prefix)'
+        required: true
+        type: string
+      rust-version:
+        description: 'Rust toolchain version'
+        required: false
+        type: string
+        default: 'stable'
+      components:
+        description: 'Rust components to install (comma-separated)'
+        required: false
+        type: string
+        default: ''
+      os:
+        description: 'Runner OS'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
+      timeout-minutes:
+        description: 'Job timeout in minutes'
+        required: false
+        type: number
+        default: 30
+      artifact-name:
+        description: 'Name for uploaded artifact'
+        required: false
+        type: string
+        default: ''
+      artifact-path:
+        description: 'Path to upload as artifact (relative to working-directory)'
+        required: false
+        type: string
+        default: ''
+      retry-count:
+        description: 'Number of retry attempts'
+        required: false
+        type: number
+        default: 1
+      continue-on-error:
+        description: 'Continue workflow if this job fails'
+        required: false
+        type: boolean
+        default: false
+      install-system-deps:
+        description: 'Install system dependencies for Tauri/etc'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  rust-job:
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    continue-on-error: ${{ inputs.continue-on-error }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies (Linux)
+        if: inputs.install-system-deps && runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libudev-dev libasound2-dev
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ inputs.rust-version }}
+          components: ${{ inputs.components }}
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ inputs.working-directory }}/target
+          key: cargo-${{ runner.os }}-${{ inputs.working-directory }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ inputs.working-directory }}-
+            cargo-${{ runner.os }}-
+
+      - name: Run Cargo command
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: ${{ inputs.retry-count }}
+          retry_wait_seconds: 10
+          timeout_minutes: ${{ inputs.timeout-minutes }}
+          command: |
+            cd ${{ inputs.working-directory }}
+            cargo ${{ inputs.command }}
+
+      - name: Upload artifact
+        if: inputs.artifact-name != '' && inputs.artifact-path != '' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ inputs.working-directory }}/${{ inputs.artifact-path }}
+          retention-days: 30
+          if-no-files-found: warn

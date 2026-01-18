@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""
+Pre-commit hook: Check docs for stale integration data.
+
+This hook runs before commits that touch docs/ and warns if:
+1. Integration status cache is stale (>24h)
+2. Documented values don't match cached values
+3. Verification hasn't been run recently
+
+Install via pre-commit config or:
+    cp scripts/hooks/pre-commit-docs .git/hooks/
+    chmod +x .git/hooks/pre-commit-docs
+"""
+
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+
+# Project root
+ROOT = Path(__file__).parent.parent.parent
+
+
+def check_integration_staleness() -> tuple[bool, str]:
+    """Check if integration status cache is stale."""
+    cache_path = ROOT / ".integration_status.json"
+
+    if not cache_path.exists():
+        return (
+            False,
+            "⚠️  No integration status cache found. Run: python scripts/verify_integrations.py",
+        )
+
+    try:
+        with open(cache_path) as f:
+            status = json.load(f)
+
+        verified_at = datetime.fromisoformat(status["verified_at"])
+        age_hours = (datetime.now() - verified_at).total_seconds() / 3600
+
+        if age_hours > 24:
+            return (
+                False,
+                f"⚠️  Integration cache is {age_hours:.0f}h old. Run: python scripts/verify_integrations.py",
+            )
+
+        return True, f"✅ Integration cache is fresh ({age_hours:.1f}h old)"
+    except Exception as e:
+        return False, f"⚠️  Error reading integration cache: {e}"
+
+
+def check_docs_consistency() -> tuple[bool, list[str]]:
+    """Check if docs match cached values."""
+    warnings = []
+    cache_path = ROOT / ".integration_status.json"
+
+    if not cache_path.exists():
+        return True, []  # Can't check without cache
+
+    try:
+        with open(cache_path) as f:
+            full_status = json.load(f)
+
+        # Get Composio status from unified cache
+        status = full_status.get("composio", {})
+
+        total_tools = status.get("total_tools", 0)
+        app_count = status.get("connected_apps", 0)
+
+        # Check CLAUDE.md
+        claude_md = ROOT / "CLAUDE.md"
+        if claude_md.exists():
+            content = claude_md.read_text()
+
+            # Check for mismatched tool counts
+            if "500 Tools" not in content and total_tools == 500:
+                pass  # OK
+            elif "356" in content and total_tools != 356:
+                warnings.append(f"CLAUDE.md mentions 356 tools but cache shows {total_tools}")
+
+            # Check for old services (GitHub, Figma were disconnected)
+            if "GitHub" in content and "GitHub" not in str(
+                [a["name"] for a in status.get("apps", [])]
+            ):
+                warnings.append("CLAUDE.md mentions GitHub but it's not in connected apps")
+            if "Figma" in content and "Figma" not in str(
+                [a["name"] for a in status.get("apps", [])]
+            ):
+                warnings.append("CLAUDE.md mentions Figma but it's not in connected apps")
+
+        return len(warnings) == 0, warnings
+    except Exception as e:
+        return True, [f"Warning: Could not check docs consistency: {e}"]
+
+
+def main():
+    """Run all checks."""
+    print("🔍 Checking docs consistency...")
+
+    all_ok = True
+
+    # Check staleness
+    ok, msg = check_integration_staleness()
+    print(f"  {msg}")
+    if not ok:
+        all_ok = False
+
+    # Check consistency
+    ok, warnings = check_docs_consistency()
+    for w in warnings:
+        print(f"  ⚠️  {w}")
+    if not ok:
+        all_ok = False
+
+    if not all_ok:
+        print("")
+        print("💡 Run 'python scripts/verify_integrations.py' to update cache")
+        print("   Then update docs to match verified values")
+        print("")
+        # Return 0 anyway - warning only, don't block commit
+        return 0
+
+    print("  ✅ Docs appear consistent with cached values")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

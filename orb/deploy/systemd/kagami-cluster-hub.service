@@ -1,0 +1,156 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# KAGAMI CLUSTER HUB SERVICE — Distributed Hub with Byzantine Detection
+# Colony: Nexus (e₄) — Distributed mesh coordination
+#
+# This service runs the Kagami Hub on Raspberry Pi with full mesh awareness.
+# Participates in hub mesh, CRDT sync, and Byzantine fault detection.
+#
+# Part of kagami.target for coordinated startup.
+#
+# Installation:
+#   sudo cp kagami-cluster-hub.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable kagami-cluster-hub
+#   sudo systemctl start kagami-cluster-hub
+# ═══════════════════════════════════════════════════════════════════════════
+
+[Unit]
+Description=Kagami Hub — Voice-First Smart Home Assistant (Cluster Mode)
+Documentation=https://github.com/kagami/kagami-hub
+After=network-online.target sound.target
+Wants=network-online.target
+Requires=sound.target
+
+# Mesh dependencies
+After=avahi-daemon.service
+Wants=avahi-daemon.service
+
+# Restart if network becomes available
+After=NetworkManager.service
+After=systemd-resolved.service
+
+# Part of kagami.target
+PartOf=kagami.target
+
+[Service]
+Type=notify
+User=kagami
+Group=kagami
+WorkingDirectory=/opt/kagami-hub
+
+# =============================================================================
+# CLUSTER CONFIGURATION (Jan 4, 2026)
+# Full mesh awareness with Byzantine fault detection
+# =============================================================================
+
+# Hub identity (auto-generated from hostname if not set)
+# Environment="KAGAMI_HUB_ID=hub-living-room"
+Environment="KAGAMI_HUB_NAME=Living Room Hub"
+
+# Service type for registration
+Environment="KAGAMI_SERVICE_TYPE=hub"
+
+# API connection (for non-mesh operations)
+Environment="KAGAMI_API_URL=http://kagami-api:8001"
+Environment="KAGAMI_API_TIMEOUT=5"
+
+# Mesh configuration
+Environment="MESH_ENABLED=true"
+Environment="MESH_WS_PORT=9877"
+Environment="MESH_MDNS_ENABLED=true"
+Environment="MESH_HEARTBEAT_INTERVAL_MS=5000"
+Environment="MESH_PEER_TIMEOUT_MS=15000"
+
+# CRDT Sync configuration
+Environment="CRDT_SYNC_INTERVAL_MS=10000"
+
+# Byzantine detection
+Environment="BYZANTINE_DETECTION_ENABLED=true"
+Environment="BYZANTINE_FAULT_THRESHOLD=3"
+Environment="BYZANTINE_DECAY_INTERVAL_S=300"
+
+# Leader election
+Environment="ELECTION_TIMEOUT_MS=3000"
+Environment="LEADER_LEASE_TTL_S=30"
+
+# State sync
+Environment="STATE_SYNC_INTERVAL_MS=10000"
+
+# Rust logging
+Environment="RUST_LOG=info,kagami_hub=debug"
+Environment="RUST_BACKTRACE=1"
+
+# Hub configuration
+Environment="KAGAMI_HUB_CONFIG=/opt/kagami-hub/config/hub.toml"
+Environment="HUB_WEB_PORT=8080"
+
+# Audio configuration
+Environment="ALSA_CARD=default"
+Environment="PULSE_SERVER=/run/user/1000/pulse/native"
+
+# Watchdog configuration for sd_notify
+Environment="WATCHDOG_USEC=30000000"
+
+# The main process
+ExecStart=/usr/local/bin/kagami-hub
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Restart policy
+Restart=on-failure
+RestartSec=10s
+TimeoutStartSec=30s
+TimeoutStopSec=30s
+
+# Watchdog
+WatchdogSec=30
+
+# Resource limits
+LimitNOFILE=65536
+LimitMEMLOCK=infinity
+
+# Security hardening (but allow GPIO/audio access)
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=false
+RestrictSUIDSGID=true
+RemoveIPC=true
+PrivateDevices=false
+
+# Required for audio and GPIO
+SupplementaryGroups=audio gpio spi i2c video
+
+# Bind mounts for configuration
+ReadWritePaths=/opt/kagami-hub/config
+ReadWritePaths=/opt/kagami-hub/logs
+ReadWritePaths=/tmp
+
+# Device access for LEDs and audio
+DeviceAllow=/dev/spidev* rw
+DeviceAllow=/dev/snd/* rw
+DeviceAllow=/dev/gpiomem rw
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kagami-hub
+
+# Capability bounding
+CapabilityBoundingSet=CAP_SYS_RAWIO CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_SYS_RAWIO
+
+[Install]
+WantedBy=kagami.target
+WantedBy=multi-user.target
+Alias=hub.service
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 鏡
+# The Hub listens. The Hub speaks. The mesh coordinates.
+# Byzantine faults detected and isolated.
+# h(x) ≥ 0. Always.
+# ═══════════════════════════════════════════════════════════════════════════

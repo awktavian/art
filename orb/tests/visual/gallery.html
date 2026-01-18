@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visual Regression Gallery - Kagami</title>
+  <style>
+    :root {
+      --bg-dark: #07060B;
+      --bg-surface: rgba(255, 255, 255, 0.03);
+      --bg-surface-elevated: rgba(255, 255, 255, 0.06);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-default: rgba(255, 255, 255, 0.12);
+      --text-primary: rgba(255, 255, 255, 0.92);
+      --text-secondary: rgba(255, 255, 255, 0.64);
+      --text-tertiary: rgba(255, 255, 255, 0.4);
+
+      /* Colony colors */
+      --spark: #FF6B35;
+      --forge: #FF9500;
+      --flow: #5AC8FA;
+      --nexus: #AF52DE;
+      --beacon: #FFD60A;
+      --grove: #32D74B;
+      --crystal: #64D2FF;
+
+      /* Status colors */
+      --success: #32D74B;
+      --warning: #FFD60A;
+      --error: #FF453A;
+      --info: #64D2FF;
+
+      /* Fibonacci timing */
+      --dur-micro: 89ms;
+      --dur-button: 144ms;
+      --dur-modal: 233ms;
+      --dur-settle: 377ms;
+      --dur-transition: 610ms;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* Header */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(7, 6, 11, 0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 16px 24px;
+    }
+
+    .header__top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .header__title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header__logo {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--spark), var(--crystal));
+      border-radius: 8px;
+    }
+
+    .header__stats {
+      display: flex;
+      gap: 24px;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat__value {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .stat__value--pass { color: var(--success); }
+    .stat__value--fail { color: var(--error); }
+    .stat__value--new { color: var(--info); }
+
+    .stat__label {
+      font-size: 0.75rem;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .control-group {
+      display: flex;
+      gap: 4px;
+    }
+
+    .control-btn {
+      padding: 8px 16px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--dur-button) ease;
+    }
+
+    .control-btn:hover {
+      background: var(--bg-surface-elevated);
+      color: var(--text-primary);
+    }
+
+    .control-btn.active {
+      background: var(--beacon);
+      color: #000;
+      border-color: var(--beacon);
+    }
+
+    .search-input {
+      padding: 8px 12px;
+      font-size: 0.8125rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      color: var(--text-primary);
+      min-width: 200px;
+      outline: none;
+      transition: border-color var(--dur-button) ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--beacon);
+    }
+
+    .search-input::placeholder {
+      color: var(--text-tertiary);
+    }
+
+    /* Main content */
+    .main {
+      padding: 24px;
+    }
+
+    /* Gallery grid */
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+      gap: 24px;
+    }
+
+    /* Comparison card */
+    .comparison-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: all var(--dur-modal) ease;
+    }
+
+    .comparison-card:hover {
+      border-color: var(--border-default);
+      transform: translateY(-2px);
+    }
+
+    .comparison-card--pass { border-left: 3px solid var(--success); }
+    .comparison-card--fail { border-left: 3px solid var(--error); }
+    .comparison-card--new { border-left: 3px solid var(--info); }
+
+    .comparison-card__header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .comparison-card__title {
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .comparison-card__meta {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .badge {
+      padding: 4px 8px;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-radius: 4px;
+    }
+
+    .badge--pass { background: rgba(50, 215, 75, 0.15); color: var(--success); }
+    .badge--fail { background: rgba(255, 69, 58, 0.15); color: var(--error); }
+    .badge--new { background: rgba(100, 210, 255, 0.15); color: var(--info); }
+    .badge--platform { background: rgba(255, 214, 10, 0.15); color: var(--beacon); }
+
+    /* Image viewer */
+    .image-viewer {
+      position: relative;
+      background: #0a090f;
+      aspect-ratio: 16 / 10;
+      overflow: hidden;
+    }
+
+    .image-viewer__container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .image-viewer__img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .image-viewer__img--baseline { z-index: 1; }
+    .image-viewer__img--current { z-index: 2; }
+    .image-viewer__img--diff { z-index: 3; opacity: 0; mix-blend-mode: difference; }
+
+    .image-viewer.show-diff .image-viewer__img--diff { opacity: 1; }
+    .image-viewer.show-baseline .image-viewer__img--current,
+    .image-viewer.show-baseline .image-viewer__img--diff { opacity: 0; }
+    .image-viewer.show-current .image-viewer__img--baseline,
+    .image-viewer.show-current .image-viewer__img--diff { opacity: 0; }
+
+    /* Slider mode */
+    .image-viewer.slider-mode .image-viewer__img--current {
+      clip-path: inset(0 0 0 var(--slider-pos, 50%));
+    }
+
+    .image-viewer__slider {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: var(--slider-pos, 50%);
+      width: 2px;
+      background: var(--beacon);
+      z-index: 10;
+      cursor: ew-resize;
+      display: none;
+    }
+
+    .image-viewer.slider-mode .image-viewer__slider { display: block; }
+
+    .image-viewer__slider::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 32px;
+      height: 32px;
+      background: var(--beacon);
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    }
+
+    /* View controls */
+    .view-controls {
+      display: flex;
+      gap: 4px;
+      padding: 12px;
+      border-top: 1px solid var(--border-subtle);
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .view-btn {
+      flex: 1;
+      padding: 8px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--dur-button) ease;
+    }
+
+    .view-btn:hover { background: var(--bg-surface); }
+    .view-btn.active { background: var(--beacon); color: #000; border-color: var(--beacon); }
+
+    /* Diff stats */
+    .diff-stats {
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.3);
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+    }
+
+    .diff-stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .diff-stat__icon {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+
+    .diff-stat__icon--changed { background: var(--error); }
+
+    /* Empty state */
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 80px 24px;
+    }
+
+    .empty-state__icon {
+      font-size: 4rem;
+      margin-bottom: 16px;
+      opacity: 0.3;
+    }
+
+    .empty-state__title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .empty-state__text {
+      color: var(--text-secondary);
+      max-width: 400px;
+      margin: 0 auto;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed var(--border-subtle);
+      border-radius: 12px;
+      padding: 48px 24px;
+      text-align: center;
+      margin-bottom: 24px;
+      transition: all var(--dur-modal) ease;
+      cursor: pointer;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      border-color: var(--beacon);
+      background: rgba(255, 214, 10, 0.05);
+    }
+
+    .drop-zone__icon {
+      font-size: 2rem;
+      margin-bottom: 12px;
+    }
+
+    .drop-zone__text {
+      color: var(--text-secondary);
+    }
+
+    .drop-zone__text strong {
+      color: var(--beacon);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .gallery { grid-template-columns: 1fr; }
+      .header__top { flex-direction: column; gap: 16px; }
+      .controls { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header__top">
+      <h1 class="header__title">
+        <div class="header__logo"></div>
+        Visual Regression Gallery
+      </h1>
+      <div class="header__stats">
+        <div class="stat">
+          <div class="stat__value stat__value--pass" id="pass-count">0</div>
+          <div class="stat__label">Passed</div>
+        </div>
+        <div class="stat">
+          <div class="stat__value stat__value--fail" id="fail-count">0</div>
+          <div class="stat__label">Failed</div>
+        </div>
+        <div class="stat">
+          <div class="stat__value stat__value--new" id="new-count">0</div>
+          <div class="stat__label">New</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="control-group" id="status-filters">
+        <button class="control-btn active" data-filter="all">All</button>
+        <button class="control-btn" data-filter="pass">Pass</button>
+        <button class="control-btn" data-filter="fail">Fail</button>
+        <button class="control-btn" data-filter="new">New</button>
+      </div>
+
+      <div class="control-group" id="platform-filters">
+        <button class="control-btn active" data-platform="all">All Platforms</button>
+        <button class="control-btn" data-platform="desktop">Desktop</button>
+        <button class="control-btn" data-platform="ios">iOS</button>
+        <button class="control-btn" data-platform="android">Android</button>
+        <button class="control-btn" data-platform="visionos">visionOS</button>
+        <button class="control-btn" data-platform="watchos">watchOS</button>
+        <button class="control-btn" data-platform="tvos">tvOS</button>
+      </div>
+
+      <input type="text" class="search-input" id="search-input" placeholder="Search screenshots...">
+
+      <button class="control-btn" id="load-samples" title="Load sample data">Demo</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="drop-zone" id="drop-zone">
+      <div class="drop-zone__icon">📸</div>
+      <div class="drop-zone__text">
+        <strong>Drop screenshot folders here</strong> or click to load test results<br>
+        Expects: baseline/, current/, diff/ folders with matching filenames
+      </div>
+    </div>
+
+    <div class="gallery" id="gallery">
+      <!-- Comparison cards inserted here -->
+    </div>
+  </main>
+
+  <script>
+    /**
+     * Visual Regression Gallery
+     *
+     * Colony: Crystal (e7) - Verification
+     * h(x) >= 0 always
+     */
+
+    const state = {
+      comparisons: [],
+      filter: { status: 'all', platform: 'all', search: '' }
+    };
+
+    const gallery = document.getElementById('gallery');
+    const dropZone = document.getElementById('drop-zone');
+    const searchInput = document.getElementById('search-input');
+
+    function updateStats() {
+      const passed = state.comparisons.filter(c => c.status === 'pass').length;
+      const failed = state.comparisons.filter(c => c.status === 'fail').length;
+      const newItems = state.comparisons.filter(c => c.status === 'new').length;
+
+      document.getElementById('pass-count').textContent = passed;
+      document.getElementById('fail-count').textContent = failed;
+      document.getElementById('new-count').textContent = newItems;
+    }
+
+    function getFilteredComparisons() {
+      return state.comparisons.filter(c => {
+        if (state.filter.status !== 'all' && c.status !== state.filter.status) return false;
+        if (state.filter.platform !== 'all' && c.platform !== state.filter.platform) return false;
+        if (state.filter.search) {
+          const search = state.filter.search.toLowerCase();
+          return c.name.toLowerCase().includes(search) || c.platform.toLowerCase().includes(search);
+        }
+        return true;
+      });
+    }
+
+    function createComparisonCard(comparison) {
+      const card = document.createElement('div');
+      card.className = `comparison-card comparison-card--${comparison.status}`;
+      card.dataset.id = comparison.id;
+
+      const diffPercent = comparison.diffPixels > 0
+        ? ((comparison.diffPixels / comparison.totalPixels) * 100).toFixed(2) : 0;
+
+      card.innerHTML = `
+        <div class="comparison-card__header">
+          <div class="comparison-card__title">${comparison.name}</div>
+          <div class="comparison-card__meta">
+            <span class="badge badge--platform">${comparison.platform}</span>
+            <span class="badge badge--${comparison.status}">${comparison.status}</span>
+          </div>
+        </div>
+        <div class="image-viewer" data-id="${comparison.id}">
+          <div class="image-viewer__container">
+            ${comparison.baseline ? `<img class="image-viewer__img image-viewer__img--baseline" src="${comparison.baseline}" alt="Baseline">` : ''}
+            ${comparison.current ? `<img class="image-viewer__img image-viewer__img--current" src="${comparison.current}" alt="Current">` : ''}
+            ${comparison.diff ? `<img class="image-viewer__img image-viewer__img--diff" src="${comparison.diff}" alt="Diff">` : ''}
+            <div class="image-viewer__slider"></div>
+          </div>
+        </div>
+        <div class="view-controls">
+          <button class="view-btn active" data-view="split">Split</button>
+          <button class="view-btn" data-view="baseline">Baseline</button>
+          <button class="view-btn" data-view="current">Current</button>
+          <button class="view-btn" data-view="diff">Diff</button>
+          <button class="view-btn" data-view="slider">Slider</button>
+        </div>
+        <div class="diff-stats">
+          <div class="diff-stat">
+            <span class="diff-stat__icon diff-stat__icon--changed"></span>
+            <span>${comparison.diffPixels.toLocaleString()} pixels changed (${diffPercent}%)</span>
+          </div>
+          <div class="diff-stat">
+            <span>${comparison.width}x${comparison.height}</span>
+          </div>
+        </div>
+      `;
+
+      // View controls
+      const viewBtns = card.querySelectorAll('.view-btn');
+      const viewer = card.querySelector('.image-viewer');
+
+      viewBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          viewBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+
+          const view = btn.dataset.view;
+          viewer.className = 'image-viewer';
+
+          if (view === 'baseline') viewer.classList.add('show-baseline');
+          if (view === 'current') viewer.classList.add('show-current');
+          if (view === 'diff') viewer.classList.add('show-diff');
+          if (view === 'slider') viewer.classList.add('slider-mode');
+        });
+      });
+
+      // Slider interaction
+      const slider = card.querySelector('.image-viewer__slider');
+      let isDragging = false;
+
+      function updateSlider(e) {
+        const rect = viewer.getBoundingClientRect();
+        const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+        const percent = (x / rect.width) * 100;
+        viewer.style.setProperty('--slider-pos', `${percent}%`);
+      }
+
+      slider.addEventListener('mousedown', () => isDragging = true);
+      document.addEventListener('mouseup', () => isDragging = false);
+      document.addEventListener('mousemove', (e) => {
+        if (isDragging && viewer.classList.contains('slider-mode')) updateSlider(e);
+      });
+
+      viewer.addEventListener('click', (e) => {
+        if (viewer.classList.contains('slider-mode')) updateSlider(e);
+      });
+
+      return card;
+    }
+
+    function renderGallery() {
+      const filtered = getFilteredComparisons();
+      gallery.innerHTML = '';
+
+      if (filtered.length === 0) {
+        gallery.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state__icon">📷</div>
+            <h2 class="empty-state__title">No screenshots to display</h2>
+            <p class="empty-state__text">
+              Drop screenshot folders here or click "Demo" to load sample data.
+            </p>
+          </div>
+        `;
+        return;
+      }
+
+      filtered.forEach(comparison => {
+        gallery.appendChild(createComparisonCard(comparison));
+      });
+
+      updateStats();
+    }
+
+    // Filter controls
+    document.getElementById('status-filters').addEventListener('click', (e) => {
+      if (e.target.classList.contains('control-btn')) {
+        document.querySelectorAll('#status-filters .control-btn').forEach(btn => {
+          btn.classList.remove('active');
+        });
+        e.target.classList.add('active');
+        state.filter.status = e.target.dataset.filter;
+        renderGallery();
+      }
+    });
+
+    document.getElementById('platform-filters').addEventListener('click', (e) => {
+      if (e.target.classList.contains('control-btn')) {
+        document.querySelectorAll('#platform-filters .control-btn').forEach(btn => {
+          btn.classList.remove('active');
+        });
+        e.target.classList.add('active');
+        state.filter.platform = e.target.dataset.platform;
+        renderGallery();
+      }
+    });
+
+    searchInput.addEventListener('input', (e) => {
+      state.filter.search = e.target.value;
+      renderGallery();
+    });
+
+    // Load sample data
+    document.getElementById('load-samples').addEventListener('click', loadSampleData);
+
+    function loadSampleData() {
+      const sampleScreenshots = [
+        { name: 'login-page', platform: 'desktop', status: 'pass' },
+        { name: 'dashboard-home', platform: 'desktop', status: 'pass' },
+        { name: 'settings-general', platform: 'desktop', status: 'fail' },
+        { name: 'room-dashboard-living', platform: 'desktop', status: 'pass' },
+        { name: 'ios-home-screen', platform: 'ios', status: 'pass' },
+        { name: 'ios-room-control', platform: 'ios', status: 'fail' },
+        { name: 'android-home', platform: 'android', status: 'pass' },
+        { name: 'android-notification', platform: 'android', status: 'new' },
+        { name: 'visionos-spatial-view', platform: 'visionos', status: 'pass' },
+        { name: 'watchos-glance', platform: 'watchos', status: 'pass' },
+        { name: 'tvos-main-menu', platform: 'tvos', status: 'pass' },
+      ];
+
+      function generatePlaceholderImage(name, variant) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 400;
+        canvas.height = 250;
+        const ctx = canvas.getContext('2d');
+
+        const bgColor = variant === 'baseline' ? '#1a1a2e' :
+                       variant === 'current' ? '#16213e' : '#0f3460';
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+        for (let i = 0; i < canvas.width; i += 20) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i, canvas.height);
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.font = 'bold 14px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(name, canvas.width / 2, 30);
+
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.font = '12px Inter, sans-serif';
+        ctx.fillText(variant.toUpperCase(), canvas.width / 2, 50);
+
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillRect(20, 70, 360, 40);
+        ctx.fillRect(20, 120, 170, 100);
+        ctx.fillRect(210, 120, 170, 100);
+
+        if (variant === 'current' || variant === 'diff') {
+          ctx.fillStyle = variant === 'diff' ? 'rgba(255,69,58,0.5)' : 'rgba(255,214,10,0.2)';
+          ctx.fillRect(230, 140, 60, 30);
+        }
+
+        return canvas.toDataURL('image/png');
+      }
+
+      state.comparisons = sampleScreenshots.map((screenshot, index) => ({
+        id: `comparison-${index}`,
+        name: screenshot.name,
+        platform: screenshot.platform,
+        status: screenshot.status,
+        baseline: screenshot.status !== 'new'
+          ? generatePlaceholderImage(screenshot.name, 'baseline') : null,
+        current: generatePlaceholderImage(screenshot.name, 'current'),
+        diff: screenshot.status === 'fail'
+          ? generatePlaceholderImage(screenshot.name, 'diff') : null,
+        diffPixels: screenshot.status === 'fail' ? Math.floor(Math.random() * 5000) + 100 : 0,
+        totalPixels: 400 * 250,
+        width: 400,
+        height: 250
+      }));
+
+      renderGallery();
+      dropZone.style.display = 'none';
+    }
+
+    // Initialize
+    renderGallery();
+
+    // Expose API for programmatic access
+    window.visualGallery = {
+      loadComparisons(comparisons) {
+        state.comparisons = comparisons;
+        renderGallery();
+      },
+      getState() { return state; },
+      addComparison(comparison) {
+        state.comparisons.push({ id: `comparison-${state.comparisons.length}`, ...comparison });
+        renderGallery();
+      },
+      clearComparisons() {
+        state.comparisons = [];
+        renderGallery();
+        dropZone.style.display = 'block';
+      },
+      setFilter(filter) {
+        Object.assign(state.filter, filter);
+        renderGallery();
+      }
+    };
+
+    console.log('%c Visual Regression Gallery', 'font-size: 16px; font-weight: bold;');
+    console.log('Use window.visualGallery for programmatic access');
+  </script>
+</body>
+</html>

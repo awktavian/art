@@ -1,0 +1,112 @@
+# Kagami Hub systemd Service Unit
+#
+# Installation:
+#   sudo cp config/kagami-hub.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable kagami-hub
+#   sudo systemctl start kagami-hub
+#
+# Secrets Setup (required before starting):
+#   sudo mkdir -p /etc/kagami-hub/credentials
+#   sudo chmod 700 /etc/kagami-hub/credentials
+#   echo "your-api-key" | sudo tee /etc/kagami-hub/credentials/hub_api_key
+#   echo "your-porcupine-key" | sudo tee /etc/kagami-hub/credentials/porcupine_access_key
+#   sudo chmod 600 /etc/kagami-hub/credentials/*
+#   sudo chown -R kagami:kagami /etc/kagami-hub/credentials
+#
+# Logs:
+#   journalctl -u kagami-hub -f
+#
+# h(x) >= 0 always
+
+[Unit]
+Description=Kagami Hub - Voice-First Home Assistant
+Documentation=https://github.com/kagami/hub
+After=network-online.target sound.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=kagami
+Group=kagami
+
+# Working directory
+WorkingDirectory=/opt/kagami-hub
+
+# Main executable
+ExecStart=/opt/kagami-hub/bin/kagami-hub --config /etc/kagami-hub/hub.toml
+
+# Graceful shutdown
+ExecStop=/bin/kill -SIGTERM $MAINPID
+TimeoutStopSec=30
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+
+# Environment
+Environment=RUST_LOG=info
+Environment=RUST_BACKTRACE=1
+
+# Secure credential loading via systemd LoadCredential
+# Credentials are loaded from /etc/kagami-hub/credentials/ and exposed at
+# $CREDENTIALS_DIRECTORY/credential_name, accessible only to this service.
+# This is more secure than environment variables as credentials are:
+# - Not visible in /proc/PID/environ
+# - Not logged by systemd
+# - Automatically cleaned up on service stop
+LoadCredential=hub_api_key:/etc/kagami-hub/credentials/hub_api_key
+LoadCredential=porcupine_access_key:/etc/kagami-hub/credentials/porcupine_access_key
+
+# Legacy environment file (fallback, deprecated - use LoadCredential instead)
+EnvironmentFile=-/etc/kagami-hub/env
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=false
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=false
+RestrictNamespaces=true
+MemoryDenyWriteExecute=false
+
+# Allow access to necessary paths
+ReadWritePaths=/var/lib/kagami-hub
+ReadWritePaths=/var/log/kagami-hub
+ReadOnlyPaths=/etc/kagami-hub
+
+# Audio access (required for voice processing)
+SupplementaryGroups=audio
+DeviceAllow=/dev/snd/* rw
+DeviceAllow=/dev/dsp rw
+
+# GPIO access (required for LED ring on Raspberry Pi)
+DeviceAllow=/dev/gpiomem rw
+DeviceAllow=/dev/spidev* rw
+SupplementaryGroups=gpio
+SupplementaryGroups=spi
+
+# Network capabilities
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+# Resource limits
+LimitNOFILE=65536
+LimitMEMLOCK=infinity
+LimitNPROC=200
+MemoryMax=512M
+CPUQuota=80%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kagami-hub
+
+[Install]
+WantedBy=multi-user.target

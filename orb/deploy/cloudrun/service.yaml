@@ -1,0 +1,161 @@
+# Cloud Run Service Configuration for Kagami API
+#
+# Deploy with:
+#   gcloud run services replace service.yaml --region=us-west1
+#
+# Or via Terraform (see ../terraform/gcp/cloudrun.tf)
+#
+# Created: January 4, 2026
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: kagami-api
+  labels:
+    app: kagami
+    component: api
+  annotations:
+    # Allow unauthenticated access (configure IAM separately for auth)
+    run.googleapis.com/ingress: all
+    # Launch stage for new features
+    run.googleapis.com/launch-stage: BETA
+spec:
+  template:
+    metadata:
+      annotations:
+        # Autoscaling configuration
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        
+        # CPU allocation
+        run.googleapis.com/cpu-throttling: "false"
+        run.googleapis.com/startup-cpu-boost: "true"
+        
+        # VPC connector for private services (configure as needed)
+        # run.googleapis.com/vpc-access-connector: projects/PROJECT_ID/locations/REGION/connectors/kagami-vpc
+        # run.googleapis.com/vpc-access-egress: all-traffic
+        
+        # Cloud SQL connections (configure as needed)
+        # run.googleapis.com/cloudsql-instances: PROJECT_ID:REGION:INSTANCE_NAME
+        
+        # Execution environment (gen2 for better CPU)
+        run.googleapis.com/execution-environment: gen2
+        
+    spec:
+      # Maximum request timeout
+      timeoutSeconds: 300
+      
+      # Service account for GCP APIs
+      serviceAccountName: kagami-api@PROJECT_ID.iam.gserviceaccount.com
+      
+      # Container spec
+      containers:
+        - name: kagami-api
+          image: gcr.io/PROJECT_ID/kagami-api:latest
+          
+          # Resource limits
+          resources:
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+            requests:
+              cpu: "1"
+              memory: "1Gi"
+          
+          # Port configuration
+          ports:
+            - name: http1
+              containerPort: 8080
+          
+          # Environment variables
+          env:
+            # GCP Project (auto-detected but explicit is better)
+            - name: GCP_PROJECT_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['run.googleapis.com/project']
+            
+            # Service metadata
+            - name: K_SERVICE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            
+            - name: K_REVISION
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['client.knative.dev/user-image']
+            
+            # Application config
+            - name: KAGAMI_ENVIRONMENT
+              value: "production"
+            
+            - name: KAGAMI_LOG_LEVEL
+              value: "INFO"
+            
+            # GCP Observability
+            - name: GCP_ENABLE_LOGGING
+              value: "true"
+            
+            - name: GCP_ENABLE_MONITORING
+              value: "true"
+            
+            - name: GCP_ENABLE_TRACING
+              value: "true"
+            
+            - name: TRACE_SAMPLE_RATE
+              value: "0.1"
+            
+            # Secrets from Secret Manager
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: kagami-database-url
+                  key: latest
+            
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: kagami-redis-url
+                  key: latest
+            
+            - name: GOOGLE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kagami-google-api-key
+                  key: latest
+          
+          # Startup probe - generous timeout for cold starts
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+            timeoutSeconds: 5
+          
+          # Liveness probe
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 15
+            failureThreshold: 3
+            timeoutSeconds: 5
+          
+          # Readiness probe (when to receive traffic)
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 3
+            timeoutSeconds: 3
+      
+      # Container concurrency (requests per instance)
+      containerConcurrency: 80
+
+  # Traffic configuration
+  traffic:
+    - percent: 100
+      latestRevision: true

@@ -1,0 +1,314 @@
+# Weaviate Vector Database for K os
+# Required for Elysia RAG integration
+#
+# FEATURES:
+# - GPU support for vectorization (optional)
+# - Multi-region replication ready
+# - High availability configuration
+#
+# For production, consider:
+# - Weaviate Cloud Services (managed)
+# - Multi-node cluster with replication
+# - Dedicated GPU nodes for vectorization
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: weaviate
+  namespace: kagami
+  labels:
+    app: weaviate
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+    - name: grpc
+      port: 50051
+      targetPort: 50051
+  selector:
+    app: weaviate
+---
+# Headless service for StatefulSet DNS
+apiVersion: v1
+kind: Service
+metadata:
+  name: weaviate-headless
+  namespace: kagami
+  labels:
+    app: weaviate
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: http
+      port: 8080
+    - name: grpc
+      port: 50051
+    - name: gossip
+      port: 7100
+  selector:
+    app: weaviate
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: weaviate
+  namespace: kagami
+  labels:
+    app: weaviate
+spec:
+  serviceName: weaviate-headless
+  replicas: 3  # HA: 3 replicas for quorum
+  selector:
+    matchLabels:
+      app: weaviate
+  template:
+    metadata:
+      labels:
+        app: weaviate
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "2112"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+      # GPU node affinity (optional - remove if no GPUs)
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: nvidia.com/gpu.present
+                    operator: In
+                    values:
+                      - "true"
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - weaviate
+              topologyKey: kubernetes.io/hostname
+
+      # GPU tolerations
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+
+      containers:
+        - name: weaviate
+          image: cr.weaviate.io/semitechnologies/weaviate:1.27.0
+          ports:
+            - containerPort: 8080
+              name: http
+            - containerPort: 50051
+              name: grpc
+            - containerPort: 7100
+              name: gossip
+            - containerPort: 2112
+              name: metrics
+          env:
+            # Cluster configuration
+            - name: CLUSTER_HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CLUSTER_GOSSIP_BIND_PORT
+              value: "7100"
+            - name: CLUSTER_DATA_BIND_PORT
+              value: "7101"
+            - name: CLUSTER_JOIN
+              value: "weaviate-0.weaviate-headless.kagami.svc.cluster.local:7100,weaviate-1.weaviate-headless.kagami.svc.cluster.local:7100,weaviate-2.weaviate-headless.kagami.svc.cluster.local:7100"
+
+            # Replication settings
+            - name: REPLICATION_FACTOR
+              value: "3"
+            - name: ASYNC_INDEXING
+              value: "true"
+
+            # Authentication
+            - name: AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED
+              value: "false"
+            - name: AUTHENTICATION_APIKEY_ENABLED
+              value: "true"
+            - name: AUTHENTICATION_APIKEY_ALLOWED_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: kagami-secrets
+                  key: WEAVIATE_API_KEY
+            - name: AUTHENTICATION_APIKEY_USERS
+              value: "kagami"
+
+            # Storage
+            - name: PERSISTENCE_DATA_PATH
+              value: "/var/lib/weaviate"
+            - name: QUERY_DEFAULTS_LIMIT
+              value: "25"
+
+            # Vectorization - GPU accelerated if available
+            - name: DEFAULT_VECTORIZER_MODULE
+              value: "none"  # External embeddings via Kagami
+            - name: ENABLE_MODULES
+              value: ""
+
+            # Performance
+            - name: GOMAXPROCS
+              value: "8"
+            - name: LIMIT_RESOURCES
+              value: "false"
+            - name: DISK_USE_WARNING_PERCENTAGE
+              value: "80"
+            - name: DISK_USE_READONLY_PERCENTAGE
+              value: "90"
+
+            # Prometheus metrics
+            - name: PROMETHEUS_MONITORING_ENABLED
+              value: "true"
+
+          volumeMounts:
+            - name: weaviate-data
+              mountPath: /var/lib/weaviate
+
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 2Gi
+              # GPU request (optional - comment out if no GPUs)
+              # nvidia.com/gpu: 1
+            limits:
+              cpu: 4000m
+              memory: 8Gi
+              # nvidia.com/gpu: 1
+
+          readinessProbe:
+            httpGet:
+              path: /v1/.well-known/ready
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /v1/.well-known/live
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+  volumeClaimTemplates:
+    - metadata:
+        name: weaviate-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: fast-ssd
+        resources:
+          requests:
+            storage: 100Gi
+---
+# PodDisruptionBudget for HA
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: weaviate-pdb
+  namespace: kagami
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: weaviate
+---
+# Network Policy for Weaviate
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: weaviate-network-policy
+  namespace: kagami
+spec:
+  podSelector:
+    matchLabels:
+      app: weaviate
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from K os API pods
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kagami
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 50051
+    # Allow inter-node gossip
+    - from:
+        - podSelector:
+            matchLabels:
+              app: weaviate
+      ports:
+        - protocol: TCP
+          port: 7100
+        - protocol: TCP
+          port: 7101
+    # Allow Prometheus scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 2112
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow inter-node gossip
+    - to:
+        - podSelector:
+            matchLabels:
+              app: weaviate
+      ports:
+        - protocol: TCP
+          port: 7100
+        - protocol: TCP
+          port: 7101
+---
+# ServiceMonitor for Prometheus Operator
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: weaviate-monitor
+  namespace: kagami
+  labels:
+    app: weaviate
+spec:
+  selector:
+    matchLabels:
+      app: weaviate
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s

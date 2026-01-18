@@ -1,0 +1,423 @@
+/**
+ * Prism Alert Dialog
+ *
+ * Confirmation dialog for destructive or important actions
+ * with glass styling and chromatic effects.
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * ALERT DIALOG (extends dialog)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-alert-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--prism-z-modal-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--prism-dur-normal) var(--prism-ease-cusp),
+    visibility var(--prism-dur-normal);
+}
+
+.prism-alert-dialog-backdrop--open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.prism-alert-dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 440px;
+  z-index: var(--prism-z-modal);
+  overflow: hidden;
+
+  /* VOLUMETRIC glass with noise texture */
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    var(--prism-surface);
+  background-blend-mode: overlay, normal;
+  backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+  -webkit-backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+
+  /* Glass edge beveling */
+  border: 1px solid transparent;
+  border-image: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.35) 0%,
+    rgba(255, 255, 255, 0.15) 40%,
+    rgba(255, 255, 255, 0.06) 60%,
+    rgba(0, 0, 0, 0.03) 100%
+  ) 1;
+  border-radius: var(--prism-radius-xl);
+
+  /* Rich volumetric shadow */
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.35),
+    0 12px 24px -8px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 1px 0 rgba(255, 255, 255, 0.12) inset;
+
+  /* Entry animation */
+  opacity: 0;
+  transform: scale(0.95);
+  transition:
+    opacity var(--prism-dur-normal) var(--prism-ease-cusp),
+    transform var(--prism-dur-slow) var(--prism-ease-spring);
+
+  /* GPU acceleration */
+  will-change: transform, opacity;
+}
+
+.prism-alert-dialog-backdrop--open .prism-alert-dialog {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * ALERT ICON
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-alert-dialog__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin: 24px auto 0;
+  border-radius: var(--prism-radius-full);
+  flex-shrink: 0;
+}
+
+.prism-alert-dialog__icon svg,
+.prism-alert-dialog__icon img {
+  width: 28px;
+  height: 28px;
+}
+
+/* Icon variants */
+.prism-alert-dialog__icon--warning {
+  background: color-mix(in srgb, var(--prism-flow) 15%, transparent);
+  color: var(--prism-flow);
+}
+
+.prism-alert-dialog__icon--danger {
+  background: color-mix(in srgb, var(--prism-spark) 15%, transparent);
+  color: var(--prism-spark);
+}
+
+.prism-alert-dialog__icon--info {
+  background: color-mix(in srgb, var(--prism-beacon) 15%, transparent);
+  color: var(--prism-beacon);
+}
+
+.prism-alert-dialog__icon--success {
+  background: color-mix(in srgb, var(--prism-nexus) 15%, transparent);
+  color: var(--prism-nexus);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * ALERT CONTENT
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-alert-dialog__content {
+  padding: 20px 24px;
+  text-align: center;
+}
+
+.prism-alert-dialog__title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--prism-text);
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+
+.prism-alert-dialog__description {
+  font-size: 0.875rem;
+  color: var(--prism-text-secondary);
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * ALERT ACTIONS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-alert-dialog__actions {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px 24px;
+}
+
+/* Stacked actions (full width buttons) */
+.prism-alert-dialog__actions--stacked {
+  flex-direction: column;
+}
+
+.prism-alert-dialog__actions--stacked > * {
+  width: 100%;
+}
+
+/* Side by side (default) */
+.prism-alert-dialog__actions--horizontal {
+  justify-content: center;
+}
+
+/* End aligned */
+.prism-alert-dialog__actions--end {
+  justify-content: flex-end;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * ACTION BUTTONS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-alert-dialog__cancel {
+  flex: 1;
+  padding: 12px 20px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--prism-text);
+  background: var(--prism-surface);
+  backdrop-filter: blur(var(--prism-blur));
+  -webkit-backdrop-filter: blur(var(--prism-blur));
+  border: 1px solid var(--prism-border);
+  border-radius: var(--prism-radius-md);
+  cursor: pointer;
+  transition:
+    background var(--prism-dur-fast) var(--prism-ease-cusp),
+    border-color var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-alert-dialog__cancel:hover {
+  background: var(--prism-surface-elevated);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.prism-alert-dialog__cancel:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 40%, transparent);
+}
+
+.prism-alert-dialog__confirm {
+  flex: 1;
+  padding: 12px 20px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: white;
+  background: var(--colony-color, var(--prism-beacon));
+  border: none;
+  border-radius: var(--prism-radius-md);
+  cursor: pointer;
+  transition:
+    background var(--prism-dur-fast) var(--prism-ease-cusp),
+    transform var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-alert-dialog__confirm:hover {
+  background: color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 85%, black);
+}
+
+.prism-alert-dialog__confirm:active {
+  transform: scale(0.98);
+}
+
+.prism-alert-dialog__confirm:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 40%, transparent);
+}
+
+/* Destructive confirm */
+.prism-alert-dialog__confirm--destructive {
+  background: var(--prism-spark);
+}
+
+.prism-alert-dialog__confirm--destructive:hover {
+  background: color-mix(in srgb, var(--prism-spark) 85%, black);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * CHROMATIC EDGE (for destructive alerts)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-alert-dialog--destructive::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  background: radial-gradient(
+    ellipse 80% 60% at 50% 0%,
+    color-mix(in srgb, var(--prism-spark) 25%, transparent) 0%,
+    transparent 60%
+  );
+  filter: blur(10px);
+  opacity: 0.8;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Warning chromatic edge */
+.prism-alert-dialog--warning::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  background: radial-gradient(
+    ellipse 80% 60% at 50% 0%,
+    color-mix(in srgb, var(--prism-flow) 25%, transparent) 0%,
+    transparent 60%
+  );
+  filter: blur(10px);
+  opacity: 0.8;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SIZE VARIANTS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Small */
+.prism-alert-dialog--sm {
+  max-width: 360px;
+}
+
+.prism-alert-dialog--sm .prism-alert-dialog__icon {
+  width: 48px;
+  height: 48px;
+  margin-top: 20px;
+}
+
+.prism-alert-dialog--sm .prism-alert-dialog__icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.prism-alert-dialog--sm .prism-alert-dialog__content {
+  padding: 16px 20px;
+}
+
+.prism-alert-dialog--sm .prism-alert-dialog__title {
+  font-size: 1rem;
+}
+
+.prism-alert-dialog--sm .prism-alert-dialog__actions {
+  padding: 12px 20px 20px;
+}
+
+/* Large */
+.prism-alert-dialog--lg {
+  max-width: 520px;
+}
+
+.prism-alert-dialog--lg .prism-alert-dialog__icon {
+  width: 64px;
+  height: 64px;
+}
+
+.prism-alert-dialog--lg .prism-alert-dialog__icon svg {
+  width: 32px;
+  height: 32px;
+}
+
+.prism-alert-dialog--lg .prism-alert-dialog__title {
+  font-size: 1.25rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * LEFT-ALIGNED VARIANT
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-alert-dialog--left {
+  text-align: left;
+}
+
+.prism-alert-dialog--left .prism-alert-dialog__icon {
+  margin: 20px 0 0 24px;
+}
+
+.prism-alert-dialog--left .prism-alert-dialog__content {
+  text-align: left;
+}
+
+.prism-alert-dialog--left .prism-alert-dialog__actions {
+  justify-content: flex-end;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * WITH ICON INLINE
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-alert-dialog--inline-icon .prism-alert-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 24px;
+}
+
+.prism-alert-dialog--inline-icon .prism-alert-dialog__icon {
+  margin: 0;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+
+.prism-alert-dialog--inline-icon .prism-alert-dialog__content {
+  padding: 0 24px 16px;
+  text-align: left;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * RESPONSIVE
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 480px) {
+  .prism-alert-dialog-backdrop {
+    padding: 16px;
+    align-items: flex-end;
+  }
+
+  .prism-alert-dialog {
+    max-width: none;
+    border-radius: var(--prism-radius-xl) var(--prism-radius-xl) 0 0;
+    transform: translateY(100%);
+  }
+
+  .prism-alert-dialog-backdrop--open .prism-alert-dialog {
+    transform: translateY(0);
+  }
+
+  .prism-alert-dialog__actions {
+    flex-direction: column-reverse;
+    padding-bottom: 28px;
+  }
+
+  .prism-alert-dialog__actions > * {
+    width: 100%;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * REDUCED MOTION
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .prism-alert-dialog {
+    transition: opacity var(--prism-dur-fast);
+    transform: none;
+  }
+
+  .prism-alert-dialog-backdrop--open .prism-alert-dialog {
+    transform: none;
+  }
+}

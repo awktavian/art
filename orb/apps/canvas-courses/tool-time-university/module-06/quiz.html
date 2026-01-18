@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz: Peak Cultural Impact | Module 06 | Tool Time University</title>
+    <link rel="stylesheet" href="../assets/style.css">
+    <style>
+        .quiz-container { max-width: 800px; margin: 0 auto; padding: var(--space-4); }
+        .quiz-header { text-align: center; padding: var(--space-5) var(--space-4); background: linear-gradient(135deg, var(--binford-red) 0%, var(--binford-red-light) 100%); color: white; border-radius: var(--radius-lg); margin-bottom: var(--space-4); }
+        .quiz-header h1 { color: white; margin-bottom: var(--space-2); }
+        .points-badge { display: inline-block; background: var(--binford-gold); color: var(--stone-900); padding: var(--space-1) var(--space-3); border-radius: var(--radius-xl); font-weight: 600; font-family: var(--font-mono); }
+        .progress-bar { background: var(--stone-200); height: 8px; border-radius: 4px; margin-bottom: var(--space-4); overflow: hidden; }
+        .progress-fill { background: linear-gradient(90deg, var(--binford-red) 0%, var(--binford-gold) 100%); height: 100%; border-radius: 4px; transition: width var(--duration-normal) var(--ease-out); }
+        .progress-text { text-align: center; font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-3); }
+        .question-card { background: var(--white); border: 1px solid var(--border-light); border-radius: var(--radius-lg); padding: var(--space-4); margin-bottom: var(--space-4); display: none; }
+        .question-card.active { display: block; animation: fadeUp var(--duration-normal) var(--ease-out); }
+        .question-number { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--binford-red); margin-bottom: var(--space-2); }
+        .question-text { font-size: var(--text-lg); font-weight: 500; margin-bottom: var(--space-3); line-height: 1.4; }
+        .question-type { display: inline-block; font-size: var(--text-xs); background: var(--stone-100); color: var(--text-secondary); padding: 2px 8px; border-radius: var(--radius-sm); margin-bottom: var(--space-3); }
+        .options-list { list-style: none; padding: 0; margin: 0; }
+        .option-item { margin-bottom: var(--space-2); }
+        .option-btn { width: 100%; text-align: left; padding: var(--space-3); background: var(--stone-50); border: 2px solid var(--border-light); border-radius: var(--radius-md); cursor: pointer; transition: all var(--duration-fast) var(--ease-out); font-size: var(--text-base); }
+        .option-btn:hover:not(:disabled) { background: var(--stone-100); border-color: var(--stone-300); }
+        .option-btn.selected { background: #fef3c7; border-color: var(--binford-gold); }
+        .option-btn.correct { background: #dcfce7; border-color: #22c55e; }
+        .option-btn.incorrect { background: #fee2e2; border-color: #ef4444; }
+        .option-btn:disabled { cursor: not-allowed; }
+        .fill-blank-input { width: 100%; padding: var(--space-2) var(--space-3); font-size: var(--text-base); border: 2px solid var(--border-light); border-radius: var(--radius-md); margin-bottom: var(--space-3); }
+        .fill-blank-input:focus { outline: none; border-color: var(--binford-gold); }
+        .fill-blank-input.correct { border-color: #22c55e; background: #dcfce7; }
+        .fill-blank-input.incorrect { border-color: #ef4444; background: #fee2e2; }
+        .feedback { padding: var(--space-3); border-radius: var(--radius-md); margin-top: var(--space-3); display: none; }
+        .feedback.show { display: block; animation: fadeUp var(--duration-fast) var(--ease-out); }
+        .feedback.correct { background: #dcfce7; border: 1px solid #22c55e; color: #166534; }
+        .feedback.incorrect { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
+        .feedback-title { font-weight: 600; margin-bottom: var(--space-1); }
+        .btn-container { display: flex; justify-content: space-between; margin-top: var(--space-4); }
+        .submit-btn { background: var(--binford-red); color: white; padding: var(--space-2) var(--space-4); border: none; border-radius: var(--radius-md); font-weight: 600; cursor: pointer; transition: all var(--duration-fast) var(--ease-out); }
+        .submit-btn:hover:not(:disabled) { background: var(--binford-red-light); transform: translateY(-2px); }
+        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .next-btn { background: var(--binford-gold); color: var(--stone-900); }
+        .next-btn:hover:not(:disabled) { background: var(--binford-gold-light); }
+        .results-card { background: var(--white); border: 1px solid var(--border-light); border-radius: var(--radius-lg); padding: var(--space-5); text-align: center; display: none; }
+        .results-card.show { display: block; animation: fadeUp var(--duration-normal) var(--ease-out); }
+        .results-score { font-size: var(--text-4xl); font-family: var(--font-display); color: var(--binford-red); margin-bottom: var(--space-2); }
+        .results-equity { font-size: var(--text-2xl); font-family: var(--font-mono); color: var(--binford-gold); margin-bottom: var(--space-4); }
+        .results-title { font-size: var(--text-xl); font-weight: 600; margin-bottom: var(--space-2); }
+        .results-message { color: var(--text-secondary); margin-bottom: var(--space-4); }
+        .tool-time-break { background: var(--stone-900); color: white; padding: var(--space-3); border-radius: var(--radius-md); text-align: center; margin: var(--space-4) 0; }
+        .tool-time-break .catchphrase { font-size: var(--text-xl); color: var(--binford-gold); font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div class="quiz-container">
+        <div class="quiz-header">
+            <p class="label" style="color: var(--binford-gold-light);">MODULE 06</p>
+            <h1>Peak Cultural Impact</h1>
+            <p style="opacity: 0.9; margin-bottom: var(--space-3);">10 Questions | Multiple Choice, True/False & Fill-in-the-Blank</p>
+            <div class="points-badge">75 Home Equity Dollars</div>
+        </div>
+
+        <div class="progress-text">Question <span id="currentQ">1</span> of 10</div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width: 10%;"></div></div>
+
+        <!-- Question 1 -->
+        <div class="question-card active" data-question="1" data-correct="ilene" data-points="7.5" data-type="fillin">
+            <div class="question-number">Question 1 of 10 (7.5 HED)</div>
+            <div class="question-type">Fill in the Blank</div>
+            <div class="question-text">Season 6 finally let Al be more than Tim's straight man. He found lasting love with a woman named _______.</div>
+            <input type="text" class="fill-blank-input" placeholder="Enter her name..." autocomplete="off">
+            <div class="feedback correct">
+                <div class="feedback-title">Al found love!</div>
+                <p>Al and Ilene's relationship showed audiences a complete character capable of vulnerability, growth, and genuine happiness. After years of failed relationships and mother jokes, Al finally found his match.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different love interest!</div>
+                <p>The correct answer is <strong>Ilene</strong>. Al and Ilene's relationship was a highlight of Season 6.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 2 -->
+        <div class="question-card" data-question="2" data-correct="B" data-points="7.5">
+            <div class="question-number">Question 2 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What was the central lesson of "Jill's Birthday"?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) Bigger parties are always better</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Love isn't about grand gestures but understanding</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Tool Time should celebrate birthdays</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Tim should always plan parties</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Simple is better!</div>
+                <p>Tim's "improvements" to Jill's birthday threatened to overshadow the simple things she actually wanted. A perfect encapsulation of Tim's character: good intentions, excessive execution, eventual realization.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Deeper meaning!</div>
+                <p>The correct answer is <strong>Love isn't about grand gestures but understanding</strong>. Tim learned that Jill wanted simplicity, not spectacle.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 3 -->
+        <div class="question-card" data-question="3" data-correct="true" data-points="7.5" data-type="truefalse">
+            <div class="question-number">Question 3 of 10 (7.5 HED)</div>
+            <div class="question-type">True or False</div>
+            <div class="question-text">"The Kiss & The Kiss-Off" was a two-part episode that shook the Taylor marriage to its core due to a misunderstanding about a kiss.</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="true">True</button></li>
+                <li class="option-item"><button class="option-btn" data-value="false">False</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Marriage crisis!</div>
+                <p>This two-part episode was the show's most emotionally raw. Tim's jealousy and Jill's frustration collided, and the resolution required genuine vulnerability from both characters.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">It happened!</div>
+                <p>This is <strong>True</strong>. The two-part episode was one of Season 6's most dramatic moments.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 4 -->
+        <div class="question-card" data-question="4" data-correct="C" data-points="7.5">
+            <div class="question-number">Question 4 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">How many viewers was Home Improvement still commanding weekly during Season 6?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) 5 million</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) 10 million</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Over 17 million</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) 3 million</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Still dominating!</div>
+                <p>Season 6 arrived with the show still commanding over 17 million viewers weekly. But numbers only tell part of the story - this was when the show transcended formula.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Bigger audience!</div>
+                <p>The correct answer is <strong>Over 17 million</strong>. Season 6 was still a ratings powerhouse.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 5 -->
+        <div class="question-card" data-question="5" data-correct="D" data-points="7.5">
+            <div class="question-number">Question 5 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What did "Totally Tool Time" meta-textually examine?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) The history of power tools</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Tim's childhood</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Binford's corporate history</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) What makes Tool Time work and what threatens to break it</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Meta-commentary!</div>
+                <p>The special all-Tool Time episode served as both celebration and deconstruction of the show-within-a-show format. Behind-the-scenes tensions between Tim and Al mirrored real creative discussions.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">More meta!</div>
+                <p>The correct answer is <strong>What makes Tool Time work and what threatens to break it</strong>. The episode was a self-aware examination of the show's formula.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <div class="tool-time-break" id="midBreak" style="display: none;">
+            <p>DOES EVERYBODY KNOW WHAT TIME IT IS?</p>
+            <p class="catchphrase">TOOL TIME!</p>
+            <p style="font-size: var(--text-sm); opacity: 0.7;">Peak cultural impact achieved!</p>
+        </div>
+
+        <!-- Question 6 -->
+        <div class="question-card" data-question="6" data-correct="true" data-points="7.5" data-type="truefalse">
+            <div class="question-number">Question 6 of 10 (7.5 HED)</div>
+            <div class="question-type">True or False</div>
+            <div class="question-text">Season 6 represented Home Improvement at its absolute zenith - the moment when every element aligned perfectly.</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="true">True</button></li>
+                <li class="option-item"><button class="option-btn" data-value="false">False</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Peak performance!</div>
+                <p>Season 6 was when Home Improvement transcended sitcom formula to become genuine family drama - while never losing its ability to make audiences laugh. The zenith!</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">It was the peak!</div>
+                <p>This is <strong>True</strong>. Season 6 represented the show's creative and commercial peak.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 7 -->
+        <div class="question-card" data-question="7" data-correct="B" data-points="7.5">
+            <div class="question-number">Question 7 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What surprising development happened with Tim's character in Season 6?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) He quit Tool Time</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) He actually grew as a person</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) He became a professional chef</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) He moved to another city</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Character development!</div>
+                <p>The man who built his persona on refusing to grow actually... grew. Jill's career advancement forced Tim to confront his insecurities about masculinity and partnership.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">More personal growth!</div>
+                <p>The correct answer is <strong>He actually grew as a person</strong>. After five seasons of resistance, Tim finally evolved.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 8 -->
+        <div class="question-card" data-question="8" data-correct="lakota" data-points="7.5" data-type="fillin">
+            <div class="question-number">Question 8 of 10 (7.5 HED)</div>
+            <div class="question-type">Fill in the Blank</div>
+            <div class="question-text">Wilson quoted the _______ Sioux saying: "We will be known forever by the tracks we leave."</div>
+            <input type="text" class="fill-blank-input" placeholder="Enter tribal name..." autocomplete="off">
+            <div class="feedback correct">
+                <div class="feedback-title">Native American wisdom!</div>
+                <p>Wilson's invocation of Lakota wisdom speaks to Season 6's preoccupation with legacy. What tracks are we leaving on our families, our audiences, and history itself?</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different tribe!</div>
+                <p>The correct answer is <strong>Lakota</strong>. Wilson drew from Lakota Sioux wisdom about legacy.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 9 -->
+        <div class="question-card" data-question="9" data-correct="C" data-points="7.5">
+            <div class="question-number">Question 9 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What was Jill's career status by Season 6?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) Retired stay-at-home mom</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Tool Time co-host</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Psychology graduate student to intern</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Professional chef</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Career woman!</div>
+                <p>From stay-at-home mom to psychology graduate student to intern - Jill's professional journey challenged the entire family dynamic and forced growth from everyone.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different career!</div>
+                <p>The correct answer is <strong>Psychology graduate student to intern</strong>. Jill's advancement was a major Season 6 theme.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 10 -->
+        <div class="question-card" data-question="10" data-correct="A" data-points="7.5">
+            <div class="question-number">Question 10 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What did the Taylor boys' Season 6 storylines reach?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) New emotional depths</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Elementary school graduation</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Professional careers</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Marriage</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Emotional complexity!</div>
+                <p>Brad faced senior year pressures. Randy's intellectualism evolved into genuine activism. Mark continued his search for identity. All three reached new emotional depths.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Deeper emotions!</div>
+                <p>The correct answer is <strong>New emotional depths</strong>. Season 6 pushed all three boys into more complex storytelling.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">See Results</button>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="results-card" id="results">
+            <h2 class="results-title" id="resultsTitle">Quiz Complete!</h2>
+            <div class="results-score" id="resultsScore">0/10</div>
+            <div class="results-equity" id="resultsEquity">0 HED Earned</div>
+            <p class="results-message" id="resultsMessage"></p>
+            <div style="margin-top: var(--space-4);">
+                <a href="index.html" class="btn btn--secondary" style="margin-right: var(--space-2);">Back to Module</a>
+                <button class="btn btn--primary" onclick="location.reload()">Retake Quiz</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const quizData = { currentQuestion: 1, totalQuestions: 10, score: 0, totalPoints: 0, maxPoints: 75, answered: new Set() };
+        document.addEventListener('DOMContentLoaded', function() { initQuiz(); });
+        function initQuiz() {
+            document.querySelectorAll('.option-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const card = this.closest('.question-card');
+                    card.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+                    this.classList.add('selected');
+                    card.querySelector('.submit-btn').disabled = false;
+                });
+            });
+            document.querySelectorAll('.fill-blank-input').forEach(input => {
+                input.addEventListener('input', function() {
+                    const card = this.closest('.question-card');
+                    card.querySelector('.submit-btn').disabled = this.value.trim() === '';
+                });
+            });
+            document.querySelectorAll('.submit-btn:not(.next-btn)').forEach(btn => { btn.addEventListener('click', function() { submitAnswer(this.closest('.question-card')); }); });
+            document.querySelectorAll('.next-btn').forEach(btn => { btn.addEventListener('click', function() { nextQuestion(); }); });
+        }
+        function submitAnswer(card) {
+            const questionNum = parseInt(card.dataset.question);
+            const correctAnswer = card.dataset.correct;
+            const points = parseFloat(card.dataset.points);
+            const type = card.dataset.type || 'multiple';
+            let userAnswer, isCorrect = false;
+            if (type === 'fillin') {
+                const input = card.querySelector('.fill-blank-input');
+                userAnswer = input.value.trim().toLowerCase();
+                isCorrect = userAnswer === correctAnswer.toLowerCase();
+                input.disabled = true;
+                input.classList.add(isCorrect ? 'correct' : 'incorrect');
+            } else {
+                const selected = card.querySelector('.option-btn.selected');
+                userAnswer = selected.dataset.value;
+                isCorrect = userAnswer === correctAnswer;
+                card.querySelectorAll('.option-btn').forEach(btn => {
+                    btn.disabled = true;
+                    if (btn.dataset.value === correctAnswer) btn.classList.add('correct');
+                    else if (btn.classList.contains('selected') && !isCorrect) btn.classList.add('incorrect');
+                });
+            }
+            if (isCorrect) { quizData.score++; quizData.totalPoints += points; card.querySelector('.feedback.correct').classList.add('show'); }
+            else { card.querySelector('.feedback.incorrect').classList.add('show'); }
+            quizData.answered.add(questionNum);
+            card.querySelector('.submit-btn:not(.next-btn)').style.display = 'none';
+            card.querySelector('.next-btn').style.display = 'inline-block';
+        }
+        function nextQuestion() {
+            const currentCard = document.querySelector('.question-card.active');
+            currentCard.classList.remove('active');
+            quizData.currentQuestion++;
+            if (quizData.currentQuestion === 6) { document.getElementById('midBreak').style.display = 'block'; setTimeout(() => { document.getElementById('midBreak').style.display = 'none'; }, 2000); }
+            if (quizData.currentQuestion <= quizData.totalQuestions) {
+                const nextCard = document.querySelector(`[data-question="${quizData.currentQuestion}"]`);
+                nextCard.classList.add('active');
+                document.getElementById('currentQ').textContent = quizData.currentQuestion;
+                document.getElementById('progressFill').style.width = (quizData.currentQuestion / quizData.totalQuestions * 100) + '%';
+            } else { showResults(); }
+        }
+        function showResults() {
+            document.getElementById('results').classList.add('show');
+            document.getElementById('resultsScore').textContent = `${quizData.score}/${quizData.totalQuestions}`;
+            document.getElementById('resultsEquity').textContent = `${quizData.totalPoints.toFixed(1)} HED Earned`;
+            const percentage = (quizData.score / quizData.totalQuestions) * 100;
+            let title, message;
+            if (percentage === 100) { title = 'Master Craftsman!'; message = 'Perfect! You\'ve experienced peak Tool Time cultural impact!'; }
+            else if (percentage >= 80) { title = 'Journeyman Builder!'; message = 'Excellent work on the zenith of the series!'; }
+            else if (percentage >= 60) { title = 'Apprentice!'; message = 'Passing! Al and Ilene\'s story deserves another look.'; }
+            else if (percentage >= 40) { title = 'Weekend Warrior'; message = 'More time with Season 6 recommended!'; }
+            else { title = 'Tim After a Disaster'; message = 'Back to peak cultural impact - Season 6 awaits!'; }
+            document.getElementById('resultsTitle').textContent = title;
+            document.getElementById('resultsMessage').textContent = message;
+        }
+    </script>
+</body>
+</html>

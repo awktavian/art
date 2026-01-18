@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kagami - Face Review</title>
+    <!-- Design System Tokens -->
+    <link rel="stylesheet" href="css/design-tokens.generated.css">
+    <style>
+        :root {
+            /* Legacy overrides - use design-tokens.generated.css for new code */
+            --bg-primary: var(--prism-void, #1a1a2e);
+            --bg-secondary: var(--prism-void-light, #16213e);
+            --bg-card: #0f3460;
+            --text-primary: var(--prism-text-primary, #eee);
+            --text-secondary: var(--prism-text-secondary, #aaa);
+            --accent: var(--prism-spark, #e94560);
+            --accent-hover: #ff6b6b;
+            --success: var(--prism-grove, #4ade80);
+            --border-radius: var(--prism-radius-md, 12px);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .stats {
+            display: flex;
+            gap: 24px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-value {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .clusters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 24px;
+        }
+
+        .cluster-card {
+            background: var(--bg-secondary);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .cluster-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+        .cluster-header {
+            padding: 16px;
+            background: var(--bg-card);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .cluster-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .cluster-count {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .cluster-faces {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            padding: 8px;
+        }
+
+        .face-thumb {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .face-thumb:hover {
+            transform: scale(1.05);
+        }
+
+        .face-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .face-thumb.selected {
+            outline: 3px solid var(--accent);
+        }
+
+        .cluster-actions {
+            padding: 12px 16px;
+            display: flex;
+            gap: 8px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .name-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .name-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: #111;
+        }
+
+        .source-info {
+            padding: 8px 16px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: rgba(0,0,0,0.2);
+        }
+
+        .source-video {
+            display: inline-block;
+            padding: 2px 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            margin-right: 4px;
+            margin-bottom: 4px;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border-radius: var(--border-radius);
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        /* Drag and drop */
+        .cluster-card.drag-over {
+            outline: 2px dashed var(--accent);
+        }
+
+        .face-thumb.dragging {
+            opacity: 0.5;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 64px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state h2 {
+            margin-bottom: 16px;
+        }
+
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 12px 24px;
+            background: var(--success);
+            color: #111;
+            border-radius: 8px;
+            font-weight: 500;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>👤 Face Review</h1>
+            <div class="stats">
+                <div class="stat">
+                    <span>Clusters:</span>
+                    <span class="stat-value" id="cluster-count">0</span>
+                </div>
+                <div class="stat">
+                    <span>Total Faces:</span>
+                    <span class="stat-value" id="face-count">0</span>
+                </div>
+                <div class="stat">
+                    <span>Source:</span>
+                    <span class="stat-value" id="source-name">-</span>
+                </div>
+            </div>
+        </header>
+
+        <div id="clusters-container" class="clusters-grid">
+            <!-- Clusters will be inserted here -->
+        </div>
+
+        <div id="empty-state" class="empty-state" style="display: none;">
+            <h2>No Faces to Review</h2>
+            <p>Insert a USB drive with video files to start extracting faces.</p>
+            <p style="margin-top: 16px;">Or load extracted faces from:</p>
+            <button class="btn btn-primary" style="margin-top: 16px;" onclick="loadFromDirectory()">
+                Load from Directory
+            </button>
+        </div>
+    </div>
+
+    <!-- Face Detail Modal -->
+    <div id="face-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Face Details</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Face details will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notification -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // State
+        let clusters = {};
+        let selectedFaces = new Set();
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Try to load from Tauri if available
+            if (window.__TAURI__) {
+                loadFromTauri();
+            } else {
+                // Demo mode - load sample data
+                loadDemoData();
+            }
+        });
+
+        // Load from Tauri backend
+        async function loadFromTauri() {
+            try {
+                const result = await window.__TAURI__.invoke('get_face_clusters');
+                if (result && result.clusters) {
+                    clusters = result.clusters;
+                    renderClusters();
+                }
+            } catch (e) {
+                console.log('Tauri not available, using demo mode');
+                loadDemoData();
+            }
+        }
+
+        // Load demo data
+        function loadDemoData() {
+            clusters = {
+                0: {
+                    cluster_id: 0,
+                    name: '',
+                    faces: [
+                        { id: 'face_001', source_video: 'Disney Burns.mp4', timestamp: '10:07', quality: 'excellent' },
+                        { id: 'face_002', source_video: 'Disney Burns.mp4', timestamp: '10:15', quality: 'good' },
+                        { id: 'face_003', source_video: 'Easter.mp4', timestamp: '08:30', quality: 'good' },
+                    ],
+                    source_videos: ['Disney Burns.mp4', 'Easter.mp4']
+                },
+                1: {
+                    cluster_id: 1,
+                    name: '',
+                    faces: [
+                        { id: 'face_004', source_video: 'Tape04.mp4', timestamp: '04:45', quality: 'excellent' },
+                        { id: 'face_005', source_video: 'KrisBDay.mp4', timestamp: '10:25', quality: 'fair' },
+                    ],
+                    source_videos: ['Tape04.mp4', 'KrisBDay.mp4']
+                },
+                2: {
+                    cluster_id: 2,
+                    name: '',
+                    faces: [
+                        { id: 'face_006', source_video: 'The Lake.mp4', timestamp: '20:12', quality: 'excellent' },
+                        { id: 'face_007', source_video: 'The Lake.mp4', timestamp: '20:16', quality: 'good' },
+                        { id: 'face_008', source_video: 'Disney Burns.mp4', timestamp: '09:56', quality: 'excellent' },
+                        { id: 'face_009', source_video: 'Easter.mp4', timestamp: '08:25', quality: 'good' },
+                    ],
+                    source_videos: ['The Lake.mp4', 'Disney Burns.mp4', 'Easter.mp4']
+                }
+            };
+            renderClusters();
+        }
+
+        // Render all clusters
+        function renderClusters() {
+            const container = document.getElementById('clusters-container');
+            const emptyState = document.getElementById('empty-state');
+
+            const clusterArray = Object.values(clusters);
+
+            // Update stats
+            document.getElementById('cluster-count').textContent = clusterArray.length;
+            document.getElementById('face-count').textContent = clusterArray.reduce((sum, c) => sum + c.faces.length, 0);
+            document.getElementById('source-name').textContent = 'WesData';
+
+            if (clusterArray.length === 0) {
+                container.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            container.innerHTML = clusterArray.map(cluster => renderClusterCard(cluster)).join('');
+
+            // Add drag and drop listeners
+            setupDragAndDrop();
+        }
+
+        // Render single cluster card
+        function renderClusterCard(cluster) {
+            const faceCount = cluster.faces.length;
+            const sources = cluster.source_videos || [];
+
+            return `
+                <div class="cluster-card" data-cluster-id="${cluster.cluster_id}"
+                     ondragover="handleDragOver(event)" ondrop="handleDrop(event, ${cluster.cluster_id})">
+                    <div class="cluster-header">
+                        <span class="cluster-title">
+                            ${cluster.name || `Person ${cluster.cluster_id + 1}`}
+                        </span>
+                        <span class="cluster-count">${faceCount} face${faceCount !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="cluster-faces">
+                        ${cluster.faces.slice(0, 6).map(face => renderFaceThumb(face, cluster.cluster_id)).join('')}
+                        ${faceCount > 6 ? `<div class="face-thumb" style="display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.1);">+${faceCount - 6}</div>` : ''}
+                    </div>
+                    <div class="source-info">
+                        ${sources.map(s => `<span class="source-video">${s}</span>`).join('')}
+                    </div>
+                    <div class="cluster-actions">
+                        <input type="text" class="name-input" placeholder="Name this person..."
+                               value="${cluster.name || ''}"
+                               onchange="updateClusterName(${cluster.cluster_id}, this.value)">
+                        <button class="btn btn-success" onclick="saveCluster(${cluster.cluster_id})">Save</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render face thumbnail
+        function renderFaceThumb(face, clusterId) {
+            // In production, this would load actual face images
+            // For demo, use placeholder
+            const placeholder = `https://via.placeholder.com/100?text=${face.id}`;
+
+            return `
+                <div class="face-thumb" data-face-id="${face.id}"
+                     draggable="true"
+                     ondragstart="handleDragStart(event, '${face.id}', ${clusterId})"
+                     onclick="showFaceDetail('${face.id}', ${clusterId})">
+                    <img src="${placeholder}" alt="Face ${face.id}">
+                </div>
+            `;
+        }
+
+        // Update cluster name
+        function updateClusterName(clusterId, name) {
+            if (clusters[clusterId]) {
+                clusters[clusterId].name = name;
+            }
+        }
+
+        // Save cluster as character profile
+        async function saveCluster(clusterId) {
+            const cluster = clusters[clusterId];
+            if (!cluster.name) {
+                showToast('Please enter a name for this person');
+                return;
+            }
+
+            try {
+                if (window.__TAURI__) {
+                    await window.__TAURI__.invoke('save_character_profile', {
+                        clusterId: clusterId,
+                        name: cluster.name
+                    });
+                }
+                showToast(`Saved profile for ${cluster.name}!`);
+            } catch (e) {
+                showToast(`Saved ${cluster.name} (demo mode)`);
+            }
+        }
+
+        // Drag and drop
+        let draggedFace = null;
+        let sourceCluster = null;
+
+        function handleDragStart(event, faceId, clusterId) {
+            draggedFace = faceId;
+            sourceCluster = clusterId;
+            event.target.classList.add('dragging');
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.currentTarget.classList.add('drag-over');
+        }
+
+        function handleDrop(event, targetClusterId) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('drag-over');
+
+            if (draggedFace && sourceCluster !== targetClusterId) {
+                // Move face from source to target cluster
+                moveFace(draggedFace, sourceCluster, targetClusterId);
+            }
+
+            document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+            draggedFace = null;
+            sourceCluster = null;
+        }
+
+        function moveFace(faceId, fromCluster, toCluster) {
+            const face = clusters[fromCluster].faces.find(f => f.id === faceId);
+            if (face) {
+                // Remove from source
+                clusters[fromCluster].faces = clusters[fromCluster].faces.filter(f => f.id !== faceId);
+
+                // Add to target
+                clusters[toCluster].faces.push(face);
+
+                // Re-render
+                renderClusters();
+                showToast('Face moved to new cluster');
+            }
+        }
+
+        function setupDragAndDrop() {
+            document.querySelectorAll('.cluster-card').forEach(card => {
+                card.addEventListener('dragleave', (e) => {
+                    e.currentTarget.classList.remove('drag-over');
+                });
+            });
+        }
+
+        // Face detail modal
+        function showFaceDetail(faceId, clusterId) {
+            const cluster = clusters[clusterId];
+            const face = cluster.faces.find(f => f.id === faceId);
+
+            if (!face) return;
+
+            const modalBody = document.getElementById('modal-body');
+            modalBody.innerHTML = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <img src="https://via.placeholder.com/200?text=${face.id}"
+                         style="border-radius: 12px; max-width: 100%;">
+                </div>
+                <table style="width: 100%; font-size: 14px;">
+                    <tr><td style="padding: 8px 0; color: var(--text-secondary);">Face ID</td><td>${face.id}</td></tr>
+                    <tr><td style="padding: 8px 0; color: var(--text-secondary);">Source Video</td><td>${face.source_video}</td></tr>
+                    <tr><td style="padding: 8px 0; color: var(--text-secondary);">Timestamp</td><td>${face.timestamp}</td></tr>
+                    <tr><td style="padding: 8px 0; color: var(--text-secondary);">Quality</td><td>${face.quality}</td></tr>
+                </table>
+                <div style="margin-top: 20px; display: flex; gap: 8px;">
+                    <button class="btn btn-primary" onclick="setAsReference('${faceId}', ${clusterId})">
+                        Set as Primary Reference
+                    </button>
+                    <button class="btn btn-secondary" onclick="removeFace('${faceId}', ${clusterId})">
+                        Remove from Cluster
+                    </button>
+                </div>
+            `;
+
+            document.getElementById('face-modal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('face-modal').classList.remove('active');
+        }
+
+        function setAsReference(faceId, clusterId) {
+            showToast('Set as primary reference');
+            closeModal();
+        }
+
+        function removeFace(faceId, clusterId) {
+            clusters[clusterId].faces = clusters[clusterId].faces.filter(f => f.id !== faceId);
+            renderClusters();
+            closeModal();
+            showToast('Face removed from cluster');
+        }
+
+        // Toast notification
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Load from directory
+        async function loadFromDirectory() {
+            if (window.__TAURI__) {
+                try {
+                    const result = await window.__TAURI__.invoke('select_face_directory');
+                    if (result) {
+                        clusters = result.clusters;
+                        renderClusters();
+                    }
+                } catch (e) {
+                    showToast('Could not load directory');
+                }
+            } else {
+                showToast('Directory selection requires desktop app');
+            }
+        }
+
+        // Close modal on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        // Close modal on backdrop click
+        document.getElementById('face-modal').addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) closeModal();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+# K os All-in-One Container
+# Includes API + Redis + CockroachDB + Ollama + Qwen3:7b
+# For development and testing environments only
+
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3.11 python3-pip python3.11-venv \
+    redis-server \
+    curl wget git \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Ollama
+RUN curl -fsSL https://ollama.com/install.sh | sh
+
+# Install CockroachDB
+RUN curl https://binaries.cockroachdb.com/cockroach-v23.1.11.linux-amd64.tgz | tar -xz && \
+    cp -i cockroach-v23.1.11.linux-amd64/cockroach /usr/local/bin/ && \
+    rm -rf cockroach-v23.1.11.linux-amd64
+
+# Create kagami user
+RUN useradd -m -s /bin/bash kagami
+
+# Copy application
+COPY --chown=kagami:kagami . /home/kagami/kagamiOS
+WORKDIR /home/kagami/kagamiOS
+
+# Install Python dependencies
+RUN pip3 install --no-cache-dir -e .
+
+# Pull Qwen model (as kagami user)
+USER kagami
+RUN ollama serve & sleep 10 && ollama pull qwen3:7b && pkill ollama
+USER root
+
+# Create supervisor config
+RUN mkdir -p /var/log/supervisor
+COPY <<'EOF' /etc/supervisor/conf.d/kagami.conf
+[supervisord]
+nodaemon=true
+user=root
+
+[program:redis]
+command=redis-server --bind 0.0.0.0
+autorestart=true
+stdout_logfile=/var/log/supervisor/redis.log
+stderr_logfile=/var/log/supervisor/redis.log
+
+[program:cockroachdb]
+command=cockroach start-single-node --insecure --listen-addr=0.0.0.0:26257 --http-addr=0.0.0.0:8080 --store=/tmp/cockroach
+autorestart=true
+stdout_logfile=/var/log/supervisor/cockroachdb.log
+stderr_logfile=/var/log/supervisor/cockroachdb.log
+
+[program:ollama]
+command=ollama serve
+environment=OLLAMA_HOST=0.0.0.0:11434
+autorestart=true
+stdout_logfile=/var/log/supervisor/ollama.log
+stderr_logfile=/var/log/supervisor/ollama.log
+
+[program:kagami-api]
+command=python3 -m kagami.main
+directory=/home/kagami/kagamiOS
+user=kagami
+environment=HOST=0.0.0.0,PORT=8001,REDIS_URL=redis://127.0.0.1:6379,DATABASE_URL=postgresql://root@127.0.0.1:26257/kagami?sslmode=disable
+autorestart=true
+stdout_logfile=/var/log/supervisor/kagami-api.log
+stderr_logfile=/var/log/supervisor/kagami-api.log
+startsecs=15
+EOF
+
+# Health check script
+COPY <<'EOF' /healthcheck.sh
+#!/bin/bash
+curl -sf http://127.0.0.1:8001/health >/dev/null && \
+redis-cli ping >/dev/null && \
+cockroach node status --insecure --host=127.0.0.1:26257 >/dev/null
+EOF
+RUN chmod +x /healthcheck.sh
+
+EXPOSE 8001 6379 26257 8080 11434
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD /healthcheck.sh
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

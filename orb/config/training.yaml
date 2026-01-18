@@ -1,0 +1,350 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# KAGAMI TRAINING CONFIGURATION
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# THE single source of truth for all training operations.
+# Used by: kagami-train CLI, TPU training, distillation, export
+#
+# Philosophy:
+#   - Apollo-grade infrastructure: repeatable, observable, centralized
+#   - Same config = same results
+#   - All state in GCS, nothing local
+#
+# Usage:
+#   kagami-train pipeline --config config/training.yaml
+#   kagami-train tpu start --config config/training.yaml
+#
+# Created: January 12, 2026
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# INFRASTRUCTURE (GCS, TPU)
+# ─────────────────────────────────────────────────────────────────────────────────
+gcs:
+  # Training data bucket (shards for TPU training)
+  data_bucket: gs://kagami-training-data
+
+  # Checkpoints bucket (90-day lifecycle)
+  checkpoint_bucket: gs://kagami-checkpoints
+
+  # Final models bucket (exported models)
+  model_bucket: gs://kagami-models
+
+  # Region (must match TPU zone)
+  region: us-central1
+
+tpu:
+  # TPU VM settings
+  name: kagami-tpu
+  zone: us-central2-b
+  type: v6e-4  # Trillium, 4 chips
+  version: v2-alpha-tpuv6e
+
+  # GCP project
+  project: kagami-prod
+
+  # Cost optimization
+  preemptible: true
+
+  # Auto-delete after training
+  delete_after_training: false
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# DATA GENERATION
+# ─────────────────────────────────────────────────────────────────────────────────
+data:
+  # Number of shards per dataset
+  genesis_shards: 1000
+  qm9_shards: 100
+  tree_shards: 200
+  language_shards: 500
+
+  # Samples per shard
+  samples_per_shard: 1000
+
+  # Sequence length for RSSM
+  seq_len: 32
+
+  # Observation/action dimensions (E8-aligned)
+  obs_dim: 64
+  action_dim: 8
+
+  # Data versioning
+  version: v1
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# TRAINING (TPU)
+# ─────────────────────────────────────────────────────────────────────────────────
+training:
+  # Duration
+  total_steps: 500000
+  warmup_steps: 2000
+
+  # Batch configuration (per-chip)
+  batch_size: 256
+  gradient_accumulation: 2
+  effective_batch_size: 2048  # 256 * 4 chips * 2 accum
+
+  # Learning rate (cosine schedule)
+  learning_rate: 1.0e-4
+  min_learning_rate: 1.0e-6
+
+  # Optimizer
+  optimizer: adamw
+  weight_decay: 0.01
+  beta1: 0.9
+  beta2: 0.999
+  eps: 1.0e-8
+
+  # Gradient clipping
+  grad_clip: 1.0
+
+  # Checkpointing
+  checkpoint_interval: 2000
+  keep_checkpoints: 5
+  save_best: true
+
+  # Logging
+  log_interval: 100
+  eval_interval: 500
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# CURRICULUM (7 Phases)
+# ─────────────────────────────────────────────────────────────────────────────────
+curriculum:
+  enabled: true
+  auto_transition: true
+
+  phases:
+    - name: WARMUP
+      steps: [0, 5000]
+      kl_weight: 1.0e-6
+      description: "Basic reconstruction"
+
+    - name: GEOMETRY
+      steps: [5000, 10000]
+      kl_weight: 0.001
+      description: "E8 lattice quantization"
+
+    - name: ROTATION
+      steps: [10000, 30000]
+      kl_weight: 0.01
+      description: "SE(3) equivariance"
+
+    - name: DYNAMICS
+      steps: [30000, 100000]
+      kl_weight: 0.1
+      description: "Temporal prediction"
+
+    - name: JOINT
+      steps: [100000, 200000]
+      kl_weight: 0.5
+      description: "Multi-dataset mixing"
+
+    - name: GENERATION
+      steps: [200000, 350000]
+      kl_weight: 1.0
+      description: "Sample generation"
+
+    - name: LANGUAGE
+      steps: [350000, 500000]
+      kl_weight: 1.0
+      description: "Language grounding"
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# MODEL ARCHITECTURE
+# ─────────────────────────────────────────────────────────────────────────────────
+model:
+  # Dimensions
+  obs_dim: 64
+  action_dim: 8
+  deter_dim: 512  # Deterministic state
+  stoch_dim: 32   # Stochastic latent
+
+  # E8 Integration
+  num_colonies: 7
+  latent_classes: 240  # E8 roots
+
+  # Transformer
+  num_layers: 8
+  num_heads: 8
+  hidden_dim: 512
+  dropout: 0.1
+
+  # GRU blocks
+  gru_num_blocks: 8
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# LOSS WEIGHTS
+# ─────────────────────────────────────────────────────────────────────────────────
+loss:
+  # Primary losses
+  recon_weight: 1.0
+  kl_weight: 0.1  # Scaled by curriculum
+  reward_weight: 1.0
+  continue_weight: 1.0
+
+  # H-JEPA horizons
+  hjepa_weight: 0.5
+  hjepa_horizons: [1, 4, 16]
+
+  # KL collapse prevention (DreamerV3)
+  kl_free_nats: 3.0
+  unimix: 0.01
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# DISTILLATION
+# ─────────────────────────────────────────────────────────────────────────────────
+distillation:
+  # Teacher model
+  teacher_checkpoint: gs://kagami-models/teacher/final
+
+  # Student configurations
+  students:
+    small:
+      deter_dim: 256
+      stoch_dim: 16
+      hidden_dim: 256
+      gru_blocks: 4
+      target: hub  # Raspberry Pi
+
+    base:
+      deter_dim: 384
+      stoch_dim: 32
+      hidden_dim: 384
+      gru_blocks: 6
+      target: mobile  # iOS/Android
+
+    large:
+      deter_dim: 512
+      stoch_dim: 32
+      hidden_dim: 512
+      gru_blocks: 8
+      target: server  # API
+
+  # Distillation settings
+  temperature: 2.0
+  alpha_hard: 0.5
+  alpha_soft: 0.5
+  alpha_feature: 0.3
+  alpha_relational: 0.2
+
+  # Training
+  steps: 100000
+  batch_size: 64
+  learning_rate: 1.0e-4
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# EXPORT
+# ─────────────────────────────────────────────────────────────────────────────────
+export:
+  # Export formats
+  formats:
+    - onnx     # Cross-platform
+    - coreml   # iOS/macOS
+    - tflite   # Android
+
+  # Optimization
+  optimize: true
+  quantize: false  # Enable for mobile
+
+  # ONNX settings
+  onnx_opset: 17
+
+  # CoreML settings
+  coreml_min_ios: "17.0"
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# MONITORING
+# ─────────────────────────────────────────────────────────────────────────────────
+monitoring:
+  # WandB
+  wandb:
+    enabled: true
+    project: kagami-training
+    entity: kagami-ai
+    tags:
+      - production
+      - v6e
+      - organism-rssm
+
+  # Live telemetry dashboard
+  telemetry:
+    enabled: true
+    port: 8765
+
+  # Alerts
+  alerts:
+    slack_webhook: null  # Set in environment
+    email: null
+
+  # Health checks
+  health:
+    kl_collapse_threshold: 0.0001
+    loss_divergence_ratio: 3.0
+    gradient_explosion_threshold: 100.0
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# PROFILING (January 11, 2026)
+# ─────────────────────────────────────────────────────────────────────────────────
+profiling:
+  # Enable integrated profiling
+  enabled: true
+
+  # Output directory (GCS or local)
+  output_dir: gs://kagami-training-profiles
+
+  # JAX profiler settings
+  jax_profiler:
+    enabled: true
+    # Steps at which to capture traces (for TensorBoard)
+    trace_steps: [100, 500, 1000, 5000, 10000]
+    trace_duration_ms: 2000
+
+  # Memory tracking
+  memory:
+    enabled: true
+    sample_interval: 100  # steps
+
+  # Throughput tracking
+  throughput:
+    window_size: 100  # Moving average window
+
+  # Bottleneck analysis
+  bottleneck:
+    enabled: true
+    data_load_threshold_ms: 50.0
+    compute_threshold_ms: 100.0
+
+  # Report settings
+  report_interval: 1000
+  save_detailed_traces: true
+
+  # TensorBoard
+  tensorboard:
+    enabled: true
+    port: 6006
+
+# ─────────────────────────────────────────────────────────────────────────────────
+# VALIDATION
+# ─────────────────────────────────────────────────────────────────────────────────
+validation:
+  # Divergence detection
+  divergence_detection:
+    enabled: true
+    max_loss_ratio: 3.0
+    auto_reduce_lr: true
+    reduction_factor: 0.5
+
+  # Plateau detection
+  plateau_detection:
+    enabled: true
+    window_size: 1000
+    velocity_threshold: 1.0e-6
+    cooldown_steps: 2000
+
+  # KL monitoring
+  kl_monitoring:
+    enabled: true
+    collapse_threshold: 0.0001
+    warning_threshold: 0.1

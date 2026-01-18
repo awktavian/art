@@ -1,0 +1,1025 @@
+/**
+ * =============================================================================
+ * COMPONENT: Button
+ * Kagami Design System V2 - World-class visionOS-quality button
+ *
+ * States: default, hover, focus, active, disabled, loading, error, success
+ * Variants: solid, outline, ghost, link
+ * Sizes: xs, sm, md, lg, xl
+ *
+ * Features:
+ * - Volumetric glass depth (visionOS-style concave appearance)
+ * - Liquid ripple effect on click
+ * - Magnetic hover attraction
+ * - Elastic gel-press feedback with spring physics
+ * - 2x brighter chromatic edge dispersion
+ * - Caustics highlights with noise texture
+ * - Real glass edge beveling
+ * - Animated icon morphing
+ * =============================================================================
+ */
+
+/* =============================================================================
+   CSS VARIABLES FOR BUTTON
+   ============================================================================= */
+
+.prism-btn {
+  /* Magnetic hover offset (set via JS) */
+  --btn-mx: 0px;
+  --btn-my: 0px;
+  --btn-rotate: 0deg;
+
+  /* Ripple position (set via JS) */
+  --ripple-x: 50%;
+  --ripple-y: 50%;
+  --ripple-size: 0px;
+
+  /* Press depth */
+  --press-depth: 1;
+
+  /* Glass depth parameters */
+  --glass-depth: 0;
+  --glass-concave: 0;
+}
+
+/* =============================================================================
+   NOISE TEXTURE FOR GLASS MATERIALITY
+   Subtle frosted glass grain effect
+   ============================================================================= */
+
+@keyframes glass-noise-shift {
+  0%, 100% { background-position: 0 0, 0 0, 0 0; }
+  25% { background-position: 1px 1px, 0 0, 0 0; }
+  50% { background-position: -1px 0, 0 0, 0 0; }
+  75% { background-position: 0 -1px, 0 0, 0 0; }
+}
+
+/* =============================================================================
+   BASE BUTTON
+   ============================================================================= */
+
+.prism-btn {
+  /* Reset */
+  appearance: none;
+  border: none;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+
+  /* Layout */
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  isolation: isolate;
+  overflow: hidden;
+
+  /* Typography */
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+
+  /* Sizing (md default) */
+  height: 44px;
+  padding: 0 20px;
+  min-width: 44px;
+
+  /* Visual - VOLUMETRIC GLASS with concave depth */
+  color: var(--prism-text);
+  background:
+    /* Noise texture for glass materiality */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    /* Main glass surface */
+    var(--prism-surface);
+  background-blend-mode: overlay, normal;
+  backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.05);
+  -webkit-backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.05);
+
+  /* Glass edge beveling - creates real glass border feel */
+  border: 1px solid transparent;
+  border-image: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.25) 40%,
+    rgba(255, 255, 255, 0.1) 60%,
+    rgba(0, 0, 0, 0.05) 80%,
+    rgba(0, 0, 0, 0.1) 100%
+  ) 1;
+  border-radius: var(--prism-radius-md);
+
+  /* VOLUMETRIC SHADOW SYSTEM - creates depth illusion */
+  box-shadow:
+    /* Outer ambient shadow */
+    0 4px 16px -4px rgba(0, 0, 0, 0.2),
+    0 2px 6px -2px rgba(0, 0, 0, 0.15),
+    /* Glass edge highlight - top */
+    inset 0 1px 1px rgba(255, 255, 255, 0.4),
+    /* Concave depth - soft inner shadow for volume */
+    inset 0 4px 8px -4px rgba(255, 255, 255, 0.2),
+    inset 0 -4px 8px -4px rgba(0, 0, 0, 0.08),
+    /* Side bevels for 3D glass edge */
+    inset 1px 0 1px rgba(255, 255, 255, 0.15),
+    inset -1px 0 1px rgba(0, 0, 0, 0.05);
+
+  /* GPU acceleration with 3D transform support */
+  transform:
+    translateX(var(--btn-mx))
+    translateY(var(--btn-my))
+    translateZ(0)
+    rotateX(calc(var(--btn-my) * -0.1))
+    rotateY(calc(var(--btn-mx) * 0.1))
+    scale(var(--press-depth));
+  transform-style: preserve-3d;
+  perspective: 1000px;
+  will-change: transform, box-shadow, background;
+
+  /* Silky smooth transitions */
+  transition:
+    transform var(--prism-dur-fast) var(--prism-ease-spring),
+    background var(--prism-dur-normal) var(--prism-ease-cusp),
+    border-color var(--prism-dur-normal) var(--prism-ease-cusp),
+    box-shadow var(--prism-dur-normal) var(--prism-ease-cusp),
+    color var(--prism-dur-normal) var(--prism-ease-cusp),
+    opacity var(--prism-dur-normal) var(--prism-ease-cusp),
+    --btn-mx 0.15s var(--prism-ease-hyperbolic),
+    --btn-my 0.15s var(--prism-ease-hyperbolic),
+    --glass-depth 0.2s var(--prism-ease-spring),
+    --glass-concave 0.15s var(--prism-ease-cusp);
+}
+
+/* Clip border-radius properly */
+.prism-btn {
+  background-clip: padding-box;
+}
+
+/* Override border for proper glass edge */
+.prism-btn::before,
+.prism-btn::after {
+  border-radius: inherit;
+}
+
+/* =============================================================================
+   CHROMATIC DISPERSION RING - 2X BRIGHTER
+   Glows with spectral colors on hover/focus, breathing animation
+   ============================================================================= */
+
+.prism-btn::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: calc(var(--prism-radius-md) + 4px);
+  background:
+    conic-gradient(
+      from var(--btn-rotate, 0deg),
+      var(--prism-spark) 0%,
+      var(--prism-forge) 14%,
+      var(--prism-flow) 28%,
+      var(--prism-nexus) 42%,
+      var(--prism-beacon) 57%,
+      var(--prism-grove) 71%,
+      var(--prism-crystal) 85%,
+      var(--prism-spark) 100%
+    );
+  z-index: -2;
+  opacity: 0;
+  filter: blur(12px);
+  transition:
+    opacity var(--prism-dur-normal) var(--prism-ease-cusp),
+    filter var(--prism-dur-normal) var(--prism-ease-cusp),
+    inset var(--prism-dur-normal) var(--prism-ease-cusp);
+  pointer-events: none;
+  animation: btn-chromatic-spin 6s linear infinite paused;
+}
+
+@keyframes btn-chromatic-spin {
+  from { --btn-rotate: 0deg; }
+  to { --btn-rotate: 360deg; }
+}
+
+@property --btn-rotate {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* =============================================================================
+   CURVED GLASS REFLECTION WITH CAUSTICS
+   Multi-layer reflection system for realistic curved glass
+   ============================================================================= */
+
+.prism-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    /* CAUSTICS - subtle light dispersion pattern */
+    radial-gradient(
+      ellipse 120% 60% at 30% 20%,
+      rgba(255, 255, 255, 0.08) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse 80% 40% at 70% 25%,
+      rgba(255, 255, 255, 0.05) 0%,
+      transparent 40%
+    ),
+    /* PRIMARY SPECULAR - bright curved highlight at top (visionOS style) */
+    linear-gradient(
+      175deg,
+      rgba(255, 255, 255, 0.45) 0%,
+      rgba(255, 255, 255, 0.25) 8%,
+      rgba(255, 255, 255, 0.12) 20%,
+      rgba(255, 255, 255, 0.05) 35%,
+      transparent 50%
+    ),
+    /* SECONDARY HIGHLIGHT - environment reflection simulation */
+    linear-gradient(
+      195deg,
+      transparent 0%,
+      transparent 60%,
+      rgba(255, 255, 255, 0.03) 75%,
+      rgba(255, 255, 255, 0.06) 85%,
+      rgba(255, 255, 255, 0.03) 95%,
+      transparent 100%
+    ),
+    /* SWEEP REFLECTION (animated on hover) */
+    linear-gradient(
+      105deg,
+      transparent 0%,
+      transparent 35%,
+      rgba(255, 255, 255, 0) 35%,
+      rgba(255, 255, 255, 0.12) 42%,
+      rgba(255, 255, 255, 0.25) 50%,
+      rgba(255, 255, 255, 0.12) 58%,
+      rgba(255, 255, 255, 0) 65%,
+      transparent 65%,
+      transparent 100%
+    );
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 300% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, -150% 0;
+  pointer-events: none;
+  opacity: 1;
+  mix-blend-mode: overlay;
+  transition:
+    background-position 0.7s var(--prism-ease-hyperbolic),
+    opacity var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+/* =============================================================================
+   LIQUID RIPPLE EFFECT
+   Expands from click point with spectral fade
+   ============================================================================= */
+
+.prism-btn__ripple {
+  position: absolute;
+  left: var(--ripple-x);
+  top: var(--ripple-y);
+  width: var(--ripple-size);
+  height: var(--ripple-size);
+  transform: translate(-50%, -50%) scale(0);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.3) 30%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.prism-btn__ripple--active {
+  animation: btn-ripple-expand 0.65s var(--prism-ease-hyperbolic) forwards;
+}
+
+@keyframes btn-ripple-expand {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 1;
+  }
+  60% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.5);
+    opacity: 0;
+  }
+}
+
+/* Spectral ripple variant */
+.prism-btn--solid .prism-btn__ripple {
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.6) 0%,
+    rgba(255, 255, 255, 0.35) 30%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 70%
+  );
+}
+
+/* Icon styling */
+.prism-btn__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.125em;
+  height: 1.125em;
+  flex-shrink: 0;
+}
+
+.prism-btn__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Loading spinner */
+.prism-btn__spinner {
+  position: absolute;
+  width: 1.25em;
+  height: 1.25em;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: prism-btn-spin 0.8s linear infinite;
+}
+
+@keyframes prism-btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =============================================================================
+   INTERACTIVE STATES
+   World-class hover, focus, and press interactions
+   ============================================================================= */
+
+/* Focus visible - Animated focus ring */
+.prism-btn:focus-visible {
+  outline: none;
+}
+
+.prism-btn:focus-visible::before {
+  opacity: 0.8;
+  filter: blur(14px);
+  animation-play-state: running;
+}
+
+/* Focus ring using box-shadow for animation */
+@keyframes btn-focus-pulse {
+  0%, 100% {
+    box-shadow:
+      0 4px 16px -4px rgba(0, 0, 0, 0.2),
+      0 2px 6px -2px rgba(0, 0, 0, 0.15),
+      inset 0 1px 1px rgba(255, 255, 255, 0.4),
+      inset 0 4px 8px -4px rgba(255, 255, 255, 0.2),
+      inset 0 -4px 8px -4px rgba(0, 0, 0, 0.08),
+      inset 1px 0 1px rgba(255, 255, 255, 0.15),
+      inset -1px 0 1px rgba(0, 0, 0, 0.05),
+      0 0 0 3px var(--colony-color, var(--prism-beacon)),
+      0 0 0 6px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 35%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 4px 16px -4px rgba(0, 0, 0, 0.2),
+      0 2px 6px -2px rgba(0, 0, 0, 0.15),
+      inset 0 1px 1px rgba(255, 255, 255, 0.4),
+      inset 0 4px 8px -4px rgba(255, 255, 255, 0.2),
+      inset 0 -4px 8px -4px rgba(0, 0, 0, 0.08),
+      inset 1px 0 1px rgba(255, 255, 255, 0.15),
+      inset -1px 0 1px rgba(0, 0, 0, 0.05),
+      0 0 0 4px var(--colony-color, var(--prism-beacon)),
+      0 0 0 8px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 25%, transparent);
+  }
+}
+
+.prism-btn:focus-visible {
+  animation: btn-focus-pulse 2s var(--prism-ease-cusp) infinite;
+}
+
+/* =============================================================================
+   HOVER STATE
+   Magnetic attraction + enhanced glass + 2x brighter chromatic glow
+   ============================================================================= */
+
+.prism-btn:hover:not(:disabled):not([aria-disabled="true"]):not(.prism-btn--loading) {
+  /* Enhanced glass surface with more depth */
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    var(--prism-surface-elevated);
+  background-blend-mode: overlay, normal;
+
+  /* ELEVATED VOLUMETRIC SHADOW - more pronounced depth */
+  box-shadow:
+    /* Stronger outer shadow for lift */
+    0 8px 32px -8px rgba(0, 0, 0, 0.25),
+    0 4px 12px -4px rgba(0, 0, 0, 0.2),
+    /* Enhanced glass edge highlights */
+    inset 0 1px 2px rgba(255, 255, 255, 0.5),
+    /* Deeper concave effect */
+    inset 0 6px 12px -6px rgba(255, 255, 255, 0.25),
+    inset 0 -6px 12px -6px rgba(0, 0, 0, 0.1),
+    /* Stronger side bevels */
+    inset 2px 0 2px rgba(255, 255, 255, 0.2),
+    inset -2px 0 2px rgba(0, 0, 0, 0.08),
+    /* Chromatic ambient glow */
+    var(--prism-shadow-chromatic-sm);
+}
+
+/* CHROMATIC RING - 2X BRIGHTER on hover */
+.prism-btn:hover:not(:disabled):not([aria-disabled="true"]):not(.prism-btn--loading)::before {
+  opacity: 1;
+  filter: blur(16px);
+  inset: -6px;
+  animation-play-state: running;
+}
+
+/* Glass sweep animation with enhanced caustics */
+.prism-btn:hover:not(:disabled):not([aria-disabled="true"]):not(.prism-btn--loading)::after {
+  background-position: 0 0, 0 0, 0 0, 0 0, 150% 0;
+  opacity: 1;
+}
+
+/* =============================================================================
+   ACTIVE/PRESSED STATE
+   GEL-LIKE press feel - sinks into liquid surface
+   ============================================================================= */
+
+.prism-btn:active:not(:disabled):not([aria-disabled="true"]):not(.prism-btn--loading) {
+  --press-depth: 0.96;
+  --glass-concave: 1;
+
+  /* GEL PRESS - deep sunken appearance like pressing into liquid */
+  box-shadow:
+    /* Minimal outer shadow - button is pressed in */
+    0 1px 4px -2px rgba(0, 0, 0, 0.15),
+    /* STRONG inner shadows - creates gel depression */
+    inset 0 4px 8px rgba(0, 0, 0, 0.15),
+    inset 0 2px 4px rgba(0, 0, 0, 0.12),
+    inset 0 1px 2px rgba(0, 0, 0, 0.1),
+    /* Rim light at bottom - gel edge catching light */
+    inset 0 -1px 1px rgba(255, 255, 255, 0.15),
+    /* Side compression */
+    inset 2px 0 4px rgba(0, 0, 0, 0.08),
+    inset -2px 0 4px rgba(0, 0, 0, 0.08);
+
+  /* Quick gel press, springy release */
+  transition:
+    transform 0.06s var(--prism-ease-cusp),
+    box-shadow 0.06s var(--prism-ease-cusp);
+}
+
+/* Dim the highlight when pressed - light source changes */
+.prism-btn:active:not(:disabled):not([aria-disabled="true"]):not(.prism-btn--loading)::after {
+  opacity: 0.5;
+  background-position: 0 0, 0 0, 0 0, 0 0, -150% 0;
+}
+
+/* Chromatic ring intensifies and tightens */
+.prism-btn:active:not(:disabled):not([aria-disabled="true"]):not(.prism-btn--loading)::before {
+  opacity: 0.9;
+  filter: blur(8px);
+  inset: -2px;
+}
+
+/* Disabled */
+.prism-btn:disabled,
+.prism-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* =============================================================================
+   LOADING STATE
+   Sophisticated spinner with spectral trail
+   ============================================================================= */
+
+.prism-btn--loading {
+  cursor: wait;
+  pointer-events: none;
+}
+
+/* Hide content but maintain layout */
+.prism-btn--loading .prism-btn__icon,
+.prism-btn--loading .prism-btn__text {
+  opacity: 0;
+  transform: scale(0.8);
+  transition:
+    opacity 0.15s var(--prism-ease-cusp),
+    transform 0.15s var(--prism-ease-cusp);
+}
+
+/* Spectral loading spinner */
+.prism-btn__spinner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.prism-btn--loading .prism-btn__spinner {
+  opacity: 1;
+  animation: btn-spinner-rotate 1s linear infinite;
+}
+
+/* Spinner ring with spectral gradient */
+.prism-btn__spinner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-right-color: color-mix(in srgb, currentColor 60%, transparent);
+}
+
+/* Spectral trail effect */
+.prism-btn__spinner::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0%,
+    var(--prism-spark) 10%,
+    var(--prism-beacon) 30%,
+    var(--prism-crystal) 50%,
+    transparent 60%
+  );
+  opacity: 0.5;
+  animation: btn-spinner-trail 1s linear infinite;
+  filter: blur(4px);
+}
+
+@keyframes btn-spinner-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes btn-spinner-trail {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Loading pulse on button background */
+.prism-btn--loading::before {
+  opacity: 0.4;
+  animation: btn-loading-pulse 1.5s var(--prism-ease-cusp) infinite;
+}
+
+@keyframes btn-loading-pulse {
+  0%, 100% { opacity: 0.3; filter: blur(12px); }
+  50% { opacity: 0.6; filter: blur(18px); }
+}
+
+/* =============================================================================
+   ERROR STATE
+   Attention-grabbing with shake animation
+   ============================================================================= */
+
+.prism-btn--error {
+  --colony-color: var(--prism-spark);
+  border-color: var(--prism-e1-25);
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    color-mix(in srgb, var(--prism-spark) 12%, var(--prism-surface));
+  background-blend-mode: overlay, normal;
+}
+
+.prism-btn--error::before {
+  background: linear-gradient(135deg, var(--prism-spark) 0%, var(--prism-forge) 100%);
+  opacity: 0.5;
+}
+
+/* Error shake animation (add class via JS for attention) */
+.prism-btn--error.prism-btn--shake {
+  animation: btn-error-shake 0.5s var(--prism-ease-spring);
+}
+
+@keyframes btn-error-shake {
+  0%, 100% { transform: translateX(0) scale(var(--press-depth, 1)); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px) scale(var(--press-depth, 1)); }
+  20%, 40%, 60%, 80% { transform: translateX(4px) scale(var(--press-depth, 1)); }
+}
+
+/* =============================================================================
+   SUCCESS STATE
+   Celebration with glow burst
+   ============================================================================= */
+
+.prism-btn--success {
+  --colony-color: var(--prism-nexus);
+  border-color: var(--prism-e4-25);
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    color-mix(in srgb, var(--prism-nexus) 12%, var(--prism-surface));
+  background-blend-mode: overlay, normal;
+}
+
+.prism-btn--success::before {
+  background: linear-gradient(135deg, var(--prism-nexus) 0%, var(--prism-beacon) 100%);
+  opacity: 0.5;
+}
+
+/* Success celebration (add class via JS) */
+.prism-btn--success.prism-btn--celebrate {
+  animation: btn-success-celebrate 0.6s var(--prism-ease-spring);
+}
+
+@keyframes btn-success-celebrate {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.05); }
+  50% { transform: scale(0.98); }
+  70% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+/* Success glow burst */
+.prism-btn--success.prism-btn--celebrate::before {
+  animation: btn-success-glow 0.6s var(--prism-ease-cusp);
+}
+
+@keyframes btn-success-glow {
+  0% { opacity: 0.5; filter: blur(12px); }
+  30% { opacity: 1; filter: blur(20px); }
+  100% { opacity: 0.5; filter: blur(12px); }
+}
+
+/* =============================================================================
+   SIZE VARIANTS
+   ============================================================================= */
+
+/* Extra Small */
+.prism-btn--xs {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 0.75rem;
+  gap: 4px;
+  border-radius: var(--prism-radius-sm);
+}
+
+.prism-btn--xs .prism-btn__icon {
+  width: 0.875em;
+  height: 0.875em;
+}
+
+/* Small */
+.prism-btn--sm {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 0.8125rem;
+  gap: 6px;
+  border-radius: var(--prism-radius-sm);
+}
+
+/* Medium (default) - defined in base */
+
+/* Large */
+.prism-btn--lg {
+  height: 52px;
+  padding: 0 28px;
+  font-size: 1.0625rem;
+  gap: 10px;
+  border-radius: var(--prism-radius-lg);
+}
+
+/* Extra Large */
+.prism-btn--xl {
+  height: 60px;
+  padding: 0 36px;
+  font-size: 1.125rem;
+  gap: 12px;
+  border-radius: var(--prism-radius-lg);
+}
+
+/* =============================================================================
+   STYLE VARIANTS
+   ============================================================================= */
+
+/* =============================================================================
+   SOLID VARIANT
+   Vibrant filled button with enhanced depth, liquid glow, and volumetric feel
+   ============================================================================= */
+
+.prism-btn--solid {
+  /* Rich gradient with glass-like layering */
+  background:
+    /* Noise for materiality */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    /* Main color with volumetric gradient */
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 100%, white 15%) 0%,
+      var(--colony-color, var(--prism-beacon)) 40%,
+      color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 85%, black) 100%
+    );
+  background-blend-mode: overlay, normal;
+  color: white;
+  border-color: transparent;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+
+  /* VOLUMETRIC colored glow shadow */
+  box-shadow:
+    /* Ambient colored glow */
+    0 4px 20px -4px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 50%, transparent),
+    0 8px 32px -8px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 35%, transparent),
+    /* Glass edge highlights */
+    inset 0 1px 2px rgba(255, 255, 255, 0.35),
+    /* Volumetric inner depth */
+    inset 0 4px 8px -4px rgba(255, 255, 255, 0.25),
+    inset 0 -4px 8px -4px rgba(0, 0, 0, 0.15),
+    /* Side bevels */
+    inset 1px 0 1px rgba(255, 255, 255, 0.2),
+    inset -1px 0 1px rgba(0, 0, 0, 0.1);
+}
+
+/* Solid: Enhanced glass highlight with caustics */
+.prism-btn--solid::after {
+  background:
+    /* Caustics on colored surface */
+    radial-gradient(
+      ellipse 100% 50% at 25% 15%,
+      rgba(255, 255, 255, 0.15) 0%,
+      transparent 50%
+    ),
+    /* Strong top specular */
+    linear-gradient(
+      175deg,
+      rgba(255, 255, 255, 0.5) 0%,
+      rgba(255, 255, 255, 0.3) 8%,
+      rgba(255, 255, 255, 0.15) 20%,
+      transparent 40%
+    ),
+    /* Environment reflection */
+    linear-gradient(
+      195deg,
+      transparent 60%,
+      rgba(255, 255, 255, 0.08) 80%,
+      rgba(255, 255, 255, 0.04) 100%
+    ),
+    /* Shimmer sweep */
+    linear-gradient(
+      105deg,
+      transparent 0%,
+      transparent 35%,
+      rgba(255, 255, 255, 0) 35%,
+      rgba(255, 255, 255, 0.2) 42%,
+      rgba(255, 255, 255, 0.4) 50%,
+      rgba(255, 255, 255, 0.2) 58%,
+      rgba(255, 255, 255, 0) 65%,
+      transparent 65%,
+      transparent 100%
+    );
+  background-size: 100% 100%, 100% 100%, 100% 100%, 300% 100%;
+  background-position: 0 0, 0 0, 0 0, -150% 0;
+  mix-blend-mode: overlay;
+}
+
+/* Solid: Hover state with intensified volumetric glow */
+.prism-btn--solid:hover:not(:disabled):not([aria-disabled="true"]):not(.prism-btn--loading) {
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 100%, white 10%) 0%,
+      var(--colony-color, var(--prism-beacon)) 35%,
+      color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 80%, black) 100%
+    );
+  background-blend-mode: overlay, normal;
+  border-color: transparent;
+
+  /* INTENSIFIED volumetric glow */
+  box-shadow:
+    0 8px 32px -6px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 60%, transparent),
+    0 12px 48px -12px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 45%, transparent),
+    inset 0 1px 2px rgba(255, 255, 255, 0.4),
+    inset 0 6px 12px -6px rgba(255, 255, 255, 0.3),
+    inset 0 -6px 12px -6px rgba(0, 0, 0, 0.15),
+    inset 2px 0 2px rgba(255, 255, 255, 0.25),
+    inset -2px 0 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Solid: Active/pressed - gel sink effect */
+.prism-btn--solid:active:not(:disabled):not([aria-disabled="true"]):not(.prism-btn--loading) {
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 85%, black) 0%,
+      color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 75%, black) 100%
+    );
+  background-blend-mode: overlay, normal;
+
+  box-shadow:
+    0 2px 8px -4px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 40%, transparent),
+    inset 0 4px 8px rgba(0, 0, 0, 0.25),
+    inset 0 2px 4px rgba(0, 0, 0, 0.2),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.1),
+    inset 2px 0 4px rgba(0, 0, 0, 0.15),
+    inset -2px 0 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Outline */
+.prism-btn--outline {
+  background: transparent;
+  backdrop-filter: blur(8px) saturate(1.2);
+  -webkit-backdrop-filter: blur(8px) saturate(1.2);
+  border: 2px solid var(--colony-color, var(--prism-beacon));
+  color: var(--colony-color, var(--prism-beacon));
+  box-shadow:
+    0 2px 8px -2px rgba(0, 0, 0, 0.1),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+
+.prism-btn--outline::after {
+  opacity: 0.5;
+}
+
+.prism-btn--outline:hover:not(:disabled):not([aria-disabled="true"]):not(.prism-btn--loading) {
+  background: color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 15%, transparent);
+  border-color: var(--colony-color, var(--prism-beacon));
+  box-shadow:
+    0 4px 16px -4px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 30%, transparent),
+    inset 0 1px 1px rgba(255, 255, 255, 0.15);
+}
+
+/* Ghost */
+.prism-btn--ghost {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: transparent;
+  color: var(--prism-text);
+  box-shadow: none;
+}
+
+.prism-btn--ghost::before,
+.prism-btn--ghost::after {
+  opacity: 0;
+}
+
+.prism-btn--ghost:hover:not(:disabled):not([aria-disabled="true"]):not(.prism-btn--loading) {
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    var(--prism-surface);
+  background-blend-mode: overlay, normal;
+  backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation));
+  -webkit-backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation));
+  border-color: var(--prism-border);
+  box-shadow:
+    0 4px 16px -4px rgba(0, 0, 0, 0.15),
+    inset 0 1px 1px rgba(255, 255, 255, 0.3),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.05);
+}
+
+.prism-btn--ghost:hover:not(:disabled):not([aria-disabled="true"]):not(.prism-btn--loading)::before {
+  opacity: 0.4;
+}
+
+.prism-btn--ghost:hover:not(:disabled):not([aria-disabled="true"]):not(.prism-btn--loading)::after {
+  opacity: 0.8;
+}
+
+/* Link */
+.prism-btn--link {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: transparent;
+  color: var(--colony-color, var(--prism-beacon));
+  box-shadow: none;
+  padding: 0;
+  height: auto;
+  min-width: auto;
+}
+
+.prism-btn--link::before,
+.prism-btn--link::after {
+  display: none;
+}
+
+.prism-btn--link:hover:not(:disabled):not([aria-disabled="true"]):not(.prism-btn--loading) {
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.prism-btn--link:focus-visible {
+  outline-offset: 4px;
+}
+
+/* =============================================================================
+   ICON SUPPORT
+   ============================================================================= */
+
+/* Icon only (square) */
+.prism-btn--icon-only {
+  padding: 0;
+  aspect-ratio: 1;
+}
+
+/* Icon on left (default) */
+.prism-btn--icon-left .prism-btn__icon {
+  order: -1;
+}
+
+/* Icon on right */
+.prism-btn--icon-right .prism-btn__icon {
+  order: 1;
+}
+
+/* =============================================================================
+   COLONY COLOR VARIANTS
+   ============================================================================= */
+
+.prism-btn[data-colony="spark"] { --colony-color: var(--prism-spark); }
+.prism-btn[data-colony="forge"] { --colony-color: var(--prism-forge); }
+.prism-btn[data-colony="flow"] { --colony-color: var(--prism-flow); }
+.prism-btn[data-colony="nexus"] { --colony-color: var(--prism-nexus); }
+.prism-btn[data-colony="beacon"] { --colony-color: var(--prism-beacon); }
+.prism-btn[data-colony="grove"] { --colony-color: var(--prism-grove); }
+.prism-btn[data-colony="crystal"] { --colony-color: var(--prism-crystal); }
+
+/* =============================================================================
+   BUTTON GROUP
+   ============================================================================= */
+
+.prism-btn-group {
+  display: inline-flex;
+  gap: 0;
+}
+
+.prism-btn-group .prism-btn {
+  border-radius: 0;
+}
+
+.prism-btn-group .prism-btn:first-child {
+  border-top-left-radius: var(--prism-radius-md);
+  border-bottom-left-radius: var(--prism-radius-md);
+}
+
+.prism-btn-group .prism-btn:last-child {
+  border-top-right-radius: var(--prism-radius-md);
+  border-bottom-right-radius: var(--prism-radius-md);
+}
+
+.prism-btn-group .prism-btn:not(:first-child) {
+  margin-left: -1px;
+}
+
+.prism-btn-group .prism-btn:hover {
+  z-index: 1;
+}
+
+.prism-btn-group .prism-btn:focus-visible {
+  z-index: 2;
+}
+
+/* =============================================================================
+   FULL WIDTH
+   ============================================================================= */
+
+.prism-btn--full {
+  width: 100%;
+}
+
+/* =============================================================================
+   REDUCED MOTION
+   ============================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .prism-btn {
+    transition: none;
+  }
+
+  .prism-btn::before,
+  .prism-btn::after {
+    transition: none;
+    animation: none;
+  }
+
+  .prism-btn__spinner {
+    animation: none;
+    border-top-color: currentColor;
+    border-right-color: transparent;
+    border-bottom-color: transparent;
+    border-left-color: transparent;
+  }
+
+  .prism-btn__ripple--active {
+    animation: none;
+  }
+}

@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kagami QA Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0a0c;
+      --bg-secondary: #111114;
+      --bg-card: rgba(22, 22, 26, 0.7);
+      --text-primary: #f5f5f7;
+      --text-secondary: #a1a1a6;
+      --text-muted: #6e6e73;
+      --accent-primary: #ff6b4a;
+      --success: #22c55e;
+      --success-bg: rgba(34, 197, 94, 0.15);
+      --warning: #eab308;
+      --warning-bg: rgba(234, 179, 8, 0.15);
+      --error: #ef4444;
+      --error-bg: rgba(239, 68, 68, 0.15);
+      --info: #3b82f6;
+      --info-bg: rgba(59, 130, 246, 0.15);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-hover: rgba(255, 107, 74, 0.3);
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --timing-normal: 377ms;
+      --timing-slow: 610ms;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'IBM Plex Sans', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      opacity: 0.025;
+      pointer-events: none;
+    }
+    .bg-glow {
+      position: fixed;
+      top: -20%; left: 50%;
+      transform: translateX(-50%);
+      width: 150%; height: 60%;
+      background: radial-gradient(ellipse at center, rgba(255,107,74,0.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .container { max-width: 1400px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+    .header { padding: 48px 0 32px; text-align: center; }
+    .header__logo { font-size: 14px; font-weight: 500; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 3px; margin-bottom: 16px; }
+    .header__title { font-size: 48px; font-weight: 700; margin-bottom: 12px; animation: glow 4s ease-in-out infinite alternate; }
+    @keyframes glow { from { filter: drop-shadow(0 0 20px rgba(255,107,74,0.2)); } to { filter: drop-shadow(0 0 40px rgba(255,107,74,0.4)); } }
+    .header__subtitle { font-size: 18px; color: var(--text-secondary); }
+    .stats-bar { display: flex; justify-content: center; gap: 48px; padding: 32px 0; margin-bottom: 24px; }
+    .stat { text-align: center; }
+    .stat__value { font-size: 48px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; line-height: 1; margin-bottom: 4px; }
+    .stat__value--success { color: var(--success); }
+    .stat__value--warning { color: var(--warning); }
+    .stat__value--error { color: var(--error); }
+    .stat__value--info { color: var(--info); }
+    .stat__label { font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+    .score-ring { display: flex; justify-content: center; margin-bottom: 48px; }
+    .score-ring__container { position: relative; width: 200px; height: 200px; }
+    .score-ring__svg { transform: rotate(-90deg); }
+    .score-ring__bg { fill: none; stroke: var(--border); stroke-width: 8; }
+    .score-ring__progress { fill: none; stroke: var(--success); stroke-width: 8; stroke-linecap: round; stroke-dasharray: 565.48; stroke-dashoffset: calc(565.48 * (1 - 0.89)); }
+    .score-ring__text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+    .score-ring__value { font-size: 56px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+    .score-ring__label { font-size: 14px; color: var(--text-muted); text-transform: uppercase; }
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .section-header__title { font-size: 24px; font-weight: 600; }
+    .section-header__badge { font-size: 13px; padding: 6px 14px; border-radius: 100px; background: var(--glass-bg); border: 1px solid var(--border); color: var(--text-secondary); }
+    .journeys-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 24px; margin-bottom: 48px; }
+    .journey-card { background: var(--bg-card); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 20px; padding: 24px; transition: all var(--timing-normal) cubic-bezier(0.4,0,0.2,1); text-decoration: none; color: inherit; display: block; }
+    .journey-card:hover { transform: translateY(-4px); border-color: var(--border-hover); box-shadow: 0 20px 40px rgba(0,0,0,0.3), 0 0 40px rgba(255,107,74,0.08); }
+    .journey-card__header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+    .journey-card__id { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .journey-card__title { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+    .journey-card__desc { font-size: 14px; color: var(--text-secondary); }
+    .journey-card__status { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 100px; font-size: 13px; font-weight: 500; }
+    .journey-card__status--pass { background: var(--success-bg); color: var(--success); }
+    .journey-card__status--fail { background: var(--error-bg); color: var(--error); }
+    .journey-card__status--pending { background: var(--info-bg); color: var(--info); }
+    .journey-card__status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+    .journey-card__scores { display: flex; gap: 12px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
+    .score-badge { flex: 1; text-align: center; padding: 12px 8px; border-radius: 12px; background: var(--glass-bg); }
+    .score-badge__value { font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 600; margin-bottom: 4px; }
+    .score-badge__label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
+    .score-badge--high .score-badge__value { color: var(--success); }
+    .score-badge--medium .score-badge__value { color: var(--warning); }
+    .score-badge--low .score-badge__value { color: var(--error); }
+    .journey-card__platforms { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    .platform-chip { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; font-size: 12px; background: var(--glass-bg); color: var(--text-secondary); }
+    .platform-chip--pass { background: var(--success-bg); color: var(--success); }
+    .platform-chip--fail { background: var(--error-bg); color: var(--error); }
+    .gemini-section { margin-top: 48px; padding-top: 48px; border-top: 1px solid var(--border); }
+    .gemini-card { background: var(--bg-card); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 20px; padding: 32px; margin-bottom: 24px; }
+    .gemini-card__header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+    .gemini-card__icon { width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #4285f4, #34a853, #fbbc04, #ea4335); display: flex; align-items: center; justify-content: center; }
+    .gemini-card__title { font-size: 20px; font-weight: 600; }
+    .gemini-card__subtitle { font-size: 14px; color: var(--text-secondary); }
+    .issues-list { list-style: none; }
+    .issue-item { display: flex; align-items: flex-start; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+    .issue-item:last-child { border-bottom: none; }
+    .issue-item__severity { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+    .issue-item__severity--critical { background: var(--error); }
+    .issue-item__severity--warning { background: var(--warning); }
+    .issue-item__severity--info { background: var(--success); }
+    .issue-item__content { flex: 1; }
+    .issue-item__platform { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--accent-primary); text-transform: uppercase; margin-bottom: 4px; }
+    .issue-item__desc { font-size: 14px; color: var(--text-primary); }
+    .footer { text-align: center; padding: 48px 0; color: var(--text-muted); font-size: 13px; }
+    .footer__timestamp { font-family: 'IBM Plex Mono', monospace; }
+    @media (max-width: 768px) {
+      .header__title { font-size: 32px; }
+      .stats-bar { flex-wrap: wrap; gap: 24px; }
+      .journeys-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-glow"></div>
+  <div class="container">
+    <header class="header">
+      <div class="header__logo">Kagami QA</div>
+      <h1 class="header__title">Quality Dashboard</h1>
+      <p class="header__subtitle">Cross-Platform User Journey Testing</p>
+    </header>
+    <div class="stats-bar">
+      <div class="stat">
+        <div class="stat__value stat__value--success">3</div>
+        <div class="stat__label">Passed</div>
+      </div>
+      <div class="stat">
+        <div class="stat__value stat__value--error">7</div>
+        <div class="stat__label">Failed</div>
+      </div>
+      <div class="stat">
+        <div class="stat__value stat__value--info">1</div>
+        <div class="stat__label">Pending</div>
+      </div>
+      <div class="stat">
+        <div class="stat__value stat__value--warning">8</div>
+        <div class="stat__label">Platforms</div>
+      </div>
+    </div>
+    <div class="score-ring">
+      <div class="score-ring__container">
+        <svg class="score-ring__svg" viewBox="0 0 200 200">
+          <circle class="score-ring__bg" cx="100" cy="100" r="90" />
+          <circle class="score-ring__progress" cx="100" cy="100" r="90" />
+        </svg>
+        <div class="score-ring__text">
+          <div class="score-ring__value">89</div>
+          <div class="score-ring__label">Overall</div>
+        </div>
+      </div>
+    </div>
+    <section>
+      <div class="section-header">
+        <h2 class="section-header__title">User Journeys</h2>
+        <span class="section-header__badge">11 Journeys Defined</span>
+      </div>
+      <div class="journeys-grid">
+        
+        <a href="../j01/index.html" class="journey-card">
+          <div class="journey-card__header">
+            <div>
+              <div class="journey-card__id">J01</div>
+              <h3 class="journey-card__title">Onboarding Flow</h3>
+              <p class="journey-card__desc">Verifies the first-time user onboarding experience works cor</p>
+            </div>
+            <div class="journey-card__status journey-card__status--fail">
+              <span class="journey-card__status-dot"></span>
+              Fail
+            </div>
+          </div>
+          <div class="journey-card__scores">
+            <div class="score-badge score-badge--low">
+              <div class="score-badge__value">38</div>
+              <div class="score-badge__label">Technical</div>
+            </div>
+            <div class="score-badge score-badge--low">
+              <div class="score-badge__value">63</div>
+              <div class="score-badge__label">Access</div>
+            </div>
+            <div class="score-badge score-badge--medium">
+              <div class="score-badge__value">71</div>
+              <div class="score-badge__label">Visual</div>
+            </div>
+          </div>
+          <div class="journey-card__platforms">
+            <span class="platform-chip platform-chip--fail">ios</span><span class="platform-chip platform-chip--fail">ipad</span><span class="platform-chip platform-chip--fail">android</span><span class="platform-chip platform-chip--pass">+5</span>
+          </div>
+        </a>
+    
+
+        <a href="../j02/index.html" class="journey-card">
+          <div class="journey-card__header">
+            <div>
+              <div class="journey-card__id">J02</div>
+              <h3 class="journey-card__title">Home Control</h3>
+              <p class="journey-card__desc">Verifies basic home control functionality - quick actions, s</p>
+            </div>
+            <div class="journey-card__status journey-card__status--pass">
+              <span class="journey-card__status-dot"></span>
+              Pass
+            </div>
+          </div>
+          <div class="journey-card__scores">
+            <div class="score-badge score-badge--high">
+              <div class="score-badge__value">100</div>
+              <div class="score-badge__label">Technical</div>
+            </div>
+            <div class="score-badge score-badge--high">
+              <div class="score-badge__value">99</div>
+              <div class="score-badge__label">Access</div>
+            </div>
+            <div class="score-badge score-badge--high">
+              <div class="score-badge__value">99</div>
+              <div class="score-badge__label">Visual</div>
+            </div>
+          </div>
+          <div class="journey-card__platforms">
+            <span class="platform-chip platform-chip--pass">ios</span><span class="platform-chip platform-chip--pass">ipad</span><span class="platform-chip platform-chip--pass">android</span><span class="platform-chip platform-chip--pass">+5</span>
+          </div>
+        </a>
+    
+
+        <a href="../j03/index.html" class="journey-card">
+          <div class="journey-card__header">
+            <div>
+              <div class="journey-card__id">J03</div>
+              <h3 class="journey-card__title">Room Navigation</h3>
+              <p class="journey-card__desc">Verifies navigation between rooms via the Rooms tab</p>
+            </div>
+            <div class="journey-card__status journey-card__status--pass">
+              <span class="journey-card__status-dot"></span>
+              Pass
+            </div>
+          </div>
+          <div class="journey-card__scores">
+            <div class="score-badge score-badge--high">
+              <div class="score-badge__value">100</div>
+              <div class="score-badge__label">Technical</div>
+            </div>
+            <div class="score-badge score-badge--high">
+              <div class="score-badge__value">98</div>
+              <div class="score-badge__label">Access</div>
+            </div>
+            <div class="score-badge score-badge--high">
+              <div class="score-badge__value">98</div>
+              <div class="score-badge__label">Visual</div>
+            </div>
+          </div>
+          <div class="journey-card__platforms">
+            <span class="platform-chip platform-chip--pass">ios</span><span class="platform-chip platform-chip--pass">ipad</span><span class="platform-chip platform-chip--pass">android</span><span class="platform-chip platform-chip--pass">+3</span>
+          </div>
+        </a>
+    
+
+        <a href="../j04/index.html" class="journey-card">
+          <div class="journey-card__header">
+            <div>
+              <div class="journey-card__id">J04</div>
+              <h3 class="journey-card__title">Voice Commands</h3>
+              <p class="journey-card__desc">Verifies voice command functionality - wake word, natural la</p>
+            </div>
+            <div class="journey-card__status journey-card__status--fail">
+              <span class="journey-card__status-dot"></span>
+              Fail
+            </div>
+          </div>
+          <div class="journey-card__scores">
+            <div class="score-badge score-badge--medium">
+              <div class="score-badge__value">85</div>
+              <div class="score-badge__label">Technical</div>
+            </div>
+            <div class="score-badge score-badge--high">
+              <div class="score-badge__value">94</div>
+              <div class="score-badge__label">Access</div>
+            </div>
+            <div class="score-badge score-badge--high">
+              <div class="score-badge__value">95</div>
+              <div class="score-badge__label">Visual</div>
+            </div>
+          </div>
+          <div class="journey-card__platforms">
+            <span class="platform-chip platform-chip--pass">ios</span><span class="platform-chip platform-chip--pass">ipad</span><span class="platform-chip platform-chip--fail">android</span><span class="platform-chip platform-chip--pass">+4</span>
+          </div>
+        </a>
+    
+
+        <a href="../j05/index.html" class="journey-card">
+          <div class="journey-card__header">
+            <div>
+              <div class="journey-card__id">J05</div>
+              <h3 class="journey-card__title">Settings & Preferences</h3>
+              <p class="journey-card__desc">Verifies settings screen functionality - profile, notificati</p>
+            </div>
+            <div class="journey-card__status journey-card__status--fail">
+              <span class="journey-card__status-dot"></span>
+              Fail
+            </div>
+          </div>
+          <div class="journey-card__scores">
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Technical</div>
+            </div>
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Access</div>
+            </div>
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Visual</div>
+            </div>
+          </div>
+          <div class="journey-card__platforms">
+            <span class="platform-chip platform-chip--fail">ios</span><span class="platform-chip platform-chip--fail">ipad</span><span class="platform-chip platform-chip--fail">android</span><span class="platform-chip platform-chip--pass">+3</span>
+          </div>
+        </a>
+    
+
+        <a href="../j06/index.html" class="journey-card">
+          <div class="journey-card__header">
+            <div>
+              <div class="journey-card__id">J06</div>
+              <h3 class="journey-card__title">Device Pairing</h3>
+              <p class="journey-card__desc">Verifies adding and configuring new smart home devices</p>
+            </div>
+            <div class="journey-card__status journey-card__status--fail">
+              <span class="journey-card__status-dot"></span>
+              Fail
+            </div>
+          </div>
+          <div class="journey-card__scores">
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Technical</div>
+            </div>
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Access</div>
+            </div>
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Visual</div>
+            </div>
+          </div>
+          <div class="journey-card__platforms">
+            <span class="platform-chip platform-chip--fail">ios</span><span class="platform-chip platform-chip--fail">ipad</span><span class="platform-chip platform-chip--fail">android</span><span class="platform-chip platform-chip--pass">+2</span>
+          </div>
+        </a>
+    
+
+        <a href="../j07/index.html" class="journey-card">
+          <div class="journey-card__header">
+            <div>
+              <div class="journey-card__id">J07</div>
+              <h3 class="journey-card__title">Scene Creation</h3>
+              <p class="journey-card__desc">Verifies creating, editing, and managing scenes/automations</p>
+            </div>
+            <div class="journey-card__status journey-card__status--fail">
+              <span class="journey-card__status-dot"></span>
+              Fail
+            </div>
+          </div>
+          <div class="journey-card__scores">
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Technical</div>
+            </div>
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Access</div>
+            </div>
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Visual</div>
+            </div>
+          </div>
+          <div class="journey-card__platforms">
+            <span class="platform-chip platform-chip--fail">ios</span><span class="platform-chip platform-chip--fail">ipad</span><span class="platform-chip platform-chip--fail">android</span><span class="platform-chip platform-chip--pass">+3</span>
+          </div>
+        </a>
+    
+
+        <a href="../j08/index.html" class="journey-card">
+          <div class="journey-card__header">
+            <div>
+              <div class="journey-card__id">J08</div>
+              <h3 class="journey-card__title">Automation Rules</h3>
+              <p class="journey-card__desc">Verifies creating automation rules with triggers, conditions</p>
+            </div>
+            <div class="journey-card__status journey-card__status--fail">
+              <span class="journey-card__status-dot"></span>
+              Fail
+            </div>
+          </div>
+          <div class="journey-card__scores">
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Technical</div>
+            </div>
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Access</div>
+            </div>
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Visual</div>
+            </div>
+          </div>
+          <div class="journey-card__platforms">
+            <span class="platform-chip platform-chip--fail">ios</span><span class="platform-chip platform-chip--fail">ipad</span><span class="platform-chip platform-chip--fail">android</span><span class="platform-chip platform-chip--pass">+2</span>
+          </div>
+        </a>
+    
+
+        <a href="../j09/index.html" class="journey-card">
+          <div class="journey-card__header">
+            <div>
+              <div class="journey-card__id">J09</div>
+              <h3 class="journey-card__title">Emergency Safety</h3>
+              <p class="journey-card__desc">Verifies emergency safety button is accessible and functiona</p>
+            </div>
+            <div class="journey-card__status journey-card__status--pass">
+              <span class="journey-card__status-dot"></span>
+              Pass
+            </div>
+          </div>
+          <div class="journey-card__scores">
+            <div class="score-badge score-badge--high">
+              <div class="score-badge__value">100</div>
+              <div class="score-badge__label">Technical</div>
+            </div>
+            <div class="score-badge score-badge--high">
+              <div class="score-badge__value">99</div>
+              <div class="score-badge__label">Access</div>
+            </div>
+            <div class="score-badge score-badge--high">
+              <div class="score-badge__value">98</div>
+              <div class="score-badge__label">Visual</div>
+            </div>
+          </div>
+          <div class="journey-card__platforms">
+            <span class="platform-chip platform-chip--pass">ios</span><span class="platform-chip platform-chip--pass">ipad</span><span class="platform-chip platform-chip--pass">android</span><span class="platform-chip platform-chip--pass">+5</span>
+          </div>
+        </a>
+    
+
+        <a href="../j10/index.html" class="journey-card">
+          <div class="journey-card__header">
+            <div>
+              <div class="journey-card__id">J10</div>
+              <h3 class="journey-card__title">Multi-User Profiles</h3>
+              <p class="journey-card__desc">Verifies multi-user support - switching profiles, permission</p>
+            </div>
+            <div class="journey-card__status journey-card__status--fail">
+              <span class="journey-card__status-dot"></span>
+              Fail
+            </div>
+          </div>
+          <div class="journey-card__scores">
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Technical</div>
+            </div>
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Access</div>
+            </div>
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Visual</div>
+            </div>
+          </div>
+          <div class="journey-card__platforms">
+            <span class="platform-chip platform-chip--fail">ios</span><span class="platform-chip platform-chip--fail">ipad</span><span class="platform-chip platform-chip--pass">android</span><span class="platform-chip platform-chip--pass">+3</span>
+          </div>
+        </a>
+    
+
+        <a href="#" class="journey-card">
+          <div class="journey-card__header">
+            <div>
+              <div class="journey-card__id">J15</div>
+              <h3 class="journey-card__title">Constellation Sync</h3>
+              <p class="journey-card__desc">Verifies multi-device synchronization across constellation (</p>
+            </div>
+            <div class="journey-card__status journey-card__status--pending">
+              <span class="journey-card__status-dot"></span>
+              Pending
+            </div>
+          </div>
+          <div class="journey-card__scores">
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Technical</div>
+            </div>
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Access</div>
+            </div>
+            <div class="score-badge">
+              <div class="score-badge__value">--</div>
+              <div class="score-badge__label">Visual</div>
+            </div>
+          </div>
+          <div class="journey-card__platforms">
+            
+            <span class="platform-chip">iOS</span>
+            <span class="platform-chip">Android</span>
+            <span class="platform-chip">+6</span>
+        
+          </div>
+        </a>
+    
+      </div>
+    </section>
+    <section class="gemini-section">
+      <div class="section-header">
+        <h2 class="section-header__title">Gemini Analysis Summary</h2>
+        <span class="section-header__badge">AI-Powered QA</span>
+      </div>
+      <div class="gemini-card">
+        <div class="gemini-card__header">
+          <div class="gemini-card__icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="gemini-card__title">Visual Inspection Results</h3>
+            <p class="gemini-card__subtitle">Platform Analysis Summary</p>
+          </div>
+        </div>
+        <ul class="issues-list">
+          
+        <li class="issue-item">
+          <span class="issue-item__severity issue-item__severity--critical"></span>
+          <div class="issue-item__content">
+            <div class="issue-item__platform">ios</div>
+            <div class="issue-item__desc">The screen is the Home screen and not the expected 'Add Device Entry' screen, lacking the necessary elements for device pairing. The required 'Add', '</div>
+          </div>
+        </li>
+    
+
+        <li class="issue-item">
+          <span class="issue-item__severity issue-item__severity--critical"></span>
+          <div class="issue-item__content">
+            <div class="issue-item__platform">ipad</div>
+            <div class="issue-item__desc">The screen shown is the home screen instead of Add Device Entry screen. The Journey FAILS.</div>
+          </div>
+        </li>
+    
+
+        <li class="issue-item">
+          <span class="issue-item__severity issue-item__severity--critical"></span>
+          <div class="issue-item__content">
+            <div class="issue-item__platform">android</div>
+            <div class="issue-item__desc">The Home screen is displayed instead of the Add Device Entry screen in the Device Pairing Journey, causing the test to fail. All required elements rel</div>
+          </div>
+        </li>
+    
+
+        <li class="issue-item">
+          <span class="issue-item__severity issue-item__severity--critical"></span>
+          <div class="issue-item__content">
+            <div class="issue-item__platform">visionos</div>
+            <div class="issue-item__desc">The application presents the wrong screen, showing the Home screen with Kagami controls instead of the Device Pairing entry screen.</div>
+          </div>
+        </li>
+    
+
+        <li class="issue-item">
+          <span class="issue-item__severity issue-item__severity--info"></span>
+          <div class="issue-item__content">
+            <div class="issue-item__platform">desktop</div>
+            <div class="issue-item__desc">The add device entry screen functions as expected with all required elements visible and a clean user interface.</div>
+          </div>
+        </li>
+    
+
+        <li class="issue-item">
+          <span class="issue-item__severity issue-item__severity--critical"></span>
+          <div class="issue-item__content">
+            <div class="issue-item__platform">ios</div>
+            <div class="issue-item__desc">The Welcome Screen is critically flawed due to missing required elements ('Kagami' branding and 'Get Started' button), rendering the screen non-functi</div>
+          </div>
+        </li>
+    
+
+        <li class="issue-item">
+          <span class="issue-item__severity issue-item__severity--critical"></span>
+          <div class="issue-item__content">
+            <div class="issue-item__platform">ipad</div>
+            <div class="issue-item__desc">The application launches into a login screen instead of displaying the expected welcome screen for the onboarding flow, which fails the test case.</div>
+          </div>
+        </li>
+    
+
+        <li class="issue-item">
+          <span class="issue-item__severity issue-item__severity--critical"></span>
+          <div class="issue-item__content">
+            <div class="issue-item__platform">android</div>
+            <div class="issue-item__desc">The Welcome Screen is incomplete, missing the 'Kagami' branding and the 'Get Started' button, rendering the screen useless.</div>
+          </div>
+        </li>
+    
+
+        <li class="issue-item">
+          <span class="issue-item__severity issue-item__severity--critical"></span>
+          <div class="issue-item__content">
+            <div class="issue-item__platform">wearos</div>
+            <div class="issue-item__desc">The Welcome screen is missing the crucial 'Get Started' button, preventing user from beginning the onboarding flow and therefore failing the Phase's c</div>
+          </div>
+        </li>
+    
+
+        <li class="issue-item">
+          <span class="issue-item__severity issue-item__severity--critical"></span>
+          <div class="issue-item__content">
+            <div class="issue-item__platform">watchos</div>
+            <div class="issue-item__desc">The welcome screen is missing a 'Get Started' button, making it impossible for the user to start the onboarding flow.  This is a critical issue.</div>
+          </div>
+        </li>
+    
+        </ul>
+      </div>
+    </section>
+    <footer class="footer">
+      <p>Kagami QA Pipeline v2.0</p>
+      <p class="footer__timestamp">Generated: 2026-01-16 07:51:25 UTC</p>
+    </footer>
+  </div>
+</body>
+</html>

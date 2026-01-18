@@ -1,0 +1,244 @@
+# Kagami Android - Onboarding Flow E2E Test
+#
+# Tests the complete onboarding wizard from first launch to completion.
+# Validates each step of the onboarding process.
+#
+# Prerequisites:
+#   - Fresh app install (clear data before running)
+#   - Network connectivity to Kagami server
+#
+# h(x) >= 0. Always.
+
+appId: com.kagami.android
+name: "Onboarding Flow - Complete First Launch Experience"
+tags:
+  - e2e
+  - onboarding
+  - critical
+
+---
+
+# ============================================================================
+# STEP 1: WELCOME SCREEN
+# ============================================================================
+- assertVisible:
+    text: "Welcome to Kagami"
+    description: "Verify welcome screen is displayed"
+
+- assertVisible:
+    text: "Your Personal Home Intelligence"
+
+- assertVisible:
+    text: "Smart Home Control"
+    description: "Verify feature highlights are shown"
+
+- assertVisible:
+    text: "Voice Commands"
+
+- assertVisible:
+    text: "Safety First"
+
+# Take screenshot of welcome screen
+- takeScreenshot:
+    path: "screenshots/onboarding_01_welcome"
+
+# Tap Get Started button
+- tapOn:
+    text: "Get Started"
+    description: "Tap Get Started to proceed"
+
+# ============================================================================
+# STEP 2: SERVER CONNECTION
+# ============================================================================
+- assertVisible:
+    text: "Connect to Kagami"
+    description: "Verify server connection screen"
+
+- assertVisible:
+    text: "Server URL"
+
+# Take screenshot of server connection screen
+- takeScreenshot:
+    path: "screenshots/onboarding_02_server_connection"
+
+# Try auto-discovery first
+- tapOn:
+    id: "discover_button"
+    optional: true
+    description: "Attempt server auto-discovery"
+
+- waitForAnimationToEnd
+
+# If no server found, enter manually
+- inputText:
+    id: "server_url_input"
+    text: "http://kagami.local:8001"
+    description: "Enter server URL"
+    optional: true
+
+# Test connection
+- tapOn:
+    text: "Test Connection"
+    description: "Test server connection"
+
+# Wait for connection result
+- extendedWaitUntil:
+    visible:
+      text: "Connected"
+    timeout: 15000
+    description: "Wait for successful connection"
+
+- takeScreenshot:
+    path: "screenshots/onboarding_02b_server_connected"
+
+# Proceed to next step
+- tapOn:
+    text: "Continue"
+
+# ============================================================================
+# STEP 3: SMART HOME INTEGRATION
+# ============================================================================
+- assertVisible:
+    text: "Smart Home Integration"
+    description: "Verify integration selection screen"
+
+- assertVisible:
+    text: "Control4"
+
+- assertVisible:
+    text: "Lutron"
+
+# Take screenshot of integration selection
+- takeScreenshot:
+    path: "screenshots/onboarding_03_integration_selection"
+
+# Select Control4 integration (or skip if not available)
+- tapOn:
+    text: "Control4"
+    optional: true
+    description: "Select Control4 integration"
+
+# If integration selected, fill credentials
+- runFlow:
+    when:
+      visible:
+        text: "Controller IP"
+    commands:
+      - inputText:
+          id: "host_input"
+          text: "192.168.1.100"
+      - inputText:
+          id: "port_input"
+          text: "8750"
+      - tapOn:
+          text: "Connect Control4"
+      - waitForAnimationToEnd
+
+# Or skip this step
+- tapOn:
+    text: "Skip"
+    optional: true
+    description: "Skip integration if not needed"
+
+- tapOn:
+    text: "Continue"
+
+# ============================================================================
+# STEP 4: ROOM CONFIGURATION
+# ============================================================================
+- assertVisible:
+    text: "Configure Rooms"
+    description: "Verify room configuration screen"
+
+# Take screenshot of room selection
+- takeScreenshot:
+    path: "screenshots/onboarding_04_room_configuration"
+
+# Verify room list or empty state
+- runFlow:
+    when:
+      visible:
+        text: "Select All"
+    commands:
+      - tapOn:
+          text: "Select All"
+          description: "Select all available rooms"
+      - takeScreenshot:
+          path: "screenshots/onboarding_04b_rooms_selected"
+
+- tapOn:
+    text: "Continue"
+
+# ============================================================================
+# STEP 5: PERMISSIONS
+# ============================================================================
+- assertVisible:
+    text: "Permissions"
+    description: "Verify permissions screen"
+
+- assertVisible:
+    text: "Notifications"
+
+- assertVisible:
+    text: "Location"
+
+# Take screenshot of permissions screen
+- takeScreenshot:
+    path: "screenshots/onboarding_05_permissions"
+
+# Grant notification permission if requested
+- tapOn:
+    text: "Allow"
+    index: 0
+    optional: true
+    description: "Grant notification permission"
+
+# Handle system permission dialog
+- runFlow:
+    when:
+      visible:
+        text: "Allow"
+    commands:
+      - tapOn:
+          text: "Allow"
+          optional: true
+
+# Skip location permission for now
+- tapOn:
+    text: "Continue"
+
+# ============================================================================
+# STEP 6: COMPLETION
+# ============================================================================
+- assertVisible:
+    text: "You're All Set!"
+    description: "Verify completion screen"
+
+- assertVisible:
+    text: "Kagami is ready to control your home"
+
+- assertVisible:
+    text: "h(x) >= 0. Always."
+
+# Take screenshot of completion screen
+- takeScreenshot:
+    path: "screenshots/onboarding_06_completion"
+
+# Finish onboarding
+- tapOn:
+    text: "Start Using Kagami"
+    description: "Complete onboarding and enter app"
+
+# ============================================================================
+# VERIFY HOME SCREEN
+# ============================================================================
+- assertVisible:
+    text: "Kagami"
+    description: "Verify landed on home screen after onboarding"
+
+- takeScreenshot:
+    path: "screenshots/onboarding_07_home_after_complete"
+
+# ============================================================================
+# Test completed successfully
+# ============================================================================

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Monitor - Kagami</title>
+    <link rel="stylesheet" href="css/design-tokens.generated.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            font-family: var(--kagami-font-family);
+            background: var(--kagami-void);
+            color: var(--kagami-text-primary);
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .monitor {
+            padding: var(--kagami-space-md);
+            padding-top: calc(var(--kagami-space-md) + 28px);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--kagami-space-md);
+        }
+
+        .title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: var(--kagami-radius-xs);
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .status-badge.idle {
+            background: var(--kagami-carbon);
+            color: var(--kagami-text-secondary);
+        }
+
+        .status-badge.listening {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--kagami-status-success);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .status-badge.processing {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--kagami-beacon);
+        }
+
+        .status-badge.speaking {
+            background: rgba(255, 107, 53, 0.2);
+            color: var(--kagami-spark);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .waveform-container {
+            flex: 1;
+            background: var(--kagami-voidWarm);
+            border-radius: var(--kagami-radius-md);
+            border: 1px solid var(--kagami-carbon);
+            padding: var(--kagami-space-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: var(--kagami-space-md);
+        }
+
+        .waveform {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            height: 60px;
+        }
+
+        .waveform-bar {
+            width: 4px;
+            background: var(--kagami-spark);
+            border-radius: 2px;
+            animation: wave 0.5s ease-in-out infinite;
+        }
+
+        .waveform-bar:nth-child(1) { animation-delay: 0.0s; }
+        .waveform-bar:nth-child(2) { animation-delay: 0.1s; }
+        .waveform-bar:nth-child(3) { animation-delay: 0.2s; }
+        .waveform-bar:nth-child(4) { animation-delay: 0.3s; }
+        .waveform-bar:nth-child(5) { animation-delay: 0.4s; }
+        .waveform-bar:nth-child(6) { animation-delay: 0.3s; }
+        .waveform-bar:nth-child(7) { animation-delay: 0.2s; }
+        .waveform-bar:nth-child(8) { animation-delay: 0.1s; }
+
+        @keyframes wave {
+            0%, 100% { height: 10px; }
+            50% { height: 50px; }
+        }
+
+        .waveform.idle .waveform-bar {
+            animation: none;
+            height: 4px;
+            background: var(--kagami-carbon);
+        }
+
+        .transcript {
+            background: var(--kagami-voidWarm);
+            border-radius: var(--kagami-radius-md);
+            border: 1px solid var(--kagami-carbon);
+            padding: var(--kagami-space-md);
+            max-height: 100px;
+            overflow-y: auto;
+            margin-bottom: var(--kagami-space-md);
+        }
+
+        .transcript-text {
+            font-size: 13px;
+            color: var(--kagami-text-secondary);
+            line-height: 1.5;
+        }
+
+        .transcript-text.active {
+            color: var(--kagami-text-primary);
+        }
+
+        .controls {
+            display: flex;
+            gap: var(--kagami-space-sm);
+        }
+
+        .control-btn {
+            flex: 1;
+            padding: var(--kagami-space-sm) var(--kagami-space-md);
+            border-radius: var(--kagami-radius-sm);
+            border: 1px solid var(--kagami-carbon);
+            background: var(--kagami-voidWarm);
+            color: var(--kagami-text-primary);
+            font-size: 13px;
+            font-family: var(--kagami-font-family);
+            cursor: pointer;
+            transition: all var(--kagami-dur-fast) var(--kagami-ease-cusp);
+        }
+
+        .control-btn:hover {
+            background: var(--kagami-obsidian);
+        }
+
+        .control-btn.primary {
+            background: var(--kagami-spark);
+            border-color: var(--kagami-spark);
+            color: white;
+        }
+
+        .control-btn.primary:hover {
+            opacity: 0.9;
+        }
+
+        .control-btn.recording {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: var(--kagami-status-error);
+            color: var(--kagami-status-error);
+        }
+
+        .level-meter {
+            display: flex;
+            align-items: center;
+            gap: var(--kagami-space-sm);
+            margin-bottom: var(--kagami-space-md);
+        }
+
+        .level-label {
+            font-size: 11px;
+            color: var(--kagami-text-tertiary);
+            width: 60px;
+        }
+
+        .level-bar {
+            flex: 1;
+            height: 6px;
+            background: var(--kagami-carbon);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .level-fill {
+            height: 100%;
+            background: var(--kagami-spark);
+            border-radius: 3px;
+            transition: width 50ms linear;
+        }
+
+        .level-value {
+            font-size: 11px;
+            color: var(--kagami-text-tertiary);
+            width: 50px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="monitor">
+        <header class="header">
+            <h1 class="title">Voice Monitor</h1>
+            <span class="status-badge idle" id="status-badge">Idle</span>
+        </header>
+
+        <div class="level-meter">
+            <span class="level-label">Input Level</span>
+            <div class="level-bar">
+                <div class="level-fill" id="level-fill" style="width: 0%"></div>
+            </div>
+            <span class="level-value" id="level-value">-60 dB</span>
+        </div>
+
+        <div class="waveform-container">
+            <div class="waveform idle" id="waveform">
+                <div class="waveform-bar"></div>
+                <div class="waveform-bar"></div>
+                <div class="waveform-bar"></div>
+                <div class="waveform-bar"></div>
+                <div class="waveform-bar"></div>
+                <div class="waveform-bar"></div>
+                <div class="waveform-bar"></div>
+                <div class="waveform-bar"></div>
+            </div>
+        </div>
+
+        <div class="transcript">
+            <p class="transcript-text" id="transcript">Press "Start Listening" to begin voice capture...</p>
+        </div>
+
+        <div class="controls">
+            <button class="control-btn primary" id="listen-btn">Start Listening</button>
+            <button class="control-btn" id="clear-btn">Clear</button>
+        </div>
+    </div>
+
+    <script type="module">
+        const isTauri = window.__TAURI_INTERNALS__ !== undefined;
+        let invoke, listen;
+
+        if (isTauri) {
+            const core = await import('@tauri-apps/api/core');
+            const event = await import('@tauri-apps/api/event');
+            invoke = core.invoke;
+            listen = event.listen;
+        }
+
+        const statusBadge = document.getElementById('status-badge');
+        const waveform = document.getElementById('waveform');
+        const transcript = document.getElementById('transcript');
+        const listenBtn = document.getElementById('listen-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const levelFill = document.getElementById('level-fill');
+        const levelValue = document.getElementById('level-value');
+
+        let isListening = false;
+
+        function setStatus(status) {
+            statusBadge.className = 'status-badge ' + status;
+            statusBadge.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+            waveform.className = 'waveform ' + (status === 'listening' ? '' : 'idle');
+        }
+
+        function updateLevel(db) {
+            const normalized = Math.max(0, Math.min(100, (db + 60) * (100 / 60)));
+            levelFill.style.width = normalized + '%';
+            levelValue.textContent = db.toFixed(0) + ' dB';
+        }
+
+        listenBtn.addEventListener('click', async () => {
+            if (!isListening) {
+                isListening = true;
+                listenBtn.textContent = 'Stop';
+                listenBtn.classList.add('recording');
+                setStatus('listening');
+                transcript.classList.add('active');
+
+                if (isTauri) {
+                    await invoke('start_voice_capture');
+                }
+            } else {
+                isListening = false;
+                listenBtn.textContent = 'Start Listening';
+                listenBtn.classList.remove('recording');
+                setStatus('processing');
+
+                if (isTauri) {
+                    const text = await invoke('stop_voice_capture');
+                    if (text) {
+                        transcript.textContent = text;
+                    }
+                }
+
+                setTimeout(() => setStatus('idle'), 500);
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            transcript.textContent = 'Press "Start Listening" to begin voice capture...';
+            transcript.classList.remove('active');
+        });
+
+        // Poll ambient audio state
+        if (isTauri) {
+            setInterval(async () => {
+                try {
+                    const state = await invoke('get_ambient_audio_state');
+                    updateLevel(state.level_db);
+                } catch {}
+            }, 100);
+        }
+    </script>
+</body>
+</html>

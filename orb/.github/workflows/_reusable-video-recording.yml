@@ -1,0 +1,297 @@
+# Reusable Video Recording Workflow Component
+#
+# Provides standardized video recording functionality for E2E tests.
+# Use this template for consistent video capture across platforms.
+#
+# Usage:
+#   jobs:
+#     ios-tests:
+#       uses: ./.github/workflows/_reusable-video-recording.yml
+#       with:
+#         platform: ios
+#         device-id: ${{ needs.setup.outputs.device_id }}
+#         working-directory: apps/ios/KagamiApp
+#         test-command: 'xcodebuild test ...'
+#       secrets:
+#         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+name: Reusable Video Recording
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        description: 'Platform identifier (ios, android, tvos, visionos, desktop)'
+        required: true
+        type: string
+      device-id:
+        description: 'Device/Simulator ID for recording'
+        required: false
+        type: string
+        default: ''
+      working-directory:
+        description: 'Working directory for test execution'
+        required: true
+        type: string
+      test-command:
+        description: 'Command to run tests'
+        required: true
+        type: string
+      video-codec:
+        description: 'Video codec for recording (h264, hevc)'
+        required: false
+        type: string
+        default: 'h264'
+      max-duration:
+        description: 'Maximum recording duration in seconds'
+        required: false
+        type: number
+        default: 300
+      compress-video:
+        description: 'Whether to compress video after recording'
+        required: false
+        type: boolean
+        default: true
+      artifact-retention-days:
+        description: 'Number of days to retain video artifacts'
+        required: false
+        type: number
+        default: 30
+      run-gemini-analysis:
+        description: 'Run Gemini AI analysis on recorded video'
+        required: false
+        type: boolean
+        default: false
+
+    secrets:
+      GEMINI_API_KEY:
+        description: 'API key for Gemini AI video analysis'
+        required: false
+
+    outputs:
+      video-path:
+        description: 'Path to the recorded video file'
+        value: ${{ jobs.record.outputs.video_path }}
+      has-issues:
+        description: 'Whether Gemini analysis found issues'
+        value: ${{ jobs.analyze.outputs.has_issues }}
+      issue-count:
+        description: 'Number of issues found by Gemini'
+        value: ${{ jobs.analyze.outputs.issue_count }}
+
+jobs:
+  record:
+    name: Record Video (${{ inputs.platform }})
+    runs-on: ${{ inputs.platform == 'android' && 'ubuntu-latest' || 'macos-14' }}
+    timeout-minutes: 45
+    outputs:
+      video_path: ${{ steps.finalize.outputs.video_path }}
+
+    steps:
+      - name: Create output directories
+        run: |
+          mkdir -p /tmp/video-recording/${{ inputs.platform }}
+          mkdir -p /tmp/video-metadata/${{ inputs.platform }}
+
+      - name: Start iOS/tvOS/visionOS Recording
+        if: contains(fromJSON('["ios", "tvos", "visionos"]'), inputs.platform)
+        id: start_apple
+        run: |
+          VIDEO_FILE="/tmp/video-recording/${{ inputs.platform }}/recording-$(date +%Y%m%d_%H%M%S).mp4"
+          xcrun simctl io "${{ inputs.device-id }}" recordVideo \
+            --codec=${{ inputs.video-codec }} \
+            "$VIDEO_FILE" &
+          RECORD_PID=$!
+          echo $RECORD_PID > /tmp/record_pid.txt
+          echo "video_file=$VIDEO_FILE" >> $GITHUB_OUTPUT
+          sleep 2
+
+      - name: Start Android Recording
+        if: inputs.platform == 'android'
+        id: start_android
+        run: |
+          VIDEO_FILE="/tmp/video-recording/${{ inputs.platform }}/recording-$(date +%Y%m%d_%H%M%S).mp4"
+          adb shell screenrecord \
+            --time-limit ${{ inputs.max-duration }} \
+            /sdcard/screen_recording.mp4 &
+          RECORD_PID=$!
+          echo $RECORD_PID > /tmp/record_pid.txt
+          echo "video_file=$VIDEO_FILE" >> $GITHUB_OUTPUT
+          sleep 2
+
+      - name: Run Tests
+        id: tests
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          START_TIME=$(date +%s)
+          ${{ inputs.test-command }} 2>&1 | tee /tmp/test_output.log || true
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "duration=$DURATION" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Stop iOS/tvOS/visionOS Recording
+        if: contains(fromJSON('["ios", "tvos", "visionos"]'), inputs.platform) && always()
+        run: |
+          if [ -f /tmp/record_pid.txt ]; then
+            kill $(cat /tmp/record_pid.txt) 2>/dev/null || true
+            sleep 3
+          fi
+
+      - name: Stop and Pull Android Recording
+        if: inputs.platform == 'android' && always()
+        run: |
+          if [ -f /tmp/record_pid.txt ]; then
+            kill $(cat /tmp/record_pid.txt) 2>/dev/null || true
+            sleep 3
+          fi
+          adb pull /sdcard/screen_recording.mp4 "${{ steps.start_android.outputs.video_file }}" || true
+
+      - name: Compress Video
+        if: inputs.compress-video && always()
+        run: |
+          VIDEO_FILE="${{ steps.start_apple.outputs.video_file || steps.start_android.outputs.video_file }}"
+          if [ -f "$VIDEO_FILE" ]; then
+            ffmpeg -i "$VIDEO_FILE" \
+              -vcodec libx264 -crf 28 -preset fast \
+              -acodec aac -b:a 64k \
+              "${VIDEO_FILE%.mp4}_compressed.mp4" 2>/dev/null || true
+            if [ -f "${VIDEO_FILE%.mp4}_compressed.mp4" ]; then
+              mv "${VIDEO_FILE%.mp4}_compressed.mp4" "$VIDEO_FILE"
+            fi
+          fi
+
+      - name: Generate Metadata
+        if: always()
+        run: |
+          VIDEO_FILE="${{ steps.start_apple.outputs.video_file || steps.start_android.outputs.video_file }}"
+          cat > /tmp/video-metadata/${{ inputs.platform }}/metadata.json << EOF
+          {
+            "platform": "${{ inputs.platform }}",
+            "device_id": "${{ inputs.device-id }}",
+            "video_file": "$(basename $VIDEO_FILE)",
+            "codec": "${{ inputs.video-codec }}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "test_duration_seconds": ${{ steps.tests.outputs.duration || 0 }},
+            "test_result": "${{ steps.tests.outcome }}",
+            "compressed": ${{ inputs.compress-video }}
+          }
+          EOF
+
+      - name: Finalize
+        id: finalize
+        if: always()
+        run: |
+          VIDEO_FILE="${{ steps.start_apple.outputs.video_file || steps.start_android.outputs.video_file }}"
+          echo "video_path=$VIDEO_FILE" >> $GITHUB_OUTPUT
+
+      - name: Upload Video
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-${{ inputs.platform }}-${{ github.run_id }}
+          path: /tmp/video-recording/${{ inputs.platform }}
+          retention-days: ${{ inputs.artifact-retention-days }}
+
+      - name: Upload Metadata
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-metadata-${{ inputs.platform }}-${{ github.run_id }}
+          path: /tmp/video-metadata/${{ inputs.platform }}
+          retention-days: ${{ inputs.artifact-retention-days }}
+
+  analyze:
+    name: Analyze Video (${{ inputs.platform }})
+    runs-on: ubuntu-latest
+    needs: record
+    if: inputs.run-gemini-analysis && always() && needs.record.result == 'success'
+    timeout-minutes: 15
+    outputs:
+      has_issues: ${{ steps.analyze.outputs.has_issues }}
+      issue_count: ${{ steps.analyze.outputs.issue_count }}
+
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install google-generativeai
+
+      - name: Download video
+        uses: actions/download-artifact@v4
+        with:
+          name: video-${{ inputs.platform }}-${{ github.run_id }}
+          path: /tmp/videos
+
+      - name: Analyze with Gemini
+        id: analyze
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}  # pragma: allowlist secret
+        run: |
+          cat > /tmp/analyze.py << 'SCRIPT'
+          import os
+          import json
+          import glob
+
+          try:
+              import google.generativeai as genai
+              GEMINI_AVAILABLE = True
+          except ImportError:
+              GEMINI_AVAILABLE = False
+
+          def main():
+              api_key = os.environ.get('GEMINI_API_KEY')
+              platform = "${{ inputs.platform }}"
+
+              if not GEMINI_AVAILABLE or not api_key:
+                  print("has_issues=false")
+                  print("issue_count=0")
+                  return
+
+              genai.configure(api_key=api_key)
+              model = genai.GenerativeModel('gemini-1.5-pro-latest')
+
+              video_files = glob.glob('/tmp/videos/**/*.mp4', recursive=True)
+              if not video_files:
+                  print("has_issues=false")
+                  print("issue_count=0")
+                  return
+
+              video_path = video_files[0]
+              video_file = genai.upload_file(video_path)
+
+              prompt = f"""
+              Analyze this {platform} app test recording for issues.
+              Return JSON with: {{"issues": [{{"severity": "critical/high/medium/low", "description": "..."}}], "issue_count": N}}
+              """
+
+              try:
+                  response = model.generate_content([video_file, prompt])
+                  text = response.text
+                  json_start = text.find('{')
+                  json_end = text.rfind('}') + 1
+                  if json_start >= 0:
+                      result = json.loads(text[json_start:json_end])
+                      issue_count = result.get('issue_count', len(result.get('issues', [])))
+                      has_critical = any(i.get('severity') == 'critical' for i in result.get('issues', []))
+
+                      with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
+                          f.write(f"has_issues={str(has_critical or issue_count > 0).lower()}\n")
+                          f.write(f"issue_count={issue_count}\n")
+                      return
+
+              except Exception as e:
+                  print(f"Analysis error: {e}")
+
+              with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
+                  f.write("has_issues=false\n")
+                  f.write("issue_count=0\n")
+
+          if __name__ == "__main__":
+              main()
+          SCRIPT
+
+          python /tmp/analyze.py

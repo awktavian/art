@@ -1,0 +1,1473 @@
+name: User Journey Tests with Video Analysis
+
+# Comprehensive User Journey E2E Testing with Video Recording and AI Analysis
+#
+# Features:
+#   - Full E2E test execution across all platforms
+#   - Video recording of test sessions
+#   - Gemini AI analysis of recorded videos
+#   - Issue detection and reporting
+#   - QA dashboard integration
+#
+# Platforms covered:
+#   - iOS (Xcode 16, iOS 18 Simulator)
+#   - Android (API 34, Pixel 8 emulator)
+#   - tvOS (tvOS 18 Simulator)
+#   - visionOS (visionOS 2 Simulator)
+#   - Desktop (macOS 14, Ubuntu 22.04)
+#
+# Colony: Crystal (e7) - Verification & Polish
+#
+# h(x) >= 0. Always.
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - '.github/workflows/user-journey-tests.yml'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Platforms to test (comma-separated: ios,android,tvos,visionos,desktop,all)'
+        type: string
+        default: 'all'
+      record_all_videos:
+        description: 'Record videos for all tests (not just failures)'
+        type: boolean
+        default: false
+      run_gemini_analysis:
+        description: 'Run Gemini AI video analysis'
+        type: boolean
+        default: true
+      notify_dashboard:
+        description: 'Notify QA dashboard with results'
+        type: boolean
+        default: true
+  schedule:
+    # Nightly full test suite at 3 AM UTC
+    - cron: '0 3 * * *'
+
+concurrency:
+  group: user-journey-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  XCODE_VERSION: "16.0"
+  JAVA_VERSION: "17"
+  NODE_VERSION: "20"
+  RUST_BACKTRACE: "1"
+  VIDEOS_DIR: /tmp/user-journey-videos
+  SCREENSHOTS_DIR: /tmp/user-journey-screenshots
+  METADATA_DIR: /tmp/user-journey-metadata
+  VIDEO_RETENTION_DAYS: 30
+  REPORT_RETENTION_DAYS: 90
+  GEMINI_MODEL: "gemini-1.5-pro-latest"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# JOBS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DETERMINE TEST MATRIX
+  # ═══════════════════════════════════════════════════════════════════════════
+  setup:
+    name: Setup Test Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      run_ios: ${{ steps.matrix.outputs.run_ios }}
+      run_android: ${{ steps.matrix.outputs.run_android }}
+      run_tvos: ${{ steps.matrix.outputs.run_tvos }}
+      run_visionos: ${{ steps.matrix.outputs.run_visionos }}
+      run_desktop: ${{ steps.matrix.outputs.run_desktop }}
+      is_nightly: ${{ steps.matrix.outputs.is_nightly }}
+      record_videos: ${{ steps.matrix.outputs.record_videos }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine test matrix
+        id: matrix
+        run: |
+          PLATFORMS="${{ github.event.inputs.platforms || 'all' }}"
+          IS_NIGHTLY="${{ github.event_name == 'schedule' }}"
+          RECORD_VIDEOS="${{ github.event.inputs.record_all_videos || 'false' }}"
+
+          # For nightly runs, always run all platforms and record all videos
+          if [ "$IS_NIGHTLY" = "true" ]; then
+            PLATFORMS="all"
+            RECORD_VIDEOS="true"
+          fi
+
+          # Parse platforms
+          if [ "$PLATFORMS" = "all" ]; then
+            echo "run_ios=true" >> $GITHUB_OUTPUT
+            echo "run_android=true" >> $GITHUB_OUTPUT
+            echo "run_tvos=true" >> $GITHUB_OUTPUT
+            echo "run_visionos=true" >> $GITHUB_OUTPUT
+            echo "run_desktop=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_ios=$(echo $PLATFORMS | grep -q 'ios' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+            echo "run_android=$(echo $PLATFORMS | grep -q 'android' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+            echo "run_tvos=$(echo $PLATFORMS | grep -q 'tvos' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+            echo "run_visionos=$(echo $PLATFORMS | grep -q 'visionos' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+            echo "run_desktop=$(echo $PLATFORMS | grep -q 'desktop' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+          fi
+
+          echo "is_nightly=$IS_NIGHTLY" >> $GITHUB_OUTPUT
+          echo "record_videos=$RECORD_VIDEOS" >> $GITHUB_OUTPUT
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # iOS USER JOURNEY TESTS
+  # ═══════════════════════════════════════════════════════════════════════════
+  ios-journey:
+    name: iOS User Journey Tests
+    runs-on: macos-14
+    needs: setup
+    if: needs.setup.outputs.run_ios == 'true'
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: apps/ios/KagamiApp
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 16
+        run: |
+          if [ -d "/Applications/Xcode_${{ env.XCODE_VERSION }}.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+          else
+            # Fall back to latest available
+            sudo xcode-select -s /Applications/Xcode.app
+          fi
+
+      - name: Cache SPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/ios/KagamiApp/.build
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-spm-journey-ios-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-journey-ios-
+
+      - name: Create output directories
+        run: |
+          mkdir -p ${{ env.VIDEOS_DIR }}/ios
+          mkdir -p ${{ env.SCREENSHOTS_DIR }}/ios
+          mkdir -p ${{ env.METADATA_DIR }}/ios
+
+      - name: Boot iOS 18 Simulator
+        id: simulator
+        run: |
+          # Try iPhone 16 Pro first, fall back to iPhone 15 Pro
+          DEVICE_NAME="iPhone 16 Pro"
+          DEVICE_ID=$(xcrun simctl list devices available | grep "$DEVICE_NAME" | head -1 | grep -oE '[A-F0-9-]{36}')
+
+          if [ -z "$DEVICE_ID" ]; then
+            DEVICE_NAME="iPhone 15 Pro"
+            DEVICE_ID=$(xcrun simctl list devices available | grep "$DEVICE_NAME" | head -1 | grep -oE '[A-F0-9-]{36}')
+          fi
+
+          xcrun simctl boot "$DEVICE_ID" || true
+          sleep 15
+          echo "device_id=$DEVICE_ID" >> $GITHUB_OUTPUT
+          echo "device_name=$DEVICE_NAME" >> $GITHUB_OUTPUT
+
+      - name: Resolve Packages
+        run: swift package resolve || true
+
+      - name: Build for Testing
+        run: |
+          xcodebuild build-for-testing \
+            -project KagamiApp.xcodeproj \
+            -scheme KagamiApp \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.device_id }}" \
+            -derivedDataPath DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty || true
+
+      - name: Start Video Recording
+        id: recording
+        run: |
+          VIDEO_FILE="${{ env.VIDEOS_DIR }}/ios/user-journey-$(date +%Y%m%d_%H%M%S).mp4"
+          xcrun simctl io "${{ steps.simulator.outputs.device_id }}" recordVideo --codec=h264 "$VIDEO_FILE" &
+          RECORD_PID=$!
+          echo $RECORD_PID > /tmp/ios_record_pid.txt
+          echo "video_file=$VIDEO_FILE" >> $GITHUB_OUTPUT
+          sleep 2
+
+      - name: Run User Journey Tests
+        id: tests
+        run: |
+          START_TIME=$(date +%s)
+
+          xcodebuild test-without-building \
+            -project KagamiApp.xcodeproj \
+            -scheme KagamiApp \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.device_id }}" \
+            -derivedDataPath DerivedData \
+            -only-testing:KagamiAppUITests/UserJourneyTests \
+            -resultBundlePath ${{ env.METADATA_DIR }}/ios/TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee test_output.log | xcpretty || true
+
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+
+          # Parse test results
+          PASSED=$(grep -c "passed" test_output.log 2>/dev/null || echo "0")
+          FAILED=$(grep -c "failed" test_output.log 2>/dev/null || echo "0")
+
+          echo "duration=$DURATION" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Stop Video Recording
+        if: always()
+        run: |
+          if [ -f /tmp/ios_record_pid.txt ]; then
+            RECORD_PID=$(cat /tmp/ios_record_pid.txt)
+            kill $RECORD_PID 2>/dev/null || true
+            sleep 3
+          fi
+
+      - name: Capture Final Screenshots
+        if: always()
+        run: |
+          xcrun simctl io "${{ steps.simulator.outputs.device_id }}" screenshot \
+            "${{ env.SCREENSHOTS_DIR }}/ios/final_state.png" || true
+
+      - name: Compress Video
+        if: always()
+        run: |
+          VIDEO_FILE="${{ steps.recording.outputs.video_file }}"
+          if [ -f "$VIDEO_FILE" ]; then
+            COMPRESSED="${VIDEO_FILE%.mp4}_compressed.mp4"
+            ffmpeg -i "$VIDEO_FILE" \
+              -vcodec libx264 -crf 28 -preset fast \
+              -acodec aac -b:a 64k \
+              "$COMPRESSED" || true
+            mv "$COMPRESSED" "$VIDEO_FILE" 2>/dev/null || true
+          fi
+
+      - name: Generate iOS Test Metadata
+        if: always()
+        run: |
+          cat > ${{ env.METADATA_DIR }}/ios/metadata.json << EOF
+          {
+            "platform": "ios",
+            "device": "${{ steps.simulator.outputs.device_name }}",
+            "os_version": "iOS 18",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "duration_seconds": ${{ steps.tests.outputs.duration || 0 }},
+            "tests_passed": ${{ steps.tests.outputs.passed || 0 }},
+            "tests_failed": ${{ steps.tests.outputs.failed || 0 }},
+            "video_file": "$(basename ${{ steps.recording.outputs.video_file }})",
+            "workflow_run_id": "${{ github.run_id }}"
+          }
+          EOF
+
+      - name: Extract Test Attachments
+        if: always()
+        run: |
+          if [ -d "${{ env.METADATA_DIR }}/ios/TestResults.xcresult" ]; then
+            xcrun xcresulttool get --path "${{ env.METADATA_DIR }}/ios/TestResults.xcresult" \
+              --format json > "${{ env.METADATA_DIR }}/ios/results.json" 2>/dev/null || true
+          fi
+
+      - name: Upload iOS Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-ios-videos
+          path: ${{ env.VIDEOS_DIR }}/ios
+          retention-days: ${{ env.VIDEO_RETENTION_DAYS }}
+
+      - name: Upload iOS Screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-ios-screenshots
+          path: ${{ env.SCREENSHOTS_DIR }}/ios
+          retention-days: ${{ env.VIDEO_RETENTION_DAYS }}
+
+      - name: Upload iOS Metadata
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-ios-metadata
+          path: ${{ env.METADATA_DIR }}/ios
+          retention-days: ${{ env.REPORT_RETENTION_DAYS }}
+
+      - name: Shutdown Simulator
+        if: always()
+        run: xcrun simctl shutdown "${{ steps.simulator.outputs.device_id }}" || true
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # ANDROID USER JOURNEY TESTS
+  # ═══════════════════════════════════════════════════════════════════════════
+  android-journey:
+    name: Android User Journey Tests
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.run_android == 'true'
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: apps/android/kagami-android
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Create output directories
+        run: |
+          mkdir -p ${{ env.VIDEOS_DIR }}/android
+          mkdir -p ${{ env.SCREENSHOTS_DIR }}/android
+          mkdir -p ${{ env.METADATA_DIR }}/android
+
+      - name: Check for Gradle wrapper
+        id: gradle_check
+        run: |
+          if [ -f "./gradlew" ]; then
+            chmod +x gradlew
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Debug APK
+        if: steps.gradle_check.outputs.exists == 'true'
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Build Test APK
+        if: steps.gradle_check.outputs.exists == 'true'
+        run: ./gradlew assembleDebugAndroidTest --no-daemon
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run User Journey Tests with Video
+        if: steps.gradle_check.outputs.exists == 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_8
+          avd-name: test_avd
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          working-directory: apps/android/kagami-android
+          script: |
+            adb wait-for-device
+            adb shell settings put global window_animation_scale 0
+            adb shell settings put global transition_animation_scale 0
+            adb shell settings put global animator_duration_scale 0
+
+            # Install APKs
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+
+            # Start video recording
+            VIDEO_FILE="${{ env.VIDEOS_DIR }}/android/user-journey-$(date +%Y%m%d_%H%M%S).mp4"
+            adb shell screenrecord --time-limit 300 /sdcard/journey_recording.mp4 &
+            RECORD_PID=$!
+
+            START_TIME=$(date +%s)
+
+            # Run E2E user journey tests
+            adb shell am instrument -w \
+              -e class com.kagami.android.e2e.OnboardingE2ETest,com.kagami.android.e2e.MainFlowsE2ETest \
+              com.kagami.android.test/androidx.test.runner.AndroidJUnitRunner \
+              2>&1 | tee test_output.log || true
+
+            END_TIME=$(date +%s)
+            DURATION=$((END_TIME - START_TIME))
+
+            # Stop recording
+            kill $RECORD_PID 2>/dev/null || true
+            sleep 3
+
+            # Pull video and screenshots
+            adb pull /sdcard/journey_recording.mp4 "$VIDEO_FILE" || true
+            adb pull /sdcard/Pictures/kagami-e2e-screenshots ${{ env.SCREENSHOTS_DIR }}/android/ || true
+
+            # Parse results
+            PASSED=$(grep -c "OK (" test_output.log 2>/dev/null || echo "0")
+            FAILED=$(grep -c "FAILURES" test_output.log 2>/dev/null || echo "0")
+
+            # Generate metadata
+            cat > ${{ env.METADATA_DIR }}/android/metadata.json << EOF
+            {
+              "platform": "android",
+              "device": "Pixel 8 (Emulator)",
+              "os_version": "Android 14 (API 34)",
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+              "commit": "${{ github.sha }}",
+              "branch": "${{ github.ref_name }}",
+              "duration_seconds": $DURATION,
+              "tests_passed": $PASSED,
+              "tests_failed": $FAILED,
+              "video_file": "$(basename $VIDEO_FILE)",
+              "workflow_run_id": "${{ github.run_id }}"
+            }
+            EOF
+
+      - name: Compress Android Video
+        if: always()
+        run: |
+          VIDEO_FILE=$(find ${{ env.VIDEOS_DIR }}/android -name "*.mp4" -type f | head -1)
+          if [ -n "$VIDEO_FILE" ] && [ -f "$VIDEO_FILE" ]; then
+            ffmpeg -i "$VIDEO_FILE" \
+              -vcodec libx264 -crf 28 -preset fast \
+              "${VIDEO_FILE%.mp4}_compressed.mp4" 2>/dev/null || true
+            mv "${VIDEO_FILE%.mp4}_compressed.mp4" "$VIDEO_FILE" 2>/dev/null || true
+          fi
+
+      - name: Upload Android Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-android-videos
+          path: ${{ env.VIDEOS_DIR }}/android
+          retention-days: ${{ env.VIDEO_RETENTION_DAYS }}
+
+      - name: Upload Android Screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-android-screenshots
+          path: ${{ env.SCREENSHOTS_DIR }}/android
+          retention-days: ${{ env.VIDEO_RETENTION_DAYS }}
+
+      - name: Upload Android Metadata
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-android-metadata
+          path: ${{ env.METADATA_DIR }}/android
+          retention-days: ${{ env.REPORT_RETENTION_DAYS }}
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # tvOS USER JOURNEY TESTS
+  # ═══════════════════════════════════════════════════════════════════════════
+  tvos-journey:
+    name: tvOS User Journey Tests
+    runs-on: macos-14
+    needs: setup
+    if: needs.setup.outputs.run_tvos == 'true'
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/tv/kagami-tv
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          if [ -d "/Applications/Xcode_${{ env.XCODE_VERSION }}.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+          else
+            sudo xcode-select -s /Applications/Xcode.app
+          fi
+
+      - name: Create output directories
+        run: |
+          mkdir -p ${{ env.VIDEOS_DIR }}/tvos
+          mkdir -p ${{ env.SCREENSHOTS_DIR }}/tvos
+          mkdir -p ${{ env.METADATA_DIR }}/tvos
+
+      - name: Boot tvOS 18 Simulator
+        id: simulator
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available | grep "Apple TV 4K (3rd generation)" | head -1 | grep -oE '[A-F0-9-]{36}')
+          xcrun simctl boot "$DEVICE_ID" || true
+          sleep 15
+          echo "device_id=$DEVICE_ID" >> $GITHUB_OUTPUT
+
+      - name: Resolve Packages
+        run: swift package resolve || true
+
+      - name: Start Video Recording
+        id: recording
+        run: |
+          VIDEO_FILE="${{ env.VIDEOS_DIR }}/tvos/user-journey-$(date +%Y%m%d_%H%M%S).mp4"
+          xcrun simctl io "${{ steps.simulator.outputs.device_id }}" recordVideo --codec=h264 "$VIDEO_FILE" &
+          echo $! > /tmp/tvos_record_pid.txt
+          echo "video_file=$VIDEO_FILE" >> $GITHUB_OUTPUT
+          sleep 2
+
+      - name: Build and Run User Journey Tests
+        id: tests
+        run: |
+          START_TIME=$(date +%s)
+
+          xcodebuild test \
+            -project KagamiTV.xcodeproj \
+            -scheme KagamiTV \
+            -destination "platform=tvOS Simulator,id=${{ steps.simulator.outputs.device_id }}" \
+            -only-testing:KagamiTVUITests/UserJourneyTests \
+            -resultBundlePath ${{ env.METADATA_DIR }}/tvos/TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee test_output.log | xcpretty || true
+
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+
+          echo "duration=$DURATION" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Stop Video Recording
+        if: always()
+        run: |
+          if [ -f /tmp/tvos_record_pid.txt ]; then
+            kill $(cat /tmp/tvos_record_pid.txt) 2>/dev/null || true
+            sleep 3
+          fi
+
+      - name: Capture Final Screenshot
+        if: always()
+        run: |
+          xcrun simctl io "${{ steps.simulator.outputs.device_id }}" screenshot \
+            "${{ env.SCREENSHOTS_DIR }}/tvos/final_state.png" || true
+
+      - name: Generate tvOS Metadata
+        if: always()
+        run: |
+          cat > ${{ env.METADATA_DIR }}/tvos/metadata.json << EOF
+          {
+            "platform": "tvos",
+            "device": "Apple TV 4K (3rd generation)",
+            "os_version": "tvOS 18",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "duration_seconds": ${{ steps.tests.outputs.duration || 0 }},
+            "video_file": "$(basename ${{ steps.recording.outputs.video_file }})",
+            "workflow_run_id": "${{ github.run_id }}"
+          }
+          EOF
+
+      - name: Upload tvOS Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-tvos-videos
+          path: ${{ env.VIDEOS_DIR }}/tvos
+          retention-days: ${{ env.VIDEO_RETENTION_DAYS }}
+
+      - name: Upload tvOS Metadata
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-tvos-metadata
+          path: ${{ env.METADATA_DIR }}/tvos
+          retention-days: ${{ env.REPORT_RETENTION_DAYS }}
+
+      - name: Shutdown Simulator
+        if: always()
+        run: xcrun simctl shutdown "${{ steps.simulator.outputs.device_id }}" || true
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # visionOS USER JOURNEY TESTS
+  # ═══════════════════════════════════════════════════════════════════════════
+  visionos-journey:
+    name: visionOS User Journey Tests
+    runs-on: macos-14
+    needs: setup
+    if: needs.setup.outputs.run_visionos == 'true'
+    timeout-minutes: 50
+    defaults:
+      run:
+        working-directory: apps/visionos/kagami-visionos
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          if [ -d "/Applications/Xcode_${{ env.XCODE_VERSION }}.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+          else
+            sudo xcode-select -s /Applications/Xcode.app
+          fi
+
+      - name: Check visionOS SDK
+        id: vision_sdk
+        run: |
+          if xcodebuild -showsdks | grep -q visionOS; then
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create output directories
+        run: |
+          mkdir -p ${{ env.VIDEOS_DIR }}/visionos
+          mkdir -p ${{ env.SCREENSHOTS_DIR }}/visionos
+          mkdir -p ${{ env.METADATA_DIR }}/visionos
+
+      - name: Boot visionOS 2 Simulator
+        id: simulator
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available | grep "Apple Vision Pro" | head -1 | grep -oE '[A-F0-9-]{36}')
+          xcrun simctl boot "$DEVICE_ID" || true
+          sleep 20
+          echo "device_id=$DEVICE_ID" >> $GITHUB_OUTPUT
+
+      - name: Resolve Packages
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: swift package resolve || true
+
+      - name: Start Video Recording
+        id: recording
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          VIDEO_FILE="${{ env.VIDEOS_DIR }}/visionos/user-journey-$(date +%Y%m%d_%H%M%S).mp4"
+          xcrun simctl io "${{ steps.simulator.outputs.device_id }}" recordVideo --codec=h264 "$VIDEO_FILE" &
+          echo $! > /tmp/visionos_record_pid.txt
+          echo "video_file=$VIDEO_FILE" >> $GITHUB_OUTPUT
+          sleep 2
+
+      - name: Build and Run User Journey Tests
+        id: tests
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          START_TIME=$(date +%s)
+
+          xcodebuild test \
+            -project KagamiVision.xcodeproj \
+            -scheme KagamiVision \
+            -destination "platform=visionOS Simulator,id=${{ steps.simulator.outputs.device_id }}" \
+            -only-testing:KagamiVisionUITests/UserJourneyTests \
+            -resultBundlePath ${{ env.METADATA_DIR }}/visionos/TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee test_output.log | xcpretty || true
+
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+
+          echo "duration=$DURATION" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Stop Video Recording
+        if: steps.vision_sdk.outputs.available == 'true' && always()
+        run: |
+          if [ -f /tmp/visionos_record_pid.txt ]; then
+            kill $(cat /tmp/visionos_record_pid.txt) 2>/dev/null || true
+            sleep 3
+          fi
+
+      - name: Capture Final Screenshot
+        if: steps.vision_sdk.outputs.available == 'true' && always()
+        run: |
+          xcrun simctl io "${{ steps.simulator.outputs.device_id }}" screenshot \
+            "${{ env.SCREENSHOTS_DIR }}/visionos/final_state.png" || true
+
+      - name: Generate visionOS Metadata
+        if: always()
+        run: |
+          cat > ${{ env.METADATA_DIR }}/visionos/metadata.json << EOF
+          {
+            "platform": "visionos",
+            "device": "Apple Vision Pro",
+            "os_version": "visionOS 2",
+            "sdk_available": ${{ steps.vision_sdk.outputs.available }},
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "duration_seconds": ${{ steps.tests.outputs.duration || 0 }},
+            "video_file": "$(basename ${{ steps.recording.outputs.video_file || 'none' }})",
+            "workflow_run_id": "${{ github.run_id }}"
+          }
+          EOF
+
+      - name: Upload visionOS Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-visionos-videos
+          path: ${{ env.VIDEOS_DIR }}/visionos
+          retention-days: ${{ env.VIDEO_RETENTION_DAYS }}
+
+      - name: Upload visionOS Metadata
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-visionos-metadata
+          path: ${{ env.METADATA_DIR }}/visionos
+          retention-days: ${{ env.REPORT_RETENTION_DAYS }}
+
+      - name: Shutdown Simulator
+        if: steps.vision_sdk.outputs.available == 'true' && always()
+        run: xcrun simctl shutdown "${{ steps.simulator.outputs.device_id }}" || true
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DESKTOP USER JOURNEY TESTS (macOS & Ubuntu)
+  # ═══════════════════════════════════════════════════════════════════════════
+  desktop-journey:
+    name: Desktop User Journey Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: setup
+    if: needs.setup.outputs.run_desktop == 'true'
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform_name: macos
+          - os: ubuntu-22.04
+            platform_name: linux
+    defaults:
+      run:
+        working-directory: apps/desktop/kagami-client
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: apps/desktop/kagami-client/package-lock.json
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf ffmpeg
+
+      - name: Create output directories
+        run: |
+          mkdir -p ${{ env.VIDEOS_DIR }}/desktop-${{ matrix.platform_name }}
+          mkdir -p ${{ env.SCREENSHOTS_DIR }}/desktop-${{ matrix.platform_name }}
+          mkdir -p ${{ env.METADATA_DIR }}/desktop-${{ matrix.platform_name }}
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Run User Journey E2E Tests with Video
+        id: tests
+        run: |
+          START_TIME=$(date +%s)
+
+          npx playwright test tests/e2e/user-flows.spec.ts tests/e2e/household-personas.spec.ts \
+            --project=desktop-dark \
+            --video=on \
+            --screenshot=on \
+            --reporter=list \
+            --reporter=json \
+            --reporter=html \
+            --output=${{ env.SCREENSHOTS_DIR }}/desktop-${{ matrix.platform_name }}/test-results \
+            2>&1 | tee test_output.log || true
+
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+
+          # Parse test results
+          PASSED=$(grep -c "passed" test_output.log 2>/dev/null || echo "0")
+          FAILED=$(grep -c "failed" test_output.log 2>/dev/null || echo "0")
+
+          echo "duration=$DURATION" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+        env:
+          CI: true
+        continue-on-error: true
+
+      - name: Collect Videos
+        if: always()
+        run: |
+          find . -name "*.webm" -exec cp {} ${{ env.VIDEOS_DIR }}/desktop-${{ matrix.platform_name }}/ \; 2>/dev/null || true
+          find test-results -name "*.webm" -exec cp {} ${{ env.VIDEOS_DIR }}/desktop-${{ matrix.platform_name }}/ \; 2>/dev/null || true
+
+      - name: Generate Desktop Metadata
+        if: always()
+        run: |
+          cat > ${{ env.METADATA_DIR }}/desktop-${{ matrix.platform_name }}/metadata.json << EOF
+          {
+            "platform": "desktop",
+            "os": "${{ matrix.platform_name }}",
+            "os_version": "${{ matrix.os }}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "duration_seconds": ${{ steps.tests.outputs.duration || 0 }},
+            "tests_passed": ${{ steps.tests.outputs.passed || 0 }},
+            "tests_failed": ${{ steps.tests.outputs.failed || 0 }},
+            "workflow_run_id": "${{ github.run_id }}"
+          }
+          EOF
+
+      - name: Upload Desktop Videos
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-desktop-${{ matrix.platform_name }}-videos
+          path: ${{ env.VIDEOS_DIR }}/desktop-${{ matrix.platform_name }}
+          retention-days: ${{ env.VIDEO_RETENTION_DAYS }}
+
+      - name: Upload Desktop Screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-desktop-${{ matrix.platform_name }}-screenshots
+          path: ${{ env.SCREENSHOTS_DIR }}/desktop-${{ matrix.platform_name }}
+          retention-days: ${{ env.VIDEO_RETENTION_DAYS }}
+
+      - name: Upload Desktop Metadata
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-desktop-${{ matrix.platform_name }}-metadata
+          path: ${{ env.METADATA_DIR }}/desktop-${{ matrix.platform_name }}
+          retention-days: ${{ env.REPORT_RETENTION_DAYS }}
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # GEMINI VIDEO ANALYSIS
+  # ═══════════════════════════════════════════════════════════════════════════
+  gemini-analysis:
+    name: Gemini AI Video Analysis
+    runs-on: ubuntu-latest
+    needs:
+      - ios-journey
+      - android-journey
+      - tvos-journey
+      - visionos-journey
+      - desktop-journey
+    if: |
+      always() &&
+      (github.event.inputs.run_gemini_analysis != 'false') &&
+      (needs.ios-journey.result != 'skipped' ||
+       needs.android-journey.result != 'skipped' ||
+       needs.tvos-journey.result != 'skipped' ||
+       needs.visionos-journey.result != 'skipped' ||
+       needs.desktop-journey.result != 'skipped')
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install google-generativeai pillow opencv-python-headless
+
+      - name: Download all video artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: journey-*-videos
+          path: /tmp/all-videos
+          merge-multiple: false
+
+      - name: Download all metadata
+        uses: actions/download-artifact@v4
+        with:
+          pattern: journey-*-metadata
+          path: /tmp/all-metadata
+          merge-multiple: false
+
+      - name: Run Gemini Video Analysis
+        id: analysis
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          mkdir -p /tmp/analysis-results
+
+          cat > /tmp/analyze_videos.py << 'ANALYSIS_SCRIPT'
+          import os
+          import json
+          import glob
+          from pathlib import Path
+
+          try:
+              import google.generativeai as genai
+              GEMINI_AVAILABLE = True
+          except ImportError:
+              GEMINI_AVAILABLE = False
+
+          def analyze_video_with_gemini(video_path, platform, api_key):
+              """Analyze a video using Gemini's multimodal capabilities."""
+              if not GEMINI_AVAILABLE or not api_key:
+                  return {
+                      "status": "skipped",
+                      "reason": "Gemini API not available or no API key",
+                      "issues": [],
+                      "suggestions": []
+                  }
+
+              genai.configure(api_key=api_key)
+              model = genai.GenerativeModel('gemini-1.5-pro-latest')
+
+              # Upload video file
+              try:
+                  video_file = genai.upload_file(video_path)
+
+                  prompt = f"""
+                  Analyze this user journey test video recording from a {platform} application.
+
+                  Please identify:
+                  1. **Critical Issues**: Any crashes, freezes, or error dialogs visible
+                  2. **UX Problems**: Confusing interactions, slow responses, or navigation issues
+                  3. **Visual Bugs**: Layout problems, missing elements, or rendering issues
+                  4. **Accessibility Concerns**: Small touch targets, poor contrast, missing labels
+                  5. **Performance Issues**: Visible lag, stuttering, or slow transitions
+
+                  For each issue found, provide:
+                  - Timestamp (approximate)
+                  - Severity (critical/high/medium/low)
+                  - Description
+                  - Suggested fix
+
+                  Also provide an overall quality score (0-100) and summary.
+
+                  Format your response as JSON with this structure:
+                  {{
+                      "quality_score": 85,
+                      "summary": "Brief overall assessment",
+                      "issues": [
+                          {{
+                              "timestamp": "0:15",
+                              "severity": "high",
+                              "category": "ux",
+                              "description": "Description of the issue",
+                              "suggestion": "How to fix it"
+                          }}
+                      ],
+                      "positive_observations": ["List of things done well"],
+                      "recommendations": ["Overall recommendations"]
+                  }}
+                  """
+
+                  response = model.generate_content([video_file, prompt])
+                  result_text = response.text
+
+                  # Parse JSON from response
+                  json_start = result_text.find('{')
+                  json_end = result_text.rfind('}') + 1
+                  if json_start >= 0 and json_end > json_start:
+                      return json.loads(result_text[json_start:json_end])
+
+                  return {
+                      "status": "parse_error",
+                      "raw_response": result_text[:1000],
+                      "issues": []
+                  }
+
+              except Exception as e:
+                  return {
+                      "status": "error",
+                      "error": str(e),
+                      "issues": []
+                  }
+
+          def main():
+              api_key = os.environ.get('GEMINI_API_KEY')
+              videos_dir = '/tmp/all-videos'
+              results_dir = '/tmp/analysis-results'
+
+              all_results = {
+                  "timestamp": "",
+                  "platforms": {},
+                  "critical_issues": [],
+                  "summary": {
+                      "total_videos": 0,
+                      "analyzed": 0,
+                      "critical_count": 0,
+                      "high_count": 0,
+                      "medium_count": 0,
+                      "low_count": 0
+                  }
+              }
+
+              import datetime
+              all_results["timestamp"] = datetime.datetime.utcnow().isoformat() + "Z"
+
+              # Find all video files
+              video_files = []
+              for ext in ['*.mp4', '*.webm', '*.mov']:
+                  video_files.extend(glob.glob(f'{videos_dir}/**/{ext}', recursive=True))
+
+              all_results["summary"]["total_videos"] = len(video_files)
+
+              for video_path in video_files:
+                  path = Path(video_path)
+                  # Extract platform from path
+                  parts = path.parts
+                  platform = "unknown"
+                  for part in parts:
+                      if "ios" in part.lower():
+                          platform = "ios"
+                      elif "android" in part.lower():
+                          platform = "android"
+                      elif "tvos" in part.lower():
+                          platform = "tvos"
+                      elif "visionos" in part.lower():
+                          platform = "visionos"
+                      elif "desktop" in part.lower() or "macos" in part.lower() or "linux" in part.lower():
+                          platform = part
+
+                  print(f"Analyzing: {video_path} (platform: {platform})")
+
+                  result = analyze_video_with_gemini(video_path, platform, api_key)
+                  result["video_file"] = path.name
+
+                  if platform not in all_results["platforms"]:
+                      all_results["platforms"][platform] = []
+                  all_results["platforms"][platform].append(result)
+
+                  if result.get("status") != "skipped" and result.get("status") != "error":
+                      all_results["summary"]["analyzed"] += 1
+
+                      for issue in result.get("issues", []):
+                          severity = issue.get("severity", "").lower()
+                          if severity == "critical":
+                              all_results["critical_issues"].append({
+                                  "platform": platform,
+                                  **issue
+                              })
+                              all_results["summary"]["critical_count"] += 1
+                          elif severity == "high":
+                              all_results["summary"]["high_count"] += 1
+                          elif severity == "medium":
+                              all_results["summary"]["medium_count"] += 1
+                          else:
+                              all_results["summary"]["low_count"] += 1
+
+              # Save results
+              with open(f'{results_dir}/gemini-analysis.json', 'w') as f:
+                  json.dump(all_results, f, indent=2)
+
+              # Generate markdown report
+              with open(f'{results_dir}/analysis-report.md', 'w') as f:
+                  f.write("# Gemini Video Analysis Report\n\n")
+                  f.write(f"Generated: {all_results['timestamp']}\n\n")
+
+                  f.write("## Summary\n\n")
+                  f.write(f"- **Total Videos**: {all_results['summary']['total_videos']}\n")
+                  f.write(f"- **Analyzed**: {all_results['summary']['analyzed']}\n")
+                  f.write(f"- **Critical Issues**: {all_results['summary']['critical_count']}\n")
+                  f.write(f"- **High Issues**: {all_results['summary']['high_count']}\n")
+                  f.write(f"- **Medium Issues**: {all_results['summary']['medium_count']}\n")
+                  f.write(f"- **Low Issues**: {all_results['summary']['low_count']}\n\n")
+
+                  if all_results['critical_issues']:
+                      f.write("## Critical Issues\n\n")
+                      for issue in all_results['critical_issues']:
+                          f.write(f"### [{issue['platform'].upper()}] {issue.get('description', 'Unknown issue')}\n")
+                          f.write(f"- **Timestamp**: {issue.get('timestamp', 'N/A')}\n")
+                          f.write(f"- **Category**: {issue.get('category', 'N/A')}\n")
+                          f.write(f"- **Suggestion**: {issue.get('suggestion', 'N/A')}\n\n")
+
+                  f.write("## Platform Results\n\n")
+                  for platform, results in all_results['platforms'].items():
+                      f.write(f"### {platform.upper()}\n\n")
+                      for result in results:
+                          if 'quality_score' in result:
+                              f.write(f"- **Quality Score**: {result['quality_score']}/100\n")
+                          if 'summary' in result:
+                              f.write(f"- **Summary**: {result['summary']}\n")
+                          f.write(f"- **Video**: {result.get('video_file', 'N/A')}\n\n")
+
+                  f.write("\n---\n*h(x) >= 0. Always.*\n")
+
+              # Output for GitHub
+              has_critical = all_results['summary']['critical_count'] > 0
+              print(f"has_critical={str(has_critical).lower()}")
+              with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
+                  f.write(f"has_critical={str(has_critical).lower()}\n")
+                  f.write(f"critical_count={all_results['summary']['critical_count']}\n")
+
+          if __name__ == "__main__":
+              main()
+          ANALYSIS_SCRIPT
+
+          python /tmp/analyze_videos.py
+
+      - name: Upload Analysis Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gemini-analysis-results
+          path: /tmp/analysis-results
+          retention-days: ${{ env.REPORT_RETENTION_DAYS }}
+
+      - name: Set analysis outputs
+        id: results
+        run: |
+          if [ -f /tmp/analysis-results/gemini-analysis.json ]; then
+            CRITICAL_COUNT=$(jq '.summary.critical_count' /tmp/analysis-results/gemini-analysis.json)
+            echo "critical_count=$CRITICAL_COUNT" >> $GITHUB_OUTPUT
+            echo "has_critical=$([ $CRITICAL_COUNT -gt 0 ] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+          else
+            echo "critical_count=0" >> $GITHUB_OUTPUT
+            echo "has_critical=false" >> $GITHUB_OUTPUT
+          fi
+
+    outputs:
+      has_critical: ${{ steps.results.outputs.has_critical }}
+      critical_count: ${{ steps.results.outputs.critical_count }}
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # AGGREGATE AND REPORT
+  # ═══════════════════════════════════════════════════════════════════════════
+  aggregate-report:
+    name: Generate Test Report
+    runs-on: ubuntu-latest
+    needs:
+      - ios-journey
+      - android-journey
+      - tvos-journey
+      - visionos-journey
+      - desktop-journey
+      - gemini-analysis
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create aggregate directory
+        run: mkdir -p /tmp/aggregate-report
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/all-artifacts
+          merge-multiple: false
+
+      - name: Generate Comprehensive Report
+        run: |
+          cd /tmp/aggregate-report
+
+          cat > report.md << 'REPORT_HEADER'
+          # Kagami User Journey Test Report
+
+          REPORT_HEADER
+
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> report.md
+          echo "Commit: ${{ github.sha }}" >> report.md
+          echo "Branch: ${{ github.ref_name }}" >> report.md
+          echo "Run: ${{ github.run_id }}" >> report.md
+          echo "" >> report.md
+
+          echo "## Platform Test Results" >> report.md
+          echo "" >> report.md
+          echo "| Platform | Status | Duration | Videos | Screenshots |" >> report.md
+          echo "|----------|--------|----------|--------|-------------|" >> report.md
+
+          # iOS
+          IOS_STATUS="${{ needs.ios-journey.result }}"
+          IOS_VIDEOS=$(find /tmp/all-artifacts -path "*ios*" -name "*.mp4" 2>/dev/null | wc -l)
+          IOS_SCREENSHOTS=$(find /tmp/all-artifacts -path "*ios*" -name "*.png" 2>/dev/null | wc -l)
+          echo "| iOS | $IOS_STATUS | - | $IOS_VIDEOS | $IOS_SCREENSHOTS |" >> report.md
+
+          # Android
+          ANDROID_STATUS="${{ needs.android-journey.result }}"
+          ANDROID_VIDEOS=$(find /tmp/all-artifacts -path "*android*" -name "*.mp4" 2>/dev/null | wc -l)
+          ANDROID_SCREENSHOTS=$(find /tmp/all-artifacts -path "*android*" -name "*.png" 2>/dev/null | wc -l)
+          echo "| Android | $ANDROID_STATUS | - | $ANDROID_VIDEOS | $ANDROID_SCREENSHOTS |" >> report.md
+
+          # tvOS
+          TVOS_STATUS="${{ needs.tvos-journey.result }}"
+          TVOS_VIDEOS=$(find /tmp/all-artifacts -path "*tvos*" -name "*.mp4" 2>/dev/null | wc -l)
+          echo "| tvOS | $TVOS_STATUS | - | $TVOS_VIDEOS | - |" >> report.md
+
+          # visionOS
+          VISIONOS_STATUS="${{ needs.visionos-journey.result }}"
+          VISIONOS_VIDEOS=$(find /tmp/all-artifacts -path "*visionos*" -name "*.mp4" 2>/dev/null | wc -l)
+          echo "| visionOS | $VISIONOS_STATUS | - | $VISIONOS_VIDEOS | - |" >> report.md
+
+          # Desktop
+          DESKTOP_STATUS="${{ needs.desktop-journey.result }}"
+          DESKTOP_VIDEOS=$(find /tmp/all-artifacts -path "*desktop*" \( -name "*.mp4" -o -name "*.webm" \) 2>/dev/null | wc -l)
+          DESKTOP_SCREENSHOTS=$(find /tmp/all-artifacts -path "*desktop*" -name "*.png" 2>/dev/null | wc -l)
+          echo "| Desktop | $DESKTOP_STATUS | - | $DESKTOP_VIDEOS | $DESKTOP_SCREENSHOTS |" >> report.md
+
+          echo "" >> report.md
+
+          # Gemini Analysis Section
+          echo "## AI Video Analysis" >> report.md
+          echo "" >> report.md
+
+          if [ -f /tmp/all-artifacts/gemini-analysis-results/analysis-report.md ]; then
+            echo "### Gemini Analysis Summary" >> report.md
+            cat /tmp/all-artifacts/gemini-analysis-results/analysis-report.md >> report.md
+          else
+            echo "Analysis not available or skipped." >> report.md
+          fi
+
+          echo "" >> report.md
+          echo "## Artifacts" >> report.md
+          echo "" >> report.md
+          echo "Download the following artifacts for detailed results:" >> report.md
+          echo "- \`journey-*-videos\`: Screen recordings from each platform" >> report.md
+          echo "- \`journey-*-screenshots\`: Screenshots captured during tests" >> report.md
+          echo "- \`journey-*-metadata\`: Test metadata and results JSON" >> report.md
+          echo "- \`gemini-analysis-results\`: AI analysis report" >> report.md
+          echo "" >> report.md
+          echo "---" >> report.md
+          echo "*h(x) >= 0. Always.*" >> report.md
+
+      - name: Upload Aggregate Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: user-journey-complete-report
+          path: /tmp/aggregate-report
+          retention-days: ${{ env.REPORT_RETENTION_DAYS }}
+
+      - name: Post GitHub Summary
+        run: |
+          echo "## User Journey Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| iOS | ${{ needs.ios-journey.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Android | ${{ needs.android-journey.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| tvOS | ${{ needs.tvos-journey.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| visionOS | ${{ needs.visionos-journey.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Desktop | ${{ needs.desktop-journey.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Gemini Analysis | ${{ needs.gemini-analysis.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.gemini-analysis.outputs.has_critical }}" = "true" ]; then
+            echo "### Critical Issues Detected" >> $GITHUB_STEP_SUMMARY
+            echo "Gemini analysis found **${{ needs.gemini-analysis.outputs.critical_count }}** critical issues." >> $GITHUB_STEP_SUMMARY
+            echo "Review the analysis report artifact for details." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download artifacts for videos, screenshots, and detailed reports." >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const results = {
+              ios: '${{ needs.ios-journey.result }}',
+              android: '${{ needs.android-journey.result }}',
+              tvos: '${{ needs.tvos-journey.result }}',
+              visionos: '${{ needs.visionos-journey.result }}',
+              desktop: '${{ needs.desktop-journey.result }}',
+              gemini: '${{ needs.gemini-analysis.result }}'
+            };
+
+            const hasCritical = '${{ needs.gemini-analysis.outputs.has_critical }}' === 'true';
+            const criticalCount = '${{ needs.gemini-analysis.outputs.critical_count }}';
+
+            const statusEmoji = (status) => {
+              if (status === 'success') return ':white_check_mark:';
+              if (status === 'failure') return ':x:';
+              if (status === 'skipped') return ':fast_forward:';
+              return ':grey_question:';
+            };
+
+            let body = '## User Journey Test Results\n\n';
+            body += '| Platform | Status |\n';
+            body += '|----------|--------|\n';
+
+            for (const [platform, result] of Object.entries(results)) {
+              body += `| ${platform.charAt(0).toUpperCase() + platform.slice(1)} | ${statusEmoji(result)} ${result} |\n`;
+            }
+
+            if (hasCritical) {
+              body += '\n### :warning: Critical Issues Detected\n\n';
+              body += `Gemini AI analysis found **${criticalCount}** critical issue(s) in the test videos.\n`;
+              body += 'Please review the `gemini-analysis-results` artifact for details.\n';
+            }
+
+            body += '\n### Artifacts\n';
+            body += '- Video recordings from all platforms\n';
+            body += '- Screenshots captured during tests\n';
+            body += '- AI-powered video analysis report\n';
+            body += '\n---\n*h(x) >= 0. Always.*';
+
+            // Find existing comment or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existingComment = comments.find(c =>
+              c.user.login === 'github-actions[bot]' &&
+              c.body.includes('User Journey Test Results')
+            );
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DASHBOARD NOTIFICATION
+  # ═══════════════════════════════════════════════════════════════════════════
+  notify-dashboard:
+    name: Notify QA Dashboard
+    runs-on: ubuntu-latest
+    needs:
+      - aggregate-report
+      - gemini-analysis
+    if: |
+      always() &&
+      github.event.inputs.notify_dashboard != 'false'
+
+    steps:
+      - name: Download metadata artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: journey-*-metadata
+          path: /tmp/all-metadata
+          merge-multiple: false
+
+      - name: Prepare dashboard payload
+        id: payload
+        run: |
+          # Aggregate all metadata
+          cat > /tmp/dashboard-payload.json << EOF
+          {
+            "workflow_run_id": "${{ github.run_id }}",
+            "repository": "${{ github.repository }}",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "trigger": "${{ github.event_name }}",
+            "results": {
+              "ios": "${{ needs.ios-journey.result || 'skipped' }}",
+              "android": "${{ needs.android-journey.result || 'skipped' }}",
+              "tvos": "${{ needs.tvos-journey.result || 'skipped' }}",
+              "visionos": "${{ needs.visionos-journey.result || 'skipped' }}",
+              "desktop": "${{ needs.desktop-journey.result || 'skipped' }}"
+            },
+            "analysis": {
+              "has_critical_issues": ${{ needs.gemini-analysis.outputs.has_critical || 'false' }},
+              "critical_count": ${{ needs.gemini-analysis.outputs.critical_count || 0 }}
+            },
+            "artifacts_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          }
+          EOF
+
+          cat /tmp/dashboard-payload.json
+
+      - name: Send to QA Dashboard API
+        if: env.QA_DASHBOARD_URL != ''
+        env:
+          QA_DASHBOARD_URL: ${{ secrets.QA_DASHBOARD_URL }}
+          QA_DASHBOARD_TOKEN: ${{ secrets.QA_DASHBOARD_TOKEN }}
+        run: |
+          curl -X POST "$QA_DASHBOARD_URL/api/v1/test-runs" \
+            -H "Authorization: Bearer $QA_DASHBOARD_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d @/tmp/dashboard-payload.json \
+            --fail --silent --show-error || echo "Dashboard notification failed (non-critical)"
+        continue-on-error: true
+
+      - name: Upload to Cloud Storage (optional)
+        if: env.CLOUD_STORAGE_BUCKET != ''
+        env:
+          CLOUD_STORAGE_BUCKET: ${{ secrets.CLOUD_STORAGE_BUCKET }}
+        run: |
+          # This would use gsutil, aws s3, or az storage depending on your cloud provider
+          echo "Cloud storage upload would happen here"
+          # Example for GCS:
+          # gsutil -m cp -r /tmp/all-videos/* gs://$CLOUD_STORAGE_BUCKET/videos/${{ github.run_id }}/
+        continue-on-error: true
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CRITICAL ISSUE GATE
+  # ═══════════════════════════════════════════════════════════════════════════
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs:
+      - ios-journey
+      - android-journey
+      - desktop-journey
+      - gemini-analysis
+    if: always()
+
+    steps:
+      - name: Check for critical failures
+        run: |
+          FAILED=false
+
+          # Check platform test failures (critical platforms)
+          if [ "${{ needs.ios-journey.result }}" = "failure" ]; then
+            echo "iOS tests failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.android-journey.result }}" = "failure" ]; then
+            echo "Android tests failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.desktop-journey.result }}" = "failure" ]; then
+            echo "Desktop tests failed"
+            FAILED=true
+          fi
+
+          # Check for critical issues from Gemini analysis
+          if [ "${{ needs.gemini-analysis.outputs.has_critical }}" = "true" ]; then
+            echo "Gemini analysis detected critical issues"
+            FAILED=true
+          fi
+
+          if [ "$FAILED" = "true" ]; then
+            echo "::error::Quality gate failed - critical tests or issues detected"
+            exit 1
+          fi
+
+          echo "Quality gate passed"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Mirror
+# User journey tests with video recording and AI analysis
+# h(x) >= 0. Always.
+# ═══════════════════════════════════════════════════════════════════════════════

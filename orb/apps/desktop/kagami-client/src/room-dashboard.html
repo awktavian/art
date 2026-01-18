@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Dashboard - Kagami</title>
+    <link rel="stylesheet" href="css/design-tokens.generated.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            font-family: var(--kagami-font-family);
+            background: var(--kagami-void);
+            color: var(--kagami-text-primary);
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            height: 100%;
+        }
+
+        .sidebar {
+            background: var(--kagami-voidWarm);
+            border-right: 1px solid var(--kagami-carbon);
+            padding: var(--kagami-space-md);
+            padding-top: calc(var(--kagami-space-md) + 28px);
+            overflow-y: auto;
+        }
+
+        .room-list {
+            list-style: none;
+        }
+
+        .room-item {
+            padding: var(--kagami-space-sm) var(--kagami-space-md);
+            border-radius: var(--kagami-radius-sm);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: var(--kagami-space-sm);
+            margin-bottom: var(--kagami-space-xs);
+            transition: background var(--kagami-dur-fast) var(--kagami-ease-cusp);
+        }
+
+        .room-item:hover {
+            background: var(--kagami-obsidian);
+        }
+
+        .room-item.active {
+            background: var(--kagami-obsidian);
+            border-left: 2px solid var(--kagami-spark);
+        }
+
+        .room-icon {
+            width: 24px;
+            height: 24px;
+            opacity: 0.7;
+        }
+
+        .room-name {
+            font-size: 14px;
+        }
+
+        .room-status {
+            margin-left: auto;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--kagami-status-success);
+        }
+
+        .room-status.off {
+            background: var(--kagami-text-tertiary);
+        }
+
+        .main-content {
+            padding: var(--kagami-space-lg);
+            padding-top: calc(var(--kagami-space-lg) + 28px);
+            overflow-y: auto;
+        }
+
+        .room-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--kagami-space-lg);
+        }
+
+        .room-title {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .room-temp {
+            font-size: 14px;
+            color: var(--kagami-text-secondary);
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: var(--kagami-space-md);
+        }
+
+        .control-card {
+            background: var(--kagami-voidWarm);
+            border: 1px solid var(--kagami-carbon);
+            border-radius: var(--kagami-radius-md);
+            padding: var(--kagami-space-md);
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--kagami-space-md);
+        }
+
+        .control-title {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .control-toggle {
+            width: 48px;
+            height: 28px;
+            border-radius: 14px;
+            background: var(--kagami-carbon);
+            cursor: pointer;
+            position: relative;
+            transition: background var(--kagami-dur-fast) var(--kagami-ease-cusp);
+        }
+
+        .control-toggle.on {
+            background: var(--kagami-spark);
+        }
+
+        .control-toggle::after {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: white;
+            top: 2px;
+            left: 2px;
+            transition: transform var(--kagami-dur-fast) var(--kagami-ease-cusp);
+        }
+
+        .control-toggle.on::after {
+            transform: translateX(20px);
+        }
+
+        .slider-container {
+            margin-top: var(--kagami-space-sm);
+        }
+
+        .slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--kagami-carbon);
+            appearance: none;
+            outline: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--kagami-spark);
+            cursor: pointer;
+        }
+
+        .slider-value {
+            font-size: 12px;
+            color: var(--kagami-text-secondary);
+            text-align: right;
+            margin-top: var(--kagami-space-xs);
+        }
+
+        .scene-buttons {
+            display: flex;
+            gap: var(--kagami-space-sm);
+            margin-top: var(--kagami-space-lg);
+        }
+
+        .scene-btn {
+            padding: var(--kagami-space-sm) var(--kagami-space-md);
+            border-radius: var(--kagami-radius-sm);
+            border: 1px solid var(--kagami-carbon);
+            background: var(--kagami-voidWarm);
+            color: var(--kagami-text-primary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all var(--kagami-dur-fast) var(--kagami-ease-cusp);
+        }
+
+        .scene-btn:hover {
+            background: var(--kagami-obsidian);
+            border-color: var(--kagami-spark);
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--kagami-carbon);
+            border-radius: var(--kagami-radius-md);
+            padding: var(--kagami-space-xl);
+            text-align: center;
+            margin-top: var(--kagami-space-lg);
+            transition: all var(--kagami-dur-fast) var(--kagami-ease-cusp);
+        }
+
+        .drop-zone.drag-over {
+            border-color: var(--kagami-spark);
+            background: rgba(255, 107, 53, 0.1);
+        }
+
+        .drop-zone-text {
+            color: var(--kagami-text-secondary);
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <aside class="sidebar">
+            <ul class="room-list" id="room-list">
+                <li class="room-item active" data-room="living_room">
+                    <span class="room-name">Living Room</span>
+                    <span class="room-status"></span>
+                </li>
+                <li class="room-item" data-room="kitchen">
+                    <span class="room-name">Kitchen</span>
+                    <span class="room-status off"></span>
+                </li>
+                <li class="room-item" data-room="office">
+                    <span class="room-name">Office</span>
+                    <span class="room-status"></span>
+                </li>
+                <li class="room-item" data-room="primary_bedroom">
+                    <span class="room-name">Primary Bedroom</span>
+                    <span class="room-status off"></span>
+                </li>
+                <li class="room-item" data-room="game_room">
+                    <span class="room-name">Game Room</span>
+                    <span class="room-status off"></span>
+                </li>
+            </ul>
+        </aside>
+        <main class="main-content">
+            <header class="room-header">
+                <h1 class="room-title" id="room-title">Living Room</h1>
+                <span class="room-temp" id="room-temp">72F</span>
+            </header>
+
+            <div class="controls-grid">
+                <div class="control-card">
+                    <div class="control-header">
+                        <span class="control-title">Lights</span>
+                        <div class="control-toggle on" id="lights-toggle"></div>
+                    </div>
+                    <div class="slider-container">
+                        <input type="range" class="slider" id="lights-slider" min="0" max="100" value="80">
+                        <div class="slider-value" id="lights-value">80%</div>
+                    </div>
+                </div>
+
+                <div class="control-card">
+                    <div class="control-header">
+                        <span class="control-title">Shades</span>
+                        <div class="control-toggle" id="shades-toggle"></div>
+                    </div>
+                    <div class="slider-container">
+                        <input type="range" class="slider" id="shades-slider" min="0" max="100" value="0">
+                        <div class="slider-value" id="shades-value">0%</div>
+                    </div>
+                </div>
+
+                <div class="control-card">
+                    <div class="control-header">
+                        <span class="control-title">Fireplace</span>
+                        <div class="control-toggle" id="fireplace-toggle"></div>
+                    </div>
+                </div>
+
+                <div class="control-card">
+                    <div class="control-header">
+                        <span class="control-title">TV Mount</span>
+                        <div class="control-toggle" id="tv-toggle"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="scene-buttons">
+                <button class="scene-btn" data-scene="movie">Movie Mode</button>
+                <button class="scene-btn" data-scene="relax">Relax</button>
+                <button class="scene-btn" data-scene="focus">Focus</button>
+                <button class="scene-btn" data-scene="goodnight">Goodnight</button>
+            </div>
+
+            <div class="drop-zone" id="drop-zone">
+                <p class="drop-zone-text">Drop files here to add context</p>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        // Tauri integration
+        const isTauri = window.__TAURI_INTERNALS__ !== undefined;
+        let invoke;
+
+        if (isTauri) {
+            const core = await import('@tauri-apps/api/core');
+            invoke = core.invoke;
+        }
+
+        // Room selection
+        const roomList = document.getElementById('room-list');
+        const roomTitle = document.getElementById('room-title');
+
+        roomList.addEventListener('click', (e) => {
+            const item = e.target.closest('.room-item');
+            if (!item) return;
+
+            roomList.querySelectorAll('.room-item').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+
+            const roomName = item.querySelector('.room-name').textContent;
+            roomTitle.textContent = roomName;
+        });
+
+        // Control toggles
+        document.querySelectorAll('.control-toggle').forEach(toggle => {
+            toggle.addEventListener('click', () => {
+                toggle.classList.toggle('on');
+            });
+        });
+
+        // Sliders
+        document.getElementById('lights-slider').addEventListener('input', (e) => {
+            document.getElementById('lights-value').textContent = e.target.value + '%';
+            if (isTauri) {
+                invoke('set_lights', { level: parseInt(e.target.value), rooms: [roomTitle.textContent] });
+            }
+        });
+
+        document.getElementById('shades-slider').addEventListener('input', (e) => {
+            document.getElementById('shades-value').textContent = e.target.value + '%';
+        });
+
+        // Scene buttons
+        document.querySelectorAll('.scene-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const scene = btn.dataset.scene;
+                if (isTauri) {
+                    await invoke('execute_scene', { scene });
+                }
+            });
+        });
+
+        // Drag and drop for file context
+        const dropZone = document.getElementById('drop-zone');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length > 0) {
+                const fileNames = files.map(f => f.name).join(', ');
+                dropZone.querySelector('.drop-zone-text').textContent = `Added: ${fileNames}`;
+            }
+        });
+    </script>
+</body>
+</html>

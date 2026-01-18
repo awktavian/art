@@ -1,0 +1,176 @@
+# PagerDuty Alert Rules for Kagami
+# Reference: https://support.pagerduty.com/docs/alerting-principles
+
+# =============================================================================
+# CRITICAL ALERTS (P1) - Page immediately
+# =============================================================================
+
+groups:
+  - name: kagami-critical
+    rules:
+      # API availability
+      - alert: APIDown
+        expr: up{job="kagami-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Kagami API is down"
+          description: "API endpoint {{ $labels.instance }} has been down for more than 2 minutes"
+          runbook_url: https://kagami.internal/runbooks/api-down
+
+      # Database connection failure
+      - alert: DatabaseConnectionFailed
+        expr: cockroachdb_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "CockroachDB connection failed"
+          description: "Cannot connect to CockroachDB cluster"
+          runbook_url: https://kagami.internal/runbooks/db-connection
+
+      # Redis connection failure
+      - alert: RedisConnectionFailed
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Redis connection failed"
+          description: "Cannot connect to Redis cluster"
+          runbook_url: https://kagami.internal/runbooks/redis-connection
+
+      # Safety violation
+      - alert: SafetyViolation
+        expr: kagami_safety_score < 0
+        for: 0s  # Immediate
+        labels:
+          severity: critical
+          team: safety
+        annotations:
+          summary: "Safety constraint violated"
+          description: "h(x) < 0 detected. Safety barrier breached."
+          runbook_url: https://kagami.internal/runbooks/safety-violation
+
+# =============================================================================
+# HIGH ALERTS (P2) - Page within 15 minutes
+# =============================================================================
+
+  - name: kagami-high
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m])) /
+          sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: high
+          team: platform
+        annotations:
+          summary: "High API error rate"
+          description: "Error rate is above 5% for the last 5 minutes"
+          runbook_url: https://kagami.internal/runbooks/high-error-rate
+
+      # Slow response time
+      - alert: SlowResponseTime
+        expr: |
+          histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
+          > 2.0
+        for: 5m
+        labels:
+          severity: high
+          team: platform
+        annotations:
+          summary: "API latency is high"
+          description: "P99 latency is above 2 seconds"
+          runbook_url: https://kagami.internal/runbooks/high-latency
+
+      # Memory pressure
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.85
+        for: 10m
+        labels:
+          severity: high
+          team: platform
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is above 85% for {{ $labels.container }}"
+
+      # Smart home integration down
+      - alert: SmartHomeIntegrationDown
+        expr: kagami_integration_health{integration="control4"} == 0
+        for: 5m
+        labels:
+          severity: high
+          team: smarthome
+        annotations:
+          summary: "Smart home integration down"
+          description: "{{ $labels.integration }} integration is unhealthy"
+          runbook_url: https://kagami.internal/runbooks/integration-down
+
+# =============================================================================
+# MEDIUM ALERTS (P3) - Notify during business hours
+# =============================================================================
+
+  - name: kagami-medium
+    rules:
+      # Certificate expiring soon
+      - alert: CertificateExpiringSoon
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 14
+        for: 1h
+        labels:
+          severity: medium
+          team: platform
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "Certificate for {{ $labels.instance }} expires in less than 14 days"
+
+      # Disk space low
+      - alert: DiskSpaceLow
+        expr: node_filesystem_avail_bytes / node_filesystem_size_bytes < 0.15
+        for: 30m
+        labels:
+          severity: medium
+          team: platform
+        annotations:
+          summary: "Disk space is low"
+          description: "Less than 15% disk space remaining on {{ $labels.mountpoint }}"
+
+# =============================================================================
+# SLO ALERTS
+# =============================================================================
+
+  - name: kagami-slo
+    rules:
+      # API availability SLO (99.9%)
+      - alert: APIAvailabilitySLOBreach
+        expr: |
+          (1 - sum(rate(http_requests_total{status!~"5.."}[30d])) /
+          sum(rate(http_requests_total[30d]))) > 0.001
+        for: 5m
+        labels:
+          severity: high
+          team: platform
+          slo: availability
+        annotations:
+          summary: "API availability SLO at risk"
+          description: "30-day availability is below 99.9% target"
+
+      # Latency SLO (P99 < 500ms)
+      - alert: LatencySLOBreach
+        expr: |
+          histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[30d])) by (le))
+          > 0.5
+        for: 5m
+        labels:
+          severity: medium
+          team: platform
+          slo: latency
+        annotations:
+          summary: "API latency SLO at risk"
+          description: "30-day P99 latency is above 500ms target"

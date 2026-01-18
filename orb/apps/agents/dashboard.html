@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Kagami Agent Metadata (#de_memo) -->
+  <meta name="kagami:agent-id" content="dashboard">
+  <meta name="kagami:agent-name" content="Dashboard">
+  <meta name="kagami:colony" content="nexus">
+  <meta name="kagami:capabilities" content="state-read,consensus-vote">
+  <meta name="kagami:consensus-weight" content="1">
+  <meta name="kagami:version" content="1.0.0">
+
+  <!-- Accessibility -->
+  <meta name="description" content="Kagami home dashboard - control your smart home">
+
+  <title>Kagami Dashboard</title>
+  <link rel="stylesheet" href="/_sdk/kagami-ui.css">
+
+  <style>
+    /* Dashboard-specific styles */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--space-4);
+      padding: var(--space-4);
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    @media (min-width: 640px) {
+      .dashboard {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    /* Status Header */
+    .status-header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-4);
+      background: var(--surface-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+    }
+
+    .status-header__left {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .status-header__logo {
+      font-size: var(--text-2xl);
+    }
+
+    .status-header__title {
+      font-family: var(--font-mono);
+      font-size: var(--text-lg);
+      font-weight: 500;
+    }
+
+    .status-header__right {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    /* Safety Score */
+    .safety-score {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: var(--space-1);
+    }
+
+    .safety-score__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-whisper);
+    }
+
+    .safety-score__value {
+      font-family: var(--font-mono);
+      font-size: var(--text-xl);
+      font-weight: 600;
+    }
+
+    .safety-score__value.safe { color: var(--pass); }
+    .safety-score__value.caution { color: var(--warn); }
+    .safety-score__value.danger { color: var(--fail); }
+
+    /* Quick Actions */
+    .quick-actions {
+      grid-column: 1 / -1;
+    }
+
+    .quick-actions__grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-3);
+    }
+
+    @media (min-width: 640px) {
+      .quick-actions__grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+
+    .quick-action {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-4);
+      background: var(--surface-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .quick-action:hover {
+      background: var(--interactive-hover);
+      border-color: var(--border-default);
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .quick-action:active {
+      transform: translateY(-1px) scale(0.97);
+      transition: all var(--transition-micro);
+    }
+
+    .quick-action:focus-visible {
+      outline: 2px solid var(--crystal);
+      outline-offset: 2px;
+    }
+
+    /* Success state */
+    .quick-action.success {
+      border-color: var(--pass);
+      background: rgba(var(--grove-rgb), 0.15);
+    }
+
+    .quick-action.success .quick-action__icon::after {
+      content: '✓';
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      font-size: 12px;
+      background: var(--pass);
+      color: var(--void);
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .quick-action__icon {
+      font-size: 24px;
+      width: 52px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-full);
+      background: rgba(var(--crystal-rgb), 0.1);
+      position: relative;
+      transition: transform var(--transition-fast);
+    }
+
+    .quick-action:hover .quick-action__icon {
+      transform: scale(1.05);
+    }
+
+    .quick-action__label {
+      font-size: var(--text-sm);
+      color: var(--text);
+      text-align: center;
+    }
+
+    .quick-action--movie .quick-action__icon { background: rgba(var(--forge-rgb), 0.15); }
+    .quick-action--goodnight .quick-action__icon { background: rgba(var(--flow-rgb), 0.15); }
+    .quick-action--lights .quick-action__icon { background: rgba(var(--beacon-rgb), 0.15); }
+    .quick-action--lock .quick-action__icon { background: rgba(var(--crystal-rgb), 0.15); }
+
+    /* Room Card */
+    .room-card {
+      padding: var(--space-4);
+      background: var(--surface-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .room-card:hover {
+      border-color: var(--border-default);
+    }
+
+    .room-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-3);
+    }
+
+    .room-card__name {
+      font-size: var(--text-base);
+      font-weight: 500;
+    }
+
+    .room-card__occupied {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-ghost);
+    }
+
+    .room-card__occupied.active {
+      background: var(--pass);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .room-card__stats {
+      display: flex;
+      gap: var(--space-4);
+    }
+
+    .room-card__stat {
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+      font-size: var(--text-sm);
+      color: var(--text-dim);
+    }
+
+    /* Footer */
+    .dashboard-footer {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .dashboard-footer__text {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-whisper);
+    }
+
+    .safety-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: var(--text-xs);
+      color: var(--grove);
+      opacity: 0.7;
+    }
+
+    /* RTL Support */
+    [dir="rtl"] .status-header__left,
+    [dir="rtl"] .quick-actions__grid,
+    [dir="rtl"] .room-card__stats {
+      flex-direction: row-reverse;
+    }
+
+    [dir="rtl"] .room-card__header {
+      flex-direction: row-reverse;
+    }
+
+    /* Font Size Settings */
+    :root {
+      --font-scale: 1;
+    }
+
+    body.font-size-small { --font-scale: 0.875; }
+    body.font-size-large { --font-scale: 1.125; }
+    body.font-size-xlarge { --font-scale: 1.25; }
+
+    .dashboard * {
+      font-size: calc(var(--text-base) * var(--font-scale));
+    }
+
+    /* Reduced Motion */
+    @media (prefers-reduced-motion: reduce) {
+      .quick-action,
+      .room-card,
+      .quick-action__icon,
+      .loading-overlay {
+        transition: none !important;
+        animation: none !important;
+      }
+
+      .room-card__occupied.active {
+        animation: none;
+      }
+    }
+
+    /* High Contrast Mode */
+    @media (prefers-contrast: more) {
+      .quick-action,
+      .room-card {
+        border-width: 2px;
+      }
+
+      .status-header,
+      .quick-actions {
+        border-width: 2px;
+      }
+    }
+
+    /* Loading State */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--void);
+      z-index: 100;
+      transition: opacity var(--dur-slow);
+    }
+
+    .loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Visually Hidden - accessible to screen readers but not visible */
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  </style>
+</head>
+<body data-kagami-agent data-theme="dark">
+  <!-- Loading Overlay -->
+  <div id="loading" class="loading-overlay" role="status" aria-live="polite" aria-label="Loading dashboard">
+    <div class="loading-spinner" aria-hidden="true"></div>
+    <span class="visually-hidden">Loading Kagami dashboard, please wait</span>
+  </div>
+
+  <!-- Dashboard -->
+  <main class="dashboard">
+    <!-- Status Header -->
+    <header class="status-header animate-fade-in">
+      <div class="status-header__left">
+        <span class="status-header__logo" aria-hidden="true">鏡</span>
+        <span class="status-header__title">Kagami</span>
+        <div id="connection-status" class="status-dot" role="status" aria-live="polite">
+          <span class="visually-hidden" id="connection-status-text">Connecting</span>
+        </div>
+      </div>
+      <div class="status-header__right">
+        <div class="safety-score" role="status" aria-live="polite" aria-atomic="true">
+          <span class="safety-score__label" id="safety-label">h(x)</span>
+          <span id="safety-value" class="safety-score__value" aria-labelledby="safety-label">--</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Quick Actions -->
+    <section class="quick-actions animate-fade-up delay-1" aria-labelledby="quick-actions-heading">
+      <h2 id="quick-actions-heading" class="visually-hidden">Quick Actions</h2>
+      <div class="quick-actions__grid" role="group" aria-label="Home control shortcuts">
+        <button class="quick-action quick-action--movie" data-action="movie_mode" aria-label="Activate Movie Mode - dims lights and lowers TV">
+          <div class="quick-action__icon" aria-hidden="true">🎬</div>
+          <span class="quick-action__label">Movie Mode</span>
+        </button>
+        <button class="quick-action quick-action--goodnight" data-action="goodnight" aria-label="Goodnight - turns off all lights and locks doors">
+          <div class="quick-action__icon" aria-hidden="true">🌙</div>
+          <span class="quick-action__label">Goodnight</span>
+        </button>
+        <button class="quick-action quick-action--lights" data-action="lights_off" aria-label="Turn off all lights in the house">
+          <div class="quick-action__icon" aria-hidden="true">💡</div>
+          <span class="quick-action__label">Lights Off</span>
+        </button>
+        <button class="quick-action quick-action--lock" data-action="lock_all" aria-label="Lock all doors in the house">
+          <div class="quick-action__icon" aria-hidden="true">🔒</div>
+          <span class="quick-action__label">Lock All</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Rooms -->
+    <section id="rooms-container" role="region" aria-labelledby="rooms-heading" aria-live="polite">
+      <h2 id="rooms-heading" class="visually-hidden">Rooms</h2>
+      <!-- Rooms will be dynamically inserted -->
+    </section>
+
+    <!-- Footer with Safety Badge -->
+    <footer class="dashboard-footer animate-fade-in delay-5">
+      <div class="safety-badge" role="img" aria-label="Safety system active - home is protected">
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="color: var(--grove); opacity: 0.6;">
+          <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
+        </svg>
+        <span>Protected</span>
+      </div>
+    </footer>
+  </main>
+
+  <script type="module">
+    import { KagamiAgent } from '/_sdk/kagami-agent.js';
+
+    // =========================================================================
+    // Dashboard Agent
+    // =========================================================================
+
+    class DashboardAgent {
+      constructor() {
+        this.agent = null;
+        this.rooms = [];
+      }
+
+      async initialize() {
+        // Initialize Kagami Agent
+        this.agent = await KagamiAgent.initialize({
+          agentId: 'dashboard',
+          colony: 'nexus',
+        });
+
+        // Setup UI bindings
+        this.bindEvents();
+
+        // Subscribe to state updates
+        this.agent.subscribe('state', (msg) => this.handleStateUpdate(msg));
+        this.agent.subscribe('home.rooms', (msg) => this.updateRooms(msg.rooms));
+
+        // Load initial data
+        await this.loadInitialData();
+
+        // Update status
+        this.updateConnectionStatus();
+
+        // Hide loading
+        document.getElementById('loading').classList.add('hidden');
+      }
+
+      bindEvents() {
+        // Quick actions
+        document.querySelectorAll('.quick-action').forEach(btn => {
+          btn.addEventListener('click', () => this.executeAction(btn.dataset.action));
+        });
+      }
+
+      async loadInitialData() {
+        try {
+          // Fetch home state
+          const state = await this.agent.fetch('home/state');
+          this.updateSafetyScore(state.h_x ?? state.safety_score);
+
+          // Fetch rooms
+          const roomsData = await this.agent.fetch('home/rooms');
+          this.updateRooms(roomsData.rooms ?? []);
+        } catch (error) {
+          console.error('Failed to load initial data:', error);
+          // Use cached data if available
+        }
+      }
+
+      updateConnectionStatus() {
+        const status = this.agent.getStatus();
+        const dot = document.getElementById('connection-status');
+        const statusText = document.getElementById('connection-status-text');
+
+        if (status.online && status.wsConnected) {
+          dot.className = 'status-dot connected pulse';
+          statusText.textContent = 'Connected';
+        } else if (status.online) {
+          dot.className = 'status-dot disconnected';
+          statusText.textContent = 'Disconnected from real-time updates';
+        } else {
+          dot.className = 'status-dot error';
+          statusText.textContent = 'Offline';
+        }
+      }
+
+      updateSafetyScore(score) {
+        const el = document.getElementById('safety-value');
+        if (score === null || score === undefined) {
+          el.textContent = '--';
+          el.className = 'safety-score__value';
+          return;
+        }
+
+        el.textContent = score.toFixed(2);
+
+        if (score >= 0.5) {
+          el.className = 'safety-score__value safe';
+        } else if (score >= 0) {
+          el.className = 'safety-score__value caution';
+        } else {
+          el.className = 'safety-score__value danger';
+        }
+      }
+
+      updateRooms(rooms) {
+        this.rooms = rooms;
+        const container = document.getElementById('rooms-container');
+
+        if (!rooms || rooms.length === 0) {
+          container.innerHTML = '';
+          return;
+        }
+
+        container.innerHTML = rooms.map((room, index) => `
+          <article class="room-card animate-fade-up delay-${Math.min(index + 2, 5)}" data-room-id="${room.id}" role="button" tabindex="0" aria-label="${room.name}${room.occupied ? ', occupied' : ', unoccupied'}. Light level ${room.avg_light_level ?? 0}%. ${room.floor ?? 'Floor'}. Click to view details.">
+            <div class="room-card__header">
+              <h3 class="room-card__name">${room.name}</h3>
+              <div class="room-card__occupied ${room.occupied ? 'active' : ''}" role="img" aria-label="${room.occupied ? 'Room is occupied' : 'Room is unoccupied'}"></div>
+            </div>
+            <div class="room-card__stats" aria-hidden="true">
+              <div class="room-card__stat">
+                <span>💡</span>
+                <span>${room.avg_light_level ?? 0}%</span>
+              </div>
+              <div class="room-card__stat">
+                <span>🏠</span>
+                <span>${room.floor ?? 'Floor'}</span>
+              </div>
+            </div>
+          </article>
+        `).join('');
+
+        // Bind room click and keyboard events
+        container.querySelectorAll('.room-card').forEach(card => {
+          const navigateToRoom = () => {
+            const roomId = card.dataset.roomId;
+            // Navigate to room detail or open rooms agent
+            window.location.href = `/agents/rooms.html?room=${roomId}`;
+          };
+          card.addEventListener('click', navigateToRoom);
+          card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              navigateToRoom();
+            }
+          });
+        });
+      }
+
+      async executeAction(action) {
+        const btn = document.querySelector(`[data-action="${action}"]`);
+        btn.classList.add('animate-press');
+
+        // Haptic feedback
+        await this.agent.bridge.haptic('medium');
+
+        try {
+          let result;
+          switch (action) {
+            case 'movie_mode':
+              result = await this.agent.execute('scenes/execute', { scene: 'movie_mode' });
+              break;
+            case 'goodnight':
+              result = await this.agent.execute('scenes/execute', { scene: 'goodnight' });
+              break;
+            case 'lights_off':
+              result = await this.agent.execute('lights/set', { level: 0 });
+              break;
+            case 'lock_all':
+              result = await this.agent.execute('locks/lock-all');
+              break;
+          }
+
+          if (result?.queued) {
+            console.log('Action queued for later:', action);
+          }
+        } catch (error) {
+          console.error('Action failed:', action, error);
+        }
+
+        setTimeout(() => btn.classList.remove('animate-press'), 100);
+      }
+
+      handleStateUpdate(msg) {
+        if (msg.key === 'h_x' || msg.key === 'safety_score') {
+          this.updateSafetyScore(msg.value);
+        }
+      }
+    }
+
+    // =========================================================================
+    // Initialize
+    // =========================================================================
+
+    const dashboard = new DashboardAgent();
+    dashboard.initialize().catch(console.error);
+
+    // Expose for debugging
+    window.dashboard = dashboard;
+  </script>
+</body>
+</html>

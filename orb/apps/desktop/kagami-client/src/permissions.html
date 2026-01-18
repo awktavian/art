@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<!--
+  Permission Onboarding — Desktop Client
+
+  Colony: Beacon (e₅) — Architecture, Planning
+
+  Features:
+    - Explains what Kagami can do with each permission
+    - Shows privacy implications clearly
+    - Allows granular opt-in (not all-or-nothing)
+    - Graceful degradation if denied
+    - Easy path to re-enable later in Settings
+
+  Safety is our top priority.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kagami Permissions</title>
+  <style>
+    :root {
+      --bg-primary: #07060B;
+      --bg-secondary: rgba(255, 255, 255, 0.05);
+      --text-primary: #ffffff;
+      --text-secondary: #888888;
+      --accent-purple: #9b7ebd;
+      --accent-cyan: #67d4e4;
+      --accent-red: #FF6B6B;
+      --accent-yellow: #FFD93D;
+      --accent-green: #00FF88;
+      --radius: 12px;
+      --spacing: 16px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 480px;
+      width: 100%;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .logo {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(155, 126, 189, 0.3), rgba(103, 212, 228, 0.3));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+    }
+
+    .logo svg {
+      width: 48px;
+      height: 48px;
+      fill: url(#gradient);
+    }
+
+    .title {
+      font-size: 28px;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* Permission Cards */
+    .permissions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .permission-card {
+      background: var(--bg-secondary);
+      border-radius: var(--radius);
+      padding: var(--spacing);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+    }
+
+    .permission-card.enabled {
+      border-color: var(--permission-color, var(--accent-purple));
+      border-opacity: 0.5;
+    }
+
+    .permission-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .permission-icon svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .permission-info {
+      flex: 1;
+    }
+
+    .permission-name {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .permission-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    /* Toggle Switch */
+    .toggle {
+      position: relative;
+      width: 50px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #333;
+      transition: 0.3s;
+      border-radius: 28px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+
+    .toggle input:checked + .toggle-slider {
+      background-color: var(--toggle-color, var(--accent-purple));
+    }
+
+    .toggle input:checked + .toggle-slider:before {
+      transform: translateX(22px);
+    }
+
+    /* Settings Button */
+    .settings-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 8px;
+      transition: background 0.2s;
+    }
+
+    .settings-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .settings-btn svg {
+      width: 24px;
+      height: 24px;
+      fill: var(--permission-color, var(--text-secondary));
+    }
+
+    /* Buttons */
+    .continue-btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: var(--radius);
+      background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan));
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      margin-bottom: 12px;
+    }
+
+    .continue-btn:hover {
+      opacity: 0.9;
+    }
+
+    .continue-btn:active {
+      transform: scale(0.98);
+    }
+
+    .continue-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    .continue-btn .spinner {
+      display: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid transparent;
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-left: 8px;
+    }
+
+    .continue-btn.loading .spinner {
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .skip-btn {
+      width: 100%;
+      padding: 12px;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 14px;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .skip-btn:hover {
+      color: var(--text-primary);
+    }
+
+    /* Status indicators */
+    .status-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(0, 255, 136, 0.2);
+      color: var(--accent-green);
+      margin-left: 8px;
+    }
+
+    .status-badge.denied {
+      background: rgba(255, 107, 107, 0.2);
+      color: var(--accent-red);
+    }
+  </style>
+</head>
+<body>
+  <!-- SVG Definitions -->
+  <svg width="0" height="0" style="position: absolute;">
+    <defs>
+      <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#9b7ebd"/>
+        <stop offset="100%" stop-color="#67d4e4"/>
+      </linearGradient>
+    </defs>
+  </svg>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+      </div>
+      <h1 class="title">鏡 Kagami</h1>
+      <p class="subtitle">
+        To give you the best experience, Kagami needs a few permissions.
+        You can enable or disable these at any time.
+      </p>
+    </div>
+
+    <!-- Permission Cards -->
+    <div class="permissions" id="permissions">
+      <!-- Accessibility -->
+      <div class="permission-card" data-id="accessibility" style="--permission-color: #9b7ebd">
+        <div class="permission-icon" style="background: rgba(155, 126, 189, 0.15)">
+          <svg viewBox="0 0 24 24" fill="#9b7ebd">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+          </svg>
+        </div>
+        <div class="permission-info">
+          <div class="permission-name">Accessibility</div>
+          <div class="permission-desc">Control other apps, read screen content, and automate tasks.</div>
+        </div>
+        <button class="settings-btn" onclick="openAccessibilitySettings()">
+          <svg viewBox="0 0 24 24">
+            <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22l-1.92 3.32c-.12.21-.07.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.03-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Screen Recording -->
+      <div class="permission-card" data-id="screen" style="--permission-color: #67d4e4">
+        <div class="permission-icon" style="background: rgba(103, 212, 228, 0.15)">
+          <svg viewBox="0 0 24 24" fill="#67d4e4">
+            <path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/>
+          </svg>
+        </div>
+        <div class="permission-info">
+          <div class="permission-name">Screen Recording</div>
+          <div class="permission-desc">Capture screen content for visual understanding and OCR.</div>
+        </div>
+        <button class="settings-btn" onclick="openScreenRecordingSettings()">
+          <svg viewBox="0 0 24 24">
+            <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22l-1.92 3.32c-.12.21-.07.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.03-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Microphone -->
+      <div class="permission-card enabled" data-id="microphone" style="--permission-color: #FF6B6B; --toggle-color: #FF6B6B">
+        <div class="permission-icon" style="background: rgba(255, 107, 107, 0.15)">
+          <svg viewBox="0 0 24 24" fill="#FF6B6B">
+            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/>
+          </svg>
+        </div>
+        <div class="permission-info">
+          <div class="permission-name">Microphone</div>
+          <div class="permission-desc">Enable voice commands for hands-free control.</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" checked onchange="togglePermission('microphone', this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <!-- Notifications -->
+      <div class="permission-card enabled" data-id="notifications" style="--permission-color: #FFD93D; --toggle-color: #FFD93D">
+        <div class="permission-icon" style="background: rgba(255, 217, 61, 0.15)">
+          <svg viewBox="0 0 24 24" fill="#FFD93D">
+            <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/>
+          </svg>
+        </div>
+        <div class="permission-info">
+          <div class="permission-name">Notifications</div>
+          <div class="permission-desc">Receive alerts about your home, security, and reminders.</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" checked onchange="togglePermission('notifications', this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <!-- Automation -->
+      <div class="permission-card" data-id="automation" style="--permission-color: #00FF88; --toggle-color: #00FF88">
+        <div class="permission-icon" style="background: rgba(0, 255, 136, 0.15)">
+          <svg viewBox="0 0 24 24" fill="#00FF88">
+            <path d="M17.66 7.93L12 2.27 6.34 7.93c-3.12 3.12-3.12 8.19 0 11.31C7.9 20.8 9.95 21.58 12 21.58s4.1-.78 5.66-2.34c3.12-3.12 3.12-8.19 0-11.31zM12 19.59c-1.6 0-3.11-.62-4.24-1.76C6.62 16.69 6 15.19 6 13.59s.62-3.11 1.76-4.24L12 5.1v14.49z"/>
+          </svg>
+        </div>
+        <div class="permission-info">
+          <div class="permission-name">Automation</div>
+          <div class="permission-desc">Control keyboard and mouse for advanced automation.</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" onchange="togglePermission('automation', this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Buttons -->
+    <button class="continue-btn" id="continueBtn" onclick="requestPermissions()">
+      Continue
+      <span class="spinner"></span>
+    </button>
+    <button class="skip-btn" onclick="skip()">Skip for now</button>
+  </div>
+
+  <script>
+    // Tauri API
+    const { invoke } = window.__TAURI__ || { invoke: async () => {} };
+
+    // Permission states
+    const permissionStates = {
+      accessibility: false,
+      screen: false,
+      microphone: true,
+      notifications: true,
+      automation: false
+    };
+
+    // Toggle permission
+    function togglePermission(id, enabled) {
+      permissionStates[id] = enabled;
+      const card = document.querySelector(`[data-id="${id}"]`);
+      if (card) {
+        card.classList.toggle('enabled', enabled);
+      }
+    }
+
+    // Open accessibility settings
+    async function openAccessibilitySettings() {
+      try {
+        await invoke('check_accessibility', { prompt: true });
+      } catch (e) {
+        // Fallback: open System Preferences
+        window.open('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
+      }
+    }
+
+    // Open screen recording settings
+    async function openScreenRecordingSettings() {
+      try {
+        await invoke('vision_request_permission');
+      } catch (e) {
+        // Fallback: open System Preferences
+        window.open('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+      }
+    }
+
+    // Request enabled permissions
+    async function requestPermissions() {
+      const btn = document.getElementById('continueBtn');
+      btn.classList.add('loading');
+      btn.disabled = true;
+
+      try {
+        // Check accessibility
+        if (permissionStates.accessibility) {
+          await invoke('check_accessibility', { prompt: true });
+        }
+
+        // Check screen recording
+        if (permissionStates.screen) {
+          await invoke('vision_check_permission');
+        }
+
+        // Save completion state
+        localStorage.setItem('permission_onboarding_completed', 'true');
+
+        // Close window or navigate
+        await invoke('hide_quick_entry');
+
+      } catch (e) {
+        console.error('Permission request error:', e);
+      } finally {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+      }
+    }
+
+    // Skip onboarding
+    async function skip() {
+      localStorage.setItem('permission_onboarding_completed', 'true');
+      try {
+        await invoke('hide_quick_entry');
+      } catch (e) {
+        console.log('Skip clicked');
+      }
+    }
+
+    // Check initial permission states on load
+    async function checkInitialStates() {
+      try {
+        const accessibilityGranted = await invoke('check_accessibility', { prompt: false });
+        if (accessibilityGranted) {
+          const card = document.querySelector('[data-id="accessibility"]');
+          if (card) {
+            const badge = document.createElement('span');
+            badge.className = 'status-badge';
+            badge.textContent = 'Granted';
+            card.querySelector('.permission-name').appendChild(badge);
+          }
+        }
+
+        const screenGranted = await invoke('vision_check_permission');
+        if (screenGranted) {
+          const card = document.querySelector('[data-id="screen"]');
+          if (card) {
+            const badge = document.createElement('span');
+            badge.className = 'status-badge';
+            badge.textContent = 'Granted';
+            card.querySelector('.permission-name').appendChild(badge);
+          }
+        }
+      } catch (e) {
+        console.log('Initial state check:', e);
+      }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', checkInitialStates);
+  </script>
+</body>
+</html>

@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kagami</title>
+
+    <!-- Microanimations -->
+    <link rel="stylesheet" href="css/microanimations.css">
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════
+         * KAGAMI COMPOSER — Minimal, Cursor-style Input
+         * ═══════════════════════════════════════════════════════════════ */
+
+        :root {
+            --bg: #1a1a1a;
+            --surface: #252525;
+            --surface-hover: #2e2e2e;
+            --border: #333;
+            --border-focus: #555;
+
+            --text: #e5e5e5;
+            --text-muted: #a0a0a0;
+            --text-dim: #666;
+
+            /* Mode colors */
+            --ask: #10B981;
+            --plan: #F59E0B;
+            --agent: #FF6B35;
+
+            /* Status */
+            --success: #10B981;
+            --warning: #F59E0B;
+            --error: #EF4444;
+
+            --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+            --font-mono: 'SF Mono', 'Monaco', 'Consolas', monospace;
+
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            background: transparent;
+            font-family: var(--font);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .composer-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 80px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+         * COMPOSER BOX
+         * ═══════════════════════════════════════════════════════════════ */
+
+        .composer {
+            width: min(600px, calc(100vw - 32px));
+            max-width: 600px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow:
+                0 20px 50px rgba(0, 0, 0, 0.4),
+                0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+            overflow: hidden;
+            /* Entrance animation */
+            animation: composerEntrance 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+            transition: border-color var(--duration-fast, 150ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+                        box-shadow var(--duration-fast, 150ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1));
+        }
+
+        @keyframes composerEntrance {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .composer:focus-within {
+            border-color: var(--border-focus);
+            box-shadow:
+                0 20px 50px rgba(0, 0, 0, 0.4),
+                0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+                0 0 0 2px rgba(16, 185, 129, 0.15);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+         * TOP BAR — Mode Pills + Model Selector
+         * ═══════════════════════════════════════════════════════════════ */
+
+        .composer-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        /* Mode Pills */
+        .mode-pills {
+            display: flex;
+            gap: 2px;
+        }
+
+        .mode-pill {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background var(--duration-fast, 150ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+                        color var(--duration-fast, 150ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+                        transform var(--duration-instant, 100ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+        }
+
+        .mode-pill:hover {
+            color: var(--text);
+            background: var(--surface-hover);
+        }
+
+        .mode-pill:active {
+            transform: scale(0.95);
+        }
+
+        .mode-pill.active {
+            color: var(--bg);
+        }
+
+        .mode-pill[data-mode="ask"].active { background: var(--ask); }
+        .mode-pill[data-mode="plan"].active { background: var(--plan); }
+        .mode-pill[data-mode="agent"].active { background: var(--agent); }
+
+        /* Model Selector */
+        .model-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .model-dropdown {
+            font-family: var(--font);
+            font-size: 12px;
+            padding: 4px 24px 4px 8px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6,9 12,15 18,9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 6px center;
+        }
+
+        .model-dropdown:hover {
+            border-color: var(--border-focus);
+        }
+
+        .model-dropdown:focus {
+            outline: none;
+            border-color: var(--border-focus);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+         * INPUT ROW
+         * ═══════════════════════════════════════════════════════════════ */
+
+        .input-row {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            gap: 12px;
+            position: relative;
+        }
+
+        .input-prompt {
+            color: var(--text-dim);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        #composer-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            font-family: var(--font);
+            font-size: 14px;
+            color: var(--text);
+            caret-color: var(--ask);
+        }
+
+        #composer-input::placeholder {
+            color: var(--text-dim);
+        }
+
+        .voice-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: background var(--duration-fast, 150ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+                        border-color var(--duration-fast, 150ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+                        color var(--duration-fast, 150ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+                        transform var(--duration-instant, 100ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .voice-btn:hover {
+            background: var(--surface-hover);
+            border-color: var(--border-focus);
+            color: var(--text);
+            transform: scale(1.05);
+        }
+
+        .voice-btn:active {
+            transform: scale(0.9);
+        }
+
+        .voice-btn.recording {
+            background: rgba(224, 64, 251, 0.2);
+            border-color: #E040FB;
+            color: #E040FB;
+        }
+
+        @keyframes listeningPulse {
+            0%, 100% {
+                opacity: 0.7;
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(224, 64, 251, 0.4);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.1);
+                box-shadow: 0 0 12px 4px rgba(224, 64, 251, 0.3);
+            }
+        }
+
+        .voice-btn.recording {
+            animation: listeningPulse 1s ease-in-out infinite;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+         * SUGGESTIONS (Typeahead)
+         * ═══════════════════════════════════════════════════════════════ */
+
+        .suggestions-container {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            right: 0;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-bottom: none;
+            border-radius: var(--radius) var(--radius) 0 0;
+            max-height: 280px;
+            overflow-y: auto;
+            opacity: 0;
+            transform: translateY(8px);
+            pointer-events: none;
+            transition: opacity 0.15s ease, transform 0.15s ease;
+        }
+
+        .suggestions-container.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .suggestion-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            cursor: pointer;
+            transition: background var(--duration-instant, 100ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+                        transform var(--duration-instant, 100ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1));
+        }
+
+        .suggestion-item:hover,
+        .suggestion-item.selected {
+            background: var(--surface-hover);
+        }
+
+        .suggestion-item:active {
+            transform: scale(0.99);
+        }
+
+        .suggestion-icon {
+            width: 20px;
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .suggestion-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .suggestion-label {
+            font-size: 13px;
+            color: var(--text);
+        }
+
+        .suggestion-secondary {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+         * CONTEXT CHIPS (@ mentions)
+         * ═══════════════════════════════════════════════════════════════ */
+
+        .context-chips {
+            display: none;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .context-chips.visible {
+            display: flex;
+        }
+
+        .context-chip {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .context-chip-icon {
+            font-size: 10px;
+        }
+
+        .context-chip-remove {
+            cursor: pointer;
+            opacity: 0.5;
+            margin-left: 2px;
+        }
+
+        .context-chip-remove:hover {
+            opacity: 1;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+         * STATUS BAR
+         * ═══════════════════════════════════════════════════════════════ */
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 16px;
+            border-top: 1px solid var(--border);
+            background: var(--surface);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-dim);
+            transition: background var(--duration-normal, 250ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+                        box-shadow var(--duration-normal, 250ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1));
+        }
+
+        .status-dot.connected {
+            background: var(--success);
+            box-shadow: 0 0 8px 2px rgba(16, 185, 129, 0.4);
+            animation: connectionPulse 2s ease-in-out infinite;
+        }
+        .status-dot.disconnected {
+            background: var(--warning);
+        }
+
+        @keyframes connectionPulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 4px 1px rgba(16, 185, 129, 0.3);
+            }
+            50% {
+                transform: scale(1.1);
+                box-shadow: 0 0 8px 3px rgba(16, 185, 129, 0.4);
+            }
+        }
+
+        .safety-score {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            opacity: 0.7;
+        }
+
+        .status-hint {
+            font-size: 10px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="composer-container" role="main">
+        <div class="composer" id="composer" role="dialog" aria-labelledby="composer-title" aria-describedby="composer-description">
+            <!-- Screen reader only title -->
+            <h1 id="composer-title" class="sr-only">Kagami Quick Entry</h1>
+            <p id="composer-description" class="sr-only">Type commands or ask questions. Use slash for commands, at-sign for context.</p>
+
+            <!-- Top Bar -->
+            <div class="composer-top" role="toolbar" aria-label="Mode and model selection">
+                <div class="mode-pills" id="mode-pills" role="radiogroup" aria-label="Interaction mode">
+                    <button class="mode-pill active" data-mode="ask" role="radio" aria-checked="true" tabindex="0" aria-label="Ask mode - get answers to questions">Ask</button>
+                    <button class="mode-pill" data-mode="plan" role="radio" aria-checked="false" tabindex="-1" aria-label="Plan mode - create step-by-step plans">Plan</button>
+                    <button class="mode-pill" data-mode="agent" role="radio" aria-checked="false" tabindex="-1" aria-label="Agent mode - autonomous task execution">Agent</button>
+                </div>
+                <div class="model-selector">
+                    <label for="model-dropdown" class="sr-only">AI Model</label>
+                    <select class="model-dropdown" id="model-dropdown" aria-label="Select AI model">
+                        <option value="auto">Auto</option>
+                        <option value="claude">Claude</option>
+                        <option value="gpt4o">GPT-4o</option>
+                        <option value="deepseek">DeepSeek</option>
+                        <option value="gemini">Gemini</option>
+                        <option value="local">Local</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Input Row -->
+            <div class="input-row" role="search">
+                <span class="input-prompt" aria-hidden="true">›</span>
+                <label for="composer-input" class="sr-only">Command or question input</label>
+                <input
+                    type="text"
+                    id="composer-input"
+                    placeholder="Type / for commands, @ for context..."
+                    autocomplete="off"
+                    autofocus
+                    aria-label="Enter command or question"
+                    aria-describedby="input-hint"
+                    aria-autocomplete="list"
+                    aria-controls="suggestions"
+                    aria-expanded="false"
+                >
+                <button class="voice-btn" id="voice-btn" title="Hold to speak" aria-label="Voice input - hold to speak" aria-pressed="false">
+                    <span aria-hidden="true">🎤</span>
+                </button>
+
+                <!-- Suggestions appear above input -->
+                <div class="suggestions-container" id="suggestions" role="listbox" aria-label="Command suggestions" aria-hidden="true"></div>
+            </div>
+
+            <!-- Context Chips -->
+            <div class="context-chips" id="context-chips" role="region" aria-label="Selected context items" aria-live="polite"></div>
+
+            <!-- Status Bar -->
+            <div class="status-bar" role="status" aria-live="polite">
+                <div class="status-left">
+                    <span class="status-dot" id="status-dot" role="img" aria-label="Connection status: disconnected"></span>
+                    <span id="status-text" aria-live="polite">Ready</span>
+                    <span class="safety-score" id="safety-score" aria-label="Safety score"></span>
+                </div>
+                <span class="status-hint" id="input-hint" aria-hidden="true">esc to close · ↑↓ to navigate · enter to select</span>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* Screen reader only content */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* Focus visible styles for keyboard navigation */
+        .mode-pill:focus-visible,
+        .voice-btn:focus-visible,
+        #composer-input:focus-visible,
+        .model-dropdown:focus-visible {
+            outline: 2px solid var(--ask);
+            outline-offset: 2px;
+        }
+
+        .suggestion-item:focus-visible,
+        .suggestion-item[aria-selected="true"] {
+            background: var(--surface-hover);
+            outline: none;
+        }
+
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            .composer {
+                border-width: 2px;
+            }
+            .status-dot {
+                width: 8px;
+                height: 8px;
+            }
+            .mode-pill.active {
+                font-weight: 700;
+            }
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            .composer,
+            .voice-btn,
+            .mode-pill,
+            .suggestions-container,
+            .suggestion-item,
+            .status-dot {
+                animation: none !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* Context chip accessibility */
+        .context-chip-remove:focus-visible {
+            outline: 2px solid var(--ask);
+            outline-offset: 1px;
+            border-radius: 2px;
+        }
+    </style>
+
+    <script type="module">
+        // ═══════════════════════════════════════════════════════════════
+        // IMPORTS
+        // ═══════════════════════════════════════════════════════════════
+
+        import {
+            initTauri,
+            createInitialState,
+            initModeSelector,
+            initModelSelector,
+            renderContextChips,
+            VoiceController,
+            updateStatus,
+            hideWindow,
+            setupKeyboardShortcuts,
+            setupVisibilityHandler,
+            setupStateListener,
+            printBanner
+        } from './js/composer.js';
+
+        // Load command registry and typeahead with error handling
+        try {
+            await import('./js/command-registry.js');
+            await import('./js/typeahead.js');
+        } catch (error) {
+            console.error('[Kagami] Failed to load modules:', error);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // INITIALIZATION
+        // ═══════════════════════════════════════════════════════════════
+
+        // Initialize Tauri
+        const tauri = await initTauri();
+
+        // Elements
+        const input = document.getElementById('composer-input');
+        const suggestions = document.getElementById('suggestions');
+        const modePills = document.getElementById('mode-pills');
+        const modelDropdown = document.getElementById('model-dropdown');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const safetyScore = document.getElementById('safety-score');
+        const contextChips = document.getElementById('context-chips');
+        const voiceBtn = document.getElementById('voice-btn');
+
+        // State
+        const state = createInitialState();
+
+        // Initialize selectors
+        initModeSelector(modePills, state);
+        initModelSelector(modelDropdown, state);
+
+        // ═══════════════════════════════════════════════════════════════
+        // TYPEAHEAD CONTROLLER
+        // ═══════════════════════════════════════════════════════════════
+
+        const typeahead = new window.TypeaheadController(input, suggestions, {
+            maxSuggestions: 8,
+            debounceMs: 80,
+
+            onExecute: async (result) => {
+                if (result.error) {
+                    statusText.textContent = `Error: ${result.error}`;
+                    setTimeout(() => { statusText.textContent = 'Ready'; }, 2000);
+                    return;
+                }
+
+                // Handle slash command result
+                if (result.type === 'slash') {
+                    statusText.textContent = 'Done';
+
+                    // Special handling for /help
+                    if (result.result?.commands) {
+                        console.table(result.result.commands);
+                    }
+
+                    setTimeout(() => hideWindow(tauri), 300);
+                }
+
+                // Handle natural language (would go to API)
+                if (result.type === 'natural') {
+                    statusText.textContent = 'Processing...';
+                    // TODO: Send to Kagami API for NL processing
+                    setTimeout(() => { statusText.textContent = 'Ready'; }, 1000);
+                }
+            },
+
+            onContextChange: (item) => {
+                // Add context chip
+                if (item.value && !state.context.find(c => c.id === item.id)) {
+                    state.context.push({
+                        id: item.id,
+                        label: item.label,
+                        icon: item.icon,
+                        type: item.type || 'unknown',
+                    });
+                    renderContextChips(contextChips, state);
+                }
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════════════
+        // VOICE INPUT
+        // ═══════════════════════════════════════════════════════════════
+
+        const voice = new VoiceController(input, statusText);
+        voice.attachButton(voiceBtn);
+
+        // ═══════════════════════════════════════════════════════════════
+        // EVENT HANDLERS
+        // ═══════════════════════════════════════════════════════════════
+
+        setupKeyboardShortcuts(tauri);
+        setupVisibilityHandler(input, statusText);
+
+        // ═══════════════════════════════════════════════════════════════
+        // REAL-TIME STATUS
+        // ═══════════════════════════════════════════════════════════════
+
+        const statusElements = { statusDot, safetyScore };
+
+        function onStatusUpdate() {
+            updateStatus(statusElements, state);
+        }
+
+        await setupStateListener(tauri, state, onStatusUpdate);
+
+        // ═══════════════════════════════════════════════════════════════
+        // INIT
+        // ═══════════════════════════════════════════════════════════════
+
+        input.focus();
+        onStatusUpdate();
+        printBanner();
+    </script>
+</body>
+</html>

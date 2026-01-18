@@ -1,0 +1,250 @@
+name: Design Tokens
+
+on:
+  push:
+    paths:
+      - 'packages/kagami-design-tokens/**'
+      - 'config/design-tokens/**'
+    branches:
+      - main
+      - 'session/*'
+  pull_request:
+    paths:
+      - 'packages/kagami-design-tokens/**'
+      - 'config/design-tokens/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate-tokens:
+    name: Generate & Validate Design Tokens
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate unified tokens.json
+        run: |
+          python3 -c "import json; json.load(open('packages/kagami-design-tokens/tokens.json'))"
+          echo "✅ packages/kagami-design-tokens/tokens.json is valid JSON"
+          # Also validate legacy config if present
+          for f in config/design-tokens/*.json 2>/dev/null || true; do
+            python3 -c "import json; json.load(open('$f'))"
+            echo "✅ $f is valid JSON"
+          done
+
+      - name: Generate platform tokens (unified)
+        run: |
+          python3 packages/kagami-design-tokens/generate.py
+          echo "Generated all platform-specific token files from unified tokens.json"
+
+      - name: List generated files
+        run: |
+          echo "Generated files:"
+          ls -la packages/kagami-design-swift/Sources/KagamiDesign/DesignTokens.generated.swift || echo "Swift tokens location check"
+          ls -la apps/android/kagami-android/app/src/main/java/com/kagami/android/ui/theme/DesignTokens.generated.kt || echo "Kotlin tokens location check"
+          ls -la apps/desktop/kagami-client/src/css/design-tokens.generated.css || echo "CSS tokens location check"
+          ls -la apps/hub/kagami-hub/src/design_tokens.generated.rs || echo "Rust tokens location check"
+
+      - name: Verify Swift syntax
+        run: |
+          grep -q "import SwiftUI" packages/kagami-design-swift/Sources/KagamiDesign/DesignTokens.generated.swift
+          grep -q "extension Color" packages/kagami-design-swift/Sources/KagamiDesign/DesignTokens.generated.swift
+          grep -q "KagamiSpacing" packages/kagami-design-swift/Sources/KagamiDesign/DesignTokens.generated.swift
+          grep -q "KagamiBreakpoint" packages/kagami-design-swift/Sources/KagamiDesign/DesignTokens.generated.swift
+          echo "✅ Swift syntax check passed"
+
+      - name: Verify Kotlin syntax
+        run: |
+          grep -q "package com.kagami.android.ui.theme" apps/android/kagami-android/app/src/main/java/com/kagami/android/ui/theme/DesignTokens.generated.kt
+          grep -q "TokenSpark = Color" apps/android/kagami-android/app/src/main/java/com/kagami/android/ui/theme/DesignTokens.generated.kt
+          grep -q "TokenSpacing" apps/android/kagami-android/app/src/main/java/com/kagami/android/ui/theme/DesignTokens.generated.kt
+          grep -q "TokenBreakpoint" apps/android/kagami-android/app/src/main/java/com/kagami/android/ui/theme/DesignTokens.generated.kt
+          echo "✅ Kotlin syntax check passed"
+
+      - name: Verify CSS syntax
+        run: |
+          grep -q ":root {" apps/desktop/kagami-client/src/css/design-tokens.generated.css
+          grep -q "--kagami-" apps/desktop/kagami-client/src/css/design-tokens.generated.css
+          grep -q "--kagami-font-size-" apps/desktop/kagami-client/src/css/design-tokens.generated.css
+          grep -q "--kagami-breakpoint-" apps/desktop/kagami-client/src/css/design-tokens.generated.css
+          echo "✅ CSS syntax check passed"
+
+      - name: Verify Rust syntax
+        run: |
+          grep -q "pub mod void" apps/hub/kagami-hub/src/design_tokens.generated.rs
+          grep -q "pub mod colony" apps/hub/kagami-hub/src/design_tokens.generated.rs
+          grep -q "pub mod font_size" apps/hub/kagami-hub/src/design_tokens.generated.rs
+          grep -q "pub mod breakpoint" apps/hub/kagami-hub/src/design_tokens.generated.rs
+          echo "✅ Rust syntax check passed"
+
+      - name: Upload generated tokens as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: design-tokens
+          path: |
+            packages/kagami-design-swift/Sources/KagamiDesign/DesignTokens.generated.swift
+            apps/android/kagami-android/app/src/main/java/com/kagami/android/ui/theme/DesignTokens.generated.kt
+            apps/desktop/kagami-client/src/css/design-tokens.generated.css
+            apps/hub/kagami-hub/src/design_tokens.generated.rs
+
+      - name: Summary
+        run: |
+          echo "## Design Tokens Generation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Source:** \`packages/kagami-design-tokens/tokens.json\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Generated files are available as build artifacts (not committed to repo)." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | File | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Swift (iOS/Watch/Vision/TV) | DesignTokens.generated.swift | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Kotlin (Android/Wear) | DesignTokens.generated.kt | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| CSS (Desktop/Web) | design-tokens.generated.css | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rust (Hub) | design_tokens.generated.rs | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Token Categories" >> $GITHUB_STEP_SUMMARY
+          echo "- Colors (void, colony, status, safety, text)" >> $GITHUB_STEP_SUMMARY
+          echo "- Typography (font sizes, weights, line heights)" >> $GITHUB_STEP_SUMMARY
+          echo "- Spacing (8pt grid)" >> $GITHUB_STEP_SUMMARY
+          echo "- Radius, Shadows, Breakpoints" >> $GITHUB_STEP_SUMMARY
+          echo "- Motion (Fibonacci durations, catastrophe easings)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To generate locally: \`python packages/kagami-design-tokens/generate.py\`" >> $GITHUB_STEP_SUMMARY
+
+  validate-tokens:
+    name: Validate Token Consistency
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate unified tokens.json schema
+        run: |
+          python3 << 'EOF'
+          import json
+          import re
+          from pathlib import Path
+
+          tokens_file = Path('packages/kagami-design-tokens/tokens.json')
+          tokens = json.loads(tokens_file.read_text())
+
+          errors = []
+
+          def validate_hex(value, path):
+              """Validate a hex color value."""
+              if isinstance(value, str) and value.startswith('#'):
+                  if not re.match(r'^#[0-9A-Fa-f]{6}$', value):
+                      errors.append(f"Invalid hex color: {path} = {value}")
+
+          # Validate void colors
+          for name, data in tokens.get('colors', {}).get('void', {}).items():
+              if name == 'description':
+                  continue
+              hex_val = data.get('hex') if isinstance(data, dict) else data
+              validate_hex(hex_val, f"colors.void.{name}")
+
+          # Validate colony colors
+          for name, data in tokens.get('colors', {}).get('colony', {}).items():
+              if name == 'description':
+                  continue
+              if isinstance(data, dict) and 'hex' in data:
+                  validate_hex(data['hex'], f"colors.colony.{name}")
+                  # Validate RGB array
+                  rgb = data.get('rgb', [])
+                  if len(rgb) != 3 or not all(0 <= v <= 255 for v in rgb):
+                      errors.append(f"Invalid RGB: colors.colony.{name} = {rgb}")
+
+          # Validate status colors
+          for name, data in tokens.get('colors', {}).get('status', {}).items():
+              if name == 'description':
+                  continue
+              hex_val = data.get('hex') if isinstance(data, dict) else data
+              validate_hex(hex_val, f"colors.status.{name}")
+
+          # Validate motion durations (Fibonacci)
+          durations = tokens.get('motion', {}).get('duration', {})
+          fibonacci = [89, 144, 233, 377, 610, 987, 1597, 2584]
+          for name, value in durations.items():
+              if name == 'description':
+                  continue
+              if value not in fibonacci:
+                  errors.append(f"Non-Fibonacci duration: motion.duration.{name} = {value}")
+
+          # Validate spacing (8pt grid)
+          spacing = tokens.get('spacing', {})
+          for name, value in spacing.items():
+              if name in ['description', 'unit']:
+                  continue
+              if value % 2 != 0:  # Must be even (8pt grid allows 2, 4, 8, etc.)
+                  errors.append(f"Spacing not on grid: spacing.{name} = {value}")
+
+          if errors:
+              print("Validation errors:")
+              for e in errors:
+                  print(f"  - {e}")
+              exit(1)
+          else:
+              print("✅ All token values are valid!")
+          EOF
+
+      - name: Check required token categories exist
+        run: |
+          python3 << 'EOF'
+          import json
+          from pathlib import Path
+
+          tokens_file = Path('packages/kagami-design-tokens/tokens.json')
+          tokens = json.loads(tokens_file.read_text())
+
+          required_categories = [
+              'colors',
+              'typography',
+              'spacing',
+              'radius',
+              'motion',
+              'shadows',
+              'breakpoints',
+              'effects',
+              'accessibility'
+          ]
+
+          missing = []
+          for category in required_categories:
+              if category not in tokens:
+                  missing.append(f"Missing category: {category}")
+
+          # Check required color subcategories
+          required_colors = ['void', 'colony', 'status', 'safety', 'text']
+          for subcategory in required_colors:
+              if subcategory not in tokens.get('colors', {}):
+                  missing.append(f"Missing color category: colors.{subcategory}")
+
+          # Check colony colors (all 7 required)
+          colonies = ['spark', 'forge', 'flow', 'nexus', 'beacon', 'grove', 'crystal']
+          for colony in colonies:
+              if colony not in tokens.get('colors', {}).get('colony', {}):
+                  missing.append(f"Missing colony color: {colony}")
+
+          if missing:
+              print("Missing required token categories:")
+              for m in missing:
+                  print(f"  - {m}")
+              exit(1)
+          else:
+              print("✅ All required token categories present!")
+          EOF

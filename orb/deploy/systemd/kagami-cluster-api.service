@@ -1,0 +1,154 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# KAGAMI CLUSTER API SERVICE — Distributed Byzantine Fault Tolerant
+# Colony: Nexus (e₄) — Distributed coordination
+#
+# This service runs the Kagami API server with full cluster awareness.
+# Participates in PBFT consensus, service registry, and cross-hub sync.
+#
+# Part of kagami.target for coordinated startup.
+#
+# Installation:
+#   sudo cp kagami-cluster-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable kagami-cluster-api
+#   sudo systemctl start kagami-cluster-api
+# ═══════════════════════════════════════════════════════════════════════════
+
+[Unit]
+Description=Kagami OS API Server (Cluster Mode)
+Documentation=https://github.com/kagami/kagami
+
+# Ordered dependencies - must start after cluster infrastructure
+After=network-online.target
+After=etcd.service
+After=redis.service
+After=cockroachdb.service
+Wants=network-online.target
+
+# Requires etcd for consensus and service registry
+Requires=etcd.service
+Wants=redis.service cockroachdb.service
+
+# Part of kagami.target
+PartOf=kagami.target
+
+[Service]
+Type=notify
+User=kagami
+Group=kagami
+WorkingDirectory=/opt/kagami
+
+# Environment - include all package paths
+Environment="PATH=/opt/kagami/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/opt/kagami/packages"
+Environment="HOME=/opt/kagami"
+Environment="LANG=en_US.UTF-8"
+
+# =============================================================================
+# UNIFIED CLUSTER CONFIGURATION (Jan 4, 2026)
+# Full Byzantine fault-tolerant distributed mode
+# =============================================================================
+
+# Cluster identity
+Environment="KAGAMI_CLUSTER_NAME=kagami"
+# Node ID auto-generated from hostname if not set
+# Environment="KAGAMI_NODE_ID=kagami-api-1"
+
+# Service type for registration
+Environment="KAGAMI_SERVICE_TYPE=api"
+
+# etcd (Consensus, Leader Election, Service Registry, Distributed Locks)
+Environment="ETCD_ENDPOINTS=http://etcd-1:2379,http://etcd-2:2379,http://etcd-3:2379"
+Environment="ETCD_TIMEOUT=5"
+Environment="ETCD_PREFIX=/kagami"
+
+# Redis (Cache, Job Queues, Pub/Sub, Sessions)
+Environment="REDIS_URL=redis://redis:6379/0"
+Environment="REDIS_MAX_CONNECTIONS=200"
+Environment="REDIS_SENTINEL_MASTER=kagami-master"
+Environment="REDIS_SENTINEL_NODES=sentinel-1:26379,sentinel-2:26379,sentinel-3:26379"
+
+# CockroachDB (Distributed SQL Persistence)
+Environment="DATABASE_URL=cockroachdb://root@cockroach-1:26257,cockroach-2:26257,cockroach-3:26257/kagami?sslmode=verify-full"
+Environment="DB_POOL_SIZE=100"
+Environment="DB_MAX_OVERFLOW=100"
+
+# PBFT Consensus Configuration (Jan 4, 2026)
+# 3f+1 = 4 nodes for f=1 Byzantine tolerance
+Environment="PBFT_CLUSTER_SIZE=4"
+Environment="PBFT_BYZANTINE_TOLERANCE=1"
+# Shared secret for HMAC message authentication
+Environment="PBFT_SECRET_KEY_FILE=/opt/kagami/secrets/pbft.key"
+
+# Cluster behavior
+Environment="CLUSTER_AUTO_FAILOVER=true"
+Environment="CLUSTER_AUTO_REBALANCE=true"
+Environment="CLUSTER_HEARTBEAT_INTERVAL=10"
+Environment="CLUSTER_HEALTH_CHECK_INTERVAL=30"
+Environment="CLUSTER_LEADER_LEASE_TTL=30"
+
+# Cross-Hub CRDT Sync
+Environment="CRDT_SYNC_INTERVAL=10"
+
+# Mesh-Homeostasis Bridge
+Environment="MESH_BRIDGE_SYNC_INTERVAL=10"
+
+# Application settings
+Environment="ENVIRONMENT=production"
+Environment="KAGAMI_BOOT_MODE=full"
+Environment="LOG_LEVEL=INFO"
+Environment="METRICS_PORT=9090"
+Environment="API_PORT=8001"
+
+# Watchdog configuration for sd_notify
+Environment="WATCHDOG_USEC=30000000"
+
+# Main API server with sd_notify support
+ExecStart=/opt/kagami/.venv/bin/python3 -m uvicorn \
+    kagami_api:create_app_v2 \
+    --factory \
+    --host 0.0.0.0 \
+    --port ${API_PORT} \
+    --workers 4 \
+    --log-level info
+
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Process management
+Restart=on-failure
+RestartSec=10s
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+TimeoutStartSec=120
+
+# Watchdog (systemd will restart if no WATCHDOG=1 within interval)
+WatchdogSec=30
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/kagami /var/log/kagami /var/run/kagami
+ReadOnlyPaths=/opt/kagami/secrets
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=8G
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kagami-api
+
+[Install]
+WantedBy=kagami.target
+WantedBy=multi-user.target
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 鏡
+# The API serves. The cluster coordinates. Byzantine faults tolerated.
+# h(x) ≥ 0. Always.
+# ═══════════════════════════════════════════════════════════════════════════

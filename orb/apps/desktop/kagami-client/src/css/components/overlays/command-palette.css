@@ -1,0 +1,574 @@
+/**
+ * Prism Command Palette
+ *
+ * Keyboard-driven command palette (Cmd+K style) with glass styling,
+ * search, categories, and chromatic effects.
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * COMMAND PALETTE BACKDROP
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-command-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--prism-z-modal-backdrop);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 80px 24px 24px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--prism-dur-normal) var(--prism-ease-cusp),
+    visibility var(--prism-dur-normal);
+}
+
+.prism-command-backdrop--open {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * COMMAND PALETTE CONTAINER
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-command {
+  width: 100%;
+  max-width: 640px;
+  max-height: calc(100vh - 160px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  /* VOLUMETRIC glass with noise texture */
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    var(--prism-surface);
+  background-blend-mode: overlay, normal;
+  backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+  -webkit-backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+
+  /* Glass edge beveling */
+  border: 1px solid transparent;
+  border-image: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.35) 0%,
+    rgba(255, 255, 255, 0.15) 40%,
+    rgba(255, 255, 255, 0.06) 60%,
+    rgba(0, 0, 0, 0.03) 100%
+  ) 1;
+  border-radius: var(--prism-radius-xl);
+
+  /* Rich volumetric shadow */
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 1px 0 rgba(255, 255, 255, 0.1) inset;
+
+  /* Entry animation */
+  opacity: 0;
+  transform: translateY(-20px) scale(0.97);
+  transition:
+    opacity var(--prism-dur-normal) var(--prism-ease-cusp),
+    transform var(--prism-dur-slow) var(--prism-ease-spring);
+
+  /* GPU acceleration */
+  will-change: transform, opacity;
+}
+
+.prism-command-backdrop--open .prism-command {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Chromatic edge effect */
+.prism-command::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    var(--prism-e5-12) 0%,
+    transparent 30%,
+    transparent 70%,
+    var(--prism-e7-12) 100%
+  );
+  filter: blur(12px);
+  opacity: 0.6;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SEARCH INPUT
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-command__search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--prism-border);
+  flex-shrink: 0;
+}
+
+.prism-command__search-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--prism-text-tertiary);
+  flex-shrink: 0;
+}
+
+.prism-command__input {
+  flex: 1;
+  padding: 0;
+  font-size: 1rem;
+  color: var(--prism-text);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+.prism-command__input::placeholder {
+  color: var(--prism-text-tertiary);
+}
+
+/* Clear button */
+.prism-command__clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--prism-radius-sm);
+  color: var(--prism-text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--prism-dur-fast) var(--prism-ease-cusp),
+    color var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-command__input:not(:placeholder-shown) ~ .prism-command__clear {
+  opacity: 1;
+}
+
+.prism-command__clear:hover {
+  color: var(--prism-text);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * RESULTS LIST
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-command__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* Custom scrollbar */
+.prism-command__list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.prism-command__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.prism-command__list::-webkit-scrollbar-thumb {
+  background: var(--prism-border);
+  border-radius: var(--prism-radius-full);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * GROUP / CATEGORY
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-command__group {
+  margin-bottom: 8px;
+}
+
+.prism-command__group:last-child {
+  margin-bottom: 0;
+}
+
+.prism-command__group-heading {
+  padding: 8px 12px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--prism-text-tertiary);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * COMMAND ITEMS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-command__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  font-size: 0.9375rem;
+  color: var(--prism-text);
+  background: transparent;
+  border: none;
+  border-radius: var(--prism-radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background var(--prism-dur-fast) var(--prism-ease-cusp),
+    color var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-command__item:hover,
+.prism-command__item--highlighted {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.prism-command__item:focus-visible {
+  outline: none;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Active/selected state with chromatic glow */
+.prism-command__item--selected {
+  background: var(--prism-surface-elevated);
+  position: relative;
+}
+
+.prism-command__item--selected::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: var(--prism-gradient-spectrum);
+  opacity: 0.1;
+  z-index: -1;
+}
+
+/* Disabled state */
+.prism-command__item:disabled,
+.prism-command__item--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * ITEM PARTS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Icon */
+.prism-command__item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--prism-radius-md);
+  flex-shrink: 0;
+}
+
+.prism-command__item-icon svg,
+.prism-command__item-icon img {
+  width: 18px;
+  height: 18px;
+  opacity: 0.8;
+}
+
+/* Content */
+.prism-command__item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.prism-command__item-title {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prism-command__item-description {
+  font-size: 0.8125rem;
+  color: var(--prism-text-secondary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Keyboard shortcut */
+.prism-command__shortcut {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.prism-command__key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  font-size: 0.6875rem;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: var(--prism-text-secondary);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--prism-border);
+  border-radius: var(--prism-radius-sm);
+}
+
+/* Badge */
+.prism-command__badge {
+  padding: 2px 8px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--colony-color, var(--prism-beacon));
+  background: color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 15%, transparent);
+  border-radius: var(--prism-radius-full);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * EMPTY STATE
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-command__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.prism-command__empty-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--prism-text-tertiary);
+  margin-bottom: 16px;
+}
+
+.prism-command__empty-title {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--prism-text);
+  margin: 0 0 4px;
+}
+
+.prism-command__empty-description {
+  font-size: 0.875rem;
+  color: var(--prism-text-secondary);
+  margin: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * LOADING STATE
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-command__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.prism-command__spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--prism-border);
+  border-top-color: var(--colony-color, var(--prism-beacon));
+  border-radius: var(--prism-radius-full);
+  animation: command-spin 0.8s linear infinite;
+}
+
+@keyframes command-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * FOOTER
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-command__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--prism-border);
+  background: rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+}
+
+.prism-command__hints {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: var(--prism-text-tertiary);
+}
+
+.prism-command__hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.prism-command__hint-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font-size: 0.625rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--prism-border);
+  border-radius: 3px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * RECENT / FREQUENT
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-command__recent {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.prism-command__recent-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.5;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SEPARATOR / DIVIDER
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-command__separator {
+  height: 1px;
+  margin: 8px 4px;
+  background: var(--prism-border);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SIZE VARIANTS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Small */
+.prism-command--sm {
+  max-width: 480px;
+}
+
+.prism-command--sm .prism-command__input {
+  font-size: 0.9375rem;
+}
+
+.prism-command--sm .prism-command__item {
+  padding: 10px;
+  font-size: 0.875rem;
+}
+
+/* Large */
+.prism-command--lg {
+  max-width: 720px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * NESTED / PAGES
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-command__breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--prism-border);
+  font-size: 0.8125rem;
+  color: var(--prism-text-secondary);
+}
+
+.prism-command__breadcrumb-item {
+  cursor: pointer;
+  transition: color var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-command__breadcrumb-item:hover {
+  color: var(--prism-text);
+}
+
+.prism-command__breadcrumb-separator {
+  opacity: 0.4;
+}
+
+.prism-command__breadcrumb-current {
+  color: var(--prism-text);
+  font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * RESPONSIVE
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 640px) {
+  .prism-command-backdrop {
+    padding: 16px;
+    align-items: flex-end;
+  }
+
+  .prism-command {
+    max-height: calc(100vh - 32px);
+    border-radius: var(--prism-radius-xl) var(--prism-radius-xl) 0 0;
+    transform: translateY(100%);
+  }
+
+  .prism-command-backdrop--open .prism-command {
+    transform: translateY(0);
+  }
+
+  .prism-command__footer {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .prism-command__hints {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * REDUCED MOTION
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .prism-command {
+    transition: opacity var(--prism-dur-fast);
+    transform: none;
+  }
+
+  .prism-command-backdrop--open .prism-command {
+    transform: none;
+  }
+
+  .prism-command__spinner {
+    animation: none;
+  }
+}

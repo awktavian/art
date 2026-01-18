@@ -1,0 +1,125 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# KAGAMI HUB — PRODUCTION DOCKER COMPOSE
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Usage:
+#   docker-compose -f docker-compose.production.yml up -d
+#
+# For Raspberry Pi with GPIO/LED access:
+#   docker-compose -f docker-compose.production.yml --profile rpi up -d
+#
+# ═══════════════════════════════════════════════════════════════════════════
+
+version: '3.9'
+
+services:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Kagami Hub — Voice-first smart home assistant
+  # ─────────────────────────────────────────────────────────────────────────
+  kagami-hub:
+    image: kagami/kagami-hub:${KAGAMI_VERSION:-stable}
+    container_name: kagami-hub
+    hostname: kagami-hub
+    restart: unless-stopped
+
+    # Pull latest stable on every restart
+    pull_policy: always
+
+    environment:
+      # Core configuration
+      - KAGAMI_API_URL=${KAGAMI_API_URL:-http://kagami.local:8001}
+      - KAGAMI_HUB_NAME=${KAGAMI_HUB_NAME:-Living Room Hub}
+      - KAGAMI_HUB_LOCATION=${KAGAMI_HUB_LOCATION:-Living Room}
+
+      # Logging
+      - RUST_LOG=${RUST_LOG:-info,kagami_hub=debug}
+      - RUST_BACKTRACE=1
+
+      # Timezone
+      - TZ=${TZ:-America/Los_Angeles}
+
+      # Feature flags
+      - KAGAMI_ENABLE_WAKE_WORD=${KAGAMI_ENABLE_WAKE_WORD:-true}
+      - KAGAMI_ENABLE_LED_RING=${KAGAMI_ENABLE_LED_RING:-false}
+      - KAGAMI_ENABLE_LOCAL_STT=${KAGAMI_ENABLE_LOCAL_STT:-true}
+      - KAGAMI_ENABLE_LOCAL_LLM=${KAGAMI_ENABLE_LOCAL_LLM:-false}
+
+    ports:
+      - "8080:8080"   # Web UI + mDNS discovery
+      - "8765:8765"   # WebSocket real-time sync
+
+    volumes:
+      - kagami-hub-config:/app/config
+      - kagami-hub-data:/app/data
+      - kagami-hub-models:/app/models
+
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    labels:
+      - "com.kagami.service=hub"
+      - "com.kagami.description=Voice-first smart home hub"
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Kagami Hub — Raspberry Pi profile (with GPIO/hardware access)
+  # ─────────────────────────────────────────────────────────────────────────
+  kagami-hub-rpi:
+    extends:
+      service: kagami-hub
+    profiles:
+      - rpi
+
+    # Required for GPIO/SPI access on Raspberry Pi
+    privileged: true
+
+    devices:
+      - /dev/snd:/dev/snd           # Audio (microphone + speaker)
+      - /dev/spidev0.0:/dev/spidev0.0  # SPI for LED ring
+      - /dev/gpiomem:/dev/gpiomem   # GPIO memory
+
+    environment:
+      - KAGAMI_ENABLE_LED_RING=true
+
+    # Use host network for mDNS discovery
+    network_mode: host
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Volumes
+# ═══════════════════════════════════════════════════════════════════════════
+
+volumes:
+  kagami-hub-config:
+    driver: local
+    labels:
+      - "com.kagami.volume=config"
+
+  kagami-hub-data:
+    driver: local
+    labels:
+      - "com.kagami.volume=data"
+
+  kagami-hub-models:
+    driver: local
+    labels:
+      - "com.kagami.volume=models"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Networks (optional — uncomment if not using host network)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# networks:
+#   kagami:
+#     driver: bridge
+#     ipam:
+#       config:
+#         - subnet: 172.30.0.0/24

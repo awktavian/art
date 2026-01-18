@@ -1,0 +1,187 @@
+name: Mesh SDK Build & Test
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'packages/kagami-mesh-sdk/**'
+      - '.github/workflows/mesh-sdk.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'packages/kagami-mesh-sdk/**'
+      - '.github/workflows/mesh-sdk.yml'
+
+concurrency:
+  group: mesh-sdk-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ============================================================================
+  # LINT & FORMAT
+  # ============================================================================
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: packages/kagami-mesh-sdk
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/kagami-mesh-sdk/target
+          key: ${{ runner.os }}-cargo-mesh-lint-${{ hashFiles('packages/kagami-mesh-sdk/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-mesh-lint-
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  # ============================================================================
+  # BUILD & TEST (Multi-platform)
+  # ============================================================================
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    needs: [lint]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+    defaults:
+      run:
+        working-directory: packages/kagami-mesh-sdk
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/kagami-mesh-sdk/target
+          key: ${{ runner.os }}-cargo-mesh-test-${{ hashFiles('packages/kagami-mesh-sdk/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-mesh-test-
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Run tests
+        run: cargo test --all-features
+
+  # ============================================================================
+  # UNIFFI BINDINGS GENERATION
+  # ============================================================================
+  bindings:
+    name: Generate UniFFI Bindings
+    runs-on: macos-latest
+    timeout-minutes: 20
+    needs: [test]
+    defaults:
+      run:
+        working-directory: packages/kagami-mesh-sdk
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/kagami-mesh-sdk/target
+          key: ${{ runner.os }}-cargo-mesh-bindings-${{ hashFiles('packages/kagami-mesh-sdk/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-mesh-bindings-
+
+      - name: Build library
+        run: cargo build --release
+
+      - name: Generate Swift bindings
+        run: cargo run --release --features bindgen --bin uniffi-bindgen -- swift
+        continue-on-error: true
+
+      - name: Generate Kotlin bindings
+        run: cargo run --release --features bindgen --bin uniffi-bindgen -- kotlin
+        continue-on-error: true
+
+      - name: Upload Swift bindings
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-bindings
+          path: packages/kagami-mesh-sdk/bindings/swift/
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload Kotlin bindings
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlin-bindings
+          path: packages/kagami-mesh-sdk/bindings/kotlin/
+          retention-days: 7
+          if-no-files-found: warn
+
+  # ============================================================================
+  # SECURITY AUDIT
+  # ============================================================================
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [lint]
+    defaults:
+      run:
+        working-directory: packages/kagami-mesh-sdk
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run security audit
+        run: cargo audit
+        continue-on-error: true
+
+# 鏡
+# Cross-platform mesh networking
+# h(x) ≥ 0. Always.

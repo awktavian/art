@@ -1,0 +1,615 @@
+name: Metrics Tracking
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    # Run weekly on Monday at 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      force_update_dashboard:
+        description: 'Force update metrics dashboard'
+        required: false
+        default: 'false'
+        type: boolean
+
+concurrency:
+  group: metrics-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PIP_NO_INPUT: "1"
+  # Metrics thresholds
+  COVERAGE_THRESHOLD: 70
+  COMPLEXITY_THRESHOLD: 15
+
+jobs:
+  # ==========================================================================
+  # COVERAGE ANALYSIS
+  # ==========================================================================
+  coverage:
+    name: Coverage Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      coverage_percent: ${{ steps.coverage.outputs.coverage_percent }}
+      coverage_status: ${{ steps.coverage.outputs.status }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+            pyproject.toml
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          df -h
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install CPU-only torch to save disk space
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          # Install satellite packages first
+          python -m pip install -e packages/kagami_math/
+          python -m pip install -e packages/kagami_observability/ || true
+          python -m pip install -e packages/kagami_smarthome/ || true
+          # Install other dependencies
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+          # Install main package
+          python -m pip install --no-deps -e .
+
+      - name: Run tests with coverage
+        id: coverage
+        run: |
+          set +e
+          pytest tests/unit/ tests/core/ tests/api/ \
+            --cov=kagami \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:htmlcov \
+            --cov-report=json:coverage.json \
+            --cov-report=term \
+            --cov-fail-under=${{ env.COVERAGE_THRESHOLD }} \
+            -n auto \
+            --dist loadgroup \
+            --maxfail=50 \
+            -q
+          TEST_EXIT_CODE=$?
+          set -e
+
+          # Extract coverage percentage
+          COVERAGE_PCT=$(python -c "import json; print(f\"{json.load(open('coverage.json'))['totals']['percent_covered']:.2f}\")")
+          echo "coverage_percent=${COVERAGE_PCT}" >> $GITHUB_OUTPUT
+
+          # Determine status
+          if [ "$TEST_EXIT_CODE" -eq 0 ]; then
+            echo "status=pass" >> $GITHUB_OUTPUT
+            echo "Coverage: ${COVERAGE_PCT}% (PASS - above ${{ env.COVERAGE_THRESHOLD }}%)"
+          else
+            echo "status=fail" >> $GITHUB_OUTPUT
+            echo "Coverage: ${COVERAGE_PCT}% (FAIL - below ${{ env.COVERAGE_THRESHOLD }}%)"
+            exit 1
+          fi
+
+      - name: Generate coverage badge
+        if: always()
+        run: |
+          python -c "
+          import json
+          with open('coverage.json') as f:
+              data = json.load(f)
+          coverage_pct = data['totals']['percent_covered']
+
+          # Determine color
+          if coverage_pct >= 90:
+              color = 'brightgreen'
+          elif coverage_pct >= 80:
+              color = 'green'
+          elif coverage_pct >= 70:
+              color = 'yellow'
+          elif coverage_pct >= 60:
+              color = 'orange'
+          else:
+              color = 'red'
+
+          badge = {
+              'schemaVersion': 1,
+              'label': 'coverage',
+              'message': f'{coverage_pct:.1f}%',
+              'color': color
+          }
+
+          with open('coverage-badge.json', 'w') as f:
+              json.dump(badge, f)
+
+          print(f'Badge generated: {coverage_pct:.1f}% ({color})')
+          "
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-reports
+          path: |
+            coverage.xml
+            coverage.json
+            htmlcov/
+            coverage-badge.json
+          retention-days: 90
+
+  # ==========================================================================
+  # COMPLEXITY ANALYSIS
+  # ==========================================================================
+  complexity:
+    name: Complexity Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      avg_complexity: ${{ steps.complexity.outputs.avg_complexity }}
+      max_complexity: ${{ steps.complexity.outputs.max_complexity }}
+      complexity_status: ${{ steps.complexity.outputs.status }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install radon
+        run: pip install radon
+
+      - name: Analyze cyclomatic complexity
+        id: complexity
+        run: |
+          echo "=== Cyclomatic Complexity Analysis ==="
+
+          # Get average complexity
+          AVG_CC=$(radon cc packages/ -a -nc --total-average 2>/dev/null | grep "Average complexity" | awk '{print $NF}' | tr -d '()')
+          if [ -z "$AVG_CC" ]; then
+            AVG_CC="0"
+          fi
+          echo "avg_complexity=${AVG_CC}" >> $GITHUB_OUTPUT
+
+          # Get max complexity
+          MAX_CC=$(radon cc packages/ -a -nc 2>/dev/null | grep -E "^\s+[A-Z]" | awk '{print $NF}' | tr -d '()' | sort -rn | head -1)
+          if [ -z "$MAX_CC" ]; then
+            MAX_CC="0"
+          fi
+          echo "max_complexity=${MAX_CC}" >> $GITHUB_OUTPUT
+
+          # Check threshold
+          AVG_INT=$(echo "$AVG_CC" | cut -d'.' -f1)
+          if [ -z "$AVG_INT" ] || [ "$AVG_INT" -eq 0 ]; then
+            AVG_INT=0
+          fi
+
+          if [ "$AVG_INT" -le "${{ env.COMPLEXITY_THRESHOLD }}" ]; then
+            echo "status=pass" >> $GITHUB_OUTPUT
+            echo "Average complexity: ${AVG_CC} (PASS - at or below ${{ env.COMPLEXITY_THRESHOLD }})"
+          else
+            echo "status=warn" >> $GITHUB_OUTPUT
+            echo "Average complexity: ${AVG_CC} (WARN - above ${{ env.COMPLEXITY_THRESHOLD }})"
+          fi
+
+          # Generate detailed report
+          echo ""
+          echo "=== High Complexity Functions (CC > 10) ==="
+          radon cc packages/ -a --min C 2>/dev/null || echo "No high-complexity functions found"
+
+          # Save report to JSON
+          radon cc packages/ -j > complexity-report.json 2>/dev/null || echo '{}' > complexity-report.json
+
+      - name: Generate complexity badge
+        run: |
+          AVG_CC="${{ steps.complexity.outputs.avg_complexity }}"
+          if [ -z "$AVG_CC" ]; then
+            AVG_CC="N/A"
+            COLOR="lightgrey"
+          else
+            AVG_INT=$(echo "$AVG_CC" | cut -d'.' -f1)
+            if [ "$AVG_INT" -le 5 ]; then
+              COLOR="brightgreen"
+            elif [ "$AVG_INT" -le 10 ]; then
+              COLOR="green"
+            elif [ "$AVG_INT" -le 15 ]; then
+              COLOR="yellow"
+            else
+              COLOR="red"
+            fi
+          fi
+
+          cat > complexity-badge.json << EOF
+          {
+            "schemaVersion": 1,
+            "label": "complexity",
+            "message": "avg ${AVG_CC}",
+            "color": "${COLOR}"
+          }
+          EOF
+
+      - name: Upload complexity artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: complexity-reports
+          path: |
+            complexity-report.json
+            complexity-badge.json
+          retention-days: 90
+
+  # ==========================================================================
+  # DEPENDENCY AUDIT
+  # ==========================================================================
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      vulnerabilities: ${{ steps.audit.outputs.vulnerabilities }}
+      audit_status: ${{ steps.audit.outputs.status }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install audit tools
+        run: |
+          pip install pip-audit safety
+
+      - name: Run pip-audit
+        id: audit
+        continue-on-error: true
+        run: |
+          echo "=== Dependency Security Audit ==="
+
+          # Install project dependencies for accurate audit
+          pip install -r requirements.txt 2>/dev/null || true
+
+          # Run pip-audit
+          set +e
+          pip-audit --format json --output pip-audit-results.json 2>/dev/null
+          AUDIT_EXIT=$?
+          set -e
+
+          # Count vulnerabilities
+          if [ -f pip-audit-results.json ]; then
+            VULN_COUNT=$(python -c "import json; data=json.load(open('pip-audit-results.json')); print(len(data.get('dependencies', [])))" 2>/dev/null || echo "0")
+          else
+            VULN_COUNT="0"
+          fi
+
+          echo "vulnerabilities=${VULN_COUNT}" >> $GITHUB_OUTPUT
+
+          if [ "$AUDIT_EXIT" -eq 0 ]; then
+            echo "status=pass" >> $GITHUB_OUTPUT
+            echo "No vulnerabilities found"
+          else
+            echo "status=warn" >> $GITHUB_OUTPUT
+            echo "Found ${VULN_COUNT} potential vulnerabilities"
+          fi
+
+      - name: Check dependency consistency
+        run: |
+          echo "=== Dependency Consistency Check ==="
+          pip check || echo "Dependency conflicts detected"
+
+      - name: List outdated packages
+        run: |
+          echo "=== Outdated Packages ==="
+          pip list --outdated --format=json > outdated-packages.json 2>/dev/null || echo '[]' > outdated-packages.json
+          cat outdated-packages.json | python -c "import sys,json; pkgs=json.load(sys.stdin); print(f'Found {len(pkgs)} outdated packages')"
+
+      - name: Generate dependency badge
+        run: |
+          VULN="${{ steps.audit.outputs.vulnerabilities }}"
+          if [ "$VULN" = "0" ]; then
+            COLOR="brightgreen"
+            MSG="0 vulnerabilities"
+          elif [ "$VULN" -lt 5 ]; then
+            COLOR="yellow"
+            MSG="${VULN} vulnerabilities"
+          else
+            COLOR="red"
+            MSG="${VULN} vulnerabilities"
+          fi
+
+          cat > dependency-badge.json << EOF
+          {
+            "schemaVersion": 1,
+            "label": "dependencies",
+            "message": "${MSG}",
+            "color": "${COLOR}"
+          }
+          EOF
+
+      - name: Upload audit artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-reports
+          path: |
+            pip-audit-results.json
+            outdated-packages.json
+            dependency-badge.json
+          retention-days: 90
+
+  # ==========================================================================
+  # METRICS SUMMARY & PR COMMENT
+  # ==========================================================================
+  metrics-summary:
+    name: Metrics Summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [coverage, complexity, dependency-audit]
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: metrics-artifacts
+
+      - name: Generate metrics summary
+        id: summary
+        run: |
+          echo "# Metrics Summary" > metrics-summary.md
+          echo "" >> metrics-summary.md
+          echo "| Metric | Value | Status | Threshold |" >> metrics-summary.md
+          echo "|--------|-------|--------|-----------|" >> metrics-summary.md
+
+          # Coverage
+          COV="${{ needs.coverage.outputs.coverage_percent }}"
+          COV_STATUS="${{ needs.coverage.outputs.coverage_status }}"
+          if [ "$COV_STATUS" = "pass" ]; then
+            COV_ICON="white_check_mark"
+          else
+            COV_ICON="x"
+          fi
+          echo "| Coverage | ${COV}% | :${COV_ICON}: | >=${{ env.COVERAGE_THRESHOLD }}% |" >> metrics-summary.md
+
+          # Complexity
+          AVG_CC="${{ needs.complexity.outputs.avg_complexity }}"
+          CC_STATUS="${{ needs.complexity.outputs.complexity_status }}"
+          if [ "$CC_STATUS" = "pass" ]; then
+            CC_ICON="white_check_mark"
+          else
+            CC_ICON="warning"
+          fi
+          echo "| Avg Complexity | ${AVG_CC} | :${CC_ICON}: | <=${{ env.COMPLEXITY_THRESHOLD }} |" >> metrics-summary.md
+
+          # Dependencies
+          VULN="${{ needs.dependency-audit.outputs.vulnerabilities }}"
+          DEP_STATUS="${{ needs.dependency-audit.outputs.audit_status }}"
+          if [ "$DEP_STATUS" = "pass" ]; then
+            DEP_ICON="white_check_mark"
+          else
+            DEP_ICON="warning"
+          fi
+          echo "| Vulnerabilities | ${VULN} | :${DEP_ICON}: | 0 |" >> metrics-summary.md
+
+          echo "" >> metrics-summary.md
+          echo "---" >> metrics-summary.md
+          echo "*Generated by [Metrics Tracking](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})*" >> metrics-summary.md
+
+          cat metrics-summary.md
+
+      - name: Comment on PR with metrics
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('metrics-summary.md', 'utf8');
+
+            const coverage = '${{ needs.coverage.outputs.coverage_percent }}';
+            const coverageStatus = '${{ needs.coverage.outputs.coverage_status }}';
+            const avgComplexity = '${{ needs.complexity.outputs.avg_complexity }}';
+            const vulnerabilities = '${{ needs.dependency-audit.outputs.vulnerabilities }}';
+
+            let comment = '## Metrics Report\n\n';
+            comment += summary;
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' &&
+              c.body.includes('## Metrics Report')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+        continue-on-error: true
+
+      - name: Upload metrics summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrics-summary
+          path: metrics-summary.md
+          retention-days: 90
+
+      - name: Fail if coverage below threshold
+        if: needs.coverage.outputs.coverage_status == 'fail'
+        run: |
+          echo "Coverage (${{ needs.coverage.outputs.coverage_percent }}%) is below threshold (${{ env.COVERAGE_THRESHOLD }}%)"
+          exit 1
+
+  # ==========================================================================
+  # BADGE GENERATION (main branch only)
+  # ==========================================================================
+  update-badges:
+    name: Update Badges
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [coverage, complexity, dependency-audit]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: metrics-artifacts
+
+      - name: Consolidate badges
+        run: |
+          mkdir -p .github/badges
+
+          # Copy badge files
+          cp metrics-artifacts/coverage-reports/coverage-badge.json .github/badges/ 2>/dev/null || true
+          cp metrics-artifacts/complexity-reports/complexity-badge.json .github/badges/ 2>/dev/null || true
+          cp metrics-artifacts/dependency-reports/dependency-badge.json .github/badges/ 2>/dev/null || true
+
+          echo "Badges consolidated:"
+          ls -la .github/badges/
+
+      - name: Upload consolidated badges
+        uses: actions/upload-artifact@v4
+        with:
+          name: badges
+          path: .github/badges/
+          retention-days: 365
+
+  # ==========================================================================
+  # HISTORICAL TRACKING (main branch only, weekly)
+  # ==========================================================================
+  update-history:
+    name: Update Historical Data
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [coverage, complexity, dependency-audit]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'schedule' || github.event.inputs.force_update_dashboard == 'true')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: metrics-artifacts
+
+      - name: Restore historical data
+        uses: actions/cache/restore@v4
+        with:
+          path: .metrics-history
+          key: metrics-history-${{ github.repository }}
+          restore-keys: |
+            metrics-history-
+
+      - name: Update historical data
+        run: |
+          mkdir -p .metrics-history
+
+          python3 << 'EOF'
+          import json
+          from datetime import datetime
+          from pathlib import Path
+
+          history_file = Path('.metrics-history/history.json')
+
+          # Load existing history
+          if history_file.exists():
+              with open(history_file) as f:
+                  history = json.load(f)
+          else:
+              history = {'entries': []}
+
+          # Add new entry
+          entry = {
+              'timestamp': datetime.utcnow().isoformat() + 'Z',
+              'commit': '${{ github.sha }}',
+              'coverage': float('${{ needs.coverage.outputs.coverage_percent }}' or 0),
+              'avg_complexity': float('${{ needs.complexity.outputs.avg_complexity }}' or 0),
+              'vulnerabilities': int('${{ needs.dependency-audit.outputs.vulnerabilities }}' or 0)
+          }
+
+          history['entries'].append(entry)
+
+          # Keep last 52 weeks (1 year)
+          history['entries'] = history['entries'][-52:]
+
+          # Save
+          with open(history_file, 'w') as f:
+              json.dump(history, f, indent=2)
+
+          print(f"Added entry for {entry['timestamp']}")
+          print(f"Total entries: {len(history['entries'])}")
+          EOF
+
+      - name: Save historical data
+        uses: actions/cache/save@v4
+        with:
+          path: .metrics-history
+          key: metrics-history-${{ github.repository }}-${{ github.sha }}
+
+      - name: Generate trend report
+        run: |
+          python3 << 'EOF'
+          import json
+          from pathlib import Path
+
+          history_file = Path('.metrics-history/history.json')
+          if not history_file.exists():
+              print("No history available")
+              exit(0)
+
+          with open(history_file) as f:
+              history = json.load(f)
+
+          entries = history.get('entries', [])
+          if len(entries) < 2:
+              print("Not enough data for trends")
+              exit(0)
+
+          print("Coverage Trend (last 8 weeks):")
+          print("-" * 40)
+          for entry in entries[-8:]:
+              date = entry['timestamp'][:10]
+              cov = entry['coverage']
+              bar = '#' * int(cov / 5)
+              print(f"{date}: {bar} {cov:.1f}%")
+          EOF

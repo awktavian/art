@@ -1,0 +1,107 @@
+# Cloud Build for Kagami Agent Runtime
+#
+# Deploy to: api.awkronos.com
+#
+# Manual: gcloud builds submit --config=deploy/cloudrun/agents/cloudbuild.yaml
+#
+# Created: January 7, 2026
+
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/kagami-agents:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/kagami-agents:latest'
+      - '-f'
+      - 'deploy/cloudrun/agents/Dockerfile'
+      - '.'
+    timeout: '900s'
+
+  # Push to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push'
+    args: ['push', '--all-tags', 'gcr.io/$PROJECT_ID/kagami-agents']
+    waitFor: ['build']
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'kagami-agents'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/kagami-agents:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--min-instances'
+      - '1'
+      - '--max-instances'
+      - '10'
+      - '--cpu'
+      - '2'
+      - '--memory'
+      - '2Gi'
+      - '--timeout'
+      - '300'
+      - '--no-cpu-throttling'
+      - '--session-affinity'
+      - '--set-env-vars'
+      - 'KAGAMI_ENVIRONMENT=production,KAGAMI_LOG_LEVEL=INFO'
+      - '--set-secrets'
+      - 'OPENAI_API_KEY=openai-api-key:latest,ELEVENLABS_API_KEY=elevenlabs-api-key:latest,REDIS_URL=kagami-redis-url:latest'
+      - '--service-account'
+      - 'kagami-agents@$PROJECT_ID.iam.gserviceaccount.com'
+    waitFor: ['push']
+
+  # Map domain to api.awkronos.com
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'domain-mapping'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud beta run domain-mappings describe \
+          --domain=api.awkronos.com \
+          --region=${_REGION} 2>/dev/null || \
+        gcloud beta run domain-mappings create \
+          --service=kagami-agents \
+          --domain=api.awkronos.com \
+          --region=${_REGION}
+    waitFor: ['deploy']
+
+  # Smoke test
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'smoke-test'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        sleep 30
+        URL=$$(gcloud run services describe kagami-agents --region=${_REGION} --format='value(status.url)')
+        echo "Testing: $$URL"
+        curl -f "$$URL/health" || exit 1
+        curl -f "$$URL/v1/agents" || exit 1
+        echo "Smoke test passed!"
+    waitFor: ['deploy']
+
+substitutions:
+  _REGION: 'us-west1'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+
+images:
+  - 'gcr.io/$PROJECT_ID/kagami-agents:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/kagami-agents:latest'
+
+timeout: '1800s'

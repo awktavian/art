@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔬 Kagami Identity Lab</title>
+    <!-- Design System Tokens -->
+    <link rel="stylesheet" href="css/design-tokens.generated.css">
+    <style>
+        :root {
+            /* Legacy overrides - use design-tokens.generated.css for new code */
+            --bg: var(--prism-void, #0a0a0a);
+            --surface: #111;
+            --surface2: var(--prism-void-light, #1a1a1a);
+            --border: #333;
+            --text: var(--prism-text-primary, #fff);
+            --text2: var(--prism-text-secondary, #888);
+            --accent: var(--prism-nexus, #003594);
+            --success: var(--prism-grove, #22c55e);
+            --error: var(--prism-safety-violation, #ef4444);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app {
+            display: grid;
+            grid-template-columns: 200px 1fr 320px;
+            height: 100vh;
+            gap: 1px;
+            background: var(--border);
+        }
+
+        /* Roster */
+        .roster {
+            background: var(--surface);
+            padding: 12px;
+            overflow-y: auto;
+        }
+        .roster h3 {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text2);
+            margin-bottom: 12px;
+        }
+        .person {
+            padding: 10px;
+            margin-bottom: 6px;
+            border-radius: 6px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            background: var(--surface2);
+        }
+        .person:hover { background: #222; }
+        .person.selected { background: rgba(0,53,148,0.3); border-left-color: var(--accent); }
+        .person.verified { border-left-color: var(--success); }
+        .person.missing { border-left-color: var(--error); }
+        .person-name { font-weight: 600; font-size: 13px; }
+        .person-role { font-size: 11px; color: var(--text2); }
+        .person-badge {
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-top: 4px;
+            display: inline-block;
+        }
+        .badge-verified { background: var(--success); color: #000; }
+        .badge-missing { background: var(--error); }
+
+        /* Main area */
+        .main {
+            background: #000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Video */
+        .video-wrap {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        .video-bar {
+            padding: 8px 12px;
+            background: var(--surface);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+        .video-bar select {
+            background: var(--surface2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .video-bar button {
+            background: var(--surface2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .video-bar button:hover { background: #333; }
+        video {
+            flex: 1;
+            width: 100%;
+            background: #000;
+            object-fit: contain;
+        }
+        .timestamp {
+            padding: 8px 12px;
+            font-family: 'SF Mono', monospace;
+            font-size: 20px;
+            background: var(--surface);
+        }
+
+        /* Frame strip */
+        .frames {
+            height: 100px;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 4px;
+            padding: 8px;
+            overflow-x: auto;
+        }
+        .frame {
+            height: 84px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            flex-shrink: 0;
+        }
+        .frame:hover { border-color: var(--accent); }
+        .frame.selected { border-color: var(--success); }
+
+        /* Detail panel */
+        .detail {
+            background: var(--surface);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+        .detail h2 {
+            font-size: 18px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+        }
+        .detail-desc {
+            font-size: 13px;
+            color: var(--text2);
+            line-height: 1.5;
+        }
+
+        /* Preview */
+        .preview {
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+        }
+        .preview img {
+            max-width: 100%;
+            max-height: 300px;
+            object-fit: contain;
+        }
+        .preview-empty {
+            color: var(--text2);
+            font-size: 12px;
+        }
+
+        /* Actions */
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+        .actions button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-reject { background: var(--error); color: #fff; }
+        .btn-accept { background: var(--success); color: #000; }
+        .btn-reject:hover { background: #dc2626; }
+        .btn-accept:hover { background: #16a34a; }
+
+        /* Knowledge */
+        .knowledge h4 {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text2);
+            margin-bottom: 8px;
+        }
+        .fact {
+            font-size: 12px;
+            padding: 6px 8px;
+            background: var(--surface2);
+            border-radius: 4px;
+            margin-bottom: 4px;
+        }
+        .fact.key {
+            background: rgba(0,53,148,0.3);
+            border-left: 2px solid var(--accent);
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="roster">
+            <h3>Identity Roster</h3>
+            <div id="roster-list"></div>
+        </div>
+
+        <div class="main">
+            <div class="video-wrap">
+                <div class="video-bar">
+                    <select id="video-select"></select>
+                    <button onclick="seekVideo(-5)">⏪ -5s</button>
+                    <button onclick="togglePlay()">⏯️</button>
+                    <button onclick="seekVideo(5)">+5s ⏩</button>
+                    <button onclick="captureFrame()">📸 Capture</button>
+                </div>
+                <video id="video" controls></video>
+                <div class="timestamp" id="timestamp">00:00.0</div>
+            </div>
+            <div class="frames" id="frames">
+                <span style="color: var(--text2); font-size: 12px; padding: 30px;">Select a person to see candidates</span>
+            </div>
+        </div>
+
+        <div class="detail">
+            <h2 id="detail-name">Select Person</h2>
+            <p class="detail-desc" id="detail-desc">Click a person from the roster to begin verification.</p>
+
+            <div class="preview" id="preview">
+                <span class="preview-empty">No frame selected</span>
+            </div>
+
+            <div class="actions">
+                <button class="btn-reject" onclick="rejectFrame()">✗ Reject</button>
+                <button class="btn-accept" onclick="acceptFrame()">✓ Accept</button>
+            </div>
+
+            <div class="knowledge">
+                <h4>Key Identifiers</h4>
+                <div id="knowledge-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE = '/Users/schizodactyl/projects/kagami/assets/characters/dcc/';
+
+        const people = {
+            kelli_finglass: {
+                name: 'Kelli Finglass',
+                role: 'Director',
+                status: 'verified',
+                desc: 'REDDISH-BROWN hair. Director of DCC. Authoritative. Often with Judy.',
+                videos: [
+                    { file: 'kelli_voice.mp4', label: '🎤 VOICE CLIP' },
+                    { file: 'victoria_tina.mp4', label: 'Interview (LEFT=Kelli)' },
+                ],
+                candidates: [
+                    { file: 'kelli_id_5s.png', label: '🎤 Voice 0:05' },
+                    { file: 'kelli_id_15s.png', label: '🎤 Voice 0:15' },
+                    { file: 'kelli_id_30s.png', label: '🎤 Voice 0:30' },
+                    { file: 'kelli_id_60s.png', label: '🎤 Voice 1:00' },
+                    { file: 'kelli_id_120s.png', label: '🎤 Voice 2:00' },
+                    { file: 'kelli_judy_interview_verified.png', label: 'With Judy' },
+                ],
+                knowledge: [
+                    { text: 'REDDISH-BROWN hair (NOT blonde)', key: true },
+                    { text: 'Sits LEFT in interviews with Judy', key: true },
+                    { text: 'Wears RED in interviews', key: true },
+                    { text: 'Director - authoritative tone', key: false },
+                    { text: 'Older woman (~60)', key: false },
+                ],
+            },
+            judy_trammell: {
+                name: 'Judy Trammell',
+                role: 'Choreographer',
+                status: 'verified',
+                desc: 'BLONDE hair. Choreographer. High energy. Often with Kelli.',
+                videos: [
+                    { file: 'judy_voice.mp4', label: '🎤 VOICE CLIP' },
+                    { file: 'victoria_tina.mp4', label: 'Interview (RIGHT=Judy)' },
+                ],
+                candidates: [
+                    { file: 'judy_id_5s.png', label: '🎤 Voice 0:05' },
+                    { file: 'judy_id_15s.png', label: '🎤 Voice 0:15' },
+                    { file: 'judy_id_30s.png', label: '🎤 Voice 0:30' },
+                    { file: 'judy_id_60s.png', label: '🎤 Voice 1:00' },
+                    { file: 'judy_id_120s.png', label: '🎤 Voice 2:00' },
+                    { file: 'kelli_judy_interview_verified.png', label: 'With Kelli' },
+                ],
+                knowledge: [
+                    { text: 'BLONDE hair (Kelli is reddish-brown)', key: true },
+                    { text: 'Sits RIGHT in interviews with Kelli', key: true },
+                    { text: 'Wears YELLOW/CREAM in interviews', key: true },
+                    { text: 'Choreographer - high energy', key: false },
+                    { text: 'Older woman (~66)', key: false },
+                ],
+            },
+            victoria_kalina: {
+                name: 'Victoria Kalina',
+                role: 'Cheerleader (2nd Gen)',
+                status: 'verified',
+                desc: 'BLONDE hair. Light skin. Blue eyes. Mother Tina was DCC.',
+                videos: [
+                    { file: 'victoria_named.mp4', label: '🎯 Victoria Named Clip' },
+                    { file: 'victoria_voice.mp4', label: '🎤 Voice Clip' },
+                ],
+                candidates: [
+                    { file: 'victoria_named_0s.png', label: '🎯 Named 0:00' },
+                    { file: 'victoria_named_5s.png', label: '🎯 Named 0:05' },
+                    { file: 'victoria_named_10s.png', label: '🎯 Named 0:10' },
+                    { file: 'victoria_named_15s.png', label: '🎯 Named 0:15' },
+                    { file: 'victoria_named_20s.png', label: '🎯 Named 0:20' },
+                    { file: 'victoria_named_30s.png', label: '🎯 Named 0:30' },
+                ],
+                knowledge: [
+                    { text: 'BLONDE hair (long)', key: true },
+                    { text: 'Light skin, blue eyes', key: true },
+                    { text: 'Second-generation DCC', key: true },
+                    { text: 'Mother TINA was also DCC', key: false },
+                    { text: 'Featured in Season 1', key: false },
+                ],
+            },
+            kelcey_wetterberg: {
+                name: 'Kelcey Wetterberg',
+                role: 'Group Leader',
+                status: 'missing',
+                desc: 'BRUNETTE (dark brown hair). Blue eyes. Group leader. Pediatric nurse. Had injury.',
+                videos: [
+                    { file: 'kelcey_named.mp4', label: '🎯 Kelcey Wedding Thunderstruck' },
+                    { file: 'kelcey_injury.mp4', label: 'Injury Story' },
+                ],
+                candidates: [
+                    { file: 'kelcey_named_5s.png', label: '🎯 Wedding 0:05' },
+                    { file: 'kelcey_named_10s.png', label: '🎯 Wedding 0:10' },
+                    { file: 'kelcey_named_15s.png', label: '🎯 Wedding 0:15' },
+                    { file: 'kelcey_named_20s.png', label: '🎯 Wedding 0:20' },
+                    { file: 'kelcey_named_30s.png', label: '🎯 Wedding 0:30' },
+                    { file: 'kelcey_named_45s.png', label: '🎯 Wedding 0:45' },
+                    { file: 'kelcey_named_60s.png', label: '🎯 Wedding 1:00' },
+                ],
+                knowledge: [
+                    { text: 'BRUNETTE - dark brown hair', key: true },
+                    { text: 'Blue eyes', key: true },
+                    { text: 'GROUP LEADER position', key: true },
+                    { text: 'Works as pediatric nurse', key: false },
+                    { text: 'Had INJURY storyline', key: false },
+                ],
+            },
+            holly_powell: {
+                name: 'Holly Powell',
+                role: 'Former DCC (2015-2016)',
+                status: 'verified',
+                desc: 'RED/AUBURN hair. Former cheerleader. Returns in documentary.',
+                videos: [
+                    { file: 'holly_voice.mp4', label: '🎤 VOICE CLIP' },
+                    { file: 'holly_interview.mp4', label: 'Holly Interview' },
+                ],
+                candidates: [
+                    { file: 'holly_cropped_left.png', label: '✅ VERIFIED CROP' },
+                    { file: 'holly_id_5s.png', label: '🎤 Voice 0:05' },
+                    { file: 'holly_id_15s.png', label: '🎤 Voice 0:15' },
+                    { file: 'holly_id_30s.png', label: '🎤 Voice 0:30' },
+                    { file: 'holly_id_60s.png', label: '🎤 Voice 1:00' },
+                ],
+                knowledge: [
+                    { text: 'RED/AUBURN hair (reddish-brown)', key: true },
+                    { text: 'Former DCC (2015-2016)', key: true },
+                    { text: 'Returns for documentary', key: false },
+                ],
+            },
+            chandi_dayle: {
+                name: 'Chandi Dayle',
+                role: '1st Group Leader (2024-25)',
+                status: 'verified',
+                desc: 'BRUNETTE. 6-season veteran. Social media manager. Pharmacy tech. Had Bahamas incident.',
+                videos: [
+                    { file: 'chandi_named.mp4', label: '🎯 Chandi Clip' },
+                ],
+                candidates: [
+                    { file: 'chandi_0s.png', label: '0:00' },
+                    { file: 'chandi_5s.png', label: '0:05' },
+                    { file: 'chandi_10s.png', label: '0:10' },
+                    { file: 'chandi_15s.png', label: '0:15' },
+                    { file: 'chandi_20s.png', label: '0:20' },
+                    { file: 'chandi_30s.png', label: '0:30' },
+                    { file: 'chandi_45s.png', label: '0:45' },
+                    { file: 'chandi_60s.png', label: '1:00' },
+                ],
+                knowledge: [
+                    { text: 'BRUNETTE - dark brown hair', key: true },
+                    { text: '6-SEASON veteran (longest tenure)', key: true },
+                    { text: '1st Group Leader 2024-25', key: true },
+                    { text: 'Works in social media + pharmacy', key: false },
+                    { text: 'Bahamas incident storyline', key: false },
+                ],
+            },
+        };
+
+        let currentPerson = null;
+        let currentFrame = null;
+
+        function renderRoster() {
+            const list = document.getElementById('roster-list');
+            list.innerHTML = '';
+            for (const [id, p] of Object.entries(people)) {
+                const div = document.createElement('div');
+                div.className = `person ${p.status}`;
+                div.innerHTML = `
+                    <div class="person-name">${p.name}</div>
+                    <div class="person-role">${p.role}</div>
+                    <span class="person-badge badge-${p.status}">${p.status === 'verified' ? '✓ VERIFIED' : '⚠ NEEDS VERIFICATION'}</span>
+                `;
+                div.onclick = () => selectPerson(id);
+                list.appendChild(div);
+            }
+        }
+
+        function selectPerson(id) {
+            currentPerson = id;
+            currentFrame = null;
+            const p = people[id];
+
+            // Update roster selection
+            document.querySelectorAll('.person').forEach(el => el.classList.remove('selected'));
+            event.currentTarget?.classList.add('selected');
+
+            // Update detail panel
+            document.getElementById('detail-name').textContent = p.name;
+            document.getElementById('detail-desc').textContent = p.desc;
+
+            // Update video selector
+            const select = document.getElementById('video-select');
+            select.innerHTML = p.videos.map(v =>
+                `<option value="${BASE}${v.file}">${v.label}</option>`
+            ).join('');
+            if (p.videos.length > 0) {
+                document.getElementById('video').src = BASE + p.videos[0].file;
+            }
+
+            // Update frames
+            const frames = document.getElementById('frames');
+            if (p.candidates.length === 0) {
+                frames.innerHTML = '<span style="color: var(--text2); font-size: 12px; padding: 30px;">No candidates yet. Use video to capture frames.</span>';
+            } else {
+                frames.innerHTML = p.candidates.map((c, i) =>
+                    `<img class="frame" src="${BASE}${c.file}" title="${c.label}" onclick="selectFrame(${i})">`
+                ).join('');
+            }
+
+            // Update knowledge
+            const know = document.getElementById('knowledge-list');
+            know.innerHTML = p.knowledge.map(k =>
+                `<div class="fact ${k.key ? 'key' : ''}">${k.text}</div>`
+            ).join('');
+
+            // Clear preview
+            document.getElementById('preview').innerHTML = '<span class="preview-empty">Click a candidate frame</span>';
+        }
+
+        function selectFrame(index) {
+            currentFrame = index;
+            const p = people[currentPerson];
+            const c = p.candidates[index];
+
+            document.querySelectorAll('.frame').forEach((el, i) => {
+                el.classList.toggle('selected', i === index);
+            });
+
+            document.getElementById('preview').innerHTML =
+                `<img src="${BASE}${c.file}" style="max-height: 400px;">`;
+        }
+
+        function togglePlay() {
+            const v = document.getElementById('video');
+            v.paused ? v.play() : v.pause();
+        }
+
+        function seekVideo(sec) {
+            document.getElementById('video').currentTime += sec;
+        }
+
+        function captureFrame() {
+            const v = document.getElementById('video');
+            const time = v.currentTime.toFixed(1);
+            alert(`Would capture frame at ${time}s. Use ffmpeg for high quality.`);
+        }
+
+        function acceptFrame() {
+            if (!currentPerson || currentFrame === null) return;
+            const p = people[currentPerson];
+            p.status = 'verified';
+            alert(`✓ Accepted: ${p.candidates[currentFrame].label} for ${p.name}`);
+            renderRoster();
+        }
+
+        function rejectFrame() {
+            if (!currentPerson || currentFrame === null) return;
+            const p = people[currentPerson];
+            p.candidates.splice(currentFrame, 1);
+            selectPerson(currentPerson);
+        }
+
+        // Video timestamp update
+        document.getElementById('video').addEventListener('timeupdate', function() {
+            const t = this.currentTime;
+            const m = Math.floor(t / 60);
+            const s = (t % 60).toFixed(1).padStart(4, '0');
+            document.getElementById('timestamp').textContent = `${m.toString().padStart(2, '0')}:${s}`;
+        });
+
+        // Video selector change
+        document.getElementById('video-select').addEventListener('change', function() {
+            document.getElementById('video').src = this.value;
+        });
+
+        // Init
+        renderRoster();
+    </script>
+</body>
+</html>

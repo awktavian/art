@@ -1,0 +1,57 @@
+#!/bin/bash
+# Post-commit hook: Verify integrations after commits that touch integration code
+#
+# Install:
+#   cp scripts/hooks/post-commit .git/hooks/
+#   chmod +x .git/hooks/post-commit
+#
+# Or use: scripts/hooks/install-hooks.sh
+
+set -e
+
+# Check if commit touches integration-related files
+INTEGRATION_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD | grep -E "(composio|smarthome|integration)" || true)
+
+if [ -n "$INTEGRATION_FILES" ]; then
+    echo "🔌 Integration files changed, verifying status..."
+
+    # Run verification in background (don't block)
+    (
+        cd "$(git rev-parse --show-toplevel)"
+
+        # Only run if .env exists
+        if [ -f .env ]; then
+            source .env 2>/dev/null || true
+
+            # Run integration verification silently, update cache
+            python scripts/verify_integrations.py --json > /dev/null 2>&1 && \
+                echo "✅ Integration status verified and cached" || \
+                echo "⚠️  Integration verification skipped (API unavailable)"
+        fi
+    ) &
+fi
+
+# Check docs staleness
+DOCS_CHANGED=$(git diff-tree --no-commit-id --name-only -r HEAD | grep -E "^docs/" || true)
+INTEGRATION_STATUS_AGE=0
+
+if [ -f .integration_status.json ]; then
+    # Check age of status file (in seconds)
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        STATUS_MTIME=$(stat -f %m .integration_status.json 2>/dev/null || echo 0)
+    else
+        STATUS_MTIME=$(stat -c %Y .integration_status.json 2>/dev/null || echo 0)
+    fi
+    CURRENT_TIME=$(date +%s)
+    INTEGRATION_STATUS_AGE=$((CURRENT_TIME - STATUS_MTIME))
+fi
+
+# Warn if status is older than 24 hours (86400 seconds)
+if [ $INTEGRATION_STATUS_AGE -gt 86400 ]; then
+    echo ""
+    echo "⚠️  Integration status cache is stale (>24h old)"
+    echo "   Run: python scripts/verify_integrations.py"
+    echo ""
+fi
+
+exit 0

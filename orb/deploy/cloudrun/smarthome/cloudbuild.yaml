@@ -1,0 +1,83 @@
+# Cloud Build for Kagami SmartHome
+#
+# Manual: gcloud builds submit --config=deploy/cloudrun/smarthome/cloudbuild.yaml
+#
+# Created: January 5, 2026
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/kagami-smarthome:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/kagami-smarthome:latest'
+      - '-f'
+      - 'deploy/cloudrun/smarthome/Dockerfile'
+      - '.'
+    timeout: '900s'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push'
+    args: ['push', '--all-tags', 'gcr.io/$PROJECT_ID/kagami-smarthome']
+    waitFor: ['build']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'kagami-smarthome'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/kagami-smarthome:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--min-instances'
+      - '1'
+      - '--max-instances'
+      - '3'
+      - '--cpu'
+      - '1'
+      - '--memory'
+      - '1Gi'
+      - '--timeout'
+      - '300'
+      - '--no-cpu-throttling'
+      - '--set-env-vars'
+      - 'KAGAMI_ENVIRONMENT=production,KAGAMI_LOG_LEVEL=INFO'
+      - '--set-secrets'
+      - 'CONTROL4_HOST=kagami-control4-host:latest,CONTROL4_BEARER_TOKEN=kagami-control4-token:latest,UNIFI_HOST=kagami-unifi-host:latest,UNIFI_LOCAL_USERNAME=kagami-unifi-username:latest,UNIFI_LOCAL_PASSWORD=kagami-unifi-password:latest'
+      - '--service-account'
+      - 'kagami-smarthome@$PROJECT_ID.iam.gserviceaccount.com'
+    waitFor: ['push']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'smoke-test'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        sleep 30
+        URL=$$(gcloud run services describe kagami-smarthome --region=${_REGION} --format='value(status.url)')
+        echo "Testing: $$URL"
+        curl -f "$$URL/health" || exit 1
+        echo "Smoke test passed!"
+    waitFor: ['deploy']
+
+substitutions:
+  _REGION: 'us-west1'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+
+images:
+  - 'gcr.io/$PROJECT_ID/kagami-smarthome:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/kagami-smarthome:latest'
+
+timeout: '1800s'

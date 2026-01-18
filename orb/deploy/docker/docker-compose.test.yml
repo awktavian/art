@@ -1,0 +1,147 @@
+# Kagami Integration Testing Docker Compose Configuration
+# Lightweight services for integration testing without the full API
+#
+# CLUSTER ARCHITECTURE:
+# All services coordinated via kagami.core.cluster.UnifiedClusterManager
+#   - etcd: Consensus, leader election, distributed locks
+#   - Redis: Caching, job queues, pub/sub, sessions
+#   - CockroachDB: Distributed SQL persistence
+#
+# Usage:
+#   docker-compose -f docker-compose.test.yml up -d
+#   KAGAMI_CLUSTER_NAME=test pytest tests/integration/
+
+services:
+  # =============================================================================
+  # CockroachDB - Distributed SQL Database
+  # =============================================================================
+  cockroachdb:
+    image: cockroachdb/cockroach:latest-v23.1
+    container_name: kagami-test-cockroachdb
+    command: >
+      start-single-node
+      --insecure
+      --advertise-addr=cockroachdb
+      --store=type=mem,size=1GiB
+    ports:
+      - "26257:26257"
+      - "8080:8080"
+    environment:
+      COCKROACH_DATABASE: kagami_test
+    networks:
+      - kagami-test-network
+    healthcheck:
+      test: ["CMD", "/cockroach/cockroach", "sql", "--insecure", "--host=localhost", "--execute=SELECT 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    tmpfs:
+      - /cockroach/cockroach-data
+
+  # =============================================================================
+  # Redis - Cache, Job Queues, Pub/Sub, Sessions
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: kagami-test-redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save ""
+    ports:
+      - "6379:6379"
+    networks:
+      - kagami-test-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # =============================================================================
+  # etcd - Consensus, Leader Election, Distributed Locks
+  # =============================================================================
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.11
+    container_name: kagami-test-etcd
+    command:
+      - /usr/local/bin/etcd
+      - --name=etcd-test
+      - --data-dir=/tmp/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://etcd:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-advertise-peer-urls=http://etcd:2380
+      - --initial-cluster=etcd-test=http://etcd:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=kagami-test-cluster
+      - --max-request-bytes=10485760
+      - --quota-backend-bytes=2147483648
+      - --auto-compaction-mode=periodic
+      - --auto-compaction-retention=1h
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    environment:
+      ETCDCTL_API: 3
+    networks:
+      - kagami-test-network
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    tmpfs:
+      - /tmp/etcd-data
+
+  # =============================================================================
+  # Weaviate - Vector Database
+  # =============================================================================
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.27.0
+    container_name: kagami-test-weaviate
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --scheme
+      - http
+    ports:
+      - "8081:8080"
+      - "50051:50051"
+    environment:
+      QUERY_DEFAULTS_LIMIT: 20
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: /tmp/weaviate
+      DEFAULT_VECTORIZER_MODULE: none
+      ENABLE_MODULES: ""
+      CLUSTER_HOSTNAME: weaviate-test-node
+      LIMIT_RESOURCES: "true"
+      GOMAXPROCS: "2"
+    networks:
+      - kagami-test-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/v1/.well-known/ready"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    tmpfs:
+      - /tmp/weaviate
+
+# =============================================================================
+# Test Environment Variables (for kagami container if added)
+# =============================================================================
+# KAGAMI_CLUSTER_NAME=kagami-test
+# DATABASE_URL=postgresql://root@cockroachdb:26257/kagami_test?sslmode=disable
+# REDIS_URL=redis://redis:6379/0
+# ETCD_ENDPOINTS=http://etcd:2379
+# ETCD_PREFIX=/kagami-test
+# CLUSTER_AUTO_FAILOVER=true
+# CLUSTER_AUTO_REBALANCE=true
+
+networks:
+  kagami-test-network:
+    driver: bridge
+    name: kagami-test-network

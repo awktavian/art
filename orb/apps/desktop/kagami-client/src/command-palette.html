@@ -1,0 +1,1584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kagami</title>
+
+    <!-- Microanimations -->
+    <link rel="stylesheet" href="css/microanimations.css">
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════
+         * KAGAMI COMPOSER — Minimal, Cursor-style Input
+         * ═══════════════════════════════════════════════════════════════ */
+
+        :root {
+            --bg: #1a1a1a;
+            --surface: #252525;
+            --surface-hover: #2e2e2e;
+            --border: #333;
+            --border-focus: #555;
+
+            --text: #e5e5e5;
+            --text-muted: #a0a0a0;  /* WCAG AA compliant: 4.5:1 on #252525 */
+            --text-dim: #666;
+
+            /* Mode colors */
+            --ask: #10B981;
+            --plan: #F59E0B;
+            --agent: #FF6B35;
+
+            /* Subagent colony colors */
+            --spark: #FF6B35;
+            --forge: #D4AF37;
+            --flow: #4ECDC4;
+            --nexus: #9B7EBD;
+            --beacon: #F59E0B;
+            --grove: #7EB77F;
+            --crystal: #67D4E4;
+
+            /* Status */
+            --success: #10B981;
+            --warning: #F59E0B;
+            --error: #EF4444;
+
+            --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+            --font-mono: 'SF Mono', 'Monaco', 'Consolas', monospace;
+
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            background: transparent;
+            font-family: var(--font);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .composer-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 80px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+         * COMPOSER BOX
+         * ═══════════════════════════════════════════════════════════════ */
+
+        .composer {
+            width: 600px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow:
+                0 20px 50px rgba(0, 0, 0, 0.4),
+                0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+            overflow: hidden;
+            /* Entrance animation */
+            animation: composerEntrance 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+            transition: border-color var(--duration-fast, 150ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+                        box-shadow var(--duration-fast, 150ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1));
+        }
+
+        @keyframes composerEntrance {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .composer:focus-within {
+            border-color: var(--border-focus);
+            box-shadow:
+                0 20px 50px rgba(0, 0, 0, 0.4),
+                0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+                0 0 0 2px rgba(16, 185, 129, 0.15);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+         * TOP BAR — Mode Pills + Model Selector
+         * ═══════════════════════════════════════════════════════════════ */
+
+        .composer-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        /* Mode Dropdown Wrapper */
+        .mode-selector-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mode-dropdown {
+            font-family: var(--font);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 6px 28px 6px 10px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6,9 12,15 18,9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            transition: background var(--duration-fast, 150ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+                        border-color var(--duration-fast, 150ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+                        box-shadow var(--duration-fast, 150ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1));
+        }
+
+        .mode-dropdown:hover {
+            border-color: var(--border-focus);
+        }
+
+        .mode-dropdown:focus {
+            outline: none;
+            border-color: var(--border-focus);
+        }
+
+        /* Mode-specific styling */
+        .mode-dropdown[data-mode="agent"] {
+            border-color: var(--agent);
+            box-shadow: 0 0 8px rgba(255, 107, 53, 0.2);
+        }
+
+        .mode-dropdown[data-mode="plan"] {
+            border-color: var(--plan);
+            box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
+        }
+
+        .mode-dropdown[data-mode="ask"] {
+            border-color: var(--ask);
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+        }
+
+        .mode-hint {
+            font-size: 10px;
+            color: var(--text-dim);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .mode-hint.visible {
+            opacity: 1;
+        }
+
+        /* Model Selector */
+        .model-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .model-dropdown {
+            font-family: var(--font);
+            font-size: 12px;
+            padding: 4px 24px 4px 8px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6,9 12,15 18,9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 6px center;
+        }
+
+        .model-dropdown:hover {
+            border-color: var(--border-focus);
+        }
+
+        .model-dropdown:focus {
+            outline: none;
+            border-color: var(--border-focus);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+         * INPUT ROW
+         * ═══════════════════════════════════════════════════════════════ */
+
+        .input-row {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            gap: 12px;
+            position: relative;
+            min-height: 52px;
+        }
+
+        .input-prompt {
+            color: var(--text-dim);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        #composer-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            font-family: var(--font);
+            font-size: 14px;
+            color: var(--text);
+            caret-color: var(--ask);
+        }
+
+        #composer-input::placeholder {
+            color: var(--text-dim);
+        }
+
+        .voice-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: background var(--duration-fast, 150ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+                        border-color var(--duration-fast, 150ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+                        color var(--duration-fast, 150ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+                        transform var(--duration-instant, 100ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .voice-btn:hover {
+            background: var(--surface-hover);
+            border-color: var(--border-focus);
+            color: var(--text);
+            transform: scale(1.05);
+        }
+
+        .voice-btn:active {
+            transform: scale(0.9);
+        }
+
+        .voice-btn.recording {
+            background: rgba(224, 64, 251, 0.2);
+            border-color: #E040FB;
+            color: #E040FB;
+        }
+
+        @keyframes listeningPulse {
+            0%, 100% {
+                opacity: 0.7;
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(224, 64, 251, 0.4);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.1);
+                box-shadow: 0 0 12px 4px rgba(224, 64, 251, 0.3);
+            }
+        }
+
+        .voice-btn.recording {
+            animation: listeningPulse 1s ease-in-out infinite;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+         * SUGGESTIONS (Typeahead)
+         * ═══════════════════════════════════════════════════════════════ */
+
+        .suggestions-container {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            right: 0;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-bottom: none;
+            border-radius: var(--radius) var(--radius) 0 0;
+            max-height: 280px;
+            overflow-y: auto;
+            opacity: 0;
+            transform: translateY(8px);
+            pointer-events: none;
+            transition: opacity 0.15s ease, transform 0.15s ease;
+        }
+
+        .suggestions-container.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .suggestion-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            cursor: pointer;
+            transition: background var(--duration-instant, 100ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+                        transform var(--duration-instant, 100ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1));
+        }
+
+        .suggestion-item:hover,
+        .suggestion-item.selected {
+            background: var(--surface-hover);
+        }
+
+        .suggestion-item:active {
+            transform: scale(0.99);
+        }
+
+        .suggestion-icon {
+            width: 20px;
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .suggestion-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .suggestion-label {
+            font-size: 13px;
+            color: var(--text);
+        }
+
+        .suggestion-secondary {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+         * CONTEXT CHIPS (@ mentions)
+         * ═══════════════════════════════════════════════════════════════ */
+
+        .context-chips {
+            display: none;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .context-chips.visible {
+            display: flex;
+        }
+
+        .context-chip {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .context-chip-icon {
+            font-size: 10px;
+        }
+
+        .context-chip-remove {
+            cursor: pointer;
+            opacity: 0.5;
+            margin-left: 2px;
+        }
+
+        .context-chip-remove:hover {
+            opacity: 1;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+         * STATUS BAR
+         * ═══════════════════════════════════════════════════════════════ */
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 16px;
+            border-top: 1px solid var(--border);
+            background: var(--surface);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-dim);
+            transition: background var(--duration-normal, 250ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+                        box-shadow var(--duration-normal, 250ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1));
+        }
+
+        .status-dot.connected {
+            background: var(--success);
+            box-shadow: 0 0 8px 2px rgba(16, 185, 129, 0.4);
+            animation: connectionPulse 2s ease-in-out infinite;
+        }
+        .status-dot.disconnected {
+            background: var(--warning);
+        }
+
+        @keyframes connectionPulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 4px 1px rgba(16, 185, 129, 0.3);
+            }
+            50% {
+                transform: scale(1.1);
+                box-shadow: 0 0 8px 3px rgba(16, 185, 129, 0.4);
+            }
+        }
+
+        /* Semantic status indicator */
+        .safety-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin-left: 8px;
+        }
+        .safety-dot.good { background: var(--success); }
+        .safety-dot.caution { background: var(--warning); }
+        .safety-dot.alert { background: var(--error); }
+
+        .status-hint {
+            font-size: 10px;
+            opacity: 0.5;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+         * PREDICTIVE ACTION — Claude Code style
+         * ═══════════════════════════════════════════════════════════════ */
+
+        .predicted-action {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: linear-gradient(135deg, rgba(255, 107, 53, 0.08) 0%, rgba(245, 158, 11, 0.05) 100%);
+            border-top: 1px solid rgba(255, 107, 53, 0.15);
+            font-size: 12px;
+            color: var(--text-muted);
+            animation: predictedSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes predictedSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .predicted-icon {
+            font-size: 14px;
+        }
+
+        .predicted-text {
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        .predicted-reason {
+            flex: 1;
+            color: var(--text-dim);
+            font-size: 11px;
+        }
+
+        .predicted-hint {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-dim);
+        }
+
+        /* Colony indicator in suggestions */
+        .suggestion-colony {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: auto;
+        }
+
+        .suggestion-colony[data-colony="spark"] { background: rgba(255, 107, 53, 0.2); color: var(--spark); }
+        .suggestion-colony[data-colony="forge"] { background: rgba(212, 175, 55, 0.2); color: var(--forge); }
+        .suggestion-colony[data-colony="flow"] { background: rgba(78, 205, 196, 0.2); color: var(--flow); }
+        .suggestion-colony[data-colony="nexus"] { background: rgba(155, 126, 189, 0.2); color: var(--nexus); }
+        .suggestion-colony[data-colony="beacon"] { background: rgba(245, 158, 11, 0.2); color: var(--beacon); }
+        .suggestion-colony[data-colony="grove"] { background: rgba(126, 183, 127, 0.2); color: var(--grove); }
+        .suggestion-colony[data-colony="crystal"] { background: rgba(103, 212, 228, 0.2); color: var(--crystal); }
+    </style>
+</head>
+<body>
+    <div class="composer-container">
+        <div class="composer" id="composer">
+            <!-- Top Bar -->
+            <div class="composer-top">
+                <div class="mode-selector-wrapper">
+                    <select class="mode-dropdown" id="mode-dropdown" title="Interaction Mode (Shift+Tab to toggle)">
+                        <option value="agent" selected>⚡ Agent</option>
+                        <option value="plan">📋 Plan</option>
+                        <option value="ask">💬 Ask</option>
+                    </select>
+                    <span class="mode-hint" id="mode-hint"></span>
+                </div>
+                <div class="model-selector">
+                    <select class="model-dropdown" id="model-dropdown">
+                        <option value="auto">Auto</option>
+                        <option value="claude-opus">Claude Opus</option>
+                        <option value="claude-sonnet">Claude Sonnet</option>
+                        <option value="gpt4o">GPT-4o</option>
+                        <option value="deepseek">DeepSeek</option>
+                        <option value="gemini">Gemini</option>
+                        <option value="local">Local</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Input Row -->
+            <div class="input-row">
+                <span class="input-prompt">›</span>
+                <input
+                    type="text"
+                    id="composer-input"
+                    placeholder="Type / for commands, @ for context..."
+                    autocomplete="off"
+                    autofocus
+                >
+                <button class="voice-btn" id="voice-btn" title="Hold to speak">🎤</button>
+
+                <!-- Suggestions appear above input -->
+                <div class="suggestions-container" id="suggestions"></div>
+            </div>
+
+            <!-- Predictive Action (Claude Code style) -->
+            <div class="predicted-action" id="predicted-action"></div>
+
+            <!-- Context Chips -->
+            <div class="context-chips" id="context-chips"></div>
+
+            <!-- Status Bar -->
+            <div class="status-bar">
+                <div class="status-left">
+                    <span class="status-dot" id="status-dot"></span>
+                    <span id="status-text">Ready</span>
+                    <span class="safety-dot" id="safety-dot"></span>
+                </div>
+                <span class="status-hint">esc to close · ↑↓ navigate · ⇧⇥ switch mode · enter to select</span>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // ═══════════════════════════════════════════════════════════════
+        // IMPORTS
+        // ═══════════════════════════════════════════════════════════════
+
+        // Load command registry and typeahead
+        await import('./js/command-registry.js');
+        await import('./js/typeahead.js');
+
+        // ═══════════════════════════════════════════════════════════════
+        // TAURI INTEGRATION
+        // ═══════════════════════════════════════════════════════════════
+
+        const isTauri = window.__TAURI_INTERNALS__ !== undefined;
+        let invoke, listen, getCurrentWindow;
+
+        if (isTauri) {
+            const core = await import('@tauri-apps/api/core');
+            const event = await import('@tauri-apps/api/event');
+            const win = await import('@tauri-apps/api/window');
+            invoke = core.invoke;
+            listen = event.listen;
+            getCurrentWindow = win.getCurrentWindow;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // ELEMENTS
+        // ═══════════════════════════════════════════════════════════════
+
+        const input = document.getElementById('composer-input');
+        const suggestions = document.getElementById('suggestions');
+        const modelDropdown = document.getElementById('model-dropdown');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const safetyDot = document.getElementById('safety-dot');
+        const contextChips = document.getElementById('context-chips');
+        const voiceBtn = document.getElementById('voice-btn');
+
+        // ═══════════════════════════════════════════════════════════════
+        // STATE
+        // ═══════════════════════════════════════════════════════════════
+
+        let state = {
+            isConnected: false,
+            safetyScore: null,
+            context: [], // Active context items (files, rooms)
+            mode: localStorage.getItem('kagami_mode') || 'agent', // Agent by default
+            model: localStorage.getItem('kagami_model') || 'auto',
+            activeSubagents: [], // Currently running subagents
+            planState: null, // Plan mode state (questions, research, plan)
+        };
+
+        // ═══════════════════════════════════════════════════════════════
+        // MODE SELECTOR — Agent by default, auto-switch to Plan when helpful
+        // ═══════════════════════════════════════════════════════════════
+
+        const modeDropdown = document.getElementById('mode-dropdown');
+        const modeHint = document.getElementById('mode-hint');
+
+        // Mode descriptions
+        const MODE_INFO = {
+            agent: {
+                name: 'Agent',
+                description: 'Full tool access. Execute actions, edit files, run commands.',
+                triggers: [], // Default mode
+            },
+            plan: {
+                name: 'Plan',
+                description: 'Read-only planning. Design implementation before coding.',
+                triggers: [
+                    /\b(plan|design|architect|structure|organize|how should)\b/i,
+                    /\b(multiple (approaches|ways|options)|trade-?offs?)\b/i,
+                    /\b(refactor|migrate|large|complex|unclear)\b/i,
+                    /\?.*\b(should|could|would|best)\b/i,
+                ],
+            },
+            ask: {
+                name: 'Ask',
+                description: 'Read-only Q&A. Explore code, answer questions.',
+                triggers: [
+                    /^(what|where|how|why|when|which|who|explain|describe|show)\b/i,
+                    /\?$/,
+                ],
+            },
+        };
+
+        // Subagent (Colony) definitions
+        const SUBAGENTS = {
+            spark: { name: 'Spark', color: '#FF6B35', tools: ['search', 'read', 'think'], canWrite: false },
+            forge: { name: 'Forge', color: '#D4AF37', tools: ['all'], canWrite: true },
+            flow: { name: 'Flow', color: '#4ECDC4', tools: ['read', 'grep', 'debug', 'edit'], canWrite: true },
+            nexus: { name: 'Nexus', color: '#9B7EBD', tools: ['memory', 'search', 'connect'], canWrite: true },
+            beacon: { name: 'Beacon', color: '#F59E0B', tools: ['read', 'search', 'todo'], canWrite: false },
+            grove: { name: 'Grove', color: '#7EB77F', tools: ['read', 'web', 'context7'], canWrite: false },
+            crystal: { name: 'Crystal', color: '#67D4E4', tools: ['test', 'lint', 'read'], canWrite: false },
+        };
+
+        function initModeSelector() {
+            // Default to agent mode
+            state.mode = localStorage.getItem('kagami_mode') || 'agent';
+            modeDropdown.value = state.mode;
+            updateModeVisual();
+
+            // Handle dropdown change
+            modeDropdown.addEventListener('change', () => {
+                state.mode = modeDropdown.value;
+                localStorage.setItem('kagami_mode', state.mode);
+                updateModeVisual();
+                showModeHint(`Switched to ${MODE_INFO[state.mode].name} mode`);
+            });
+
+            // Shift+Tab to cycle modes (Cursor-style)
+            document.addEventListener('keydown', (e) => {
+                if (e.shiftKey && e.key === 'Tab') {
+                    e.preventDefault();
+                    cycleModes();
+                }
+            });
+        }
+
+        function updateModeVisual() {
+            modeDropdown.setAttribute('data-mode', state.mode);
+            // Update caret color to match mode
+            const modeColor = state.mode === 'agent' ? 'var(--agent)' :
+                             state.mode === 'plan' ? 'var(--plan)' : 'var(--ask)';
+            input.style.caretColor = modeColor;
+        }
+
+        function cycleModes() {
+            const modes = ['agent', 'plan', 'ask'];
+            const currentIndex = modes.indexOf(state.mode);
+            const nextIndex = (currentIndex + 1) % modes.length;
+            state.mode = modes[nextIndex];
+            modeDropdown.value = state.mode;
+            localStorage.setItem('kagami_mode', state.mode);
+            updateModeVisual();
+            showModeHint(`${MODE_INFO[state.mode].name}: ${MODE_INFO[state.mode].description}`);
+        }
+
+        function showModeHint(text) {
+            modeHint.textContent = text;
+            modeHint.classList.add('visible');
+            setTimeout(() => modeHint.classList.remove('visible'), 2000);
+        }
+
+        /**
+         * Auto-suggest Plan mode when input matches planning triggers
+         * Called on input change
+         */
+        function checkAutoSwitchToPlan(inputText) {
+            if (state.mode === 'agent' && inputText.length > 10) {
+                // Check if input suggests planning is needed
+                for (const pattern of MODE_INFO.plan.triggers) {
+                    if (pattern.test(inputText)) {
+                        showModeHint('💡 Shift+Tab to switch to Plan mode for this task');
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function initModelSelector() {
+            modelDropdown.value = state.model;
+            modelDropdown.addEventListener('change', () => {
+                state.model = modelDropdown.value;
+                localStorage.setItem('kagami_model', state.model);
+            });
+        }
+
+        initModeSelector();
+        initModelSelector();
+
+        // ═══════════════════════════════════════════════════════════════
+        // PREDICTIVE SUGGESTIONS — Claude Code style with sensory context
+        // ═══════════════════════════════════════════════════════════════
+
+        const PredictiveEngine = {
+            lastAction: null,
+            sensoryContext: {},
+            userPatterns: {},
+
+            /**
+             * Update sensory context from Kagami backend
+             * Includes: home state, time, weather, calendar, presence
+             */
+            async updateSensoryContext() {
+                if (isTauri) {
+                    try {
+                        const context = await invoke('get_sensory_context');
+                        this.sensoryContext = context;
+                    } catch {
+                        // Fallback to basic context
+                        this.sensoryContext = this.getBasicContext();
+                    }
+                } else {
+                    this.sensoryContext = this.getBasicContext();
+                }
+                return this.sensoryContext;
+            },
+
+            getBasicContext() {
+                const now = new Date();
+                const hour = now.getHours();
+                return {
+                    time: {
+                        hour,
+                        period: hour < 6 ? 'night' : hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 21 ? 'evening' : 'night',
+                        isWeekend: [0, 6].includes(now.getDay()),
+                    },
+                    home: {
+                        // Will be populated by API
+                        occupiedRooms: [],
+                        activeLights: [],
+                        activeScenes: [],
+                    },
+                    weather: {
+                        condition: 'unknown',
+                        temperature: null,
+                    },
+                    calendar: {
+                        nextEvent: null,
+                        minutesUntil: null,
+                    },
+                };
+            },
+
+            /**
+             * Predict next action based on context + last action
+             * Returns array of suggestions with confidence scores
+             */
+            predictNextActions() {
+                const predictions = [];
+                const ctx = this.sensoryContext;
+                const last = this.lastAction;
+
+                // ═══════════════════════════════════════════════════════════
+                // TIME-BASED PREDICTIONS
+                // ═══════════════════════════════════════════════════════════
+
+                if (ctx.time?.period === 'night' && ctx.time?.hour >= 22) {
+                    predictions.push({
+                        action: '/scene goodnight',
+                        label: 'Goodnight mode',
+                        reason: 'It\'s late — ready for bed?',
+                        confidence: 0.85,
+                        icon: '🌙',
+                    });
+                }
+
+                if (ctx.time?.period === 'morning' && ctx.time?.hour >= 6 && ctx.time?.hour < 9) {
+                    predictions.push({
+                        action: '/scene welcome',
+                        label: 'Good morning',
+                        reason: 'Start your day with optimal lighting',
+                        confidence: 0.7,
+                        icon: '☀️',
+                    });
+                }
+
+                if (ctx.time?.period === 'evening' && ctx.time?.hour >= 18 && ctx.time?.hour < 21) {
+                    predictions.push({
+                        action: '/scene movie',
+                        label: 'Movie mode',
+                        reason: 'Evening entertainment?',
+                        confidence: 0.6,
+                        icon: '🎬',
+                    });
+                }
+
+                // ═══════════════════════════════════════════════════════════
+                // CALENDAR-BASED PREDICTIONS
+                // ═══════════════════════════════════════════════════════════
+
+                if (ctx.calendar?.nextEvent && ctx.calendar?.minutesUntil <= 15) {
+                    predictions.push({
+                        action: `Meeting in ${ctx.calendar.minutesUntil}min`,
+                        label: ctx.calendar.nextEvent,
+                        reason: 'Upcoming calendar event',
+                        confidence: 0.9,
+                        icon: '📅',
+                        isInfo: true, // Not actionable, just info
+                    });
+                }
+
+                // ═══════════════════════════════════════════════════════════
+                // WEATHER-BASED PREDICTIONS
+                // ═══════════════════════════════════════════════════════════
+
+                if (ctx.weather?.condition === 'rain' || ctx.weather?.condition === 'cloudy') {
+                    predictions.push({
+                        action: 'Open all shades',
+                        label: 'Enjoy the weather',
+                        reason: `${ctx.weather.condition} — no glare to worry about`,
+                        confidence: 0.75,
+                        icon: '🌧️',
+                    });
+                }
+
+                // ═══════════════════════════════════════════════════════════
+                // FOLLOW-UP PREDICTIONS (based on last action)
+                // ═══════════════════════════════════════════════════════════
+
+                if (last) {
+                    const followUps = this.getFollowUpSuggestions(last);
+                    predictions.push(...followUps);
+                }
+
+                // ═══════════════════════════════════════════════════════════
+                // PRESENCE-BASED PREDICTIONS
+                // ═══════════════════════════════════════════════════════════
+
+                if (ctx.home?.occupiedRooms?.length === 0) {
+                    predictions.push({
+                        action: '/lights 0',
+                        label: 'All lights off',
+                        reason: 'No one seems to be home',
+                        confidence: 0.65,
+                        icon: '💡',
+                    });
+                }
+
+                // Sort by confidence
+                predictions.sort((a, b) => b.confidence - a.confidence);
+                return predictions.slice(0, 5); // Top 5 predictions
+            },
+
+            /**
+             * Get follow-up suggestions based on last action
+             */
+            getFollowUpSuggestions(lastAction) {
+                const followUps = [];
+
+                // Scene follow-ups
+                if (lastAction.type === 'scene') {
+                    if (lastAction.scene === 'movie') {
+                        followUps.push({
+                            action: '/scene exit_movie',
+                            label: 'Exit movie mode',
+                            reason: 'When you\'re done watching',
+                            confidence: 0.8,
+                            icon: '☀️',
+                        });
+                        followUps.push({
+                            action: '/announce "Movie time!"',
+                            label: 'Announce movie time',
+                            reason: 'Let everyone know',
+                            confidence: 0.5,
+                            icon: '📢',
+                        });
+                    }
+                    if (lastAction.scene === 'goodnight') {
+                        followUps.push({
+                            action: 'Lock all doors',
+                            label: 'Lock up',
+                            reason: 'Secure the house for the night',
+                            confidence: 0.85,
+                            icon: '🔒',
+                        });
+                    }
+                }
+
+                // Light follow-ups
+                if (lastAction.type === 'lights') {
+                    if (lastAction.room) {
+                        followUps.push({
+                            action: `/lights ${lastAction.level} ${this.getAdjacentRoom(lastAction.room)}`,
+                            label: `Same in ${this.getAdjacentRoom(lastAction.room)}`,
+                            reason: 'Match adjacent room',
+                            confidence: 0.6,
+                            icon: '💡',
+                        });
+                    }
+                }
+
+                // File follow-ups
+                if (lastAction.type === 'file') {
+                    followUps.push({
+                        action: 'Run tests',
+                        label: 'Test this file',
+                        reason: 'Verify changes',
+                        confidence: 0.7,
+                        icon: '🧪',
+                    });
+                    followUps.push({
+                        action: 'Git commit',
+                        label: 'Commit changes',
+                        reason: 'Save your work',
+                        confidence: 0.6,
+                        icon: '📝',
+                    });
+                }
+
+                return followUps;
+            },
+
+            getAdjacentRoom(room) {
+                const adjacency = {
+                    'Living Room': 'Kitchen',
+                    'Kitchen': 'Dining',
+                    'Dining': 'Living Room',
+                    'Office': 'Loft',
+                    'Primary Bedroom': 'Primary Bath',
+                };
+                return adjacency[room] || 'all rooms';
+            },
+
+            /**
+             * Record action for pattern learning
+             */
+            recordAction(action) {
+                this.lastAction = {
+                    ...action,
+                    timestamp: Date.now(),
+                };
+            },
+        };
+
+        // ═══════════════════════════════════════════════════════════════
+        // PREDICTIVE UI — Grayed suggestion below input
+        // ═══════════════════════════════════════════════════════════════
+
+        let predictedAction = null;
+
+        async function updatePredictions() {
+            await PredictiveEngine.updateSensoryContext();
+            const predictions = PredictiveEngine.predictNextActions();
+
+            if (predictions.length > 0 && !input.value) {
+                predictedAction = predictions[0];
+                showPredictedAction(predictedAction);
+            } else {
+                hidePredictedAction();
+            }
+        }
+
+        function showPredictedAction(prediction) {
+            const predictedEl = document.getElementById('predicted-action');
+            if (!predictedEl) return;
+
+            predictedEl.innerHTML = `
+                <span class="predicted-icon">${prediction.icon}</span>
+                <span class="predicted-text">${prediction.label}</span>
+                <span class="predicted-reason">${prediction.reason}</span>
+                <span class="predicted-hint">⇥ Tab to accept</span>
+            `;
+            predictedEl.style.display = 'flex';
+            predictedEl.dataset.action = prediction.action;
+        }
+
+        function hidePredictedAction() {
+            const predictedEl = document.getElementById('predicted-action');
+            if (predictedEl) {
+                predictedEl.style.display = 'none';
+            }
+            predictedAction = null;
+        }
+
+        // Accept prediction with Tab
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab' && !e.shiftKey && predictedAction && !input.value) {
+                e.preventDefault();
+                input.value = predictedAction.action;
+                hidePredictedAction();
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        });
+
+        // Update predictions periodically and on focus
+        updatePredictions();
+        setInterval(updatePredictions, 30000); // Every 30 seconds
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) updatePredictions();
+        });
+
+        // ═══════════════════════════════════════════════════════════════
+        // AUTO-SWITCH TO PLAN MODE DETECTION
+        // ═══════════════════════════════════════════════════════════════
+
+        input.addEventListener('input', () => {
+            const text = input.value;
+            if (text.length > 0) {
+                hidePredictedAction();
+            } else {
+                updatePredictions();
+            }
+            if (text.length > 15) {
+                checkAutoSwitchToPlan(text);
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════════════
+        // PLAN MODE IMPLEMENTATION — Full-featured Cursor-style
+        // ═══════════════════════════════════════════════════════════════
+
+        const PlanMode = {
+            /**
+             * Start Plan mode workflow
+             * 1. Ask clarifying questions
+             * 2. Research codebase
+             * 3. Generate plan with Mermaid diagrams
+             * 4. Interactive editing
+             * 5. Execute with Agent mode
+             */
+            async startPlan(prompt) {
+                state.planState = {
+                    phase: 'questions',
+                    prompt,
+                    questions: [],
+                    answers: {},
+                    research: [],
+                    plan: null,
+                };
+
+                statusText.textContent = 'Analyzing task...';
+
+                // Phase 1: Generate clarifying questions
+                const questions = await this.generateQuestions(prompt);
+                state.planState.questions = questions;
+
+                if (questions.length > 0) {
+                    return { type: 'plan_questions', questions };
+                }
+
+                // If no questions needed, proceed to research
+                return await this.proceedToResearch();
+            },
+
+            async generateQuestions(prompt) {
+                // In production, this calls the API
+                // For now, generate smart questions based on prompt analysis
+                const questions = [];
+
+                if (/auth|login|security/i.test(prompt)) {
+                    questions.push('What authentication method should be used (OAuth, JWT, session)?');
+                }
+                if (/database|storage|persist/i.test(prompt)) {
+                    questions.push('Which database/storage solution should be used?');
+                }
+                if (/api|endpoint/i.test(prompt)) {
+                    questions.push('Should this be a REST API or GraphQL?');
+                }
+                if (/refactor|migrate/i.test(prompt)) {
+                    questions.push('Should we maintain backward compatibility?');
+                }
+
+                return questions;
+            },
+
+            async proceedToResearch() {
+                state.planState.phase = 'research';
+                statusText.textContent = 'Researching codebase...';
+
+                // Simulated codebase research
+                const research = {
+                    relevantFiles: [],
+                    patterns: [],
+                    dependencies: [],
+                };
+
+                state.planState.research = research;
+                return await this.generatePlan();
+            },
+
+            async generatePlan() {
+                state.planState.phase = 'plan';
+                statusText.textContent = 'Generating implementation plan...';
+
+                // Generate Mermaid diagram + task list
+                const plan = {
+                    title: state.planState.prompt,
+                    diagram: `graph TD
+    A[Start] --> B{Analyze}
+    B --> C[Implement]
+    C --> D[Test]
+    D --> E[Deploy]`,
+                    tasks: [
+                        { id: 1, task: 'Set up project structure', status: 'pending' },
+                        { id: 2, task: 'Implement core functionality', status: 'pending' },
+                        { id: 3, task: 'Add tests', status: 'pending' },
+                        { id: 4, task: 'Documentation', status: 'pending' },
+                    ],
+                    markdown: '',
+                };
+
+                state.planState.plan = plan;
+                state.planState.phase = 'review';
+
+                return { type: 'plan_ready', plan };
+            },
+
+            async executePlan() {
+                // Switch to Agent mode and execute
+                state.mode = 'agent';
+                modeDropdown.value = 'agent';
+                updateModeVisual();
+
+                return { type: 'plan_executing', plan: state.planState.plan };
+            },
+        };
+
+        // ═══════════════════════════════════════════════════════════════
+        // SUBAGENT (COLONY) IMPLEMENTATION — Parallel task execution
+        // ═══════════════════════════════════════════════════════════════
+
+        const SubagentManager = {
+            /**
+             * Launch parallel subagents for complex tasks
+             * Each subagent has its own context and tool permissions
+             */
+            async launchParallel(tasks) {
+                const results = [];
+
+                // Launch all subagents in parallel
+                const promises = tasks.map(async (task) => {
+                    const subagent = this.createSubagent(task.colony);
+                    state.activeSubagents.push(subagent);
+
+                    try {
+                        const result = await this.executeSubagent(subagent, task.prompt);
+                        return { colony: task.colony, success: true, result };
+                    } catch (error) {
+                        return { colony: task.colony, success: false, error: error.message };
+                    } finally {
+                        // Remove from active
+                        state.activeSubagents = state.activeSubagents.filter(s => s.id !== subagent.id);
+                    }
+                });
+
+                return await Promise.all(promises);
+            },
+
+            createSubagent(colony) {
+                const config = SUBAGENTS[colony] || SUBAGENTS.spark;
+                return {
+                    id: `${colony}-${Date.now()}`,
+                    colony,
+                    name: config.name,
+                    color: config.color,
+                    tools: config.tools,
+                    canWrite: config.canWrite,
+                    context: {}, // Isolated context
+                    startTime: Date.now(),
+                };
+            },
+
+            async executeSubagent(subagent, prompt) {
+                // In production, this calls the API with subagent context
+                console.log(`[${subagent.name}] Executing: ${prompt}`);
+
+                // Simulate execution
+                return new Promise((resolve) => {
+                    setTimeout(() => {
+                        resolve({
+                            subagent: subagent.name,
+                            completed: true,
+                            output: `${subagent.name} completed: ${prompt}`,
+                        });
+                    }, 1000 + Math.random() * 1000);
+                });
+            },
+
+            /**
+             * Delegation triggers — auto-route to appropriate colony
+             */
+            suggestColony(prompt) {
+                if (/error|bug|fix|debug|trace/i.test(prompt)) return 'flow';
+                if (/test|verify|lint|check/i.test(prompt)) return 'crystal';
+                if (/plan|architect|design|structure/i.test(prompt)) return 'beacon';
+                if (/research|explore|document|learn/i.test(prompt)) return 'grove';
+                if (/build|implement|create|code/i.test(prompt)) return 'forge';
+                if (/brainstorm|ideate|imagine/i.test(prompt)) return 'spark';
+                if (/connect|integrate|bridge/i.test(prompt)) return 'nexus';
+                return 'forge'; // Default to Forge for general tasks
+            },
+        };
+
+        // ═══════════════════════════════════════════════════════════════
+        // TYPEAHEAD CONTROLLER
+        // ═══════════════════════════════════════════════════════════════
+
+        const typeahead = new window.TypeaheadController(input, suggestions, {
+            maxSuggestions: 8,
+            debounceMs: 80,
+
+            onExecute: async (result) => {
+                if (result.error) {
+                    statusText.textContent = `Error: ${result.error}`;
+                    setTimeout(() => { statusText.textContent = 'Ready'; }, 2000);
+                    return;
+                }
+
+                // Handle slash command result
+                if (result.type === 'slash') {
+                    statusText.textContent = '✓ Done';
+
+                    // Special handling for /help
+                    if (result.result?.commands) {
+                        console.table(result.result.commands);
+                    }
+
+                    setTimeout(() => hideWindow(), 300);
+                    return;
+                }
+
+                // Handle natural language based on current mode
+                if (result.type === 'natural') {
+                    const prompt = result.input;
+
+                    switch (state.mode) {
+                        case 'plan':
+                            // Plan mode: Start planning workflow
+                            statusText.textContent = '📋 Planning...';
+                            try {
+                                const planResult = await PlanMode.startPlan(prompt);
+                                if (planResult.type === 'plan_questions') {
+                                    statusText.textContent = `📝 ${planResult.questions.length} questions`;
+                                    console.log('Plan questions:', planResult.questions);
+                                } else if (planResult.type === 'plan_ready') {
+                                    statusText.textContent = '✅ Plan ready';
+                                    console.log('Plan:', planResult.plan);
+                                }
+                            } catch (e) {
+                                statusText.textContent = `Error: ${e.message}`;
+                            }
+                            break;
+
+                        case 'ask':
+                            // Ask mode: Read-only Q&A
+                            statusText.textContent = '💬 Answering...';
+                            // In production, this calls the API in read-only mode
+                            setTimeout(() => { statusText.textContent = 'Ready'; }, 1000);
+                            break;
+
+                        case 'agent':
+                        default:
+                            // Agent mode: Full execution with subagent routing
+                            const suggestedColony = SubagentManager.suggestColony(prompt);
+                            statusText.textContent = `⚡ ${SUBAGENTS[suggestedColony].name}...`;
+
+                            // In production, this sends to the API with colony context
+                            // For complex tasks, can launch parallel subagents
+                            if (isTauri) {
+                                try {
+                                    const response = await invoke('process_command', {
+                                        prompt,
+                                        mode: 'agent',
+                                        colony: suggestedColony,
+                                        context: state.context,
+                                    });
+                                    statusText.textContent = '✓ Done';
+                                    setTimeout(() => hideWindow(), 300);
+                                } catch (e) {
+                                    statusText.textContent = `Error: ${e.message}`;
+                                }
+                            } else {
+                                setTimeout(() => { statusText.textContent = 'Ready'; }, 1000);
+                            }
+                            break;
+                    }
+                }
+            },
+
+            onContextChange: (item) => {
+                // Add context chip
+                if (item.value && !state.context.find(c => c.id === item.id)) {
+                    state.context.push({
+                        id: item.id,
+                        label: item.label,
+                        icon: item.icon,
+                        type: item.type || 'unknown',
+                    });
+                    renderContextChips();
+                }
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════════════
+        // CONTEXT CHIPS
+        // ═══════════════════════════════════════════════════════════════
+
+        function renderContextChips() {
+            if (state.context.length === 0) {
+                contextChips.classList.remove('visible');
+                return;
+            }
+
+            contextChips.classList.add('visible');
+            contextChips.innerHTML = state.context.map((ctx, i) => `
+                <div class="context-chip" data-index="${i}">
+                    <span class="context-chip-icon">${ctx.icon || '@'}</span>
+                    <span>${ctx.label}</span>
+                    <span class="context-chip-remove" data-index="${i}">×</span>
+                </div>
+            `).join('');
+
+            // Handle remove clicks
+            contextChips.querySelectorAll('.context-chip-remove').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const index = parseInt(btn.dataset.index, 10);
+                    state.context.splice(index, 1);
+                    renderContextChips();
+                });
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // VOICE INPUT
+        // ═══════════════════════════════════════════════════════════════
+
+        let recognition = null;
+        let isRecording = false;
+
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+
+            recognition.onstart = () => {
+                isRecording = true;
+                voiceBtn.classList.add('recording');
+                statusText.textContent = 'Listening...';
+            };
+
+            recognition.onresult = (event) => {
+                let finalTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        input.value = event.results[i][0].transcript;
+                    }
+                }
+
+                if (finalTranscript) {
+                    input.value = finalTranscript;
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            };
+
+            recognition.onerror = (event) => {
+                statusText.textContent = event.error === 'no-speech'
+                    ? 'No speech detected'
+                    : `Error: ${event.error}`;
+                stopVoice();
+                setTimeout(() => { statusText.textContent = 'Ready'; }, 2000);
+            };
+
+            recognition.onend = () => stopVoice();
+        }
+
+        function startVoice() {
+            if (recognition) {
+                try { recognition.start(); } catch {}
+            }
+        }
+
+        function stopVoice() {
+            isRecording = false;
+            voiceBtn.classList.remove('recording');
+            if (recognition) {
+                try { recognition.stop(); } catch {}
+            }
+        }
+
+        voiceBtn.addEventListener('mousedown', startVoice);
+        voiceBtn.addEventListener('mouseup', stopVoice);
+        voiceBtn.addEventListener('mouseleave', () => { if (isRecording) stopVoice(); });
+        voiceBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startVoice(); });
+        voiceBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopVoice(); });
+
+        // ═══════════════════════════════════════════════════════════════
+        // KEYBOARD SHORTCUTS
+        // ═══════════════════════════════════════════════════════════════
+
+        document.addEventListener('keydown', async (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                await hideWindow();
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════════════
+        // WINDOW MANAGEMENT
+        // ═══════════════════════════════════════════════════════════════
+
+        async function hideWindow() {
+            if (isTauri) {
+                try {
+                    await invoke('hide_quick_entry');
+                } catch {
+                    const win = getCurrentWindow();
+                    await win.hide();
+                }
+            }
+        }
+
+        // Reset on show
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                input.value = '';
+                input.focus();
+                statusText.textContent = 'Ready';
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════════════
+        // REAL-TIME STATUS
+        // ═══════════════════════════════════════════════════════════════
+
+        function updateStatus() {
+            statusDot.classList.toggle('connected', state.isConnected);
+            statusDot.classList.toggle('disconnected', !state.isConnected);
+
+            // Semantic safety status
+            if (state.safetyScore !== null) {
+                safetyDot.classList.remove('good', 'caution', 'alert');
+                if (state.safetyScore >= 0.5) {
+                    safetyDot.classList.add('good');
+                } else if (state.safetyScore >= 0) {
+                    safetyDot.classList.add('caution');
+                } else {
+                    safetyDot.classList.add('alert');
+                }
+            }
+        }
+
+        if (isTauri) {
+            // Listen for state updates
+            await listen('kagami-state', (event) => {
+                state.isConnected = event.payload.connected;
+                state.safetyScore = event.payload.safety_score;
+                updateStatus();
+            });
+
+            // Initial fetch
+            try {
+                const ctxState = await invoke('get_context_state');
+                state.isConnected = ctxState.is_connected;
+                state.safetyScore = ctxState.safety_score;
+                updateStatus();
+            } catch {}
+
+            // Check API status
+            try {
+                const apiStatus = await invoke('get_api_status');
+                state.isConnected = apiStatus.running;
+                updateStatus();
+            } catch {}
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // INIT
+        // ═══════════════════════════════════════════════════════════════
+
+        input.focus();
+        updateStatus();
+
+        console.log(`%c鏡 Kagami
+%c━━━━━━━━━━━━━
+%cType / for commands
+%cType @ for context`,
+            'color: #10B981; font-size: 14px; font-weight: bold;',
+            'color: #10B981;',
+            'color: #888;',
+            'color: #888;'
+        );
+    </script>
+</body>
+</html>

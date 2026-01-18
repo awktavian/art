@@ -1,0 +1,428 @@
+/**
+ * =============================================================================
+ * COMPONENT: Toggle
+ * Kagami Design System V2 - Toggle button for binary choices
+ *
+ * States: default, hover, focus, active, disabled, loading, error, success, pressed
+ * Sizes: sm, md, lg
+ * =============================================================================
+ */
+
+/* =============================================================================
+   BASE TOGGLE
+   Toggle button with elastic physics and volumetric glass depth
+   ============================================================================= */
+
+.prism-toggle {
+  /* Custom properties for dynamic effects */
+  --toggle-scale: 1;
+  --toggle-press-depth: 0;
+
+  /* Reset */
+  appearance: none;
+  border: none;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  /* Layout */
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  isolation: isolate;
+  overflow: hidden;
+
+  /* Sizing (md default) */
+  height: 40px;
+  padding: 0 16px;
+  min-width: 40px;
+
+  /* Typography */
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+
+  /* Visual - VOLUMETRIC glass with noise texture */
+  color: var(--prism-text-secondary);
+  background:
+    /* Noise texture for glass materiality */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    var(--prism-surface);
+  background-blend-mode: overlay, normal;
+  backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+  -webkit-backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+
+  /* Glass edge beveling */
+  border: 1px solid transparent;
+  border-image: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.35) 0%,
+    rgba(255, 255, 255, 0.15) 40%,
+    rgba(255, 255, 255, 0.06) 60%,
+    rgba(0, 0, 0, 0.03) 80%,
+    rgba(0, 0, 0, 0.06) 100%
+  ) 1;
+  border-radius: var(--prism-radius-md);
+
+  /* Volumetric shadow system */
+  box-shadow:
+    /* Outer ambient */
+    0 2px 6px -2px rgba(0, 0, 0, 0.12),
+    0 1px 2px -1px rgba(0, 0, 0, 0.08),
+    /* Glass edge highlight */
+    inset 0 1px 1px rgba(255, 255, 255, 0.3),
+    /* Concave depth */
+    inset 0 2px 4px -2px rgba(255, 255, 255, 0.12),
+    inset 0 -2px 4px -2px rgba(0, 0, 0, 0.04),
+    /* Side bevels */
+    inset 1px 0 1px rgba(255, 255, 255, 0.1),
+    inset -1px 0 1px rgba(0, 0, 0, 0.03);
+
+  /* GPU acceleration with 3D transform */
+  transform: translateZ(0) scale(var(--toggle-scale));
+  transform-style: preserve-3d;
+  will-change: transform, background, box-shadow;
+
+  /* Elastic spring transitions */
+  transition:
+    transform var(--prism-dur-fast) var(--prism-ease-spring),
+    background var(--prism-dur-normal) var(--prism-ease-cusp),
+    border-color var(--prism-dur-normal) var(--prism-ease-cusp),
+    color var(--prism-dur-normal) var(--prism-ease-cusp),
+    box-shadow var(--prism-dur-normal) var(--prism-ease-cusp);
+}
+
+/* Chromatic ring - animated on interaction */
+.prism-toggle::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--toggle-rotate, 0deg),
+    var(--colony-color, var(--prism-beacon)) 0%,
+    color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 80%, var(--prism-crystal)) 50%,
+    var(--colony-color, var(--prism-beacon)) 100%
+  );
+  z-index: -1;
+  opacity: 0;
+  filter: blur(6px);
+  transition:
+    opacity var(--prism-dur-normal) var(--prism-ease-cusp),
+    filter var(--prism-dur-normal) var(--prism-ease-cusp),
+    inset var(--prism-dur-normal) var(--prism-ease-cusp);
+  pointer-events: none;
+  animation: toggle-chromatic-breathe 3s ease-in-out infinite paused;
+}
+
+@keyframes toggle-chromatic-breathe {
+  0%, 100% {
+    opacity: 0.4;
+    filter: blur(6px);
+  }
+  50% {
+    opacity: 0.6;
+    filter: blur(8px);
+  }
+}
+
+/* Glass reflection overlay */
+.prism-toggle::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    /* Primary specular */
+    linear-gradient(
+      175deg,
+      rgba(255, 255, 255, 0.25) 0%,
+      rgba(255, 255, 255, 0.1) 15%,
+      transparent 40%
+    ),
+    /* Bottom reflection */
+    linear-gradient(
+      195deg,
+      transparent 70%,
+      rgba(255, 255, 255, 0.03) 90%
+    );
+  pointer-events: none;
+  opacity: 1;
+  mix-blend-mode: overlay;
+  transition: opacity var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+/* Icon */
+.prism-toggle__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+}
+
+.prism-toggle__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* =============================================================================
+   INTERACTIVE STATES
+   Elastic physics with satisfying press feedback
+   ============================================================================= */
+
+/* Focus visible - Animated focus ring */
+.prism-toggle:focus-visible {
+  outline: none;
+}
+
+.prism-toggle:focus-visible::before {
+  opacity: 0.6;
+  animation-play-state: running;
+}
+
+/* Focus ring via box-shadow animation */
+@keyframes toggle-focus-pulse {
+  0%, 100% {
+    box-shadow:
+      0 2px 6px -2px rgba(0, 0, 0, 0.12),
+      0 1px 2px -1px rgba(0, 0, 0, 0.08),
+      inset 0 1px 1px rgba(255, 255, 255, 0.3),
+      inset 0 2px 4px -2px rgba(255, 255, 255, 0.12),
+      inset 0 -2px 4px -2px rgba(0, 0, 0, 0.04),
+      inset 1px 0 1px rgba(255, 255, 255, 0.1),
+      inset -1px 0 1px rgba(0, 0, 0, 0.03),
+      0 0 0 2px var(--colony-color, var(--prism-beacon)),
+      0 0 0 5px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 25%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 2px 6px -2px rgba(0, 0, 0, 0.12),
+      0 1px 2px -1px rgba(0, 0, 0, 0.08),
+      inset 0 1px 1px rgba(255, 255, 255, 0.3),
+      inset 0 2px 4px -2px rgba(255, 255, 255, 0.12),
+      inset 0 -2px 4px -2px rgba(0, 0, 0, 0.04),
+      inset 1px 0 1px rgba(255, 255, 255, 0.1),
+      inset -1px 0 1px rgba(0, 0, 0, 0.03),
+      0 0 0 3px var(--colony-color, var(--prism-beacon)),
+      0 0 0 6px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 18%, transparent);
+  }
+}
+
+.prism-toggle:focus-visible {
+  animation: toggle-focus-pulse 2s var(--prism-ease-cusp) infinite;
+}
+
+/* Hover - Lift and glow */
+.prism-toggle:hover:not(:disabled):not([aria-disabled="true"]):not(.prism-toggle--loading) {
+  --toggle-scale: 1.02;
+
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    var(--prism-surface-elevated);
+  background-blend-mode: overlay, normal;
+  color: var(--prism-text);
+
+  /* Elevated shadow */
+  box-shadow:
+    0 4px 12px -3px rgba(0, 0, 0, 0.15),
+    0 2px 4px -1px rgba(0, 0, 0, 0.1),
+    inset 0 1px 2px rgba(255, 255, 255, 0.35),
+    inset 0 3px 6px -3px rgba(255, 255, 255, 0.15),
+    inset 0 -3px 6px -3px rgba(0, 0, 0, 0.05),
+    inset 1px 0 1px rgba(255, 255, 255, 0.12),
+    inset -1px 0 1px rgba(0, 0, 0, 0.04);
+}
+
+.prism-toggle:hover:not(:disabled):not([aria-disabled="true"]):not(.prism-toggle--loading)::before {
+  opacity: 0.35;
+}
+
+/* Active/Pressed - Elastic gel press */
+.prism-toggle:active:not(:disabled):not([aria-disabled="true"]):not(.prism-toggle--loading) {
+  --toggle-scale: 0.96;
+
+  /* Gel press - sunken appearance */
+  box-shadow:
+    0 1px 2px -1px rgba(0, 0, 0, 0.08),
+    inset 0 2px 4px rgba(0, 0, 0, 0.1),
+    inset 0 1px 2px rgba(0, 0, 0, 0.08),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.1),
+    inset 1px 0 2px rgba(0, 0, 0, 0.05),
+    inset -1px 0 2px rgba(0, 0, 0, 0.05);
+
+  /* Quick gel press, springy release */
+  transition:
+    transform 0.06s var(--prism-ease-cusp),
+    box-shadow 0.06s var(--prism-ease-cusp);
+}
+
+.prism-toggle:active:not(:disabled):not([aria-disabled="true"]):not(.prism-toggle--loading)::after {
+  opacity: 0.5;
+}
+
+/* Disabled */
+.prism-toggle:disabled,
+.prism-toggle[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Loading */
+.prism-toggle--loading {
+  cursor: wait;
+  color: transparent;
+}
+
+/* Pressed/Selected state - Vibrant active appearance */
+.prism-toggle[aria-pressed="true"],
+.prism-toggle--pressed {
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 25%, var(--prism-surface-elevated)) 0%,
+      color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 18%, var(--prism-surface)) 100%
+    );
+  background-blend-mode: overlay, normal;
+  color: var(--colony-color, var(--prism-beacon));
+
+  /* Enhanced shadow with colored glow */
+  box-shadow:
+    0 2px 8px -2px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 30%, transparent),
+    0 1px 3px -1px rgba(0, 0, 0, 0.1),
+    inset 0 1px 1px rgba(255, 255, 255, 0.35),
+    inset 0 2px 4px -2px rgba(255, 255, 255, 0.15),
+    inset 0 -2px 4px -2px rgba(0, 0, 0, 0.05),
+    inset 1px 0 1px rgba(255, 255, 255, 0.12),
+    inset -1px 0 1px rgba(0, 0, 0, 0.04);
+}
+
+.prism-toggle[aria-pressed="true"]::before,
+.prism-toggle--pressed::before {
+  opacity: 0.4;
+  animation-play-state: running;
+}
+
+.prism-toggle[aria-pressed="true"]:hover:not(:disabled),
+.prism-toggle--pressed:hover:not(:disabled) {
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 32%, var(--prism-surface-elevated)) 0%,
+      color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 22%, var(--prism-surface)) 100%
+    );
+  background-blend-mode: overlay, normal;
+
+  box-shadow:
+    0 4px 16px -4px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 40%, transparent),
+    0 2px 6px -2px rgba(0, 0, 0, 0.12),
+    inset 0 1px 2px rgba(255, 255, 255, 0.4),
+    inset 0 3px 6px -3px rgba(255, 255, 255, 0.18),
+    inset 0 -3px 6px -3px rgba(0, 0, 0, 0.06),
+    inset 1px 0 1px rgba(255, 255, 255, 0.15),
+    inset -1px 0 1px rgba(0, 0, 0, 0.05);
+}
+
+.prism-toggle[aria-pressed="true"]:hover:not(:disabled)::before,
+.prism-toggle--pressed:hover:not(:disabled)::before {
+  opacity: 0.55;
+}
+
+/* Error */
+.prism-toggle--error {
+  --colony-color: var(--prism-spark);
+  border-color: var(--prism-e1-25);
+}
+
+.prism-toggle--error[aria-pressed="true"],
+.prism-toggle--error.prism-toggle--pressed {
+  background: color-mix(in srgb, var(--prism-spark) 15%, var(--prism-surface));
+  color: var(--prism-spark);
+}
+
+/* Success */
+.prism-toggle--success {
+  --colony-color: var(--prism-nexus);
+  border-color: var(--prism-e4-25);
+}
+
+.prism-toggle--success[aria-pressed="true"],
+.prism-toggle--success.prism-toggle--pressed {
+  background: color-mix(in srgb, var(--prism-nexus) 15%, var(--prism-surface));
+  color: var(--prism-nexus);
+}
+
+/* =============================================================================
+   SIZE VARIANTS
+   ============================================================================= */
+
+/* Small */
+.prism-toggle--sm {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 0.8125rem;
+  gap: 6px;
+  border-radius: var(--prism-radius-sm);
+}
+
+/* Large */
+.prism-toggle--lg {
+  height: 48px;
+  padding: 0 20px;
+  font-size: 0.9375rem;
+  gap: 10px;
+  border-radius: var(--prism-radius-lg);
+}
+
+/* =============================================================================
+   ICON ONLY
+   ============================================================================= */
+
+.prism-toggle--icon-only {
+  padding: 0;
+  aspect-ratio: 1;
+  min-width: unset;
+}
+
+.prism-toggle--icon-only.prism-toggle--sm {
+  width: 32px;
+  height: 32px;
+}
+
+.prism-toggle--icon-only.prism-toggle--lg {
+  width: 48px;
+  height: 48px;
+}
+
+/* =============================================================================
+   COLONY COLOR VARIANTS
+   ============================================================================= */
+
+.prism-toggle[data-colony="spark"] { --colony-color: var(--prism-spark); }
+.prism-toggle[data-colony="forge"] { --colony-color: var(--prism-forge); }
+.prism-toggle[data-colony="flow"] { --colony-color: var(--prism-flow); }
+.prism-toggle[data-colony="nexus"] { --colony-color: var(--prism-nexus); }
+.prism-toggle[data-colony="beacon"] { --colony-color: var(--prism-beacon); }
+.prism-toggle[data-colony="grove"] { --colony-color: var(--prism-grove); }
+.prism-toggle[data-colony="crystal"] { --colony-color: var(--prism-crystal); }
+
+/* =============================================================================
+   REDUCED MOTION
+   ============================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .prism-toggle {
+    transition: none;
+  }
+
+  .prism-toggle::before {
+    transition: none;
+  }
+}

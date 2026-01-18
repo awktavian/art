@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz: Mature Storylines | Module 05 | Tool Time University</title>
+    <link rel="stylesheet" href="../assets/style.css">
+    <style>
+        .quiz-container { max-width: 800px; margin: 0 auto; padding: var(--space-4); }
+        .quiz-header { text-align: center; padding: var(--space-5) var(--space-4); background: linear-gradient(135deg, var(--binford-red) 0%, var(--binford-red-light) 100%); color: white; border-radius: var(--radius-lg); margin-bottom: var(--space-4); }
+        .quiz-header h1 { color: white; margin-bottom: var(--space-2); }
+        .points-badge { display: inline-block; background: var(--binford-gold); color: var(--stone-900); padding: var(--space-1) var(--space-3); border-radius: var(--radius-xl); font-weight: 600; font-family: var(--font-mono); }
+        .progress-bar { background: var(--stone-200); height: 8px; border-radius: 4px; margin-bottom: var(--space-4); overflow: hidden; }
+        .progress-fill { background: linear-gradient(90deg, var(--binford-red) 0%, var(--binford-gold) 100%); height: 100%; border-radius: 4px; transition: width var(--duration-normal) var(--ease-out); }
+        .progress-text { text-align: center; font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-3); }
+        .question-card { background: var(--white); border: 1px solid var(--border-light); border-radius: var(--radius-lg); padding: var(--space-4); margin-bottom: var(--space-4); display: none; }
+        .question-card.active { display: block; animation: fadeUp var(--duration-normal) var(--ease-out); }
+        .question-number { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--binford-red); margin-bottom: var(--space-2); }
+        .question-text { font-size: var(--text-lg); font-weight: 500; margin-bottom: var(--space-3); line-height: 1.4; }
+        .question-type { display: inline-block; font-size: var(--text-xs); background: var(--stone-100); color: var(--text-secondary); padding: 2px 8px; border-radius: var(--radius-sm); margin-bottom: var(--space-3); }
+        .options-list { list-style: none; padding: 0; margin: 0; }
+        .option-item { margin-bottom: var(--space-2); }
+        .option-btn { width: 100%; text-align: left; padding: var(--space-3); background: var(--stone-50); border: 2px solid var(--border-light); border-radius: var(--radius-md); cursor: pointer; transition: all var(--duration-fast) var(--ease-out); font-size: var(--text-base); }
+        .option-btn:hover:not(:disabled) { background: var(--stone-100); border-color: var(--stone-300); }
+        .option-btn.selected { background: #fef3c7; border-color: var(--binford-gold); }
+        .option-btn.correct { background: #dcfce7; border-color: #22c55e; }
+        .option-btn.incorrect { background: #fee2e2; border-color: #ef4444; }
+        .option-btn:disabled { cursor: not-allowed; }
+        .fill-blank-input { width: 100%; padding: var(--space-2) var(--space-3); font-size: var(--text-base); border: 2px solid var(--border-light); border-radius: var(--radius-md); margin-bottom: var(--space-3); }
+        .fill-blank-input:focus { outline: none; border-color: var(--binford-gold); }
+        .fill-blank-input.correct { border-color: #22c55e; background: #dcfce7; }
+        .fill-blank-input.incorrect { border-color: #ef4444; background: #fee2e2; }
+        .feedback { padding: var(--space-3); border-radius: var(--radius-md); margin-top: var(--space-3); display: none; }
+        .feedback.show { display: block; animation: fadeUp var(--duration-fast) var(--ease-out); }
+        .feedback.correct { background: #dcfce7; border: 1px solid #22c55e; color: #166534; }
+        .feedback.incorrect { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
+        .feedback-title { font-weight: 600; margin-bottom: var(--space-1); }
+        .btn-container { display: flex; justify-content: space-between; margin-top: var(--space-4); }
+        .submit-btn { background: var(--binford-red); color: white; padding: var(--space-2) var(--space-4); border: none; border-radius: var(--radius-md); font-weight: 600; cursor: pointer; transition: all var(--duration-fast) var(--ease-out); }
+        .submit-btn:hover:not(:disabled) { background: var(--binford-red-light); transform: translateY(-2px); }
+        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .next-btn { background: var(--binford-gold); color: var(--stone-900); }
+        .next-btn:hover:not(:disabled) { background: var(--binford-gold-light); }
+        .results-card { background: var(--white); border: 1px solid var(--border-light); border-radius: var(--radius-lg); padding: var(--space-5); text-align: center; display: none; }
+        .results-card.show { display: block; animation: fadeUp var(--duration-normal) var(--ease-out); }
+        .results-score { font-size: var(--text-4xl); font-family: var(--font-display); color: var(--binford-red); margin-bottom: var(--space-2); }
+        .results-equity { font-size: var(--text-2xl); font-family: var(--font-mono); color: var(--binford-gold); margin-bottom: var(--space-4); }
+        .results-title { font-size: var(--text-xl); font-weight: 600; margin-bottom: var(--space-2); }
+        .results-message { color: var(--text-secondary); margin-bottom: var(--space-4); }
+        .tool-time-break { background: var(--stone-900); color: white; padding: var(--space-3); border-radius: var(--radius-md); text-align: center; margin: var(--space-4) 0; }
+        .tool-time-break .catchphrase { font-size: var(--text-xl); color: var(--binford-gold); font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div class="quiz-container">
+        <div class="quiz-header">
+            <p class="label" style="color: var(--binford-gold-light);">MODULE 05</p>
+            <h1>Mature Storylines</h1>
+            <p style="opacity: 0.9; margin-bottom: var(--space-3);">10 Questions | Multiple Choice, True/False & Fill-in-the-Blank</p>
+            <div class="points-badge">75 Home Equity Dollars</div>
+        </div>
+
+        <div class="progress-text">Question <span id="currentQ">1</span> of 10</div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width: 10%;"></div></div>
+
+        <!-- Question 1 -->
+        <div class="question-card active" data-question="1" data-correct="B" data-points="7.5">
+            <div class="question-number">Question 1 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What did Season 5 prove about Home Improvement's storytelling ability?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) It could only do slapstick comedy</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) It could deliver complex family drama while maintaining its comedic core</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) It needed more Tool Time segments</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) The format was outdated</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Show maturation!</div>
+                <p>By Season 5, Home Improvement had transcended its "man vs. power tools" premise. The show delivered complex family drama wrapped in comfortable comedy.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Think deeper!</div>
+                <p>The correct answer is <strong>It could deliver complex family drama while maintaining its comedic core</strong>. The show evolved significantly.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 2 -->
+        <div class="question-card" data-question="2" data-correct="true" data-points="7.5" data-type="truefalse">
+            <div class="question-number">Question 2 of 10 (7.5 HED)</div>
+            <div class="question-type">True or False</div>
+            <div class="question-text">In Season 5, Tim and Jill's marriage faced genuine strain as Jill's growing independence through psychology studies created friction with Tim's traditional worldview.</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="true">True</button></li>
+                <li class="option-item"><button class="option-btn" data-value="false">False</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Marriage under pressure!</div>
+                <p>The show asked: can a relationship evolve while honoring what made it work in the first place? Tim and Jill's tensions were real and meaningful.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">The tension was real!</div>
+                <p>This is <strong>True</strong>. Jill's career ambitions and Tim's traditional views created genuine marital conflict.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 3 -->
+        <div class="question-card" data-question="3" data-correct="D" data-points="7.5">
+            <div class="question-number">Question 3 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">In "A Night to Dismember" (Halloween episode), what went wrong with Tim's Tool Time project?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) It caught fire</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) It collapsed on set</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) It electrocuted someone</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) His haunted house was so over-engineered it terrified the construction crew</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Too scary!</div>
+                <p>Tim's haunted house was so over-engineered it terrified the construction crew. A meditation on knowing when "more power" crosses the line!</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different disaster!</div>
+                <p>The correct answer is <strong>His haunted house was so over-engineered it terrified the construction crew</strong>. More power = more nightmares!</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 4 -->
+        <div class="question-card" data-question="4" data-correct="attic" data-points="7.5" data-type="fillin">
+            <div class="question-number">Question 4 of 10 (7.5 HED)</div>
+            <div class="question-type">Fill in the Blank</div>
+            <div class="question-text">In "Room at the Top," Tim converts the _______ into a bedroom for one of the boys to resolve their fighting.</div>
+            <input type="text" class="fill-blank-input" placeholder="Enter room location..." autocomplete="off">
+            <div class="feedback correct">
+                <div class="feedback-title">Personal space solved!</div>
+                <p>The attic renovation became a metaphor for growing up and apart. The question wasn't just about space - it was about which brother would take this step toward independence.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different room!</div>
+                <p>The correct answer is <strong>attic</strong>. The attic conversion explored sibling rivalry and personal space.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 5 -->
+        <div class="question-card" data-question="5" data-correct="C" data-points="7.5">
+            <div class="question-number">Question 5 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What was the subject of "The Feminine Mistake"?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) Jill's cooking disaster</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) A Tool Time accident</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Tim's casual sexism requiring sensitivity training</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Heidi quitting the show</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Time for training!</div>
+                <p>Tim's casual sexism on Tool Time led to a producer's mandate for sensitivity training - delivered by Jill. The episode brilliantly used humor to explore workplace equality and unconscious bias.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">More serious topic!</div>
+                <p>The correct answer is <strong>Tim's casual sexism requiring sensitivity training</strong>. A groundbreaking episode for its time.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <div class="tool-time-break" id="midBreak" style="display: none;">
+            <p>DOES EVERYBODY KNOW WHAT TIME IT IS?</p>
+            <p class="catchphrase">TOOL TIME!</p>
+            <p style="font-size: var(--text-sm); opacity: 0.7;">Mature storylines require mature viewers!</p>
+        </div>
+
+        <!-- Question 6 -->
+        <div class="question-card" data-question="6" data-correct="A" data-points="7.5">
+            <div class="question-number">Question 6 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">According to "The Feminine Mistake" study tip, what should viewers watch for in Al's reactions?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) How well-meaning men can be complicit through silence</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) His flannel fashion choices</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) His tool recommendations</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) His lunch preferences</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Al's complicity!</div>
+                <p>Al's discomfort reveals how even well-meaning men can be complicit in casual sexism through silence. The episode made this point subtly through his reactions.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Deeper message!</div>
+                <p>The correct answer is <strong>How well-meaning men can be complicit through silence</strong>. The episode had important subtext.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 7 -->
+        <div class="question-card" data-question="7" data-correct="B" data-points="7.5">
+            <div class="question-number">Question 7 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What was Mark's storyline focus during Season 5?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) Athletic achievements</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Finding his identity between more prominent older brothers</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Becoming Tim's assistant on Tool Time</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Dating his first girlfriend</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">The youngest struggles!</div>
+                <p>Mark, the youngest Taylor, struggled to find his identity between his more prominent older brothers. These growing pains would eventually lead to his dramatic goth phase transformation.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different focus!</div>
+                <p>The correct answer is <strong>Finding his identity between more prominent older brothers</strong>. Mark's middle-school isolation was a recurring theme.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 8 -->
+        <div class="question-card" data-question="8" data-correct="rumi" data-points="7.5" data-type="fillin">
+            <div class="question-number">Question 8 of 10 (7.5 HED)</div>
+            <div class="question-type">Fill in the Blank</div>
+            <div class="question-text">Wilson quotes the 13th-century Persian poet _______ who wrote "The wound is the place where the Light enters you."</div>
+            <input type="text" class="fill-blank-input" placeholder="Enter poet name..." autocomplete="off">
+            <div class="feedback correct">
+                <div class="feedback-title">Persian poetry!</div>
+                <p>Wilson's invocation of Rumi speaks to Season 5's central theme: growth through struggle. The Taylor family's wounds become the very places where light enters their relationships.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different poet!</div>
+                <p>The correct answer is <strong>Rumi</strong>. His poetry about wounds and light was perfect for Season 5's themes.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 9 -->
+        <div class="question-card" data-question="9" data-correct="true" data-points="7.5" data-type="truefalse">
+            <div class="question-number">Question 9 of 10 (7.5 HED)</div>
+            <div class="question-type">True or False</div>
+            <div class="question-text">Brad navigated high school athletics and first serious romantic relationships during Season 5.</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="true">True</button></li>
+                <li class="option-item"><button class="option-btn" data-value="false">False</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Brad growing up!</div>
+                <p>As the eldest, Brad faced the pressures of high school athletics, peer pressure, and those first meaningful relationships that define teenage years.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Brad was busy!</div>
+                <p>This is <strong>True</strong>. Brad's high school journey was a major Season 5 storyline.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 10 -->
+        <div class="question-card" data-question="10" data-correct="C" data-points="7.5">
+            <div class="question-number">Question 10 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What philosophical question did Randy's Season 5 intellectual development pose?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) Whether Tool Time should expand nationally</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) How to build better tools</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Questioning everything through philosophical exploration</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Sports vs. academics</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">The philosopher Taylor!</div>
+                <p>Randy's intellectual curiosity deepened into philosophical questioning. Jonathan Taylor Thomas's character became the show's philosophical voice, questioning everything.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Deeper questions!</div>
+                <p>The correct answer is <strong>Questioning everything through philosophical exploration</strong>. Randy evolved into the family's philosophical voice.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">See Results</button>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="results-card" id="results">
+            <h2 class="results-title" id="resultsTitle">Quiz Complete!</h2>
+            <div class="results-score" id="resultsScore">0/10</div>
+            <div class="results-equity" id="resultsEquity">0 HED Earned</div>
+            <p class="results-message" id="resultsMessage"></p>
+            <div style="margin-top: var(--space-4);">
+                <a href="index.html" class="btn btn--secondary" style="margin-right: var(--space-2);">Back to Module</a>
+                <button class="btn btn--primary" onclick="location.reload()">Retake Quiz</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const quizData = { currentQuestion: 1, totalQuestions: 10, score: 0, totalPoints: 0, maxPoints: 75, answered: new Set() };
+        document.addEventListener('DOMContentLoaded', function() { initQuiz(); });
+        function initQuiz() {
+            document.querySelectorAll('.option-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const card = this.closest('.question-card');
+                    card.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+                    this.classList.add('selected');
+                    card.querySelector('.submit-btn').disabled = false;
+                });
+            });
+            document.querySelectorAll('.fill-blank-input').forEach(input => {
+                input.addEventListener('input', function() {
+                    const card = this.closest('.question-card');
+                    card.querySelector('.submit-btn').disabled = this.value.trim() === '';
+                });
+            });
+            document.querySelectorAll('.submit-btn:not(.next-btn)').forEach(btn => { btn.addEventListener('click', function() { submitAnswer(this.closest('.question-card')); }); });
+            document.querySelectorAll('.next-btn').forEach(btn => { btn.addEventListener('click', function() { nextQuestion(); }); });
+        }
+        function submitAnswer(card) {
+            const questionNum = parseInt(card.dataset.question);
+            const correctAnswer = card.dataset.correct;
+            const points = parseFloat(card.dataset.points);
+            const type = card.dataset.type || 'multiple';
+            let userAnswer, isCorrect = false;
+            if (type === 'fillin') {
+                const input = card.querySelector('.fill-blank-input');
+                userAnswer = input.value.trim().toLowerCase();
+                isCorrect = userAnswer === correctAnswer.toLowerCase();
+                input.disabled = true;
+                input.classList.add(isCorrect ? 'correct' : 'incorrect');
+            } else {
+                const selected = card.querySelector('.option-btn.selected');
+                userAnswer = selected.dataset.value;
+                isCorrect = userAnswer === correctAnswer;
+                card.querySelectorAll('.option-btn').forEach(btn => {
+                    btn.disabled = true;
+                    if (btn.dataset.value === correctAnswer) btn.classList.add('correct');
+                    else if (btn.classList.contains('selected') && !isCorrect) btn.classList.add('incorrect');
+                });
+            }
+            if (isCorrect) { quizData.score++; quizData.totalPoints += points; card.querySelector('.feedback.correct').classList.add('show'); }
+            else { card.querySelector('.feedback.incorrect').classList.add('show'); }
+            quizData.answered.add(questionNum);
+            card.querySelector('.submit-btn:not(.next-btn)').style.display = 'none';
+            card.querySelector('.next-btn').style.display = 'inline-block';
+        }
+        function nextQuestion() {
+            const currentCard = document.querySelector('.question-card.active');
+            currentCard.classList.remove('active');
+            quizData.currentQuestion++;
+            if (quizData.currentQuestion === 6) { document.getElementById('midBreak').style.display = 'block'; setTimeout(() => { document.getElementById('midBreak').style.display = 'none'; }, 2000); }
+            if (quizData.currentQuestion <= quizData.totalQuestions) {
+                const nextCard = document.querySelector(`[data-question="${quizData.currentQuestion}"]`);
+                nextCard.classList.add('active');
+                document.getElementById('currentQ').textContent = quizData.currentQuestion;
+                document.getElementById('progressFill').style.width = (quizData.currentQuestion / quizData.totalQuestions * 100) + '%';
+            } else { showResults(); }
+        }
+        function showResults() {
+            document.getElementById('results').classList.add('show');
+            document.getElementById('resultsScore').textContent = `${quizData.score}/${quizData.totalQuestions}`;
+            document.getElementById('resultsEquity').textContent = `${quizData.totalPoints.toFixed(1)} HED Earned`;
+            const percentage = (quizData.score / quizData.totalQuestions) * 100;
+            let title, message;
+            if (percentage === 100) { title = 'Master Craftsman!'; message = 'Perfect! You understand the mature Taylor household!'; }
+            else if (percentage >= 80) { title = 'Journeyman Builder!'; message = 'Excellent! Season 5\'s depth resonated with you.'; }
+            else if (percentage >= 60) { title = 'Apprentice!'; message = 'Passing! The Feminine Mistake deserves a rewatch.'; }
+            else if (percentage >= 40) { title = 'Weekend Warrior'; message = 'More Rumi, more rewatching needed!'; }
+            else { title = 'Tim After a Disaster'; message = 'Back to Season 5 - the wounds need healing!'; }
+            document.getElementById('resultsTitle').textContent = title;
+            document.getElementById('resultsMessage').textContent = message;
+        }
+    </script>
+</body>
+</html>

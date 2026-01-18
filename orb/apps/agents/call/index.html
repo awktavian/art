@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kagami Video Call</title>
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --surface: #14141f;
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.3);
+            --text: #f1f1f4;
+            --text-muted: #8888a0;
+            --success: #22c55e;
+            --danger: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Video Container */
+        .video-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr;
+            gap: 8px;
+            padding: 8px;
+            position: relative;
+        }
+
+        .video-container.has-remote {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        @media (max-width: 768px) {
+            .video-container.has-remote {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr 1fr;
+            }
+        }
+
+        .video-wrapper {
+            position: relative;
+            background: var(--surface);
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .video-wrapper video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-wrapper.local {
+            position: absolute;
+            bottom: 100px;
+            right: 16px;
+            width: 180px;
+            height: 240px;
+            z-index: 10;
+            border: 2px solid var(--accent);
+            box-shadow: 0 8px 32px var(--accent-glow);
+        }
+
+        @media (max-width: 768px) {
+            .video-wrapper.local {
+                width: 120px;
+                height: 160px;
+                bottom: 120px;
+            }
+        }
+
+        .video-label {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            backdrop-filter: blur(8px);
+        }
+
+        /* Waiting State */
+        .waiting-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            text-align: center;
+        }
+
+        .kagami-logo {
+            font-size: 64px;
+            opacity: 0.8;
+        }
+
+        .waiting-text {
+            font-size: 24px;
+            color: var(--text-muted);
+        }
+
+        .pulse-ring {
+            width: 120px;
+            height: 120px;
+            border: 3px solid var(--accent);
+            border-radius: 50%;
+            animation: pulse 2s ease-out infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.8); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            padding: 24px;
+            background: var(--surface);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .control-btn {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: all 0.2s ease;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .control-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+
+        .control-btn.active {
+            background: var(--accent);
+        }
+
+        .control-btn.muted {
+            background: var(--danger);
+        }
+
+        .control-btn.end-call {
+            background: var(--danger);
+            width: 72px;
+            height: 72px;
+        }
+
+        .control-btn.join {
+            background: var(--success);
+            width: 80px;
+            height: 80px;
+            font-size: 28px;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            position: absolute;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            backdrop-filter: blur(8px);
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: blink 1s ease infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-dot.connecting {
+            background: var(--accent);
+        }
+
+        .status-dot.error {
+            background: var(--danger);
+            animation: none;
+        }
+
+        /* Permission Dialog */
+        .permission-dialog {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .permission-content {
+            background: var(--surface);
+            padding: 32px;
+            border-radius: 16px;
+            text-align: center;
+            max-width: 400px;
+        }
+
+        .permission-content h2 {
+            margin-bottom: 16px;
+        }
+
+        .permission-content p {
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+
+        .permission-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        /* Hidden */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Permission Dialog -->
+    <div id="permissionDialog" class="permission-dialog hidden">
+        <div class="permission-content">
+            <h2>📹 Camera & Microphone</h2>
+            <p>Kagami needs access to your camera and microphone for the video call.</p>
+            <button class="permission-btn" onclick="requestPermissions()">Allow Access</button>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <div id="statusDot" class="status-dot connecting"></div>
+        <span id="statusText">Connecting...</span>
+        <span id="callDuration" class="hidden">00:00</span>
+    </div>
+
+    <!-- Video Container -->
+    <div id="videoContainer" class="video-container">
+        <!-- Waiting State -->
+        <div id="waitingState" class="video-wrapper waiting-state">
+            <div class="pulse-ring"></div>
+            <div class="kagami-logo">鏡</div>
+            <div class="waiting-text">Waiting for connection...</div>
+        </div>
+
+        <!-- Remote Video -->
+        <div id="remoteVideoWrapper" class="video-wrapper hidden">
+            <video id="remoteVideo" autoplay playsinline></video>
+            <div class="video-label" id="remoteLabel">Kagami</div>
+        </div>
+
+        <!-- Local Video (PIP) -->
+        <div id="localVideoWrapper" class="video-wrapper local hidden">
+            <video id="localVideo" autoplay playsinline muted></video>
+            <div class="video-label">You</div>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <button id="joinBtn" class="control-btn join" onclick="joinRoom()">📞</button>
+        <button id="muteBtn" class="control-btn hidden" onclick="toggleMute()">🎤</button>
+        <button id="videoBtn" class="control-btn hidden" onclick="toggleVideo()">📹</button>
+        <button id="endBtn" class="control-btn end-call hidden" onclick="endCall()">📵</button>
+    </div>
+
+    <!-- LiveKit SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.js"></script>
+
+    <script>
+        // =========================================================================
+        // URL Parameters
+        // =========================================================================
+        // ?room=xyz           - Room name (required)
+        // ?token=abc          - Pre-generated token (optional)
+        // ?identity=tim       - Participant identity (optional)
+        // ?audio=true         - Enable audio (default: true)
+        // ?video=true         - Enable video (default: true)
+        // ?server=wss://...   - LiveKit server URL (optional)
+        // =========================================================================
+
+        const params = new URLSearchParams(window.location.search);
+        const config = {
+            room: params.get('room') || 'kagami-call-' + Date.now(),
+            token: params.get('token'),
+            identity: params.get('identity') || 'guest-' + Math.random().toString(36).slice(2, 8),
+            audio: params.get('audio') !== 'false',
+            video: params.get('video') !== 'false',
+            server: params.get('server') || 'wss://kagami.livekit.cloud',
+        };
+
+        console.log('📹 Call config:', config);
+
+        // State
+        let room = null;
+        let localTrackPublication = null;
+        let isMuted = false;
+        let isVideoOff = false;
+        let callStartTime = null;
+        let durationInterval = null;
+
+        // Elements
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const callDuration = document.getElementById('callDuration');
+        const waitingState = document.getElementById('waitingState');
+        const videoContainer = document.getElementById('videoContainer');
+        const localVideo = document.getElementById('localVideo');
+        const localVideoWrapper = document.getElementById('localVideoWrapper');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const remoteVideoWrapper = document.getElementById('remoteVideoWrapper');
+        const remoteLabel = document.getElementById('remoteLabel');
+        const joinBtn = document.getElementById('joinBtn');
+        const muteBtn = document.getElementById('muteBtn');
+        const videoBtn = document.getElementById('videoBtn');
+        const endBtn = document.getElementById('endBtn');
+        const permissionDialog = document.getElementById('permissionDialog');
+
+        // =========================================================================
+        // Permissions
+        // =========================================================================
+
+        async function checkPermissions() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: config.video,
+                    audio: config.audio
+                });
+                stream.getTracks().forEach(track => track.stop());
+                return true;
+            } catch (e) {
+                console.log('Permission check failed:', e);
+                return false;
+            }
+        }
+
+        async function requestPermissions() {
+            permissionDialog.classList.add('hidden');
+            const granted = await checkPermissions();
+            if (granted) {
+                updateStatus('Ready to join', 'connecting');
+            } else {
+                updateStatus('Camera/mic access denied', 'error');
+            }
+        }
+
+        // =========================================================================
+        // Room Connection
+        // =========================================================================
+
+        async function joinRoom() {
+            updateStatus('Connecting...', 'connecting');
+            joinBtn.classList.add('hidden');
+
+            try {
+                // Get token - either from URL or fetch from API
+                let token = config.token;
+                if (!token) {
+                    token = await fetchToken();
+                }
+
+                if (!token) {
+                    throw new Error('Could not get access token');
+                }
+
+                // Create room
+                room = new LivekitClient.Room({
+                    adaptiveStream: true,
+                    dynacast: true,
+                });
+
+                // Event handlers
+                room.on(LivekitClient.RoomEvent.Connected, () => {
+                    console.log('✅ Connected to room');
+                    onConnected();
+                });
+
+                room.on(LivekitClient.RoomEvent.Disconnected, (reason) => {
+                    console.log('❌ Disconnected:', reason);
+                    onDisconnected();
+                });
+
+                room.on(LivekitClient.RoomEvent.ParticipantConnected, (participant) => {
+                    console.log('👤 Participant joined:', participant.identity);
+                    handleParticipant(participant);
+                });
+
+                room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+                    console.log('🎥 Track subscribed:', track.kind, 'from', participant.identity);
+                    handleTrack(track, participant);
+                });
+
+                room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+                    console.log('🎥 Track unsubscribed:', track.kind);
+                    if (track.kind === 'video') {
+                        remoteVideoWrapper.classList.add('hidden');
+                        videoContainer.classList.remove('has-remote');
+                    }
+                });
+
+                // Connect
+                await room.connect(config.server, token);
+
+                // Publish local tracks
+                await room.localParticipant.enableCameraAndMicrophone();
+
+                // Attach local video
+                const videoTrack = room.localParticipant.getTrackPublication(LivekitClient.Track.Source.Camera);
+                if (videoTrack && videoTrack.track) {
+                    videoTrack.track.attach(localVideo);
+                    localVideoWrapper.classList.remove('hidden');
+                }
+
+                // Handle existing participants
+                room.remoteParticipants.forEach(handleParticipant);
+
+            } catch (e) {
+                console.error('Failed to join:', e);
+                updateStatus('Connection failed: ' + e.message, 'error');
+                joinBtn.classList.remove('hidden');
+            }
+        }
+
+        async function fetchToken() {
+            try {
+                // Try to fetch token from Kagami API
+                const response = await fetch(`/api/livekit/token?room=${config.room}&identity=${config.identity}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.token;
+                }
+            } catch (e) {
+                console.log('Could not fetch token from API:', e);
+            }
+
+            // For demo/testing - show error
+            updateStatus('Token required. Add ?token=... to URL', 'error');
+            return null;
+        }
+
+        function onConnected() {
+            updateStatus('Connected', 'connected');
+            waitingState.classList.add('hidden');
+
+            // Show controls
+            muteBtn.classList.remove('hidden');
+            videoBtn.classList.remove('hidden');
+            endBtn.classList.remove('hidden');
+
+            // Start duration timer
+            callStartTime = Date.now();
+            callDuration.classList.remove('hidden');
+            durationInterval = setInterval(updateDuration, 1000);
+        }
+
+        function onDisconnected() {
+            updateStatus('Call ended', 'error');
+
+            // Stop duration timer
+            if (durationInterval) {
+                clearInterval(durationInterval);
+            }
+
+            // Reset UI
+            waitingState.classList.remove('hidden');
+            localVideoWrapper.classList.add('hidden');
+            remoteVideoWrapper.classList.add('hidden');
+            muteBtn.classList.add('hidden');
+            videoBtn.classList.add('hidden');
+            endBtn.classList.add('hidden');
+            joinBtn.classList.remove('hidden');
+            videoContainer.classList.remove('has-remote');
+        }
+
+        function handleParticipant(participant) {
+            remoteLabel.textContent = participant.identity || 'Remote';
+
+            participant.trackPublications.forEach((publication) => {
+                if (publication.track) {
+                    handleTrack(publication.track, participant);
+                }
+            });
+        }
+
+        function handleTrack(track, participant) {
+            if (track.kind === 'video') {
+                track.attach(remoteVideo);
+                remoteVideoWrapper.classList.remove('hidden');
+                videoContainer.classList.add('has-remote');
+                waitingState.classList.add('hidden');
+            } else if (track.kind === 'audio') {
+                track.attach(document.createElement('audio'));
+            }
+        }
+
+        // =========================================================================
+        // Controls
+        // =========================================================================
+
+        function toggleMute() {
+            if (!room) return;
+
+            isMuted = !isMuted;
+            room.localParticipant.setMicrophoneEnabled(!isMuted);
+            muteBtn.classList.toggle('muted', isMuted);
+            muteBtn.textContent = isMuted ? '🔇' : '🎤';
+        }
+
+        function toggleVideo() {
+            if (!room) return;
+
+            isVideoOff = !isVideoOff;
+            room.localParticipant.setCameraEnabled(!isVideoOff);
+            videoBtn.classList.toggle('muted', isVideoOff);
+            videoBtn.textContent = isVideoOff ? '📷' : '📹';
+            localVideoWrapper.classList.toggle('hidden', isVideoOff);
+        }
+
+        function endCall() {
+            if (room) {
+                room.disconnect();
+            }
+        }
+
+        // =========================================================================
+        // UI Helpers
+        // =========================================================================
+
+        function updateStatus(text, state) {
+            statusText.textContent = text;
+            statusDot.className = 'status-dot ' + state;
+        }
+
+        function updateDuration() {
+            if (!callStartTime) return;
+            const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+            const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
+            const secs = (elapsed % 60).toString().padStart(2, '0');
+            callDuration.textContent = mins + ':' + secs;
+        }
+
+        // =========================================================================
+        // Init
+        // =========================================================================
+
+        async function init() {
+            document.title = `Call: ${config.room} | Kagami`;
+
+            // Check if we have a token
+            if (config.token) {
+                updateStatus('Ready to join', 'connecting');
+            } else {
+                // Check permissions first
+                const hasPermission = await checkPermissions();
+                if (!hasPermission) {
+                    permissionDialog.classList.remove('hidden');
+                } else {
+                    updateStatus('Ready to join', 'connecting');
+                }
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

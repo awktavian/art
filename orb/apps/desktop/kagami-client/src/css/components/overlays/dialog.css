@@ -1,0 +1,979 @@
+/**
+ * =============================================================================
+ * COMPONENT: Dialog
+ * Kagami Design System V2 - World-class modal dialogs
+ *
+ * Features:
+ * - Spring-based entry with overshoot and settle
+ * - Focus trap animation (spotlight effect)
+ * - Gesture hints for dismissal
+ * - Chromatic edge glow with breathing animation
+ * - Backdrop depth blur progression
+ * - Drag-to-dismiss on mobile
+ * - Keyboard navigation feedback
+ *
+ * Usage:
+ *   <div class="prism-dialog-backdrop prism-dialog-backdrop--open">
+ *     <div class="prism-dialog" role="dialog" aria-modal="true">
+ *       <div class="prism-dialog__header">...</div>
+ *       <div class="prism-dialog__content">...</div>
+ *       <div class="prism-dialog__footer">...</div>
+ *     </div>
+ *   </div>
+ * =============================================================================
+ */
+
+/* =============================================================================
+   CSS CUSTOM PROPERTIES
+   ============================================================================= */
+
+.prism-dialog-backdrop {
+  /* Backdrop blur progression (animated via JS) */
+  --backdrop-blur: 0px;
+  --backdrop-opacity: 0;
+
+  /* Focus spotlight position (for focus trap animation) */
+  --focus-x: 50%;
+  --focus-y: 50%;
+  --focus-scale: 0;
+}
+
+.prism-dialog {
+  /* Entry animation state */
+  --dialog-scale: 0.9;
+  --dialog-y: 30px;
+  --dialog-rotate: 0deg;
+
+  /* Glow intensity */
+  --glow-intensity: 0;
+
+  /* Drag state (for mobile drag-to-dismiss) */
+  --drag-y: 0px;
+  --drag-opacity: 1;
+
+  /* Focus ring animation */
+  --focus-ring-scale: 0;
+  --focus-ring-opacity: 0;
+}
+
+/* =============================================================================
+   DIALOG BACKDROP - Depth blur with spotlight
+   ============================================================================= */
+
+.prism-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--prism-z-modal-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+
+  /* Layered backdrop for depth */
+  background:
+    radial-gradient(
+      ellipse at var(--focus-x) var(--focus-y),
+      transparent 0%,
+      rgba(0, 0, 0, 0.3) 50%,
+      rgba(0, 0, 0, 0.7) 100%
+    ),
+    rgba(0, 0, 0, 0.5);
+
+  /* Progressive blur */
+  backdrop-filter: blur(var(--backdrop-blur)) saturate(120%);
+  -webkit-backdrop-filter: blur(var(--backdrop-blur)) saturate(120%);
+
+  opacity: var(--backdrop-opacity);
+  visibility: hidden;
+
+  /* Smooth backdrop entrance */
+  transition:
+    opacity var(--prism-dur-slow) var(--prism-ease-cusp),
+    visibility var(--prism-dur-slow),
+    backdrop-filter var(--prism-dur-slow) var(--prism-ease-cusp);
+}
+
+.prism-dialog-backdrop--open {
+  --backdrop-blur: 12px;
+  --backdrop-opacity: 1;
+  visibility: visible;
+}
+
+/* Spotlight animation on open */
+.prism-dialog-backdrop--open {
+  animation: backdrop-spotlight 0.6s var(--prism-ease-cusp) forwards;
+}
+
+@keyframes backdrop-spotlight {
+  0% {
+    --focus-scale: 0;
+    background:
+      radial-gradient(
+        ellipse at 50% 50%,
+        transparent 0%,
+        rgba(0, 0, 0, 0.3) 20%,
+        rgba(0, 0, 0, 0.7) 40%
+      ),
+      rgba(0, 0, 0, 0.5);
+  }
+  100% {
+    --focus-scale: 1;
+    background:
+      radial-gradient(
+        ellipse at var(--focus-x) var(--focus-y),
+        transparent 0%,
+        rgba(0, 0, 0, 0.3) 50%,
+        rgba(0, 0, 0, 0.7) 100%
+      ),
+      rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Click outside hint - subtle pulse */
+.prism-dialog-backdrop--hint {
+  animation: backdrop-hint 0.4s var(--prism-ease-spring);
+}
+
+@keyframes backdrop-hint {
+  0%, 100% {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+  50% {
+    background-color: rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* =============================================================================
+   DIALOG CONTAINER - Spring entry with overshoot
+   ============================================================================= */
+
+.prism-dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 500px;
+  max-height: calc(100vh - 48px);
+  z-index: var(--prism-z-modal);
+  overflow: hidden;
+
+  /* Visual - VOLUMETRIC glass with noise texture */
+  background:
+    /* Noise texture for frosted glass feel */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    var(--prism-surface);
+  background-blend-mode: overlay, normal;
+  backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+  -webkit-backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+
+  /* Glass edge beveling */
+  border: 1px solid transparent;
+  border-image: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.35) 0%,
+    rgba(255, 255, 255, 0.15) 40%,
+    rgba(255, 255, 255, 0.06) 60%,
+    rgba(0, 0, 0, 0.03) 80%,
+    rgba(0, 0, 0, 0.06) 100%
+  ) 1;
+  border-radius: var(--prism-radius-xl);
+
+  /* Rich layered shadow */
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 1px 0 rgba(255, 255, 255, 0.1) inset;
+
+  /* Transform state (animated via keyframes) */
+  opacity: 0;
+  transform:
+    translateY(var(--dialog-y))
+    scale(var(--dialog-scale))
+    rotate(var(--dialog-rotate))
+    translateY(var(--drag-y));
+  transform-origin: center center;
+
+  /* GPU acceleration */
+  will-change: transform, opacity;
+}
+
+/* Spring entry animation with overshoot */
+.prism-dialog-backdrop--open .prism-dialog {
+  animation: dialog-spring-in 0.5s var(--prism-ease-spring) forwards;
+  --glow-intensity: 1;
+}
+
+@keyframes dialog-spring-in {
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scale(0.9) rotate(-1deg);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-8px) scale(1.02) rotate(0.5deg);
+  }
+  70% {
+    transform: translateY(4px) scale(0.99) rotate(-0.2deg);
+  }
+  85% {
+    transform: translateY(-2px) scale(1.005) rotate(0.1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+/* Exit animation - faster and simpler */
+.prism-dialog-backdrop--closing .prism-dialog {
+  animation: dialog-exit 0.25s var(--prism-ease-cusp) forwards;
+}
+
+@keyframes dialog-exit {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+}
+
+/* Shake animation for invalid actions (e.g., required fields) */
+.prism-dialog--shake {
+  animation: dialog-shake 0.5s var(--prism-ease-spring);
+}
+
+@keyframes dialog-shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 50%, 90% { transform: translateX(-6px); }
+  30%, 70% { transform: translateX(6px); }
+}
+
+/* Focus pulse when focus enters dialog */
+.prism-dialog--focus-enter {
+  animation: dialog-focus-pulse 0.3s var(--prism-ease-cusp);
+}
+
+@keyframes dialog-focus-pulse {
+  0%, 100% {
+    box-shadow:
+      0 25px 50px -12px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+      0 1px 0 rgba(255, 255, 255, 0.1) inset;
+  }
+  50% {
+    box-shadow:
+      0 25px 50px -12px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+      0 1px 0 rgba(255, 255, 255, 0.1) inset,
+      0 0 30px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 20%, transparent);
+  }
+}
+
+/* =============================================================================
+   CHROMATIC EDGE EFFECTS - Breathing spectral glow
+   ============================================================================= */
+
+.prism-dialog::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    color-mix(in srgb, var(--prism-spark) 60%, transparent),
+    color-mix(in srgb, var(--prism-forge) 60%, transparent),
+    color-mix(in srgb, var(--prism-flow) 60%, transparent),
+    color-mix(in srgb, var(--prism-nexus) 60%, transparent),
+    color-mix(in srgb, var(--prism-beacon) 60%, transparent),
+    color-mix(in srgb, var(--prism-grove) 60%, transparent),
+    color-mix(in srgb, var(--prism-crystal) 60%, transparent),
+    color-mix(in srgb, var(--prism-spark) 60%, transparent)
+  );
+  filter: blur(16px);
+  opacity: calc(0.3 * var(--glow-intensity));
+  z-index: -1;
+  pointer-events: none;
+  animation: dialog-chromatic-rotate 8s linear infinite;
+}
+
+@keyframes dialog-chromatic-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Secondary glow layer for depth */
+.prism-dialog::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 30%, transparent) 0%,
+    transparent 50%,
+    color-mix(in srgb, var(--prism-crystal) 20%, transparent) 100%
+  );
+  filter: blur(8px);
+  opacity: calc(0.4 * var(--glow-intensity));
+  z-index: -1;
+  pointer-events: none;
+  animation: dialog-glow-breathe 4s ease-in-out infinite;
+}
+
+@keyframes dialog-glow-breathe {
+  0%, 100% {
+    opacity: calc(0.3 * var(--glow-intensity));
+    transform: scale(1);
+  }
+  50% {
+    opacity: calc(0.5 * var(--glow-intensity));
+    transform: scale(1.02);
+  }
+}
+
+/* Glass reflection sweep across dialog */
+.prism-dialog__reflection {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.prism-dialog__reflection::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.03) 40%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.03) 60%,
+    transparent 100%
+  );
+  transform: skewX(-20deg);
+}
+
+.prism-dialog-backdrop--open .prism-dialog__reflection::before {
+  animation: dialog-reflection-sweep 1s 0.3s var(--prism-ease-cusp) forwards;
+}
+
+@keyframes dialog-reflection-sweep {
+  from { left: -100%; }
+  to { left: 200%; }
+}
+
+/* =============================================================================
+   DRAG HINT INDICATOR (Mobile)
+   ============================================================================= */
+
+.prism-dialog__drag-hint {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 4px;
+  background: var(--prism-border);
+  border-radius: var(--prism-radius-full);
+  opacity: 0;
+  transition: opacity var(--prism-dur-fast) var(--prism-ease-cusp);
+  z-index: 20;
+}
+
+/* Show on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .prism-dialog__drag-hint {
+    opacity: 0.6;
+  }
+}
+
+/* Pulse animation to hint at draggability */
+.prism-dialog__drag-hint--pulse {
+  animation: drag-hint-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes drag-hint-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: translateX(-50%) scaleX(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateX(-50%) scaleX(1.1);
+  }
+}
+
+/* Active drag state */
+.prism-dialog--dragging .prism-dialog__drag-hint {
+  opacity: 1;
+  background: var(--colony-color, var(--prism-beacon));
+}
+
+/* =============================================================================
+   GESTURE HINT OVERLAY
+   ============================================================================= */
+
+.prism-dialog__gesture-hint {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: var(--prism-radius-full);
+  font-size: 0.75rem;
+  color: var(--prism-text-secondary);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--prism-dur-normal) var(--prism-ease-cusp);
+  z-index: 20;
+}
+
+.prism-dialog__gesture-hint-icon {
+  width: 16px;
+  height: 16px;
+  animation: gesture-swipe 1.5s ease-in-out infinite;
+}
+
+@keyframes gesture-swipe {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
+
+/* Show gesture hint on first open (JS controlled) */
+.prism-dialog--show-gesture-hint .prism-dialog__gesture-hint {
+  opacity: 1;
+  animation: gesture-hint-fade-in 0.3s var(--prism-ease-cusp) 1s both;
+}
+
+@keyframes gesture-hint-fade-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* =============================================================================
+   DIALOG HEADER
+   ============================================================================= */
+
+.prism-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--prism-border);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.prism-dialog__header-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.prism-dialog__title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--prism-text);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.prism-dialog__description {
+  font-size: 0.875rem;
+  color: var(--prism-text-secondary);
+  margin: 4px 0 0;
+  line-height: 1.5;
+}
+
+/* Close button - with rotation on hover */
+.prism-dialog__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--prism-radius-full);
+  color: var(--prism-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+
+  /* Smooth transitions */
+  transition:
+    color var(--prism-dur-fast) var(--prism-ease-cusp),
+    background var(--prism-dur-fast) var(--prism-ease-cusp),
+    transform var(--prism-dur-normal) var(--prism-ease-spring),
+    box-shadow var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-dialog__close:hover {
+  color: var(--prism-text);
+  background: rgba(255, 255, 255, 0.1);
+  transform: rotate(90deg) scale(1.1);
+}
+
+.prism-dialog__close:active {
+  transform: rotate(90deg) scale(0.95);
+}
+
+.prism-dialog__close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--colony-color, var(--prism-beacon)) 40%, transparent);
+}
+
+/* Keyboard hint for close (Esc key) */
+.prism-dialog__close::after {
+  content: 'Esc';
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: var(--prism-text-tertiary);
+  background: var(--prism-surface);
+  border: 1px solid var(--prism-border);
+  border-radius: var(--prism-radius-xs);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--prism-dur-fast) var(--prism-ease-cusp);
+  white-space: nowrap;
+}
+
+.prism-dialog__close:hover::after,
+.prism-dialog__close:focus-visible::after {
+  opacity: 1;
+}
+
+.prism-dialog__close-icon {
+  width: 18px;
+  height: 18px;
+  transition: transform var(--prism-dur-normal) var(--prism-ease-spring);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * DIALOG CONTENT
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-dialog__content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  color: var(--prism-text-secondary);
+  line-height: 1.6;
+}
+
+/* Custom scrollbar */
+.prism-dialog__content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.prism-dialog__content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.prism-dialog__content::-webkit-scrollbar-thumb {
+  background: var(--prism-border);
+  border-radius: var(--prism-radius-full);
+}
+
+.prism-dialog__content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * DIALOG FOOTER
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--prism-border);
+  flex-shrink: 0;
+}
+
+/* Footer with left/right sections */
+.prism-dialog__footer--split {
+  justify-content: space-between;
+}
+
+.prism-dialog__footer-start {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.prism-dialog__footer-end {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SIZE VARIANTS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Small */
+.prism-dialog--sm {
+  max-width: 400px;
+}
+
+.prism-dialog--sm .prism-dialog__header {
+  padding: 16px 20px;
+}
+
+.prism-dialog--sm .prism-dialog__content {
+  padding: 20px;
+}
+
+.prism-dialog--sm .prism-dialog__footer {
+  padding: 12px 20px;
+}
+
+/* Large */
+.prism-dialog--lg {
+  max-width: 700px;
+}
+
+.prism-dialog--lg .prism-dialog__header {
+  padding: 24px 28px;
+}
+
+.prism-dialog--lg .prism-dialog__content {
+  padding: 28px;
+}
+
+.prism-dialog--lg .prism-dialog__footer {
+  padding: 20px 28px;
+}
+
+/* Extra Large */
+.prism-dialog--xl {
+  max-width: 900px;
+}
+
+/* Full Screen */
+.prism-dialog--full {
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
+  width: 100%;
+  height: 100%;
+}
+
+/* Full Screen Mobile */
+@media (max-width: 640px) {
+  .prism-dialog--full-mobile {
+    max-width: 100vw;
+    max-height: 100vh;
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .prism-dialog-backdrop:has(.prism-dialog--full-mobile) {
+    padding: 0;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * POSITION VARIANTS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Center (default) - handled by backdrop flex */
+
+/* Top */
+.prism-dialog-backdrop--top {
+  align-items: flex-start;
+  padding-top: 80px;
+}
+
+.prism-dialog-backdrop--top .prism-dialog {
+  transform: translateY(-24px) scale(0.96);
+}
+
+.prism-dialog-backdrop--top.prism-dialog-backdrop--open .prism-dialog {
+  transform: translateY(0) scale(1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SCROLLABLE BEHAVIOR
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Scrollable content with fixed header/footer */
+.prism-dialog--scrollable {
+  max-height: calc(100vh - 48px);
+}
+
+.prism-dialog--scrollable .prism-dialog__content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Scrollable entire dialog (within viewport) */
+.prism-dialog--scroll-all {
+  max-height: none;
+  overflow-y: auto;
+}
+
+.prism-dialog--scroll-all .prism-dialog__content {
+  overflow: visible;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * HEADER VARIANTS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* No header border */
+.prism-dialog--no-header-border .prism-dialog__header {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+/* Centered header */
+.prism-dialog--centered-header .prism-dialog__header {
+  flex-direction: column;
+  text-align: center;
+}
+
+.prism-dialog--centered-header .prism-dialog__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * FOOTER VARIANTS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* No footer border */
+.prism-dialog--no-footer-border .prism-dialog__footer {
+  border-top: none;
+  padding-top: 0;
+}
+
+/* Stacked footer buttons (mobile) */
+.prism-dialog--stacked-footer .prism-dialog__footer {
+  flex-direction: column;
+}
+
+.prism-dialog--stacked-footer .prism-dialog__footer > * {
+  width: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SPECIAL VARIANTS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* No chromatic effects (performance) */
+.prism-dialog--no-chromatic::before,
+.prism-dialog--no-chromatic::after {
+  display: none;
+}
+
+/* Minimal (no header/footer) */
+.prism-dialog--minimal .prism-dialog__header,
+.prism-dialog--minimal .prism-dialog__footer {
+  display: none;
+}
+
+.prism-dialog--minimal .prism-dialog__content {
+  padding: 0;
+}
+
+/* =============================================================================
+   RESPONSIVE - Mobile bottom sheet style
+   ============================================================================= */
+
+@media (max-width: 640px) {
+  .prism-dialog-backdrop {
+    padding: 0;
+    padding-top: 64px;
+    align-items: flex-end;
+  }
+
+  .prism-dialog {
+    max-height: calc(100vh - 64px);
+    border-radius: var(--prism-radius-xl) var(--prism-radius-xl) 0 0;
+
+    /* Show drag hint on mobile */
+    padding-top: 12px;
+  }
+
+  /* Mobile spring-up animation */
+  .prism-dialog-backdrop--open .prism-dialog {
+    animation: dialog-mobile-spring-up 0.4s var(--prism-ease-spring) forwards;
+  }
+
+  @keyframes dialog-mobile-spring-up {
+    0% {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+    60% {
+      opacity: 1;
+      transform: translateY(-10px);
+    }
+    80% {
+      transform: translateY(5px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .prism-dialog__header {
+    padding: 8px 20px 16px;
+  }
+
+  .prism-dialog__content {
+    padding: 20px;
+  }
+
+  .prism-dialog__footer {
+    padding: 12px 20px 24px;
+    flex-direction: column;
+    /* Safe area for home indicator */
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .prism-dialog__footer > * {
+    width: 100%;
+  }
+
+  /* Hide Esc hint on mobile */
+  .prism-dialog__close::after {
+    display: none;
+  }
+
+  /* Show drag hint */
+  .prism-dialog__drag-hint {
+    opacity: 0.5;
+  }
+}
+
+/* =============================================================================
+   REDUCED MOTION
+   ============================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .prism-dialog-backdrop {
+    animation: none;
+    transition: opacity var(--prism-dur-fast) var(--prism-ease-cusp);
+  }
+
+  .prism-dialog {
+    animation: none;
+    transition: opacity var(--prism-dur-fast);
+  }
+
+  .prism-dialog-backdrop--open .prism-dialog {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .prism-dialog-backdrop--closing .prism-dialog {
+    animation: none;
+    opacity: 0;
+  }
+
+  .prism-dialog::before,
+  .prism-dialog::after {
+    animation: none;
+  }
+
+  .prism-dialog__reflection::before {
+    animation: none;
+  }
+
+  .prism-dialog__close:hover {
+    transform: none;
+  }
+
+  .prism-dialog--shake {
+    animation: none;
+  }
+
+  .prism-dialog--focus-enter {
+    animation: none;
+  }
+
+  .prism-dialog__drag-hint--pulse {
+    animation: none;
+  }
+
+  .prism-dialog__gesture-hint-icon {
+    animation: none;
+  }
+}
+
+/* =============================================================================
+   CONFIRMATION DIALOG VARIANT
+   ============================================================================= */
+
+.prism-dialog--confirm {
+  max-width: 400px;
+}
+
+.prism-dialog--confirm .prism-dialog__content {
+  text-align: center;
+  padding: 32px 24px;
+}
+
+.prism-dialog--confirm .prism-dialog__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+  border-radius: var(--prism-radius-full);
+  background: var(--prism-surface);
+  border: 2px solid var(--prism-border);
+}
+
+.prism-dialog--confirm .prism-dialog__icon svg {
+  width: 32px;
+  height: 32px;
+  color: var(--colony-color, var(--prism-beacon));
+}
+
+/* Destructive confirmation */
+.prism-dialog--destructive .prism-dialog__icon {
+  border-color: var(--prism-spark);
+  background: color-mix(in srgb, var(--prism-spark) 10%, transparent);
+}
+
+.prism-dialog--destructive .prism-dialog__icon svg {
+  color: var(--prism-spark);
+}
+
+/* Success confirmation */
+.prism-dialog--success .prism-dialog__icon {
+  border-color: var(--prism-nexus);
+  background: color-mix(in srgb, var(--prism-nexus) 10%, transparent);
+}
+
+.prism-dialog--success .prism-dialog__icon svg {
+  color: var(--prism-nexus);
+}

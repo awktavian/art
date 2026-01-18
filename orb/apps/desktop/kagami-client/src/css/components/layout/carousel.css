@@ -1,0 +1,549 @@
+/**
+ * Glass Effects Carousel Component
+ *
+ * Image/content carousel with glass controls,
+ * smooth scrolling, and spectral indicators.
+ *
+ * Usage:
+ *   <div class="prism-carousel">
+ *     <div class="prism-carousel__viewport">
+ *       <div class="prism-carousel__track">
+ *         <div class="prism-carousel__slide">...</div>
+ *       </div>
+ *     </div>
+ *     <button class="prism-carousel__prev">...</button>
+ *     <button class="prism-carousel__next">...</button>
+ *     <div class="prism-carousel__indicators">...</div>
+ *   </div>
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * BASE CAROUSEL
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-carousel {
+  --slide-gap: 16px;
+  --slide-size: 100%;
+
+  position: relative;
+  width: 100%;
+
+  /* Containment */
+  contain: layout;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VIEWPORT
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-carousel__viewport {
+  overflow: hidden;
+  border-radius: var(--prism-radius-lg);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * TRACK
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-carousel__track {
+  display: flex;
+  gap: var(--slide-gap);
+  transition: transform var(--prism-dur-slow) var(--prism-ease-cusp);
+
+  /* GPU acceleration */
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Dragging state */
+.prism-carousel--dragging .prism-carousel__track {
+  transition: none;
+  cursor: grabbing;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SLIDES
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-carousel__slide {
+  flex: 0 0 var(--slide-size);
+  min-width: 0;
+}
+
+/* Slide content */
+.prism-carousel__slide-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--prism-radius-md);
+  background: var(--prism-surface);
+}
+
+/* Image slides */
+.prism-carousel__slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Slide with glass card */
+.prism-carousel__slide--glass .prism-carousel__slide-content {
+  background: var(--prism-surface);
+  backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation));
+  -webkit-backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation));
+  border: 1px solid var(--prism-border);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SLIDE SIZE VARIANTS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-carousel--full .prism-carousel__slide {
+  --slide-size: 100%;
+}
+
+.prism-carousel--half .prism-carousel__slide {
+  --slide-size: calc(50% - var(--slide-gap) / 2);
+}
+
+.prism-carousel--third .prism-carousel__slide {
+  --slide-size: calc(33.333% - var(--slide-gap) * 2 / 3);
+}
+
+.prism-carousel--quarter .prism-carousel__slide {
+  --slide-size: calc(25% - var(--slide-gap) * 3 / 4);
+}
+
+/* Responsive slide sizes */
+@media (max-width: 768px) {
+  .prism-carousel--responsive .prism-carousel__slide {
+    --slide-size: 85%;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .prism-carousel--responsive .prism-carousel__slide {
+    --slide-size: calc(50% - var(--slide-gap) / 2);
+  }
+}
+
+@media (min-width: 1025px) {
+  .prism-carousel--responsive .prism-carousel__slide {
+    --slide-size: calc(33.333% - var(--slide-gap) * 2 / 3);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * NAVIGATION ARROWS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-carousel__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+
+  /* VOLUMETRIC glass with noise texture */
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    var(--prism-surface);
+  background-blend-mode: overlay, normal;
+  backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+  -webkit-backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+
+  /* Glass edge beveling */
+  border: 1px solid transparent;
+  border-image: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(0, 0, 0, 0.02) 100%
+  ) 1;
+  border-radius: var(--prism-radius-full);
+  color: var(--prism-text);
+  cursor: pointer;
+  opacity: 0;
+
+  /* Volumetric shadow */
+  box-shadow:
+    0 4px 12px -4px rgba(0, 0, 0, 0.15),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
+
+  /* Elastic spring transitions */
+  transition:
+    opacity var(--prism-dur-fast) var(--prism-ease-cusp),
+    background var(--prism-dur-fast) var(--prism-ease-cusp),
+    transform var(--prism-dur-fast) var(--prism-ease-spring),
+    box-shadow var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-carousel:hover .prism-carousel__nav {
+  opacity: 1;
+}
+
+.prism-carousel__nav:hover {
+  background: var(--prism-surface-elevated);
+}
+
+.prism-carousel__nav:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.prism-carousel__nav:focus-visible {
+  outline: 2px solid var(--colony-color, var(--prism-beacon));
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+.prism-carousel__nav:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.prism-carousel__nav--prev {
+  left: 16px;
+}
+
+.prism-carousel__nav--next {
+  right: 16px;
+}
+
+/* Arrow icons */
+.prism-carousel__nav::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+}
+
+.prism-carousel__nav--prev::before {
+  transform: rotate(-135deg);
+  margin-left: 4px;
+}
+
+.prism-carousel__nav--next::before {
+  transform: rotate(45deg);
+  margin-right: 4px;
+}
+
+/* Always visible nav */
+.prism-carousel--nav-visible .prism-carousel__nav {
+  opacity: 1;
+}
+
+/* Nav outside carousel */
+.prism-carousel--nav-outside .prism-carousel__nav--prev {
+  left: -56px;
+}
+
+.prism-carousel--nav-outside .prism-carousel__nav--next {
+  right: -56px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * INDICATORS / DOTS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-carousel__indicators {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.prism-carousel__indicator {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  background: var(--prism-border);
+  border: none;
+  border-radius: var(--prism-radius-full);
+  cursor: pointer;
+  transition:
+    background var(--prism-dur-fast) var(--prism-ease-cusp),
+    transform var(--prism-dur-fast) var(--prism-ease-spring),
+    width var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-carousel__indicator:hover {
+  background: var(--prism-text-tertiary);
+  transform: scale(1.2);
+}
+
+.prism-carousel__indicator--active {
+  background: var(--colony-color, var(--prism-beacon));
+  width: 24px;
+}
+
+.prism-carousel__indicator:focus-visible {
+  outline: 2px solid var(--colony-color, var(--prism-beacon));
+  outline-offset: 2px;
+}
+
+/* Spectral indicators */
+.prism-carousel--spectral-indicators .prism-carousel__indicator--active {
+  background: var(--prism-gradient-spectrum);
+}
+
+/* Line indicators */
+.prism-carousel--line-indicators .prism-carousel__indicator {
+  width: 32px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.prism-carousel--line-indicators .prism-carousel__indicator--active {
+  width: 32px;
+}
+
+/* Numbers indicator */
+.prism-carousel__counter {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 0.875rem;
+  color: var(--prism-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.prism-carousel__counter-current {
+  color: var(--prism-text);
+  font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * OVERLAY INDICATORS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-carousel--overlay-indicators .prism-carousel__indicators {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 0;
+  padding: 8px 12px;
+  background: var(--prism-surface);
+  backdrop-filter: blur(var(--prism-blur));
+  -webkit-backdrop-filter: blur(var(--prism-blur));
+  border-radius: var(--prism-radius-full);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * THUMBNAILS NAVIGATION
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-carousel__thumbnails {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  overflow-x: auto;
+  padding: 4px;
+  scrollbar-width: none;
+}
+
+.prism-carousel__thumbnails::-webkit-scrollbar {
+  display: none;
+}
+
+.prism-carousel__thumbnail {
+  flex-shrink: 0;
+  width: 64px;
+  height: 48px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--prism-radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  opacity: 0.6;
+  transition:
+    opacity var(--prism-dur-fast) var(--prism-ease-cusp),
+    border-color var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-carousel__thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.prism-carousel__thumbnail:hover {
+  opacity: 0.9;
+}
+
+.prism-carousel__thumbnail--active {
+  opacity: 1;
+  border-color: var(--colony-color, var(--prism-beacon));
+}
+
+/* Spectral border on active thumbnail */
+.prism-carousel--spectral-indicators .prism-carousel__thumbnail--active {
+  border-image: var(--prism-gradient-spectrum) 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * AUTOPLAY PROGRESS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-carousel__progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.prism-carousel__progress-bar {
+  height: 100%;
+  background: var(--colony-color, var(--prism-beacon));
+  transform-origin: left;
+  animation: carousel-progress linear forwards;
+}
+
+@keyframes carousel-progress {
+  0% { transform: scaleX(0); }
+  100% { transform: scaleX(1); }
+}
+
+/* Spectral progress */
+.prism-carousel--spectral-indicators .prism-carousel__progress-bar {
+  background: var(--prism-gradient-spectrum);
+}
+
+/* Paused state */
+.prism-carousel--paused .prism-carousel__progress-bar {
+  animation-play-state: paused;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * FADE TRANSITION
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-carousel--fade .prism-carousel__track {
+  position: relative;
+  transition: none;
+}
+
+.prism-carousel--fade .prism-carousel__slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  opacity: 0;
+  transition: opacity var(--prism-dur-slow) var(--prism-ease-cusp);
+  pointer-events: none;
+}
+
+.prism-carousel--fade .prism-carousel__slide--active {
+  position: relative;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * LOOP / INFINITE
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-carousel--loop .prism-carousel__nav:disabled {
+  opacity: 1;
+  cursor: pointer;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SWIPE HINT
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-carousel__swipe-hint {
+  display: none;
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  background: var(--prism-surface);
+  backdrop-filter: blur(var(--prism-blur));
+  -webkit-backdrop-filter: blur(var(--prism-blur));
+  border-radius: var(--prism-radius-full);
+  font-size: 0.75rem;
+  color: var(--prism-text-secondary);
+  animation: swipe-hint 2s ease-in-out infinite;
+}
+
+@media (hover: none) {
+  .prism-carousel__swipe-hint {
+    display: block;
+  }
+}
+
+@keyframes swipe-hint {
+  0%, 100% { transform: translateX(-50%); }
+  50% { transform: translateX(calc(-50% + 10px)); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * VERTICAL CAROUSEL
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-carousel--vertical .prism-carousel__track {
+  flex-direction: column;
+}
+
+.prism-carousel--vertical .prism-carousel__nav {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.prism-carousel--vertical .prism-carousel__nav--prev {
+  top: 16px;
+}
+
+.prism-carousel--vertical .prism-carousel__nav--prev::before {
+  transform: rotate(-45deg);
+  margin-bottom: 4px;
+}
+
+.prism-carousel--vertical .prism-carousel__nav--next {
+  top: auto;
+  bottom: 16px;
+}
+
+.prism-carousel--vertical .prism-carousel__nav--next::before {
+  transform: rotate(135deg);
+  margin-top: 4px;
+}
+
+.prism-carousel--vertical .prism-carousel__indicators {
+  flex-direction: column;
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-top: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * REDUCED MOTION
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .prism-carousel__track,
+  .prism-carousel__nav,
+  .prism-carousel__indicator,
+  .prism-carousel__thumbnail,
+  .prism-carousel--fade .prism-carousel__slide {
+    transition: none;
+  }
+
+  .prism-carousel__progress-bar,
+  .prism-carousel__swipe-hint {
+    animation: none;
+  }
+}

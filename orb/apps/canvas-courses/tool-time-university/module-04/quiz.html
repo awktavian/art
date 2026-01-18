@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz: Teen Years | Module 04 | Tool Time University</title>
+    <link rel="stylesheet" href="../assets/style.css">
+    <style>
+        .quiz-container { max-width: 800px; margin: 0 auto; padding: var(--space-4); }
+        .quiz-header { text-align: center; padding: var(--space-5) var(--space-4); background: linear-gradient(135deg, var(--binford-red) 0%, var(--binford-red-light) 100%); color: white; border-radius: var(--radius-lg); margin-bottom: var(--space-4); }
+        .quiz-header h1 { color: white; margin-bottom: var(--space-2); }
+        .points-badge { display: inline-block; background: var(--binford-gold); color: var(--stone-900); padding: var(--space-1) var(--space-3); border-radius: var(--radius-xl); font-weight: 600; font-family: var(--font-mono); }
+        .progress-bar { background: var(--stone-200); height: 8px; border-radius: 4px; margin-bottom: var(--space-4); overflow: hidden; }
+        .progress-fill { background: linear-gradient(90deg, var(--binford-red) 0%, var(--binford-gold) 100%); height: 100%; border-radius: 4px; transition: width var(--duration-normal) var(--ease-out); }
+        .progress-text { text-align: center; font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-3); }
+        .question-card { background: var(--white); border: 1px solid var(--border-light); border-radius: var(--radius-lg); padding: var(--space-4); margin-bottom: var(--space-4); display: none; }
+        .question-card.active { display: block; animation: fadeUp var(--duration-normal) var(--ease-out); }
+        .question-number { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--binford-red); margin-bottom: var(--space-2); }
+        .question-text { font-size: var(--text-lg); font-weight: 500; margin-bottom: var(--space-3); line-height: 1.4; }
+        .question-type { display: inline-block; font-size: var(--text-xs); background: var(--stone-100); color: var(--text-secondary); padding: 2px 8px; border-radius: var(--radius-sm); margin-bottom: var(--space-3); }
+        .options-list { list-style: none; padding: 0; margin: 0; }
+        .option-item { margin-bottom: var(--space-2); }
+        .option-btn { width: 100%; text-align: left; padding: var(--space-3); background: var(--stone-50); border: 2px solid var(--border-light); border-radius: var(--radius-md); cursor: pointer; transition: all var(--duration-fast) var(--ease-out); font-size: var(--text-base); }
+        .option-btn:hover:not(:disabled) { background: var(--stone-100); border-color: var(--stone-300); }
+        .option-btn.selected { background: #fef3c7; border-color: var(--binford-gold); }
+        .option-btn.correct { background: #dcfce7; border-color: #22c55e; }
+        .option-btn.incorrect { background: #fee2e2; border-color: #ef4444; }
+        .option-btn:disabled { cursor: not-allowed; }
+        .fill-blank-input { width: 100%; padding: var(--space-2) var(--space-3); font-size: var(--text-base); border: 2px solid var(--border-light); border-radius: var(--radius-md); margin-bottom: var(--space-3); }
+        .fill-blank-input:focus { outline: none; border-color: var(--binford-gold); }
+        .fill-blank-input.correct { border-color: #22c55e; background: #dcfce7; }
+        .fill-blank-input.incorrect { border-color: #ef4444; background: #fee2e2; }
+        .feedback { padding: var(--space-3); border-radius: var(--radius-md); margin-top: var(--space-3); display: none; }
+        .feedback.show { display: block; animation: fadeUp var(--duration-fast) var(--ease-out); }
+        .feedback.correct { background: #dcfce7; border: 1px solid #22c55e; color: #166534; }
+        .feedback.incorrect { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
+        .feedback-title { font-weight: 600; margin-bottom: var(--space-1); }
+        .btn-container { display: flex; justify-content: space-between; margin-top: var(--space-4); }
+        .submit-btn { background: var(--binford-red); color: white; padding: var(--space-2) var(--space-4); border: none; border-radius: var(--radius-md); font-weight: 600; cursor: pointer; transition: all var(--duration-fast) var(--ease-out); }
+        .submit-btn:hover:not(:disabled) { background: var(--binford-red-light); transform: translateY(-2px); }
+        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .next-btn { background: var(--binford-gold); color: var(--stone-900); }
+        .next-btn:hover:not(:disabled) { background: var(--binford-gold-light); }
+        .results-card { background: var(--white); border: 1px solid var(--border-light); border-radius: var(--radius-lg); padding: var(--space-5); text-align: center; display: none; }
+        .results-card.show { display: block; animation: fadeUp var(--duration-normal) var(--ease-out); }
+        .results-score { font-size: var(--text-4xl); font-family: var(--font-display); color: var(--binford-red); margin-bottom: var(--space-2); }
+        .results-equity { font-size: var(--text-2xl); font-family: var(--font-mono); color: var(--binford-gold); margin-bottom: var(--space-4); }
+        .results-title { font-size: var(--text-xl); font-weight: 600; margin-bottom: var(--space-2); }
+        .results-message { color: var(--text-secondary); margin-bottom: var(--space-4); }
+        .tool-time-break { background: var(--stone-900); color: white; padding: var(--space-3); border-radius: var(--radius-md); text-align: center; margin: var(--space-4) 0; }
+        .tool-time-break .catchphrase { font-size: var(--text-xl); color: var(--binford-gold); font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div class="quiz-container">
+        <div class="quiz-header">
+            <p class="label" style="color: var(--binford-gold-light);">MODULE 04</p>
+            <h1>Teen Years</h1>
+            <p style="opacity: 0.9; margin-bottom: var(--space-3);">10 Questions | Multiple Choice, True/False & Fill-in-the-Blank</p>
+            <div class="points-badge">75 Home Equity Dollars</div>
+        </div>
+
+        <div class="progress-text">Question <span id="currentQ">1</span> of 10</div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width: 10%;"></div></div>
+
+        <!-- Question 1 -->
+        <div class="question-card active" data-question="1" data-correct="C" data-points="7.5">
+            <div class="question-number">Question 1 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What major life stage did the Taylor boys enter during Season 4?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) Elementary school</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) College</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Their teenage years</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Marriage</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Growing up Taylor!</div>
+                <p>Brad, Randy, and Mark navigated adolescence on screen - first girlfriends, peer pressure, and the awkwardness of growing up in a household where Dad's idea of bonding involves power tools.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different life stage!</div>
+                <p>The correct answer is <strong>Their teenage years</strong>. Season 4 dealt heavily with adolescence and its challenges.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 2 -->
+        <div class="question-card" data-question="2" data-correct="psychology" data-points="7.5" data-type="fillin">
+            <div class="question-number">Question 2 of 10 (7.5 HED)</div>
+            <div class="question-type">Fill in the Blank</div>
+            <div class="question-text">In Season 4, Jill returns to school for a degree in _______.</div>
+            <input type="text" class="fill-blank-input" placeholder="Enter field of study..." autocomplete="off">
+            <p style="font-size: var(--text-sm); color: var(--text-muted);">Hint: She wanted to understand people's minds</p>
+            <div class="feedback correct">
+                <div class="feedback-title">Dr. Jill Taylor in training!</div>
+                <p>Jill's return to school for psychology reflected real 90s trends in women's graduate education and created new tensions and humor in the Taylor household.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different degree!</div>
+                <p>The correct answer is <strong>psychology</strong>. Jill's academic journey became a major storyline.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 3 -->
+        <div class="question-card" data-question="3" data-correct="false" data-points="7.5" data-type="truefalse">
+            <div class="question-number">Question 3 of 10 (7.5 HED)</div>
+            <div class="question-type">True or False</div>
+            <div class="question-text">"Tool Time After Dark" was a Season 4 episode where Binford experimented with a late-night Tool Time format.</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="true">True</button></li>
+                <li class="option-item"><button class="option-btn" data-value="false">False</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Good memory!</div>
+                <p>"Tool Time After Dark" was actually a clip show - Tim can't sleep and ends up watching old Tool Time episodes, not a late-night format experiment. A Season 4 finale celebration of classic moments!</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Not quite!</div>
+                <p>This is <strong>False</strong>. "Tool Time After Dark" was a clip show where Tim can't sleep and watches old Tool Time episodes - not a late-night format experiment.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 4 -->
+        <div class="question-card" data-question="4" data-correct="B" data-points="7.5">
+            <div class="question-number">Question 4 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">In "Don't Tell Momma," Tim faces what central conflict?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) Choosing between two job offers</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Being the fun dad vs. being honest with Jill</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Deciding whether to retire Tool Time</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Planning a surprise party</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Parental dilemma!</div>
+                <p>When the boys hide a significant mistake from Jill, Tim must navigate between solidarity with his sons and honesty with his wife. The "Don't tell your mother" problem explored!</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different dilemma!</div>
+                <p>The correct answer is <strong>Being the fun dad vs. being honest with Jill</strong>. A classic parenting conflict!</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 5 -->
+        <div class="question-card" data-question="5" data-correct="D" data-points="7.5">
+            <div class="question-number">Question 5 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What major movie did Tim Allen release in 1994, during Season 4's run?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) Toy Story</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Galaxy Quest</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Jungle 2 Jungle</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) The Santa Clause</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Tim becomes Santa!</div>
+                <p>The Santa Clause premiered in 1994, making Tim Allen one of Hollywood's biggest stars while he was still doing Home Improvement. Double duty!</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different Christmas movie!</div>
+                <p>The correct answer is <strong>The Santa Clause</strong> (1994). This launched Tim Allen's film career alongside his TV work.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <div class="tool-time-break" id="midBreak" style="display: none;">
+            <p>DOES EVERYBODY KNOW WHAT TIME IT IS?</p>
+            <p class="catchphrase">TOOL TIME!</p>
+            <p style="font-size: var(--text-sm); opacity: 0.7;">Teen years are tough!</p>
+        </div>
+
+        <!-- Question 6 -->
+        <div class="question-card" data-question="6" data-correct="B" data-points="7.5">
+            <div class="question-number">Question 6 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">In "The Naked Truth," what awkward situation does Tim accidentally find himself in?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) He walks in on Al in the bathroom</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) He sees his sister-in-law Nancy naked</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) He forgets to wear pants to Tool Time</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) He gets locked outside without clothes</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Awkward family moment!</div>
+                <p>Tim accidentally sees his sister-in-law Nancy naked, leading to a comedy of embarrassment and awkward family dynamics. The episode showcases the show's ability to mine humor from uncomfortable situations.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Different embarrassment!</div>
+                <p>The correct answer is <strong>He sees his sister-in-law Nancy naked</strong>. This classic awkward situation drove the episode's comedy.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 7 -->
+        <div class="question-card" data-question="7" data-correct="true" data-points="7.5" data-type="truefalse">
+            <div class="question-number">Question 7 of 10 (7.5 HED)</div>
+            <div class="question-type">True or False</div>
+            <div class="question-text">Tim's biggest challenge in Season 4 was relating to his teenagers, as the grunt proved insufficient for real conversations.</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="true">True</button></li>
+                <li class="option-item"><button class="option-btn" data-value="false">False</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Parenting evolution!</div>
+                <p>Tim faced his biggest challenge: relating to teenagers who don't always want to "improve" things. Real conversations became necessary - character growth ensues!</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Grunts aren't enough!</div>
+                <p>This is <strong>True</strong>. A father who communicates through grunts now faced kids who needed actual words.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 8 -->
+        <div class="question-card" data-question="8" data-correct="B" data-points="7.5">
+            <div class="question-number">Question 8 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">According to Wilson's Season 4 wisdom about Kierkegaard, what does parenting teenagers require?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) Perfect planning</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Leaps of faith</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Strict discipline</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Financial investment</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">Kierkegaard knows parenting!</div>
+                <p>Wilson referenced the "leap of faith" - that moment when we must act without certainty, trusting that the net will appear. You cannot know if your words will land; you simply must speak them and trust.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">More philosophical!</div>
+                <p>The correct answer is <strong>Leaps of faith</strong>. Kierkegaard's philosophy applied perfectly to parenting teenagers.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 9 -->
+        <div class="question-card" data-question="9" data-correct="A" data-points="7.5">
+            <div class="question-number">Question 9 of 10 (7.5 HED)</div>
+            <div class="question-type">Multiple Choice</div>
+            <div class="question-text">What real-world trend did Home Improvement help fuel by 1994?</div>
+            <ul class="options-list">
+                <li class="option-item"><button class="option-btn" data-value="A">A) A DIY revolution and power tool purchases</button></li>
+                <li class="option-item"><button class="option-btn" data-value="B">B) Flannel shirt sales</button></li>
+                <li class="option-item"><button class="option-btn" data-value="C">C) Fence construction</button></li>
+                <li class="option-item"><button class="option-btn" data-value="D">D) Cable TV subscriptions</button></li>
+            </ul>
+            <div class="feedback correct">
+                <div class="feedback-title">MORE POWER to the people!</div>
+                <p>Hardware stores reported Tim Taylor-inspired purchases (and subsequent returns). The show's influence on real home improvement culture was significant - for better or worse!</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Think bigger!</div>
+                <p>The correct answer is <strong>A DIY revolution and power tool purchases</strong>. Tim made power tools aspirational!</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+
+        <!-- Question 10 -->
+        <div class="question-card" data-question="10" data-correct="brad" data-points="7.5" data-type="fillin">
+            <div class="question-number">Question 10 of 10 (7.5 HED)</div>
+            <div class="question-type">Fill in the Blank</div>
+            <div class="question-text">In Season 4, the oldest Taylor son _______ begins navigating first girlfriends and peer pressure.</div>
+            <input type="text" class="fill-blank-input" placeholder="Enter name..." autocomplete="off">
+            <div class="feedback correct">
+                <div class="feedback-title">Brad's growing up!</div>
+                <p>As the oldest, Brad faced the teenage pressures first - girlfriends, peer pressure, and all the awkwardness of adolescence in a household where Dad's bonding involves power tools.</p>
+            </div>
+            <div class="feedback incorrect">
+                <div class="feedback-title">Wrong Taylor brother!</div>
+                <p>The correct answer is <strong>Brad</strong>. As the oldest son, he was first to navigate teenage challenges.</p>
+            </div>
+            <div class="btn-container">
+                <button class="submit-btn" disabled>Submit Answer</button>
+                <button class="submit-btn next-btn" style="display: none;">See Results</button>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="results-card" id="results">
+            <h2 class="results-title" id="resultsTitle">Quiz Complete!</h2>
+            <div class="results-score" id="resultsScore">0/10</div>
+            <div class="results-equity" id="resultsEquity">0 HED Earned</div>
+            <p class="results-message" id="resultsMessage"></p>
+            <div style="margin-top: var(--space-4);">
+                <a href="index.html" class="btn btn--secondary" style="margin-right: var(--space-2);">Back to Module</a>
+                <button class="btn btn--primary" onclick="location.reload()">Retake Quiz</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const quizData = { currentQuestion: 1, totalQuestions: 10, score: 0, totalPoints: 0, maxPoints: 75, answered: new Set() };
+        document.addEventListener('DOMContentLoaded', function() { initQuiz(); });
+        function initQuiz() {
+            document.querySelectorAll('.option-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const card = this.closest('.question-card');
+                    card.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+                    this.classList.add('selected');
+                    card.querySelector('.submit-btn').disabled = false;
+                });
+            });
+            document.querySelectorAll('.fill-blank-input').forEach(input => {
+                input.addEventListener('input', function() {
+                    const card = this.closest('.question-card');
+                    card.querySelector('.submit-btn').disabled = this.value.trim() === '';
+                });
+            });
+            document.querySelectorAll('.submit-btn:not(.next-btn)').forEach(btn => { btn.addEventListener('click', function() { submitAnswer(this.closest('.question-card')); }); });
+            document.querySelectorAll('.next-btn').forEach(btn => { btn.addEventListener('click', function() { nextQuestion(); }); });
+        }
+        function submitAnswer(card) {
+            const questionNum = parseInt(card.dataset.question);
+            const correctAnswer = card.dataset.correct;
+            const points = parseFloat(card.dataset.points);
+            const type = card.dataset.type || 'multiple';
+            let userAnswer, isCorrect = false;
+            if (type === 'fillin') {
+                const input = card.querySelector('.fill-blank-input');
+                userAnswer = input.value.trim().toLowerCase();
+                isCorrect = userAnswer === correctAnswer.toLowerCase();
+                input.disabled = true;
+                input.classList.add(isCorrect ? 'correct' : 'incorrect');
+            } else {
+                const selected = card.querySelector('.option-btn.selected');
+                userAnswer = selected.dataset.value;
+                isCorrect = userAnswer === correctAnswer;
+                card.querySelectorAll('.option-btn').forEach(btn => {
+                    btn.disabled = true;
+                    if (btn.dataset.value === correctAnswer) btn.classList.add('correct');
+                    else if (btn.classList.contains('selected') && !isCorrect) btn.classList.add('incorrect');
+                });
+            }
+            if (isCorrect) { quizData.score++; quizData.totalPoints += points; card.querySelector('.feedback.correct').classList.add('show'); }
+            else { card.querySelector('.feedback.incorrect').classList.add('show'); }
+            quizData.answered.add(questionNum);
+            card.querySelector('.submit-btn:not(.next-btn)').style.display = 'none';
+            card.querySelector('.next-btn').style.display = 'inline-block';
+        }
+        function nextQuestion() {
+            const currentCard = document.querySelector('.question-card.active');
+            currentCard.classList.remove('active');
+            quizData.currentQuestion++;
+            if (quizData.currentQuestion === 6) { document.getElementById('midBreak').style.display = 'block'; setTimeout(() => { document.getElementById('midBreak').style.display = 'none'; }, 2000); }
+            if (quizData.currentQuestion <= quizData.totalQuestions) {
+                const nextCard = document.querySelector(`[data-question="${quizData.currentQuestion}"]`);
+                nextCard.classList.add('active');
+                document.getElementById('currentQ').textContent = quizData.currentQuestion;
+                document.getElementById('progressFill').style.width = (quizData.currentQuestion / quizData.totalQuestions * 100) + '%';
+            } else { showResults(); }
+        }
+        function showResults() {
+            document.getElementById('results').classList.add('show');
+            document.getElementById('resultsScore').textContent = `${quizData.score}/${quizData.totalQuestions}`;
+            document.getElementById('resultsEquity').textContent = `${quizData.totalPoints.toFixed(1)} HED Earned`;
+            const percentage = (quizData.score / quizData.totalQuestions) * 100;
+            let title, message;
+            if (percentage === 100) { title = 'Master Craftsman!'; message = 'Perfect! You survived the teen years with flying colors!'; }
+            else if (percentage >= 80) { title = 'Journeyman Builder!'; message = 'Great work! You understand the Taylor teens well.'; }
+            else if (percentage >= 60) { title = 'Apprentice!'; message = 'Passing! But Tool Time After Dark deserves another viewing.'; }
+            else if (percentage >= 40) { title = 'Weekend Warrior'; message = 'Teen years are complicated - so is this quiz!'; }
+            else { title = 'Tim After a Disaster'; message = 'Back to Season 4 - those teen storylines await!'; }
+            document.getElementById('resultsTitle').textContent = title;
+            document.getElementById('resultsMessage').textContent = message;
+        }
+    </script>
+</body>
+</html>

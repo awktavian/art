@@ -1,0 +1,619 @@
+name: Gemini Byzantine Video Analysis
+
+# Byzantine Quality Analysis for E2E Test Videos using Gemini 2.0 Flash
+#
+# This workflow analyzes recorded E2E test videos using Google's Gemini AI
+# to perform Byzantine quality scoring across 6 dimensions:
+#   - Technical: UI correctness, standards compliance
+#   - Aesthetic: Visual harmony, spacing, colors
+#   - Accessibility: Touch targets, contrast, WCAG
+#   - Emotional: Interaction feel, feedback
+#   - Polish: Animation smoothness, transitions
+#   - Delight: Joy, surprise, memorable moments
+#
+# Quality Gate: ALL dimensions must score >= 90/100 to pass
+#
+# Colony: Crystal (e7) - Verification & Polish
+# h(x) >= 0. Always.
+# craft(x) → ∞ always
+
+on:
+  # Run after E2E tests complete
+  workflow_run:
+    workflows:
+      - "e2e-validation"
+      - "User Journey Tests with Video Analysis"
+    types:
+      - completed
+    branches:
+      - main
+      - develop
+
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      workflow_run_id:
+        description: 'Workflow run ID to analyze videos from (leave empty to analyze most recent)'
+        type: string
+        default: ''
+      dimensions:
+        description: 'Dimensions to analyze (comma-separated: technical,aesthetic,accessibility,emotional,polish,delight)'
+        type: string
+        default: 'technical,aesthetic,accessibility,emotional,polish,delight'
+      threshold:
+        description: 'Minimum score threshold (0-100)'
+        type: number
+        default: 90
+      fail_on_threshold:
+        description: 'Fail CI if any dimension below threshold'
+        type: boolean
+        default: true
+      publish_to_dashboard:
+        description: 'Publish results to QA dashboard'
+        type: boolean
+        default: true
+
+  # Scheduled nightly analysis
+  schedule:
+    # Run at 4 AM UTC (after nightly E2E tests at 3 AM)
+    - cron: '0 4 * * *'
+
+  # Run on PRs for video analysis
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'apps/**'
+      - 'packages/kagami-qa-pipeline/**'
+      - '.github/workflows/gemini-video-analysis.yml'
+
+concurrency:
+  group: gemini-analysis-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+  ANALYSIS_RESULTS_DIR: /tmp/gemini-analysis
+  VIDEO_CACHE_DIR: /tmp/video-cache
+  QUALITY_THRESHOLD: ${{ github.event.inputs.threshold || 90 }}
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # SETUP: Download videos from triggering workflow
+  # ═══════════════════════════════════════════════════════════════════════════
+  setup:
+    name: Setup Analysis Environment
+    runs-on: ubuntu-latest
+    outputs:
+      has_videos: ${{ steps.check.outputs.has_videos }}
+      video_count: ${{ steps.check.outputs.video_count }}
+      source_workflow: ${{ steps.check.outputs.source_workflow }}
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create directories
+        run: |
+          mkdir -p ${{ env.ANALYSIS_RESULTS_DIR }}
+          mkdir -p ${{ env.VIDEO_CACHE_DIR }}
+
+      - name: Determine source workflow run
+        id: source
+        run: |
+          if [ -n "${{ github.event.inputs.workflow_run_id }}" ]; then
+            echo "run_id=${{ github.event.inputs.workflow_run_id }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "run_id=${{ github.event.workflow_run.id }}" >> $GITHUB_OUTPUT
+          else
+            # Find most recent E2E validation run
+            RUN_ID=$(gh run list --workflow=e2e-validation.yml --status=completed --limit=1 --json databaseId -q '.[0].databaseId')
+            echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Download video artifacts
+        id: download
+        run: |
+          RUN_ID="${{ steps.source.outputs.run_id }}"
+
+          if [ -z "$RUN_ID" ]; then
+            echo "No source workflow run found"
+            echo "downloaded=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Downloading artifacts from run $RUN_ID"
+
+          # Download all video artifacts
+          gh run download "$RUN_ID" \
+            --pattern "*videos*" \
+            --dir "${{ env.VIDEO_CACHE_DIR }}" \
+            2>/dev/null || true
+
+          # Also try journey-specific artifacts
+          gh run download "$RUN_ID" \
+            --pattern "journey-*" \
+            --dir "${{ env.VIDEO_CACHE_DIR }}" \
+            2>/dev/null || true
+
+          # Download e2e artifacts
+          gh run download "$RUN_ID" \
+            --pattern "e2e-*" \
+            --dir "${{ env.VIDEO_CACHE_DIR }}" \
+            2>/dev/null || true
+
+          echo "downloaded=true" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+        continue-on-error: true
+
+      - name: Check for videos
+        id: check
+        run: |
+          # Find all video files
+          VIDEO_COUNT=$(find "${{ env.VIDEO_CACHE_DIR }}" -type f \( -name "*.mp4" -o -name "*.mov" -o -name "*.webm" \) 2>/dev/null | wc -l || echo "0")
+
+          echo "Found $VIDEO_COUNT video files"
+
+          if [ "$VIDEO_COUNT" -gt 0 ]; then
+            echo "has_videos=true" >> $GITHUB_OUTPUT
+            echo "video_count=$VIDEO_COUNT" >> $GITHUB_OUTPUT
+
+            # List videos for logging
+            find "${{ env.VIDEO_CACHE_DIR }}" -type f \( -name "*.mp4" -o -name "*.mov" -o -name "*.webm" \) -exec echo "  - {}" \;
+          else
+            echo "has_videos=false" >> $GITHUB_OUTPUT
+            echo "video_count=0" >> $GITHUB_OUTPUT
+          fi
+
+          echo "source_workflow=${{ steps.source.outputs.run_id }}" >> $GITHUB_OUTPUT
+
+      - name: Upload video cache
+        if: steps.check.outputs.has_videos == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-cache
+          path: ${{ env.VIDEO_CACHE_DIR }}
+          retention-days: 1
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # ANALYZE: Run Gemini Byzantine Quality Analysis
+  # ═══════════════════════════════════════════════════════════════════════════
+  analyze:
+    name: Byzantine Quality Analysis
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.has_videos == 'true'
+    timeout-minutes: 45
+    outputs:
+      overall_score: ${{ steps.analyze.outputs.overall_score }}
+      meets_threshold: ${{ steps.analyze.outputs.meets_threshold }}
+      technical_score: ${{ steps.analyze.outputs.technical }}
+      aesthetic_score: ${{ steps.analyze.outputs.aesthetic }}
+      accessibility_score: ${{ steps.analyze.outputs.accessibility }}
+      emotional_score: ${{ steps.analyze.outputs.emotional }}
+      polish_score: ${{ steps.analyze.outputs.polish }}
+      delight_score: ${{ steps.analyze.outputs.delight }}
+      critical_issues: ${{ steps.analyze.outputs.critical_issues }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: packages/kagami-qa-pipeline/package-lock.json
+
+      - name: Download video cache
+        uses: actions/download-artifact@v4
+        with:
+          name: video-cache
+          path: ${{ env.VIDEO_CACHE_DIR }}
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install QA Pipeline dependencies
+        working-directory: packages/kagami-qa-pipeline
+        run: npm ci
+
+      - name: Build QA Pipeline
+        working-directory: packages/kagami-qa-pipeline
+        run: npm run build
+
+      - name: Create directories
+        run: |
+          mkdir -p ${{ env.ANALYSIS_RESULTS_DIR }}
+          mkdir -p ${{ env.ANALYSIS_RESULTS_DIR }}/reports
+          mkdir -p ${{ env.ANALYSIS_RESULTS_DIR }}/json
+
+      - name: Restore analysis cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.ANALYSIS_RESULTS_DIR }}/cache
+          key: gemini-analysis-${{ github.sha }}
+          restore-keys: |
+            gemini-analysis-${{ github.base_ref || 'main' }}
+            gemini-analysis-
+
+      - name: Run Gemini Byzantine Analysis
+        id: analyze
+        working-directory: packages/kagami-qa-pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANALYSIS_OUTPUT_DIR: ${{ env.ANALYSIS_RESULTS_DIR }}
+          VIDEO_INPUT_DIR: ${{ env.VIDEO_CACHE_DIR }}
+          QUALITY_THRESHOLD: ${{ env.QUALITY_THRESHOLD }}
+        run: |
+          # Run the analysis CLI
+          node dist/bin/qa-analyze.js gemini \
+            --videos "$VIDEO_INPUT_DIR" \
+            --output "$ANALYSIS_OUTPUT_DIR/json/results.json" \
+            --dimensions "${{ github.event.inputs.dimensions || 'technical,aesthetic,accessibility,emotional,polish,delight' }}" \
+            --threshold "$QUALITY_THRESHOLD" \
+            --format json \
+            --report-file "$ANALYSIS_OUTPUT_DIR/reports/byzantine-report.md" \
+            2>&1 | tee analysis.log || true
+
+          # Parse results
+          if [ -f "$ANALYSIS_OUTPUT_DIR/json/results.json" ]; then
+            # Extract scores using jq
+            OVERALL=$(jq -r '.overallScore // 0' "$ANALYSIS_OUTPUT_DIR/json/results.json")
+            TECHNICAL=$(jq -r '.byzantineScores.technical // 0' "$ANALYSIS_OUTPUT_DIR/json/results.json")
+            AESTHETIC=$(jq -r '.byzantineScores.aesthetic // 0' "$ANALYSIS_OUTPUT_DIR/json/results.json")
+            ACCESSIBILITY=$(jq -r '.byzantineScores.accessibility // 0' "$ANALYSIS_OUTPUT_DIR/json/results.json")
+            EMOTIONAL=$(jq -r '.byzantineScores.emotional // 0' "$ANALYSIS_OUTPUT_DIR/json/results.json")
+            POLISH=$(jq -r '.byzantineScores.polish // 0' "$ANALYSIS_OUTPUT_DIR/json/results.json")
+            DELIGHT=$(jq -r '.byzantineScores.delight // 0' "$ANALYSIS_OUTPUT_DIR/json/results.json")
+            MEETS=$(jq -r '.meetsQualityBar // false' "$ANALYSIS_OUTPUT_DIR/json/results.json")
+            CRITICAL=$(jq -r '[.issues[] | select(.severity == "critical")] | length // 0' "$ANALYSIS_OUTPUT_DIR/json/results.json")
+
+            echo "overall_score=$OVERALL" >> $GITHUB_OUTPUT
+            echo "technical=$TECHNICAL" >> $GITHUB_OUTPUT
+            echo "aesthetic=$AESTHETIC" >> $GITHUB_OUTPUT
+            echo "accessibility=$ACCESSIBILITY" >> $GITHUB_OUTPUT
+            echo "emotional=$EMOTIONAL" >> $GITHUB_OUTPUT
+            echo "polish=$POLISH" >> $GITHUB_OUTPUT
+            echo "delight=$DELIGHT" >> $GITHUB_OUTPUT
+            echo "meets_threshold=$MEETS" >> $GITHUB_OUTPUT
+            echo "critical_issues=$CRITICAL" >> $GITHUB_OUTPUT
+          else
+            echo "overall_score=0" >> $GITHUB_OUTPUT
+            echo "technical=0" >> $GITHUB_OUTPUT
+            echo "aesthetic=0" >> $GITHUB_OUTPUT
+            echo "accessibility=0" >> $GITHUB_OUTPUT
+            echo "emotional=0" >> $GITHUB_OUTPUT
+            echo "polish=0" >> $GITHUB_OUTPUT
+            echo "delight=0" >> $GITHUB_OUTPUT
+            echo "meets_threshold=false" >> $GITHUB_OUTPUT
+            echo "critical_issues=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate Byzantine Report
+        if: always()
+        run: |
+          cat > "${{ env.ANALYSIS_RESULTS_DIR }}/reports/SUMMARY.md" << 'EOF'
+          # Byzantine Quality Analysis Report
+
+          Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          Commit: ${{ github.sha }}
+          Branch: ${{ github.ref_name }}
+
+          ## Quality Gate: ${{ steps.analyze.outputs.meets_threshold == 'true' && 'PASSED' || 'FAILED' }}
+
+          **Threshold: ${{ env.QUALITY_THRESHOLD }}/100**
+
+          ## Byzantine Scores
+
+          | Dimension | Score | Status |
+          |-----------|-------|--------|
+          | Technical | ${{ steps.analyze.outputs.technical_score }}/100 | ${{ steps.analyze.outputs.technical_score >= env.QUALITY_THRESHOLD && '✅' || '❌' }} |
+          | Aesthetic | ${{ steps.analyze.outputs.aesthetic_score }}/100 | ${{ steps.analyze.outputs.aesthetic_score >= env.QUALITY_THRESHOLD && '✅' || '❌' }} |
+          | Accessibility | ${{ steps.analyze.outputs.accessibility_score }}/100 | ${{ steps.analyze.outputs.accessibility_score >= env.QUALITY_THRESHOLD && '✅' || '❌' }} |
+          | Emotional | ${{ steps.analyze.outputs.emotional_score }}/100 | ${{ steps.analyze.outputs.emotional_score >= env.QUALITY_THRESHOLD && '✅' || '❌' }} |
+          | Polish | ${{ steps.analyze.outputs.polish_score }}/100 | ${{ steps.analyze.outputs.polish_score >= env.QUALITY_THRESHOLD && '✅' || '❌' }} |
+          | Delight | ${{ steps.analyze.outputs.delight_score }}/100 | ${{ steps.analyze.outputs.delight_score >= env.QUALITY_THRESHOLD && '✅' || '❌' }} |
+
+          **Overall Score: ${{ steps.analyze.outputs.overall_score }}/100**
+
+          ## Critical Issues: ${{ steps.analyze.outputs.critical_issues }}
+
+          ---
+          *h(x) >= 0. Always.*
+          *craft(x) → ∞ always*
+          EOF
+
+      - name: Save analysis cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: ${{ env.ANALYSIS_RESULTS_DIR }}/cache
+          key: gemini-analysis-${{ github.sha }}
+
+      - name: Upload analysis results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gemini-byzantine-analysis
+          path: ${{ env.ANALYSIS_RESULTS_DIR }}
+          retention-days: 90
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PUBLISH: Send results to QA Dashboard
+  # ═══════════════════════════════════════════════════════════════════════════
+  publish:
+    name: Publish to QA Dashboard
+    runs-on: ubuntu-latest
+    needs: analyze
+    if: |
+      always() &&
+      needs.analyze.result == 'success' &&
+      (github.event.inputs.publish_to_dashboard != 'false')
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download analysis results
+        uses: actions/download-artifact@v4
+        with:
+          name: gemini-byzantine-analysis
+          path: ${{ env.ANALYSIS_RESULTS_DIR }}
+
+      - name: Prepare dashboard payload
+        id: payload
+        run: |
+          cat > /tmp/dashboard-payload.json << EOF
+          {
+            "type": "byzantine_analysis",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "workflow_run_id": "${{ github.run_id }}",
+            "repository": "${{ github.repository }}",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "source_workflow": "${{ needs.setup.outputs.source_workflow }}",
+            "video_count": ${{ needs.setup.outputs.video_count }},
+            "quality_gate": {
+              "threshold": ${{ env.QUALITY_THRESHOLD }},
+              "passed": ${{ needs.analyze.outputs.meets_threshold }},
+              "overall_score": ${{ needs.analyze.outputs.overall_score }}
+            },
+            "byzantine_scores": {
+              "technical": ${{ needs.analyze.outputs.technical_score || 0 }},
+              "aesthetic": ${{ needs.analyze.outputs.aesthetic_score || 0 }},
+              "accessibility": ${{ needs.analyze.outputs.accessibility_score || 0 }},
+              "emotional": ${{ needs.analyze.outputs.emotional_score || 0 }},
+              "polish": ${{ needs.analyze.outputs.polish_score || 0 }},
+              "delight": ${{ needs.analyze.outputs.delight_score || 0 }}
+            },
+            "critical_issues": ${{ needs.analyze.outputs.critical_issues || 0 }},
+            "artifacts_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          }
+          EOF
+
+          cat /tmp/dashboard-payload.json
+
+      - name: Send to QA Dashboard API
+        if: env.QA_DASHBOARD_URL != ''
+        env:
+          QA_DASHBOARD_URL: ${{ secrets.QA_DASHBOARD_URL }}
+          QA_DASHBOARD_TOKEN: ${{ secrets.QA_DASHBOARD_TOKEN }}
+        run: |
+          curl -X POST "$QA_DASHBOARD_URL/api/v1/byzantine-analysis" \
+            -H "Authorization: Bearer $QA_DASHBOARD_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d @/tmp/dashboard-payload.json \
+            --fail --silent --show-error || echo "Dashboard notification failed (non-critical)"
+        continue-on-error: true
+
+      - name: Upload to Cloud Storage
+        if: env.CLOUD_STORAGE_BUCKET != ''
+        env:
+          CLOUD_STORAGE_BUCKET: ${{ secrets.CLOUD_STORAGE_BUCKET }}
+        run: |
+          # Upload results to cloud storage for long-term retention
+          echo "Would upload to gs://$CLOUD_STORAGE_BUCKET/byzantine-analysis/${{ github.run_id }}/"
+        continue-on-error: true
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PR STATUS: Report results on pull request
+  # ═══════════════════════════════════════════════════════════════════════════
+  pr-status:
+    name: Update PR Status
+    runs-on: ubuntu-latest
+    needs: analyze
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 5
+
+    steps:
+      - name: Post PR Comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const scores = {
+              technical: ${{ needs.analyze.outputs.technical_score || 0 }},
+              aesthetic: ${{ needs.analyze.outputs.aesthetic_score || 0 }},
+              accessibility: ${{ needs.analyze.outputs.accessibility_score || 0 }},
+              emotional: ${{ needs.analyze.outputs.emotional_score || 0 }},
+              polish: ${{ needs.analyze.outputs.polish_score || 0 }},
+              delight: ${{ needs.analyze.outputs.delight_score || 0 }}
+            };
+
+            const threshold = ${{ env.QUALITY_THRESHOLD }};
+            const overallScore = ${{ needs.analyze.outputs.overall_score || 0 }};
+            const meetsThreshold = '${{ needs.analyze.outputs.meets_threshold }}' === 'true';
+            const criticalIssues = ${{ needs.analyze.outputs.critical_issues || 0 }};
+
+            const scoreEmoji = (score) => {
+              if (score >= 90) return ':white_check_mark:';
+              if (score >= 70) return ':yellow_circle:';
+              return ':red_circle:';
+            };
+
+            let body = `## Byzantine Quality Analysis\n\n`;
+            body += `**Quality Gate: ${meetsThreshold ? ':white_check_mark: PASSED' : ':x: FAILED'}**\n\n`;
+            body += `Threshold: ${threshold}/100\n\n`;
+
+            body += `### Byzantine Scores\n\n`;
+            body += `| Dimension | Score | Status |\n`;
+            body += `|-----------|-------|--------|\n`;
+
+            for (const [dim, score] of Object.entries(scores)) {
+              const dimName = dim.charAt(0).toUpperCase() + dim.slice(1);
+              body += `| ${dimName} | ${score}/100 | ${scoreEmoji(score)} ${score >= threshold ? 'Pass' : 'Below threshold'} |\n`;
+            }
+
+            body += `\n**Overall Score: ${overallScore}/100**\n`;
+
+            if (criticalIssues > 0) {
+              body += `\n### :warning: Critical Issues: ${criticalIssues}\n`;
+              body += `Review the analysis artifacts for details.\n`;
+            }
+
+            body += `\n### What do these scores mean?\n`;
+            body += `- **Technical**: UI correctness, element presence, standards compliance\n`;
+            body += `- **Aesthetic**: Visual harmony, spacing, color consistency\n`;
+            body += `- **Accessibility**: Touch targets (44pt+), contrast (WCAG AA), focus indicators\n`;
+            body += `- **Emotional**: Interaction feel, feedback appropriateness, flow\n`;
+            body += `- **Polish**: Animation smoothness (60fps), transitions, edge cases\n`;
+            body += `- **Delight**: Joy moments, responsive feel, memorable interactions\n`;
+
+            body += `\n---\n`;
+            body += `*h(x) >= 0. Always.*\n`;
+            body += `*craft(x) → ∞ always*\n`;
+            body += `\n[View Full Analysis](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existingComment = comments.find(c =>
+              c.user.login === 'github-actions[bot]' &&
+              c.body.includes('Byzantine Quality Analysis')
+            );
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # QUALITY GATE: Enforce Byzantine quality threshold
+  # ═══════════════════════════════════════════════════════════════════════════
+  quality-gate:
+    name: Byzantine Quality Gate
+    runs-on: ubuntu-latest
+    needs: analyze
+    if: always()
+    timeout-minutes: 5
+
+    steps:
+      - name: Post GitHub Summary
+        run: |
+          echo "## Byzantine Quality Analysis Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          MEETS="${{ needs.analyze.outputs.meets_threshold }}"
+          if [ "$MEETS" = "true" ]; then
+            echo ":white_check_mark: **Quality Gate PASSED**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo ":x: **Quality Gate FAILED**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Scores (Threshold: ${{ env.QUALITY_THRESHOLD }}/100)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Dimension | Score |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Technical | ${{ needs.analyze.outputs.technical_score }}/100 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Aesthetic | ${{ needs.analyze.outputs.aesthetic_score }}/100 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Accessibility | ${{ needs.analyze.outputs.accessibility_score }}/100 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Emotional | ${{ needs.analyze.outputs.emotional_score }}/100 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Polish | ${{ needs.analyze.outputs.polish_score }}/100 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Delight | ${{ needs.analyze.outputs.delight_score }}/100 |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Overall: ${{ needs.analyze.outputs.overall_score }}/100**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          CRITICAL="${{ needs.analyze.outputs.critical_issues }}"
+          if [ "$CRITICAL" != "0" ]; then
+            echo ":warning: **Critical Issues: $CRITICAL**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check Quality Gate
+        if: github.event.inputs.fail_on_threshold != 'false'
+        run: |
+          MEETS="${{ needs.analyze.outputs.meets_threshold }}"
+          CRITICAL="${{ needs.analyze.outputs.critical_issues }}"
+
+          if [ "$MEETS" != "true" ]; then
+            echo "::error::Byzantine Quality Gate FAILED - One or more dimensions below ${{ env.QUALITY_THRESHOLD }}/100"
+            echo ""
+            echo "Scores:"
+            echo "  Technical: ${{ needs.analyze.outputs.technical_score }}/100"
+            echo "  Aesthetic: ${{ needs.analyze.outputs.aesthetic_score }}/100"
+            echo "  Accessibility: ${{ needs.analyze.outputs.accessibility_score }}/100"
+            echo "  Emotional: ${{ needs.analyze.outputs.emotional_score }}/100"
+            echo "  Polish: ${{ needs.analyze.outputs.polish_score }}/100"
+            echo "  Delight: ${{ needs.analyze.outputs.delight_score }}/100"
+            echo ""
+            echo "All dimensions must score >= ${{ env.QUALITY_THRESHOLD }} to pass."
+            exit 1
+          fi
+
+          if [ "$CRITICAL" != "0" ] && [ "$CRITICAL" != "" ]; then
+            echo "::error::Critical issues detected: $CRITICAL"
+            exit 1
+          fi
+
+          echo "Byzantine Quality Gate PASSED - All dimensions >= ${{ env.QUALITY_THRESHOLD }}/100"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # NO VIDEOS: Handle case when no videos are available
+  # ═══════════════════════════════════════════════════════════════════════════
+  no-videos:
+    name: No Videos Available
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.has_videos != 'true'
+    timeout-minutes: 5
+
+    steps:
+      - name: Report no videos
+        run: |
+          echo "## Byzantine Video Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo ":fast_forward: **Skipped** - No video artifacts found" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To enable video analysis:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Run E2E tests with video recording enabled" >> $GITHUB_STEP_SUMMARY
+          echo "2. Ensure videos are uploaded as artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "3. Trigger this workflow after E2E completion" >> $GITHUB_STEP_SUMMARY
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Mirror that sparkles.
+# Byzantine quality analysis for virtuoso standards.
+# h(x) >= 0. Always.
+# craft(x) → ∞ always
+# ═══════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,458 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "kagami-slo-dashboard",
+    "title": "KagamiOS - SLO Dashboard",
+    "tags": ["kagami", "slo", "latency", "reliability"],
+    "timezone": "utc",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "P50/P95/P99 Request Latency",
+        "type": "timeseries",
+        "description": "Request latency percentiles (P50, P95, P99) over time",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(kagami_http_request_duration_seconds_bucket[5m])) by (le, endpoint))",
+            "legendFormat": "P50 - {{endpoint}}",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(kagami_http_request_duration_seconds_bucket[5m])) by (le, endpoint))",
+            "legendFormat": "P95 - {{endpoint}}",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(kagami_http_request_duration_seconds_bucket[5m])) by (le, endpoint))",
+            "legendFormat": "P99 - {{endpoint}}",
+            "refId": "C"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 10,
+              "lineWidth": 2
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 0.5, "color": "yellow"},
+                {"value": 1.0, "color": "red"}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byRegexp", "options": "P50.*"},
+              "properties": [
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}
+              ]
+            },
+            {
+              "matcher": {"id": "byRegexp", "options": "P95.*"},
+              "properties": [
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}
+              ]
+            },
+            {
+              "matcher": {"id": "byRegexp", "options": "P99.*"},
+              "properties": [
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": ["mean", "max", "last"]
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Error Rate (4xx + 5xx)",
+        "type": "timeseries",
+        "description": "HTTP error rate as percentage of total requests",
+        "targets": [
+          {
+            "expr": "sum(rate(kagami_http_requests_total{status_code=~\"4..\"}[5m])) / sum(rate(kagami_http_requests_total[5m])) * 100",
+            "legendFormat": "4xx Error Rate",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(kagami_http_requests_total{status_code=~\"5..\"}[5m])) / sum(rate(kagami_http_requests_total[5m])) * 100",
+            "legendFormat": "5xx Error Rate",
+            "refId": "B"
+          },
+          {
+            "expr": "(sum(rate(kagami_http_requests_total{status_code=~\"4..|5..\"}[5m])) / sum(rate(kagami_http_requests_total[5m]))) * 100",
+            "legendFormat": "Total Error Rate",
+            "refId": "C"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 20,
+              "lineWidth": 2
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 5, "color": "red"}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Total Error Rate"},
+              "properties": [
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+                {"id": "custom.lineWidth", "value": 3}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": ["mean", "max", "last"]
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "SLO Compliance - Latency (P95 < 500ms)",
+        "type": "stat",
+        "description": "Percentage of requests meeting P95 latency SLO (< 500ms)",
+        "targets": [
+          {
+            "expr": "(sum(rate(kagami_http_request_duration_seconds_bucket{le=\"0.5\"}[5m])) / sum(rate(kagami_http_request_duration_seconds_count[5m]))) * 100",
+            "legendFormat": "P95 < 500ms",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 8},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 95, "color": "yellow"},
+                {"value": 99, "color": "green"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "background",
+          "orientation": "auto",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "SLO Compliance - Availability (> 99.9%)",
+        "type": "stat",
+        "description": "Percentage of successful requests (2xx + 3xx status codes)",
+        "targets": [
+          {
+            "expr": "(sum(rate(kagami_http_requests_total{status_code=~\"2..|3..\"}[5m])) / sum(rate(kagami_http_requests_total[5m]))) * 100",
+            "legendFormat": "Success Rate",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 8},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 99.0, "color": "yellow"},
+                {"value": 99.9, "color": "green"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "background",
+          "orientation": "auto",
+          "textMode": "value_and_name",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Error Budget Burn Rate (1h)",
+        "type": "gauge",
+        "description": "Rate at which error budget is being consumed (target: < 1.0)",
+        "targets": [
+          {
+            "expr": "(sum(rate(kagami_http_requests_total{status_code=~\"5..\"}[1h])) / sum(rate(kagami_http_requests_total[1h]))) / 0.001",
+            "legendFormat": "Burn Rate (1h)",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 6, "x": 12, "y": 8},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0,
+            "max": 10,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 2, "color": "orange"},
+                {"value": 5, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true,
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Error Budget Burn Rate (6h)",
+        "type": "gauge",
+        "description": "6-hour error budget burn rate for detecting slower degradation",
+        "targets": [
+          {
+            "expr": "(sum(rate(kagami_http_requests_total{status_code=~\"5..\"}[6h])) / sum(rate(kagami_http_requests_total[6h]))) / 0.001",
+            "legendFormat": "Burn Rate (6h)",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 6, "x": 18, "y": 8},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0,
+            "max": 10,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 2, "color": "orange"},
+                {"value": 5, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true,
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Latency Breakdown by Endpoint",
+        "type": "timeseries",
+        "description": "P95 latency broken down by endpoint",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(kagami_http_request_duration_seconds_bucket[5m])) by (le, endpoint, method))",
+            "legendFormat": "{{method}} {{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 10,
+              "lineWidth": 1
+            }
+          }
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": ["mean", "max", "last"]
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Request Volume by Status Code",
+        "type": "timeseries",
+        "description": "Request volume breakdown by HTTP status code",
+        "targets": [
+          {
+            "expr": "sum(rate(kagami_http_requests_total[5m])) by (status_code)",
+            "legendFormat": "{{status_code}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 10,
+              "lineWidth": 2,
+              "stacking": {
+                "mode": "normal"
+              }
+            }
+          }
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": ["mean", "max", "last"]
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "SLO Compliance Trend (24h)",
+        "type": "timeseries",
+        "description": "24-hour trend of SLO compliance percentage",
+        "targets": [
+          {
+            "expr": "avg_over_time(((sum(rate(kagami_http_requests_total{status_code=~\"2..|3..\"}[5m])) / sum(rate(kagami_http_requests_total[5m]))) * 100)[24h:5m])",
+            "legendFormat": "Availability SLO",
+            "refId": "A"
+          },
+          {
+            "expr": "avg_over_time(((sum(rate(kagami_http_request_duration_seconds_bucket{le=\"0.5\"}[5m])) / sum(rate(kagami_http_request_duration_seconds_count[5m]))) * 100)[24h:5m])",
+            "legendFormat": "Latency SLO",
+            "refId": "B"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 22},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 90,
+            "max": 100,
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 20,
+              "lineWidth": 2
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 99.0, "color": "yellow"},
+                {"value": 99.9, "color": "green"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": ["mean", "min", "max", "last"]
+          }
+        }
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "Prometheus",
+          "enable": true,
+          "expr": "changes(kagami_build_info[5m]) > 0",
+          "iconColor": "blue",
+          "tagKeys": "version"
+        }
+      ]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "datasource",
+          "type": "datasource",
+          "query": "prometheus",
+          "current": {
+            "text": "Prometheus",
+            "value": "Prometheus"
+          }
+        },
+        {
+          "name": "endpoint",
+          "type": "query",
+          "datasource": "$datasource",
+          "query": "label_values(kagami_http_requests_total, endpoint)",
+          "refresh": 1,
+          "multi": true,
+          "includeAll": true,
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          }
+        }
+      ]
+    }
+  },
+  "overwrite": true
+}

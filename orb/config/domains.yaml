@@ -1,0 +1,162 @@
+# Kagami Domain Configuration
+# Created: January 5, 2026
+
+# =============================================================================
+# PRIMARY DOMAINS
+# =============================================================================
+
+domains:
+  # Business domain - email, corporate identity
+  awkronos:
+    domain: awkronos.com
+    registrar: cloudflare
+    purpose: business
+    email_routing:
+      enabled: true
+      addresses:
+        - from: tim@awkronos.com
+          to: timothyjacoby@gmail.com
+        - from: support@awkronos.com
+          to: timothyjacoby@gmail.com
+        - from: kagami@awkronos.com
+          to: timothyjacoby@gmail.com
+    dns_provider: cloudflare
+    ssl: cloudflare_universal
+
+  # Protocol domain - API, WebSocket, voice
+  kagami:
+    domain: awkronos.com
+    registrar: cloudflare
+    purpose: protocol
+    dns_provider: gcp_cloud_dns
+    ssl: gcp_managed
+    
+    subdomains:
+      api:
+        host: api.awkronos.com
+        target: kagami-api-service  # Cloud Run
+        purpose: REST API
+        
+      ws:
+        host: ws.awkronos.com
+        target: kagami-realtime-service  # Cloud Run
+        purpose: WebSocket real-time events
+        
+      voice:
+        host: voice.awkronos.com
+        target: kagami-voice-service  # Cloud Run
+        purpose: Voice streaming (Whisper + ElevenLabs)
+        
+      cdn:
+        host: cdn.awkronos.com
+        target: kagami-cdn-bucket  # Cloud Storage
+        purpose: Static assets
+        
+      docs:
+        host: docs.awkronos.com
+        target: kagami-docs-bucket  # Cloud Storage
+        purpose: Documentation site
+        
+      status:
+        host: status.awkronos.com
+        target: external  # Statuspage or similar
+        purpose: Service status
+
+# =============================================================================
+# PROTOCOL MAPPING
+# =============================================================================
+
+protocol:
+  scheme: kagami
+  
+  # kagami:// → https://api.awkronos.com/v1/
+  routes:
+    # Smart Home
+    - pattern: "kagami://lights/{room}/{level}"
+      method: POST
+      endpoint: "https://api.awkronos.com/v1/lights/{room}"
+      body: '{"level": {level}}'
+      
+    - pattern: "kagami://shades/{room}/{action}"
+      method: POST
+      endpoint: "https://api.awkronos.com/v1/shades/{room}"
+      body: '{"action": "{action}"}'
+      
+    - pattern: "kagami://scene/{name}"
+      method: POST
+      endpoint: "https://api.awkronos.com/v1/scenes/{name}/activate"
+      
+    - pattern: "kagami://fireplace/{action}"
+      method: POST
+      endpoint: "https://api.awkronos.com/v1/fireplace"
+      body: '{"action": "{action}"}'
+      
+    - pattern: "kagami://tv/{action}"
+      method: POST
+      endpoint: "https://api.awkronos.com/v1/tv"
+      body: '{"action": "{action}"}'
+      
+    - pattern: "kagami://announce/{message}"
+      method: POST
+      endpoint: "https://api.awkronos.com/v1/announce"
+      body: '{"message": "{message}"}'
+      
+    # Voice
+    - pattern: "kagami://voice/start"
+      method: WSS
+      endpoint: "wss://voice.awkronos.com/v1/stream"
+      
+    - pattern: "kagami://voice/join/{call_id}"
+      method: WSS
+      endpoint: "wss://voice.awkronos.com/v1/call/{call_id}"
+      
+    # Status & Query
+    - pattern: "kagami://status"
+      method: GET
+      endpoint: "https://api.awkronos.com/v1/status"
+      
+    - pattern: "kagami://intent/{query}"
+      method: POST
+      endpoint: "https://api.awkronos.com/v1/intent"
+      body: '{"query": "{query}"}'
+      
+    # Device Deep Links
+    - pattern: "kagami://app/{screen}"
+      method: DEEPLINK
+      ios: "kagami-ios://{screen}"
+      macos: "kagami-desktop://{screen}"
+      watch: "kagami-watch://{screen}"
+
+# =============================================================================
+# GCP CONFIGURATION
+# =============================================================================
+
+gcp:
+  project: gen-lang-client-0509316009
+  region: us-west1
+  
+  cloud_dns:
+    zone_name: kagami-dev
+    dns_name: awkronos.com.
+    
+  cloud_run:
+    services:
+      - name: kagami-api-service
+        image: gcr.io/gen-lang-client-0509316009/kagami-api
+        
+      - name: kagami-realtime-service
+        image: gcr.io/gen-lang-client-0509316009/kagami-realtime
+        
+      - name: kagami-voice-service
+        image: gcr.io/gen-lang-client-0509316009/kagami-voice
+
+# =============================================================================
+# ENVIRONMENT VARIABLES
+# =============================================================================
+
+env:
+  KAGAMI_API_URL: https://api.awkronos.com
+  KAGAMI_WS_URL: wss://ws.awkronos.com
+  KAGAMI_VOICE_URL: wss://voice.awkronos.com
+  KAGAMI_CDN_URL: https://cdn.awkronos.com
+  KAGAMI_PROTOCOL_SCHEME: kagami

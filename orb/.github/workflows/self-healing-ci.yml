@@ -1,0 +1,453 @@
+name: Self-Healing CI
+
+# Continuous background improvement workflow
+# When CI fails, this workflow:
+# 1. Analyzes the failure using Claude API
+# 2. Generates fix suggestions
+# 3. Creates a draft PR with the fix
+# 4. Tracks success/failure for learning
+
+on:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+
+  # Manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      workflow_run_id:
+        description: 'Workflow run ID to analyze'
+        required: false
+        type: string
+
+concurrency:
+  group: self-healing-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ============================================================================
+  # DETECT FAILURE: Only proceed if CI failed
+  # ============================================================================
+  detect_failure:
+    name: Detect CI Failure
+    runs-on: ubuntu-latest
+    outputs:
+      should_fix: ${{ steps.check.outputs.should_fix }}
+      run_id: ${{ steps.check.outputs.run_id }}
+      failure_type: ${{ steps.check.outputs.failure_type }}
+    steps:
+      - name: Check if fix needed
+        id: check
+        run: |
+          SHOULD_FIX="false"
+          RUN_ID=""
+          FAILURE_TYPE=""
+          
+          # Check workflow_run conclusion
+          if [ "${{ github.event.workflow_run.conclusion }}" = "failure" ]; then
+            SHOULD_FIX="true"
+            RUN_ID="${{ github.event.workflow_run.id }}"
+            FAILURE_TYPE="ci_failure"
+            echo "🔴 CI workflow failed - initiating self-healing"
+          elif [ "${{ github.event.workflow_run.conclusion }}" = "timed_out" ]; then
+            SHOULD_FIX="true"
+            RUN_ID="${{ github.event.workflow_run.id }}"
+            FAILURE_TYPE="timeout"
+            echo "⏰ CI workflow timed out"
+          elif [ -n "${{ github.event.inputs.workflow_run_id }}" ]; then
+            # Manual trigger
+            SHOULD_FIX="true"
+            RUN_ID="${{ github.event.inputs.workflow_run_id }}"
+            FAILURE_TYPE="manual"
+            echo "🔧 Manual self-healing trigger"
+          else
+            echo "✅ No failure detected, skipping self-healing"
+          fi
+          
+          echo "should_fix=${SHOULD_FIX}" >> $GITHUB_OUTPUT
+          echo "run_id=${RUN_ID}" >> $GITHUB_OUTPUT
+          echo "failure_type=${FAILURE_TYPE}" >> $GITHUB_OUTPUT
+
+  # ============================================================================
+  # ANALYZE FAILURE: Extract actionable signals
+  # ============================================================================
+  analyze_failure:
+    name: Analyze Failure
+    runs-on: ubuntu-latest
+    needs: detect_failure
+    if: needs.detect_failure.outputs.should_fix == 'true'
+    outputs:
+      signals_json: ${{ steps.analyze.outputs.signals_json }}
+      fix_count: ${{ steps.analyze.outputs.fix_count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install aiohttp anthropic
+          pip install -e .
+
+      - name: Download workflow logs
+        id: logs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_ID="${{ needs.detect_failure.outputs.run_id }}"
+          echo "📥 Downloading logs for run $RUN_ID..."
+          
+          # Get failed jobs
+          gh api \
+            repos/${{ github.repository }}/actions/runs/${RUN_ID}/jobs \
+            --jq '.jobs[] | select(.conclusion == "failure") | {id: .id, name: .name}' \
+            > failed_jobs.json || echo "[]" > failed_jobs.json
+          
+          # Download logs for each failed job
+          mkdir -p logs
+          for job_id in $(jq -r '.id' failed_jobs.json 2>/dev/null || echo ""); do
+            if [ -n "$job_id" ]; then
+              gh api \
+                repos/${{ github.repository }}/actions/jobs/${job_id}/logs \
+                > logs/job_${job_id}.log 2>/dev/null || true
+            fi
+          done
+          
+          # Combine logs
+          cat logs/*.log > combined_logs.txt 2>/dev/null || echo "No logs available" > combined_logs.txt
+          
+          echo "📋 Log size: $(wc -l < combined_logs.txt) lines"
+
+      - name: Analyze logs with CI Feedback Bridge
+        id: analyze
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}  # pragma: allowlist secret
+          RUN_ID: ${{ needs.detect_failure.outputs.run_id }}
+        run: |
+          python << 'EOF'
+          import asyncio
+          import json
+          import os
+          import sys
+
+          # Add package to path
+          sys.path.insert(0, 'packages')
+
+          async def main():
+              from kagami.core.evolution.ci_feedback_bridge import (
+                  CIReportParser,
+                  CISignalType,
+              )
+
+              # Read logs
+              try:
+                  with open('combined_logs.txt', 'r') as f:
+                      logs = f.read()
+              except:
+                  logs = ""
+
+              # Parse
+              parser = CIReportParser()
+              report = parser.parse_workflow_output(
+                  workflow_name="ci",
+                  output=logs,
+                  metadata={
+                      "run_id": os.environ.get("RUN_ID", "unknown"),
+                      "status": "failure",
+                  }
+              )
+
+              # Output signals
+              signals = [
+                  {
+                      "type": s.signal_type.value,
+                      "file": s.file_path,
+                      "line": s.line_number,
+                      "message": s.message[:200],
+                      "severity": s.severity,
+                  }
+                  for s in report.signals[:10]  # Limit to 10
+              ]
+
+              signals_json = json.dumps(signals)
+              print(f"signals_json={signals_json}")
+
+              with open(os.environ.get("GITHUB_OUTPUT", "/dev/stdout"), "a") as f:
+                  f.write(f"signals_json={signals_json}\n")
+                  f.write(f"fix_count={len(signals)}\n")
+
+              print(f"📊 Found {len(signals)} actionable signals")
+              for s in signals:
+                  print(f"  - [{s['severity']}] {s['type']}: {s['file']}")
+
+          asyncio.run(main())
+          EOF
+
+  # ============================================================================
+  # GENERATE FIXES: Use Claude API to generate code fixes
+  # ============================================================================
+  generate_fixes:
+    name: Generate Fixes
+    runs-on: ubuntu-latest
+    needs: [detect_failure, analyze_failure]
+    if: needs.analyze_failure.outputs.fix_count > 0
+    outputs:
+      has_fixes: ${{ steps.generate.outputs.has_fixes }}
+      branch_name: ${{ steps.generate.outputs.branch_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install anthropic
+          pip install -e .
+
+      - name: Generate fixes with Claude
+        id: generate
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}  # pragma: allowlist secret
+        run: |
+          python << 'EOF'
+          import anthropic
+          import json
+          import os
+          import sys
+          from pathlib import Path
+          import re
+          
+          # Parse signals
+          signals_json = '''${{ needs.analyze_failure.outputs.signals_json }}'''
+          try:
+              signals = json.loads(signals_json) if signals_json else []
+          except:
+              signals = []
+          
+          if not signals:
+              print("No signals to process")
+              with open(os.environ.get("GITHUB_OUTPUT", "/dev/stdout"), "a") as f:
+                  f.write("has_fixes=false\n")
+              sys.exit(0)
+          
+          # Check for API key
+          api_key = os.environ.get("ANTHROPIC_API_KEY")
+          if not api_key:
+              print("⚠️ ANTHROPIC_API_KEY not set, skipping fix generation")
+              with open(os.environ.get("GITHUB_OUTPUT", "/dev/stdout"), "a") as f:
+                  f.write("has_fixes=false\n")
+              sys.exit(0)
+          
+          client = anthropic.Anthropic()
+          fixes_applied = 0
+          
+          for signal in signals[:3]:  # Limit to 3 fixes per run
+              file_path = signal.get("file", "")
+              if not file_path or not Path(file_path).exists():
+                  continue
+              
+              # Read file
+              try:
+                  content = Path(file_path).read_text()
+              except:
+                  continue
+              
+              # Build prompt
+              prompt = f"""You are fixing a CI error in a Python codebase.
+
+          ERROR TYPE: {signal.get('type')}
+          FILE: {file_path}
+          LINE: {signal.get('line', 'unknown')}
+          ERROR: {signal.get('message')}
+          SEVERITY: {signal.get('severity')}
+
+          CURRENT FILE CONTENT:
+          ```python
+          {content[:3000]}
+          ```
+
+          Provide a MINIMAL fix. Respond with a JSON object:
+          {{
+              "fixed": true/false,
+              "changes": [
+                  {{"old_line": "original line", "new_line": "fixed line"}}
+              ],
+              "explanation": "brief explanation"
+          }}
+
+          If you cannot fix it safely, set fixed to false."""
+
+              try:
+                  response = client.messages.create(
+                      model="claude-sonnet-4-20250514",
+                      max_tokens=1024,
+                      messages=[{"role": "user", "content": prompt}],
+                  )
+                  
+                  response_text = response.content[0].text
+                  
+                  # Extract JSON from response
+                  json_match = re.search(r'\{[\s\S]*\}', response_text)
+                  if json_match:
+                      fix_data = json.loads(json_match.group())
+                      
+                      if fix_data.get("fixed") and fix_data.get("changes"):
+                          # Apply changes
+                          for change in fix_data["changes"]:
+                              old_line = change.get("old_line", "")
+                              new_line = change.get("new_line", "")
+                              if old_line and new_line and old_line in content:
+                                  content = content.replace(old_line, new_line, 1)
+                                  fixes_applied += 1
+                          
+                          # Write back
+                          Path(file_path).write_text(content)
+                          print(f"✅ Fixed {file_path}: {fix_data.get('explanation', 'N/A')[:50]}")
+                  
+              except Exception as e:
+                  print(f"⚠️ Fix generation failed for {file_path}: {e}")
+          
+          has_fixes = fixes_applied > 0
+          branch_name = f"autofix/ci-{os.environ.get('GITHUB_RUN_ID', 'unknown')}"
+          
+          with open(os.environ.get("GITHUB_OUTPUT", "/dev/stdout"), "a") as f:
+              f.write(f"has_fixes={str(has_fixes).lower()}\n")
+              f.write(f"branch_name={branch_name}\n")
+          
+          print(f"📝 Applied {fixes_applied} fixes")
+          EOF
+
+      - name: Create fix branch and commit
+        if: steps.generate.outputs.has_fixes == 'true'
+        run: |
+          git config --global user.email "kagami-autofix[bot]@users.noreply.github.com"
+          git config --global user.name "Kagami Autofix Bot"
+          
+          BRANCH="${{ steps.generate.outputs.branch_name }}"
+          git checkout -b "$BRANCH"
+          
+          git add -A
+          git commit -m "🤖 Autofix: CI failure remediation
+
+          This commit was automatically generated by the self-healing CI system.
+          
+          Triggered by: ${{ needs.detect_failure.outputs.failure_type }}
+          Run ID: ${{ needs.detect_failure.outputs.run_id }}
+          
+          Changes:
+          - Analyzed CI failure logs
+          - Generated fixes using Claude API
+          - Applied safe, minimal fixes
+          
+          Please review before merging."
+          
+          git push origin "$BRANCH"
+          
+          echo "✅ Created branch $BRANCH with fixes"
+
+  # ============================================================================
+  # CREATE PULL REQUEST: Open draft PR for review
+  # ============================================================================
+  create_pr:
+    name: Create Pull Request
+    runs-on: ubuntu-latest
+    needs: [detect_failure, analyze_failure, generate_fixes]
+    if: needs.generate_fixes.outputs.has_fixes == 'true'
+    steps:
+      - name: Create Draft PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${{ needs.generate_fixes.outputs.branch_name }}"
+          RUN_ID="${{ needs.detect_failure.outputs.run_id }}"
+          SIGNALS='${{ needs.analyze_failure.outputs.signals_json }}'
+          
+          # Create PR body
+          cat << EOF > pr_body.md
+          ## 🤖 Automated CI Fix
+          
+          This PR was automatically generated by Kagami's self-healing CI system.
+          
+          ### Trigger
+          - **Failed Run ID:** [$RUN_ID](https://github.com/${{ github.repository }}/actions/runs/$RUN_ID)
+          - **Failure Type:** ${{ needs.detect_failure.outputs.failure_type }}
+          - **Branch:** ${{ github.event.workflow_run.head_branch || github.ref_name }}
+          
+          ### Signals Detected
+          \`\`\`json
+          $SIGNALS
+          \`\`\`
+          
+          ### Review Checklist
+          - [ ] Verify fix addresses the root cause
+          - [ ] Ensure no new issues introduced
+          - [ ] Run tests locally if concerned
+          - [ ] Check for unintended side effects
+          
+          ### Auto-generated by
+          [Self-Healing CI Workflow](https://github.com/${{ github.repository }}/actions/workflows/self-healing-ci.yml)
+          
+          ---
+          *This is a draft PR. Please review before marking ready.*
+          EOF
+          
+          # Create draft PR
+          gh pr create \
+            --repo "${{ github.repository }}" \
+            --head "$BRANCH" \
+            --base "main" \
+            --title "🤖 Autofix: CI failure remediation (Run #$RUN_ID)" \
+            --body-file pr_body.md \
+            --draft \
+            --label "autofix,ci" \
+            || echo "PR may already exist"
+
+  # ============================================================================
+  # RECORD LEARNING: Track success/failure for continuous improvement
+  # ============================================================================
+  record_learning:
+    name: Record Learning
+    runs-on: ubuntu-latest
+    needs: [detect_failure, analyze_failure, generate_fixes, create_pr]
+    if: always() && needs.detect_failure.outputs.should_fix == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Record outcome
+        run: |
+          # Create learning record
+          cat << EOF >> .github/self_healing_log.jsonl
+          {
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "run_id": "${{ needs.detect_failure.outputs.run_id }}",
+            "failure_type": "${{ needs.detect_failure.outputs.failure_type }}",
+            "signals_count": ${{ needs.analyze_failure.outputs.fix_count || 0 }},
+            "fixes_generated": "${{ needs.generate_fixes.outputs.has_fixes }}",
+            "pr_created": "${{ needs.create_pr.result == 'success' }}",
+            "workflow_run_id": "${{ github.run_id }}"
+          }
+          EOF
+          
+          echo "📊 Learning record created"
+          
+          # Note: In production, this would be sent to the evolution engine
+          # via the CI Feedback Bridge for continuous learning

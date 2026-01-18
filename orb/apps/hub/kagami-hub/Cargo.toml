@@ -1,0 +1,369 @@
+[package]
+name = "kagami-hub"
+version = "0.1.0"
+edition = "2021"
+description = "Kagami Hub — Voice-first embedded home assistant"
+authors = ["Tim"]
+license = "MIT"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full", "sync"] }
+
+# HTTP client (rustls-tls for secure mesh communication)
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Async traits (for VM hypervisor backend abstraction)
+async-trait = "0.1"
+
+# Mesh SDK (canonical sync primitives)
+kagami-mesh-sdk = { path = "../../../packages/kagami-mesh-sdk" }
+
+# Time handling
+chrono = "0.4"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# LRU cache (for bounded earcon/audio caches)
+lru = "0.12"
+
+# Configuration
+toml = "0.8"
+url = "2"  # For URL validation in config
+
+# Regex for word boundary matching in voice commands
+regex = "1"
+
+# World model inference (ONNX)
+ndarray = { version = "0.16", optional = true }
+ort = { version = "2.0.0-rc.9", optional = true, default-features = false, features = ["ndarray"] }
+parking_lot = { version = "0.12", optional = true }
+
+# Random number generation (for personality ambient behaviors + mesh crypto)
+# Note: Also used by mesh feature, keep as regular dependency
+
+# Web server for phone configuration
+axum = { version = "0.7", features = ["ws"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "limit"] }
+base64 = "0.22"
+hostname = "0.4"
+
+# HMAC-SHA256 for request signing
+hmac = "0.12"
+sha2 = "0.10"
+
+# mDNS service discovery
+mdns-sd = { version = "0.11", optional = true }
+
+# Real-time WebSocket
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+futures-util = "0.3"
+
+# ============================================================================
+# Audio Processing
+# ============================================================================
+
+# Cross-platform audio I/O (microphone + speaker)
+cpal = { version = "0.15", optional = true }
+
+# WAV file handling (for debugging/caching)
+hound = { version = "3.5", optional = true }
+
+# Sample rate conversion (for TTS output matching)
+rubato = { version = "0.15", optional = true }
+
+# Audio DSP utilities
+dasp = { version = "0.11", optional = true, features = ["signal"] }
+
+# ============================================================================
+# Wake Word Detection
+# ============================================================================
+
+# Wake word detection options:
+# Option 1: Picovoice Porcupine (commercial, requires license)
+# All crates.io versions are yanked - use git dependency when needed:
+# pv_porcupine = { git = "https://github.com/Picovoice/porcupine.git", optional = true }
+
+# Option 2: Vosk offline speech recognition (open source)
+# Good alternative, supports keyword spotting and full ASR
+vosk = { version = "0.3", optional = true }
+
+# ============================================================================
+# Speech-to-Text (Whisper.cpp)
+# ============================================================================
+
+# Rust bindings for whisper.cpp - local STT inference
+# Supports whisper-tiny, whisper-base, whisper-small models
+whisper-rs = { version = "0.12", optional = true }
+
+# ============================================================================
+# Text-to-Speech
+# ============================================================================
+
+# Piper TTS - fast ONNX-based neural TTS (recommended for embedded)
+# Low latency, multiple voices, runs on RPi
+piper-rs = { version = "0.1.9", optional = true }
+
+# ONNX runtime for Piper models (optional, used by piper-rs)
+# ort = { version = "2.0.0-rc.10", optional = true, default-features = false }
+
+# Parler-TTS via Python interop (high quality but slower)
+pyo3 = { version = "0.21", optional = true, features = ["auto-initialize"] }
+
+# Cross-platform TTS wrapper (fallback)
+tts = { version = "0.26", optional = true }
+
+# ============================================================================
+# State Persistence (SQLite)
+# ============================================================================
+
+# SQLite database for state caching across restarts
+rusqlite = { version = "0.31", features = ["bundled"], optional = true }
+
+# ============================================================================
+# Cryptography (Mesh Authentication)
+# ============================================================================
+
+# X25519 key exchange for peer authentication
+x25519-dalek = { version = "2", optional = true }
+
+# Ed25519 signatures for genome verification
+ed25519-dalek = { version = "2", features = ["rand_core"], optional = true }
+
+# Random number generation (always needed for personality, optional features extend usage)
+rand = "0.8"
+
+# Binary serialization for genome
+bincode = { version = "1", optional = true }
+
+# UUID generation for hub IDs and command IDs
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Hex encoding for crypto
+hex = "0.4"
+
+# Directory utilities
+dirs = { version = "5", optional = true }
+
+# Serde utilities (for large byte arrays)
+serde_with = { version = "3", features = ["base64"], optional = true }
+
+# System information (real diagnostics)
+sysinfo = "0.31"
+
+# Serial communication (for Pico coprocessor)
+serialport = { version = "4.3", optional = true }
+tokio-serial = { version = "5.4", optional = true }
+
+# ============================================================================
+# GPIO / LED Ring (Raspberry Pi)
+# ============================================================================
+
+# Raspberry Pi Peripheral Access Library
+rppal = { version = "0.17", optional = true }
+
+# WS2812 (NeoPixel) LED driver via SPI
+ws2812-spi = { version = "0.4", optional = true }
+
+# Smart LED traits
+smart-leds = { version = "0.4", optional = true }
+
+# Embedded HAL traits
+embedded-hal = { version = "0.2", optional = true }
+
+# ============================================================================
+# Linux-specific Audio
+# ============================================================================
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# ALSA audio (Linux, low-level)
+alsa = { version = "0.9", optional = true }
+
+# PipeWire audio (modern Linux)
+# pipewire = { version = "0.8", optional = true }
+
+# ============================================================================
+# macOS-specific Audio
+# ============================================================================
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# CoreAudio bindings come via cpal, no extra deps needed
+
+# ============================================================================
+# Feature Flags
+# ============================================================================
+
+[features]
+default = ["audio", "persistence"]
+
+# Enable Raspberry Pi GPIO features (LED ring, hardware buttons)
+rpi = ["rppal", "ws2812-spi", "smart-leds", "embedded-hal"]
+
+# Enable mDNS service discovery for automatic server detection
+mdns = ["mdns-sd"]
+
+# Enable local Whisper STT (requires whisper.cpp model files)
+whisper = ["whisper-rs"]
+
+# Enable Piper TTS (fast, recommended for hub)
+piper = ["piper-rs"]
+
+# Enable Parler-TTS via Python (high quality, slower)
+parler = ["pyo3"]
+
+# Enable cross-platform TTS wrapper
+tts-fallback = ["tts"]
+
+# Enable Porcupine wake word (requires license key from Picovoice)
+# Note: Add pv_porcupine git dependency to use this feature
+# porcupine = ["pv_porcupine"]
+
+# Enable Vosk wake word (open source alternative)
+vosk-wake = ["vosk"]
+porcupine = ["vosk"]  # Fallback to vosk until porcupine crate is fixed
+
+# Enable cpal audio I/O
+audio = ["cpal", "hound", "rubato", "dasp"]
+
+# Enable ALSA audio (Linux only)
+alsa-audio = ["alsa"]
+
+# Enable SQLite persistence
+persistence = ["rusqlite"]
+
+# Enable mesh networking with crypto
+mesh = ["x25519-dalek", "ed25519-dalek", "bincode", "mdns", "dirs", "serde_with"]
+
+# Enable genome/identity features
+genome = ["ed25519-dalek", "bincode", "dirs", "serde_with"]
+
+# Full feature set for production hub hardware (Raspberry Pi)
+hub-hardware = [
+    "rpi",
+    "mdns",
+    "whisper",
+    "piper",
+    "porcupine",
+    "audio",
+    "persistence",
+    "mesh",
+    "genome",
+]
+
+# World model inference
+world-model = ["ndarray", "ort", "parking_lot"]
+
+# Development build (no hardware dependencies)
+dev = ["mdns", "persistence"]
+
+# Feature set for testing on desktop
+desktop = [
+    "mdns",
+    "audio",
+    "whisper",
+    "piper",
+    "persistence",
+]
+
+# Seed architecture: full offline capability
+seed = [
+    "whisper",
+    "piper",
+    "persistence",
+    "mesh",
+    "genome",
+]
+
+# Pico coprocessor support (UART communication)
+pico = ["serialport", "tokio-serial"]
+
+# ============================================================================
+# Build Profiles
+# ============================================================================
+
+[profile.release]
+# Optimize for size on embedded targets
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.release-debug]
+inherits = "release"
+debug = true
+strip = false
+
+# Profile for development with faster compilation
+[profile.dev]
+opt-level = 0
+debug = true
+
+# Profile for development with some optimization (faster to test)
+[profile.dev-fast]
+inherits = "dev"
+opt-level = 1
+
+# ============================================================================
+# Build Dependencies (for model downloading/processing)
+# ============================================================================
+
+[build-dependencies]
+# For downloading models at build time (optional)
+# ureq = "2.9"
+
+# ============================================================================
+# Dev Dependencies (for testing)
+# ============================================================================
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3"
+criterion = "0.5"
+
+# Mocking frameworks
+mockall = "0.13"
+wiremock = "0.6"
+
+# Embedded HAL mocking for LED ring hardware simulation
+embedded-hal-mock = { version = "0.11", features = ["eh1"] }
+
+# Parameterized testing
+test-case = "3"
+rstest = "0.19"
+
+# Property-based testing
+proptest = "1"
+
+# Better assertion diffs
+pretty_assertions = "1"
+
+# Async test utilities
+async-trait = "0.1"
+
+# ============================================================================
+# Benchmarks (uncomment when benchmark files are created)
+# ============================================================================
+
+# [[bench]]
+# name = "voice_pipeline"
+# harness = false
+
+# ============================================================================
+# Documentation
+# ============================================================================
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

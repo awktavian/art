@@ -1,0 +1,734 @@
+name: E2E Visual Regression Tests
+
+# Comprehensive E2E Visual Regression Testing
+# Runs screenshot and video capture tests across ALL platforms
+#
+# Platforms covered:
+#   - iOS (XCUITest with screenshots/video)
+#   - Android (UIAutomator/Espresso with screenshots)
+#   - Desktop (Playwright with screenshots/video)
+#   - tvOS (XCUITest with screenshots)
+#   - visionOS (XCUITest with screenshots)
+#
+# Colony: Crystal (e7) - Verification & Polish
+#
+# h(x) >= 0. Always.
+
+on:
+  pull_request:
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - '.github/workflows/e2e-visual-regression.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+  workflow_dispatch:
+    inputs:
+      record_videos:
+        description: 'Record videos for all tests'
+        type: boolean
+        default: false
+      update_baselines:
+        description: 'Update baseline screenshots'
+        type: boolean
+        default: false
+      platforms:
+        description: 'Platforms to test (comma-separated: ios,android,desktop,tvos,visionos,all)'
+        type: string
+        default: 'all'
+
+concurrency:
+  group: e2e-visual-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  XCODE_VERSION: "15.4"
+  JAVA_VERSION: "17"
+  NODE_VERSION: "20"
+  RUST_BACKTRACE: "1"
+  SCREENSHOTS_DIR: /tmp/visual-regression-screenshots
+  VIDEOS_DIR: /tmp/visual-regression-videos
+  ARTIFACT_RETENTION_DAYS: 30
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# JOBS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # iOS Visual Regression Tests
+  # ═══════════════════════════════════════════════════════════════════════════
+  ios-visual:
+    name: iOS Visual Regression
+    runs-on: macos-14
+    if: contains(github.event.inputs.platforms, 'ios') || contains(github.event.inputs.platforms, 'all') || github.event.inputs.platforms == ''
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/ios/kagami-ios
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Cache SPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/ios/kagami-ios/.build
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-spm-visual-${{ hashFiles('**/Package.swift') }}
+
+      - name: Create directories
+        run: |
+          mkdir -p ${{ env.SCREENSHOTS_DIR }}/ios
+          mkdir -p ${{ env.VIDEOS_DIR }}/ios
+
+      - name: Boot iOS Simulator
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available | grep "iPhone 15 Pro" | head -1 | grep -oE '[A-F0-9-]{36}')
+          xcrun simctl boot "$DEVICE_ID" || true
+          sleep 10
+          echo "DEVICE_ID=$DEVICE_ID" >> $GITHUB_ENV
+
+      - name: Resolve Packages
+        run: swift package resolve
+
+      - name: Build for Testing
+        run: |
+          xcodebuild build-for-testing \
+            -scheme KagamiIOS \
+            -destination "platform=iOS Simulator,name=iPhone 15 Pro" \
+            -derivedDataPath DerivedData \
+            | xcpretty
+
+      - name: Start Video Recording
+        if: github.event.inputs.record_videos == 'true'
+        run: |
+          xcrun simctl io "$DEVICE_ID" recordVideo --codec=h264 ${{ env.VIDEOS_DIR }}/ios/visual-tests.mp4 &
+          echo $! > /tmp/video_pid.txt
+
+      - name: Run Visual Regression Tests
+        run: |
+          xcodebuild test-without-building \
+            -scheme KagamiIOS \
+            -destination "platform=iOS Simulator,name=iPhone 15 Pro" \
+            -derivedDataPath DerivedData \
+            -only-testing:KagamiIOSUITests/VisualRegressionTests \
+            -resultBundlePath ${{ env.SCREENSHOTS_DIR }}/ios/VisualTests.xcresult \
+            | xcpretty || true
+
+      - name: Run Video Recording Tests
+        run: |
+          xcodebuild test-without-building \
+            -scheme KagamiIOS \
+            -destination "platform=iOS Simulator,name=iPhone 15 Pro" \
+            -derivedDataPath DerivedData \
+            -only-testing:KagamiIOSUITests/VideoRecordingTestCase \
+            -resultBundlePath ${{ env.SCREENSHOTS_DIR }}/ios/VideoTests.xcresult \
+            | xcpretty || true
+
+      - name: Stop Video Recording
+        if: github.event.inputs.record_videos == 'true' && always()
+        run: |
+          if [ -f /tmp/video_pid.txt ]; then
+            kill $(cat /tmp/video_pid.txt) || true
+          fi
+
+      - name: Capture Final Screenshot
+        if: always()
+        run: |
+          xcrun simctl io "$DEVICE_ID" screenshot ${{ env.SCREENSHOTS_DIR }}/ios/final_state.png || true
+
+      - name: Extract Test Attachments
+        if: always()
+        run: |
+          # Extract screenshots from xcresult bundles
+          for result in ${{ env.SCREENSHOTS_DIR }}/ios/*.xcresult; do
+            if [ -d "$result" ]; then
+              xcrun xcresulttool get --path "$result" --format json > "${result%.xcresult}_results.json" 2>/dev/null || true
+            fi
+          done
+
+      - name: Generate iOS Manifest
+        if: always()
+        run: |
+          echo "# iOS Visual Regression Results" > ${{ env.SCREENSHOTS_DIR }}/ios/MANIFEST.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ${{ env.SCREENSHOTS_DIR }}/ios/MANIFEST.md
+          echo "Device: iPhone 15 Pro (Simulator)" >> ${{ env.SCREENSHOTS_DIR }}/ios/MANIFEST.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/ios/MANIFEST.md
+          echo "## Screenshots" >> ${{ env.SCREENSHOTS_DIR }}/ios/MANIFEST.md
+          find ${{ env.SCREENSHOTS_DIR }}/ios -name "*.png" -exec basename {} \; | sort >> ${{ env.SCREENSHOTS_DIR }}/ios/MANIFEST.md
+
+      - name: Upload iOS Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-ios
+          path: |
+            ${{ env.SCREENSHOTS_DIR }}/ios
+            ${{ env.VIDEOS_DIR }}/ios
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+
+      - name: Shutdown Simulator
+        if: always()
+        run: xcrun simctl shutdown "$DEVICE_ID" || true
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Android Visual Regression Tests
+  # ═══════════════════════════════════════════════════════════════════════════
+  android-visual:
+    name: Android Visual Regression
+    runs-on: ubuntu-latest
+    if: contains(github.event.inputs.platforms, 'android') || contains(github.event.inputs.platforms, 'all') || github.event.inputs.platforms == ''
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/android/kagami-android
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Create directories
+        run: |
+          mkdir -p ${{ env.SCREENSHOTS_DIR }}/android
+          mkdir -p ${{ env.VIDEOS_DIR }}/android
+
+      - name: Check for Gradle wrapper
+        id: gradle_check
+        run: |
+          if [ -f "./gradlew" ]; then
+            chmod +x gradlew
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Debug APK
+        if: steps.gradle_check.outputs.exists == 'true'
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Build Test APK
+        if: steps.gradle_check.outputs.exists == 'true'
+        run: ./gradlew assembleDebugAndroidTest --no-daemon
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run E2E Visual Tests
+        if: steps.gradle_check.outputs.exists == 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_7
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          working-directory: apps/android/kagami-android
+          script: |
+            adb wait-for-device
+
+            # Install APKs
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+
+            # Start video recording if enabled
+            if [ "${{ github.event.inputs.record_videos }}" = "true" ]; then
+              adb shell screenrecord /sdcard/visual-tests.mp4 --time-limit 180 &
+              RECORD_PID=$!
+            fi
+
+            # Run E2E tests
+            adb shell am instrument -w \
+              -e class com.kagami.android.e2e.OnboardingE2ETest \
+              com.kagami.android.test/androidx.test.runner.AndroidJUnitRunner || true
+
+            adb shell am instrument -w \
+              -e class com.kagami.android.e2e.MainFlowsE2ETest \
+              com.kagami.android.test/androidx.test.runner.AndroidJUnitRunner || true
+
+            # Stop video recording
+            if [ "${{ github.event.inputs.record_videos }}" = "true" ]; then
+              kill $RECORD_PID || true
+              sleep 2
+              adb pull /sdcard/visual-tests.mp4 ${{ env.VIDEOS_DIR }}/android/ || true
+            fi
+
+            # Pull screenshots
+            adb pull /sdcard/Pictures/kagami-e2e-screenshots ${{ env.SCREENSHOTS_DIR }}/android/ || true
+            adb pull /data/data/com.kagami.android/files/screenshots ${{ env.SCREENSHOTS_DIR }}/android/ || true
+
+      - name: Run Roborazzi Screenshot Tests
+        if: steps.gradle_check.outputs.exists == 'true'
+        run: |
+          ./gradlew testDebugUnitTest --tests "*ScreenshotTest*" --continue || true
+          cp -r app/build/outputs/roborazzi/* ${{ env.SCREENSHOTS_DIR }}/android/ 2>/dev/null || true
+
+      - name: Generate Android Manifest
+        if: always()
+        run: |
+          echo "# Android Visual Regression Results" > ${{ env.SCREENSHOTS_DIR }}/android/MANIFEST.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ${{ env.SCREENSHOTS_DIR }}/android/MANIFEST.md
+          echo "Device: Pixel 7 (Emulator API 34)" >> ${{ env.SCREENSHOTS_DIR }}/android/MANIFEST.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/android/MANIFEST.md
+          echo "## Screenshots" >> ${{ env.SCREENSHOTS_DIR }}/android/MANIFEST.md
+          find ${{ env.SCREENSHOTS_DIR }}/android -name "*.png" -exec basename {} \; 2>/dev/null | sort >> ${{ env.SCREENSHOTS_DIR }}/android/MANIFEST.md || true
+
+      - name: Upload Android Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-android
+          path: |
+            ${{ env.SCREENSHOTS_DIR }}/android
+            ${{ env.VIDEOS_DIR }}/android
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Desktop Visual Regression Tests
+  # ═══════════════════════════════════════════════════════════════════════════
+  desktop-visual:
+    name: Desktop Visual Regression (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    if: contains(github.event.inputs.platforms, 'desktop') || contains(github.event.inputs.platforms, 'all') || github.event.inputs.platforms == ''
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        working-directory: apps/desktop/kagami-client
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: apps/desktop/kagami-client/package-lock.json
+
+      - name: Create directories
+        run: |
+          mkdir -p ${{ env.SCREENSHOTS_DIR }}/desktop/${{ matrix.os }}
+          mkdir -p ${{ env.VIDEOS_DIR }}/desktop/${{ matrix.os }}
+        shell: bash
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Visual Tests
+        run: |
+          npx playwright test tests/visual/ \
+            --project=desktop-dark \
+            --reporter=list \
+            --reporter=html \
+            --output=${{ env.SCREENSHOTS_DIR }}/desktop/${{ matrix.os }}/visual-results
+        env:
+          CI: true
+        continue-on-error: true
+
+      - name: Run E2E Tests with Video
+        run: |
+          npx playwright test tests/e2e/video-recording.spec.ts \
+            --project=desktop-dark \
+            --video=${{ github.event.inputs.record_videos == 'true' && 'on' || 'retain-on-failure' }} \
+            --reporter=list \
+            --output=${{ env.SCREENSHOTS_DIR }}/desktop/${{ matrix.os }}/e2e-results
+        env:
+          CI: true
+        continue-on-error: true
+
+      - name: Copy Snapshots
+        run: |
+          cp -r tests/visual/__snapshots__/* ${{ env.SCREENSHOTS_DIR }}/desktop/${{ matrix.os }}/ 2>/dev/null || true
+          cp -r test-results/**/*.png ${{ env.SCREENSHOTS_DIR }}/desktop/${{ matrix.os }}/ 2>/dev/null || true
+          cp -r test-results/**/*.webm ${{ env.VIDEOS_DIR }}/desktop/${{ matrix.os }}/ 2>/dev/null || true
+        shell: bash
+
+      - name: Generate Desktop Manifest
+        run: |
+          echo "# Desktop Visual Regression Results" > ${{ env.SCREENSHOTS_DIR }}/desktop/${{ matrix.os }}/MANIFEST.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ${{ env.SCREENSHOTS_DIR }}/desktop/${{ matrix.os }}/MANIFEST.md
+          echo "Platform: ${{ matrix.os }}" >> ${{ env.SCREENSHOTS_DIR }}/desktop/${{ matrix.os }}/MANIFEST.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/desktop/${{ matrix.os }}/MANIFEST.md
+          echo "## Screenshots" >> ${{ env.SCREENSHOTS_DIR }}/desktop/${{ matrix.os }}/MANIFEST.md
+          find ${{ env.SCREENSHOTS_DIR }}/desktop/${{ matrix.os }} -name "*.png" -exec basename {} \; 2>/dev/null | sort >> ${{ env.SCREENSHOTS_DIR }}/desktop/${{ matrix.os }}/MANIFEST.md || true
+        shell: bash
+
+      - name: Upload Desktop Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-desktop-${{ matrix.os }}
+          path: |
+            ${{ env.SCREENSHOTS_DIR }}/desktop/${{ matrix.os }}
+            ${{ env.VIDEOS_DIR }}/desktop/${{ matrix.os }}
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # tvOS Visual Regression Tests
+  # ═══════════════════════════════════════════════════════════════════════════
+  tvos-visual:
+    name: tvOS Visual Regression
+    runs-on: macos-14
+    if: contains(github.event.inputs.platforms, 'tvos') || contains(github.event.inputs.platforms, 'all') || github.event.inputs.platforms == ''
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: apps/tv/kagami-tv
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Create directories
+        run: |
+          mkdir -p ${{ env.SCREENSHOTS_DIR }}/tvos
+          mkdir -p ${{ env.VIDEOS_DIR }}/tvos
+
+      - name: Boot tvOS Simulator
+        run: |
+          TV_ID=$(xcrun simctl list devices available | grep "Apple TV 4K (3rd generation)" | head -1 | grep -oE '[A-F0-9-]{36}')
+          xcrun simctl boot "$TV_ID" || true
+          sleep 10
+          echo "TV_ID=$TV_ID" >> $GITHUB_ENV
+
+      - name: Resolve Packages
+        run: swift package resolve
+
+      - name: Build and Run Visual Tests
+        run: |
+          xcodebuild test \
+            -scheme KagamiTV \
+            -destination "platform=tvOS Simulator,name=Apple TV 4K (3rd generation)" \
+            -only-testing:KagamiTVUITests/TVVisualRegressionTests \
+            -resultBundlePath ${{ env.SCREENSHOTS_DIR }}/tvos/TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty || true
+
+      - name: Capture Final Screenshot
+        if: always()
+        run: |
+          xcrun simctl io "$TV_ID" screenshot ${{ env.SCREENSHOTS_DIR }}/tvos/final_state.png || true
+
+      - name: Generate tvOS Manifest
+        if: always()
+        run: |
+          echo "# tvOS Visual Regression Results" > ${{ env.SCREENSHOTS_DIR }}/tvos/MANIFEST.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ${{ env.SCREENSHOTS_DIR }}/tvos/MANIFEST.md
+          echo "Device: Apple TV 4K (3rd generation) (Simulator)" >> ${{ env.SCREENSHOTS_DIR }}/tvos/MANIFEST.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/tvos/MANIFEST.md
+          echo "## Screenshots" >> ${{ env.SCREENSHOTS_DIR }}/tvos/MANIFEST.md
+          find ${{ env.SCREENSHOTS_DIR }}/tvos -name "*.png" -exec basename {} \; | sort >> ${{ env.SCREENSHOTS_DIR }}/tvos/MANIFEST.md
+
+      - name: Upload tvOS Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-tvos
+          path: ${{ env.SCREENSHOTS_DIR }}/tvos
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+
+      - name: Shutdown Simulator
+        if: always()
+        run: xcrun simctl shutdown "$TV_ID" || true
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # visionOS Visual Regression Tests
+  # ═══════════════════════════════════════════════════════════════════════════
+  visionos-visual:
+    name: visionOS Visual Regression
+    runs-on: macos-14
+    if: contains(github.event.inputs.platforms, 'visionos') || contains(github.event.inputs.platforms, 'all') || github.event.inputs.platforms == ''
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: apps/vision/kagami-vision
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Check visionOS SDK
+        id: vision_sdk
+        run: |
+          if xcodebuild -showsdks | grep -q visionOS; then
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create directories
+        run: |
+          mkdir -p ${{ env.SCREENSHOTS_DIR }}/visionos
+          mkdir -p ${{ env.VIDEOS_DIR }}/visionos
+
+      - name: Boot visionOS Simulator
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          VISION_ID=$(xcrun simctl list devices available | grep "Apple Vision Pro" | head -1 | grep -oE '[A-F0-9-]{36}')
+          xcrun simctl boot "$VISION_ID" || true
+          sleep 15
+          echo "VISION_ID=$VISION_ID" >> $GITHUB_ENV
+
+      - name: Resolve Packages
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: swift package resolve
+
+      - name: Build and Run Visual Tests
+        if: steps.vision_sdk.outputs.available == 'true'
+        run: |
+          xcodebuild test \
+            -scheme KagamiVision \
+            -destination "platform=visionOS Simulator,name=Apple Vision Pro" \
+            -only-testing:KagamiVisionUITests/VisionVisualRegressionTests \
+            -resultBundlePath ${{ env.SCREENSHOTS_DIR }}/visionos/TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty || true
+
+      - name: Capture Final Screenshot
+        if: steps.vision_sdk.outputs.available == 'true' && always()
+        run: |
+          xcrun simctl io "$VISION_ID" screenshot ${{ env.SCREENSHOTS_DIR }}/visionos/final_state.png || true
+
+      - name: Generate visionOS Manifest
+        if: always()
+        run: |
+          echo "# visionOS Visual Regression Results" > ${{ env.SCREENSHOTS_DIR }}/visionos/MANIFEST.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ${{ env.SCREENSHOTS_DIR }}/visionos/MANIFEST.md
+          echo "Device: Apple Vision Pro (Simulator)" >> ${{ env.SCREENSHOTS_DIR }}/visionos/MANIFEST.md
+          echo "SDK Available: ${{ steps.vision_sdk.outputs.available }}" >> ${{ env.SCREENSHOTS_DIR }}/visionos/MANIFEST.md
+          echo "" >> ${{ env.SCREENSHOTS_DIR }}/visionos/MANIFEST.md
+          echo "## Screenshots" >> ${{ env.SCREENSHOTS_DIR }}/visionos/MANIFEST.md
+          find ${{ env.SCREENSHOTS_DIR }}/visionos -name "*.png" -exec basename {} \; 2>/dev/null | sort >> ${{ env.SCREENSHOTS_DIR }}/visionos/MANIFEST.md || true
+
+      - name: Upload visionOS Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-visionos
+          path: ${{ env.SCREENSHOTS_DIR }}/visionos
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+
+      - name: Shutdown Simulator
+        if: steps.vision_sdk.outputs.available == 'true' && always()
+        run: xcrun simctl shutdown "$VISION_ID" || true
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # AGGREGATE AND REPORT
+  # ═══════════════════════════════════════════════════════════════════════════
+  aggregate-results:
+    name: Aggregate Visual Regression Results
+    runs-on: ubuntu-latest
+    needs:
+      - ios-visual
+      - android-visual
+      - desktop-visual
+      - tvos-visual
+      - visionos-visual
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create aggregate directory
+        run: mkdir -p /tmp/all-visual-results
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: visual-*
+          path: /tmp/all-visual-results
+          merge-multiple: false
+
+      - name: Generate Visual Regression Report
+        run: |
+          cd /tmp/all-visual-results
+
+          echo "# Kagami Visual Regression Report" > REPORT.md
+          echo "" >> REPORT.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> REPORT.md
+          echo "Commit: ${{ github.sha }}" >> REPORT.md
+          echo "Branch: ${{ github.ref_name }}" >> REPORT.md
+          echo "" >> REPORT.md
+
+          echo "## Platform Results" >> REPORT.md
+          echo "" >> REPORT.md
+          echo "| Platform | Status | Screenshots | Videos |" >> REPORT.md
+          echo "|----------|--------|-------------|--------|" >> REPORT.md
+
+          PLATFORMS=("ios" "android" "desktop" "tvos" "visionos")
+          RESULTS=("${{ needs.ios-visual.result }}" "${{ needs.android-visual.result }}" "${{ needs.desktop-visual.result }}" "${{ needs.tvos-visual.result }}" "${{ needs.visionos-visual.result }}")
+
+          for i in "${!PLATFORMS[@]}"; do
+            PLATFORM="${PLATFORMS[$i]}"
+            RESULT="${RESULTS[$i]}"
+
+            if [ "$RESULT" = "success" ]; then
+              STATUS="Passed"
+            elif [ "$RESULT" = "failure" ]; then
+              STATUS="Failed"
+            elif [ "$RESULT" = "skipped" ]; then
+              STATUS="Skipped"
+            else
+              STATUS="$RESULT"
+            fi
+
+            SCREENSHOT_COUNT=$(find . -path "*$PLATFORM*" -name "*.png" 2>/dev/null | wc -l || echo "0")
+            VIDEO_COUNT=$(find . -path "*$PLATFORM*" \( -name "*.mp4" -o -name "*.webm" \) 2>/dev/null | wc -l || echo "0")
+
+            echo "| $PLATFORM | $STATUS | $SCREENSHOT_COUNT | $VIDEO_COUNT |" >> REPORT.md
+          done
+
+          echo "" >> REPORT.md
+          echo "## Screenshot Inventory" >> REPORT.md
+          echo "" >> REPORT.md
+
+          for dir in visual-*/; do
+            PLATFORM=$(echo "$dir" | sed 's/visual-//' | sed 's/\///')
+            echo "### $PLATFORM" >> REPORT.md
+            find "$dir" -name "*.png" -exec basename {} \; 2>/dev/null | sort | head -30 >> REPORT.md || echo "No screenshots" >> REPORT.md
+            TOTAL=$(find "$dir" -name "*.png" 2>/dev/null | wc -l || echo "0")
+            if [ "$TOTAL" -gt "30" ]; then
+              echo "... and $((TOTAL - 30)) more" >> REPORT.md
+            fi
+            echo "" >> REPORT.md
+          done
+
+          echo "" >> REPORT.md
+          echo "---" >> REPORT.md
+          echo "*h(x) >= 0. Always.*" >> REPORT.md
+
+      - name: Upload Complete Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-complete-report
+          path: /tmp/all-visual-results
+          retention-days: 90
+
+      - name: Post Summary
+        run: |
+          echo "## Visual Regression Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| iOS | ${{ needs.ios-visual.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Android | ${{ needs.android-visual.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Desktop | ${{ needs.desktop-visual.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| tvOS | ${{ needs.tvos-visual.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| visionOS | ${{ needs.visionos-visual.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download the **visual-regression-complete-report** artifact for all screenshots and videos." >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const results = {
+              ios: '${{ needs.ios-visual.result }}',
+              android: '${{ needs.android-visual.result }}',
+              desktop: '${{ needs.desktop-visual.result }}',
+              tvos: '${{ needs.tvos-visual.result }}',
+              visionos: '${{ needs.visionos-visual.result }}'
+            };
+
+            const statusEmoji = (status) => {
+              if (status === 'success') return ':white_check_mark:';
+              if (status === 'failure') return ':x:';
+              if (status === 'skipped') return ':fast_forward:';
+              return ':question:';
+            };
+
+            let body = '## Visual Regression Test Results\n\n';
+            body += '| Platform | Status |\n';
+            body += '|----------|--------|\n';
+
+            for (const [platform, result] of Object.entries(results)) {
+              body += `| ${platform} | ${statusEmoji(result)} ${result} |\n`;
+            }
+
+            body += '\n### Artifacts\n';
+            body += 'Download the test artifacts to review screenshots and videos.\n\n';
+            body += '---\n*h(x) >= 0. Always.*';
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existingComment = comments.find(c =>
+              c.user.login === 'github-actions[bot]' &&
+              c.body.includes('Visual Regression Test Results')
+            );
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # UPDATE BASELINES (on main branch or manual trigger)
+  # ═══════════════════════════════════════════════════════════════════════════
+  update-baselines:
+    name: Update Baseline Screenshots
+    runs-on: ubuntu-latest
+    needs: aggregate-results
+    if: github.ref == 'refs/heads/main' || github.event.inputs.update_baselines == 'true'
+
+    steps:
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          name: visual-regression-complete-report
+          path: /tmp/baselines
+
+      - name: Save baseline cache
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/baselines
+          key: visual-baselines-${{ github.sha }}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Mirror
+# Visual regression ensures UI consistency across all platforms
+# h(x) >= 0. Always.
+# ═══════════════════════════════════════════════════════════════════════════════

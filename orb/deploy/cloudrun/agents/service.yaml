@@ -1,0 +1,61 @@
+# Kagami Agent Runtime Service Configuration
+#
+# Apply: gcloud run services replace deploy/cloudrun/agents/service.yaml
+#
+# Created: January 7, 2026
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: kagami-agents
+  labels:
+    cloud.googleapis.com/location: us-west1
+  annotations:
+    run.googleapis.com/launch-stage: BETA
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        run.googleapis.com/cpu-throttling: "false"
+        run.googleapis.com/session-affinity: "true"
+        run.googleapis.com/startup-cpu-boost: "true"
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 300
+      serviceAccountName: kagami-agents
+      containers:
+        - image: gcr.io/PROJECT_ID/kagami-agents:latest
+          ports:
+            - containerPort: 8000
+          resources:
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          env:
+            - name: KAGAMI_ENVIRONMENT
+              value: production
+            - name: KAGAMI_LOG_LEVEL
+              value: INFO
+            - name: PORT
+              value: "8000"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            timeoutSeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+            periodSeconds: 30
+            failureThreshold: 3
+  traffic:
+    - percent: 100
+      latestRevision: true

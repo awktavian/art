@@ -1,0 +1,70 @@
+[package]
+name = "kagami-orb-firmware"
+version = "1.0.0"
+edition = "2021"
+description = "Kagami Orb ESP32-S3 Co-processor Firmware — HID, LED, Sensor Control"
+authors = ["Kagami"]
+license = "MIT"
+
+# ============================================================================
+# ESP32-S3 HAL (no_std async)
+# ============================================================================
+
+[dependencies]
+# ESP-IDF HAL bindings
+esp-idf-hal = "0.44"
+esp-idf-svc = { version = "0.49", features = ["alloc"] }
+esp-idf-sys = { version = "0.35", features = ["binstart"] }
+
+# Embassy async runtime (ESP32-S3 support)
+embassy-executor = { version = "0.7", features = ["arch-xtensa", "executor-thread"] }
+embassy-time = { version = "0.4" }
+embassy-sync = { version = "0.6" }
+
+# Logging
+log = "0.4"
+
+# Embedded HID
+usbd-hid = "0.8"
+usb-device = "0.3"
+
+# Heapless (no_std collections)
+heapless = "0.8"
+
+# Serialization
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+serde_yaml = { version = "0.9", optional = true }
+postcard = { version = "1.0", features = ["alloc"] }
+
+# Cryptography (payload signing)
+ed25519-dalek = { version = "2.1", default-features = false, features = ["alloc", "zeroize"] }
+
+# WASM runtime (plugin sandbox)
+wasmi = { version = "0.32", default-features = false, optional = true }
+
+# ============================================================================
+# Features
+# ============================================================================
+
+[features]
+default = ["ble_hid", "usb_hid", "duckyscript"]
+ble_hid = []           # Bluetooth HID profile
+usb_hid = []           # USB HID (docked mode)
+duckyscript = []       # DuckyScript interpreter
+plugin_system = ["wasmi", "serde_yaml"]  # WASM plugin support
+developer_mode = []    # Extended capabilities
+
+# ============================================================================
+# Build Configuration
+# ============================================================================
+
+[build-dependencies]
+embuild = "0.32"
+
+[profile.release]
+opt-level = "s"
+lto = "fat"
+
+[profile.dev]
+debug = true
+opt-level = 1

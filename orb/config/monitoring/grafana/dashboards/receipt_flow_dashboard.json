@@ -1,0 +1,212 @@
+{
+  "dashboard": {
+    "title": "K os Receipt Flow",
+    "tags": ["kagami", "receipts", "observability"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Receipt Flow (PLAN → EXECUTE → VERIFY)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kagami_receipts_total{phase=\"PLAN\"}[5m])",
+            "legendFormat": "PLAN - {{action}}",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(kagami_receipts_total{phase=\"EXECUTE\"}[5m])",
+            "legendFormat": "EXECUTE - {{action}}",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(kagami_receipts_total{phase=\"VERIFY\"}[5m])",
+            "legendFormat": "VERIFY - {{action}}",
+            "refId": "C"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}
+      },
+      {
+        "id": 2,
+        "title": "Receipt Phase Completeness Ratio",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(kagami_receipts_total{phase=\"VERIFY\"}[5m])) / sum(rate(kagami_receipts_total{phase=\"EXECUTE\"}[5m]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 0.8, "color": "yellow"},
+                {"value": 0.95, "color": "green"}
+              ]
+            },
+            "unit": "percentunit"
+          }
+        },
+        "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4}
+      },
+      {
+        "id": 3,
+        "title": "Receipt Write Errors by Type",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kagami_receipt_write_errors_total[5m])",
+            "legendFormat": "{{error_type}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"x": 18, "y": 0, "w": 6, "h": 4}
+      },
+      {
+        "id": 7,
+        "title": "Receipt Completeness Score",
+        "type": "gauge",
+        "description": "Percentage of operations with complete PLAN→EXECUTE→VERIFY cycles",
+        "targets": [
+          {
+            "expr": "kagami_receipt_completeness_score",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 50, "color": "orange"},
+                {"value": 80, "color": "yellow"},
+                {"value": 95, "color": "green"}
+              ]
+            },
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"x": 0, "y": 16, "w": 8, "h": 6}
+      },
+      {
+        "id": 8,
+        "title": "Missing Receipt Phases",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kagami_receipt_missing_phase_total{phase=\"plan\"}[5m])",
+            "legendFormat": "Missing PLAN",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(kagami_receipt_missing_phase_total{phase=\"execute\"}[5m])",
+            "legendFormat": "Missing EXECUTE",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(kagami_receipt_missing_phase_total{phase=\"verify\"}[5m])",
+            "legendFormat": "Missing VERIFY",
+            "refId": "C"
+          }
+        ],
+        "gridPos": {"x": 8, "y": 16, "w": 8, "h": 6}
+      },
+      {
+        "id": 9,
+        "title": "Receipt Sync Metrics",
+        "type": "graph",
+        "description": "Cross-instance receipt synchronization via etcd",
+        "targets": [
+          {
+            "expr": "rate(kagami_receipt_sync_publishes_total[5m])",
+            "legendFormat": "Published",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(kagami_receipt_sync_subscribes_total[5m])",
+            "legendFormat": "Received",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(kagami_receipt_sync_rate_limited_total[5m])",
+            "legendFormat": "Rate Limited",
+            "refId": "C"
+          },
+          {
+            "expr": "rate(kagami_receipt_sync_watch_failures_total[5m])",
+            "legendFormat": "Watch Failures",
+            "refId": "D"
+          }
+        ],
+        "gridPos": {"x": 16, "y": 16, "w": 8, "h": 6}
+      },
+      {
+        "id": 4,
+        "title": "Receipts by Correlation ID (Top 10)",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(10, count by (correlation_id) (kagami_receipts_total))",
+            "format": "table",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8}
+      },
+      {
+        "id": 5,
+        "title": "Receipt Endpoint Duration (p50/p95/p99)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(kagami_receipts_endpoint_duration_seconds_bucket[5m]))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(kagami_receipts_endpoint_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(kagami_receipts_endpoint_duration_seconds_bucket[5m]))",
+            "legendFormat": "p99",
+            "refId": "C"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}
+      },
+      {
+        "id": 6,
+        "title": "Receipt Phase Latency (PLAN→EXECUTE→VERIFY avg time)",
+        "type": "stat",
+        "description": "Average time from PLAN to VERIFY completion",
+        "targets": [
+          {
+            "expr": "avg(kagami_receipts_endpoint_duration_seconds)",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1.0, "color": "yellow"},
+                {"value": 5.0, "color": "red"}
+              ]
+            }
+          }
+        },
+        "gridPos": {"x": 18, "y": 4, "w": 6, "h": 4}
+      }
+    ],
+    "refresh": "10s",
+    "time": {"from": "now-1h", "to": "now"}
+  }
+}

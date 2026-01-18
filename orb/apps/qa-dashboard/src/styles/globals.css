@@ -1,0 +1,501 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Kagami QA Dashboard - Global Styles
+ *
+ * IMPORTANT: CSS custom properties defined here MUST stay in sync with
+ * design-tokens.ts - that file is the single source of truth.
+ * @see ./design-tokens.ts
+ *
+ * Design Philosophy:
+ * - Dark mode by default (void background)
+ * - Colony colors for semantic meaning
+ * - Fibonacci timing for all animations (89, 144, 233, 377, 610, 987, 1597, 2584ms)
+ * - WCAG AAA compliance
+ */
+
+@layer base {
+  :root {
+    /* Colony Colors */
+    --color-spark: 255 107 53;
+    --color-forge: 255 149 0;
+    --color-flow: 90 200 250;
+    --color-nexus: 175 82 222;
+    --color-beacon: 255 214 10;
+    --color-grove: 50 215 75;
+    --color-crystal: 100 210 255;
+
+    /* Semantic Colors */
+    --color-void: 10 10 15;
+    --color-void-light: 28 28 36;
+    --color-void-lighter: 42 42 54;
+
+    /* Status Colors */
+    --color-pass: 50 215 75;
+    --color-fail: 255 59 48;
+    --color-progress: 255 149 0;
+    --color-pending: 100 210 255;
+    --color-warning: 255 214 10;
+
+    /* Text Colors */
+    --color-text-primary: 255 255 255;
+    --color-text-secondary: 180 180 190;
+    --color-text-tertiary: 120 120 130;
+
+    /* Fibonacci Durations */
+    --duration-micro: 89ms;
+    --duration-fast: 144ms;
+    --duration-normal: 233ms;
+    --duration-medium: 377ms;
+    --duration-slow: 610ms;
+    --duration-slower: 987ms;
+    --duration-slowest: 1597ms;
+    --duration-breathing: 2584ms;
+
+    /* Easing */
+    --ease-standard: cubic-bezier(0.4, 0.0, 0.2, 1.0);
+    --ease-decelerate: cubic-bezier(0.0, 0.0, 0.2, 1.0);
+    --ease-accelerate: cubic-bezier(0.4, 0.0, 1.0, 1.0);
+    --ease-overshoot: cubic-bezier(0.34, 1.56, 0.64, 1.0);
+
+    /* Spacing */
+    --min-touch-target: 44px;
+  }
+
+  /* Light mode overrides */
+  .light {
+    --color-void: 250 250 252;
+    --color-void-light: 240 240 244;
+    --color-void-lighter: 230 230 236;
+    --color-text-primary: 10 10 15;
+    --color-text-secondary: 80 80 90;
+    --color-text-tertiary: 140 140 150;
+  }
+
+  html {
+    font-family: 'Inter', 'SF Pro', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-void text-white min-h-screen;
+    transition: background-color var(--duration-normal) var(--ease-standard),
+                color var(--duration-normal) var(--ease-standard);
+  }
+
+  /* Focus styles for accessibility */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-colony-crystal ring-offset-2 ring-offset-void;
+  }
+
+  /* Skip link for keyboard navigation */
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50;
+    @apply bg-colony-crystal text-void px-4 py-2 rounded-md font-medium;
+  }
+
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    :root {
+      --color-text-secondary: 220 220 230;
+      --color-text-tertiary: 180 180 190;
+    }
+
+    .dark {
+      /* Increase contrast for dark mode in high contrast preference */
+      --color-void-light: 20 20 28;
+      --color-void-lighter: 32 32 44;
+    }
+
+    /* Ensure minimum contrast for interactive elements */
+    a,
+    button,
+    [role="button"] {
+      text-decoration-thickness: 2px;
+    }
+
+    /* Stronger borders in high contrast mode */
+    .card,
+    .btn,
+    .input {
+      border-width: 2px;
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+  }
+
+  /* Force colors mode (Windows High Contrast) */
+  @media (forced-colors: active) {
+    .card,
+    .btn,
+    .badge {
+      border: 1px solid CanvasText;
+    }
+
+    .btn-primary {
+      background-color: Highlight;
+      color: HighlightText;
+    }
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Card component */
+  .card {
+    @apply bg-void-light rounded-lg p-4 shadow-card;
+    @apply transition-all duration-normal ease-standard;
+  }
+
+  .card:hover {
+    @apply shadow-card-hover;
+    transform: translateY(-2px);
+  }
+
+  /* Status badge */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply transition-colors duration-fast ease-standard;
+  }
+
+  .badge-pass {
+    @apply bg-status-pass/20 text-status-pass;
+  }
+
+  .badge-fail {
+    @apply bg-status-fail/20 text-status-fail;
+  }
+
+  .badge-progress {
+    @apply bg-status-progress/20 text-status-progress;
+  }
+
+  .badge-pending {
+    @apply bg-status-pending/20 text-status-pending;
+  }
+
+  .badge-warning {
+    @apply bg-status-warning/20 text-status-warning;
+  }
+
+  /* Button base */
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-md font-medium;
+    @apply transition-all duration-fast ease-standard;
+    @apply focus-visible:ring-2 focus-visible:ring-colony-crystal focus-visible:ring-offset-2;
+    min-height: var(--min-touch-target);
+    min-width: var(--min-touch-target);
+  }
+
+  .btn-primary {
+    @apply bg-colony-crystal text-void hover:bg-colony-crystal/90;
+  }
+
+  .btn-secondary {
+    @apply bg-void-lighter text-white hover:bg-void-lighter/80;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent text-white/70 hover:text-white hover:bg-white/10;
+  }
+
+  /* Input base */
+  .input {
+    @apply w-full px-3 py-2 bg-void-lighter rounded-md border border-white/10;
+    @apply text-white placeholder:text-white/40;
+    @apply transition-all duration-fast ease-standard;
+    @apply focus:border-colony-crystal focus:ring-1 focus:ring-colony-crystal;
+    min-height: var(--min-touch-target);
+  }
+
+  /* Glow effects for colony colors - static */
+  .glow-spark { box-shadow: 0 0 20px rgba(255, 107, 53, 0.3); }
+  .glow-forge { box-shadow: 0 0 20px rgba(255, 149, 0, 0.3); }
+  .glow-flow { box-shadow: 0 0 20px rgba(90, 200, 250, 0.3); }
+  .glow-nexus { box-shadow: 0 0 20px rgba(175, 82, 222, 0.3); }
+  .glow-beacon { box-shadow: 0 0 20px rgba(255, 214, 10, 0.3); }
+  .glow-grove { box-shadow: 0 0 20px rgba(50, 215, 75, 0.3); }
+  .glow-crystal { box-shadow: 0 0 20px rgba(100, 210, 255, 0.3); }
+
+  /* ==========================================================================
+   * ANIMATED GLOW STATES - Sensory richness for celebrations!
+   *
+   * Use these for:
+   * - glow-grove: Success states, test passes, achievements
+   * - glow-nexus: Processing states, thinking, working
+   * - glow-beacon: TRIUMPH celebrations, major wins
+   * ========================================================================== */
+
+  /* Pulsing glow for success - satisfying, warm */
+  .glow-grove-pulse {
+    animation: glow-grove-pulse var(--duration-slower) ease-in-out;
+  }
+
+  @keyframes glow-grove-pulse {
+    0% {
+      box-shadow: 0 0 20px rgba(50, 215, 75, 0.2);
+      background: radial-gradient(circle at center, rgba(50, 215, 75, 0.15), transparent 70%);
+    }
+    50% {
+      box-shadow: 0 0 60px rgba(50, 215, 75, 0.5), 0 0 100px rgba(50, 215, 75, 0.3);
+      background: radial-gradient(circle at center, rgba(50, 215, 75, 0.3), transparent 70%);
+    }
+    100% {
+      box-shadow: 0 0 20px rgba(50, 215, 75, 0.1);
+      background: radial-gradient(circle at center, rgba(50, 215, 75, 0.05), transparent 70%);
+    }
+  }
+
+  /* Breathing glow for processing - calm, focused */
+  .glow-nexus-breathe {
+    animation: glow-nexus-breathe var(--duration-breathing) ease-in-out infinite;
+  }
+
+  @keyframes glow-nexus-breathe {
+    0%, 100% {
+      box-shadow: 0 0 30px rgba(175, 82, 222, 0.2);
+      background: radial-gradient(circle at center, rgba(175, 82, 222, 0.1), transparent 70%);
+    }
+    50% {
+      box-shadow: 0 0 50px rgba(175, 82, 222, 0.4), 0 0 80px rgba(175, 82, 222, 0.2);
+      background: radial-gradient(circle at center, rgba(175, 82, 222, 0.2), transparent 70%);
+    }
+  }
+
+  /* TRIUMPH glow - radiating joy! Golden beacon effect */
+  .glow-beacon-triumph {
+    animation: glow-beacon-triumph var(--duration-slowest) ease-out;
+  }
+
+  @keyframes glow-beacon-triumph {
+    0% {
+      box-shadow: 0 0 40px rgba(255, 214, 10, 0.3);
+      background: radial-gradient(circle at center, rgba(255, 214, 10, 0.2), transparent 60%);
+    }
+    25% {
+      box-shadow:
+        0 0 80px rgba(255, 214, 10, 0.6),
+        0 0 120px rgba(255, 149, 0, 0.4),
+        0 0 160px rgba(50, 215, 75, 0.2);
+      background: radial-gradient(circle at center, rgba(255, 214, 10, 0.4), transparent 70%);
+    }
+    50% {
+      box-shadow:
+        0 0 100px rgba(255, 214, 10, 0.5),
+        0 0 150px rgba(255, 149, 0, 0.3),
+        0 0 200px rgba(50, 215, 75, 0.15);
+      background: radial-gradient(circle at center, rgba(255, 214, 10, 0.35), transparent 75%);
+    }
+    100% {
+      box-shadow: 0 0 30px rgba(255, 214, 10, 0.1);
+      background: radial-gradient(circle at center, rgba(255, 214, 10, 0.05), transparent 60%);
+    }
+  }
+
+  /* Shimmer effect for micro-wins */
+  .glow-shimmer {
+    animation: glow-shimmer var(--duration-slow) ease-out;
+  }
+
+  @keyframes glow-shimmer {
+    0% {
+      box-shadow: 0 0 0 rgba(100, 210, 255, 0);
+    }
+    30% {
+      box-shadow: 0 0 30px rgba(100, 210, 255, 0.5);
+    }
+    100% {
+      box-shadow: 0 0 0 rgba(100, 210, 255, 0);
+    }
+  }
+
+  /* Full-screen glow overlay states (for CelebrationCanvas) */
+  .glow-overlay-grove {
+    background: radial-gradient(circle at center, rgba(50, 215, 75, 0.15), transparent 70%);
+    transition: opacity var(--duration-slow) var(--ease-decelerate);
+  }
+
+  .glow-overlay-nexus {
+    background: radial-gradient(circle at center, rgba(175, 82, 222, 0.12), transparent 70%);
+    transition: opacity var(--duration-slow) var(--ease-decelerate);
+  }
+
+  .glow-overlay-beacon {
+    background: radial-gradient(
+      circle at center,
+      rgba(255, 214, 10, 0.2),
+      rgba(255, 149, 0, 0.1) 40%,
+      transparent 70%
+    );
+    transition: opacity var(--duration-slow) var(--ease-decelerate);
+  }
+
+  /* Video player container */
+  .video-container {
+    @apply relative w-full bg-black rounded-lg overflow-hidden;
+    aspect-ratio: 16 / 9;
+  }
+
+  /* Timeline marker */
+  .timeline-marker {
+    @apply absolute w-3 h-3 rounded-full cursor-pointer;
+    @apply transition-transform duration-fast ease-overshoot;
+    transform: translateY(-50%);
+  }
+
+  .timeline-marker:hover {
+    transform: translateY(-50%) scale(1.3);
+  }
+
+  /* Chart container */
+  .chart-container {
+    @apply w-full h-64 bg-void-light rounded-lg p-4;
+  }
+
+  /* Skeleton loading */
+  .skeleton {
+    @apply bg-void-lighter rounded animate-pulse;
+  }
+
+  /* Table styles */
+  .table-header {
+    @apply text-left text-sm font-medium text-white/60 px-4 py-3;
+  }
+
+  .table-cell {
+    @apply px-4 py-3 text-sm;
+  }
+
+  .table-row {
+    @apply border-t border-white/5 transition-colors duration-fast;
+  }
+
+  .table-row:hover {
+    @apply bg-white/5;
+  }
+
+  /* Scrollbar styling */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-white/20 rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-white/30;
+  }
+}
+
+@layer utilities {
+  /* Colony background utilities */
+  .bg-colony-spark-gradient {
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.2), rgba(255, 107, 53, 0.05));
+  }
+  .bg-colony-forge-gradient {
+    background: linear-gradient(135deg, rgba(255, 149, 0, 0.2), rgba(255, 149, 0, 0.05));
+  }
+  .bg-colony-flow-gradient {
+    background: linear-gradient(135deg, rgba(90, 200, 250, 0.2), rgba(90, 200, 250, 0.05));
+  }
+  .bg-colony-nexus-gradient {
+    background: linear-gradient(135deg, rgba(175, 82, 222, 0.2), rgba(175, 82, 222, 0.05));
+  }
+  .bg-colony-beacon-gradient {
+    background: linear-gradient(135deg, rgba(255, 214, 10, 0.2), rgba(255, 214, 10, 0.05));
+  }
+  .bg-colony-grove-gradient {
+    background: linear-gradient(135deg, rgba(50, 215, 75, 0.2), rgba(50, 215, 75, 0.05));
+  }
+  .bg-colony-crystal-gradient {
+    background: linear-gradient(135deg, rgba(100, 210, 255, 0.2), rgba(100, 210, 255, 0.05));
+  }
+
+  /* Animation delay utilities (Fibonacci sequence)
+   * Use these for staggered animations to create natural rhythm.
+   * Higher values (slowest, breathing, celebration) are for emphasis.
+   */
+  .animation-delay-89 { animation-delay: 89ms; }      /* micro */
+  .animation-delay-144 { animation-delay: 144ms; }    /* fast */
+  .animation-delay-233 { animation-delay: 233ms; }    /* normal */
+  .animation-delay-377 { animation-delay: 377ms; }    /* medium */
+  .animation-delay-610 { animation-delay: 610ms; }    /* slow */
+  .animation-delay-987 { animation-delay: 987ms; }    /* slower */
+  .animation-delay-1597 { animation-delay: 1597ms; }  /* slowest */
+  .animation-delay-2584 { animation-delay: 2584ms; }  /* breathing */
+
+  /* Celebration duration classes - scale based on context importance
+   * 1 (minor): 233ms, 2: 377ms, 3 (standard): 610ms, 4: 987ms, 5 (major): 1597ms
+   * @see design-tokens.ts getCelebrationDuration()
+   */
+  .celebration-minor { animation-duration: 233ms; }
+  .celebration-small { animation-duration: 377ms; }
+  .celebration-standard { animation-duration: 610ms; }
+  .celebration-notable { animation-duration: 987ms; }
+  .celebration-major { animation-duration: 1597ms; }
+
+  /* Safe area padding for mobile */
+  .safe-area-inset {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Video.js custom theme */
+.vjs-kagami-theme {
+  --vjs-theme-color: #64D2FF;
+}
+
+.vjs-kagami-theme .vjs-control-bar {
+  @apply bg-void-light/90 backdrop-blur-sm;
+}
+
+.vjs-kagami-theme .vjs-play-progress,
+.vjs-kagami-theme .vjs-volume-level {
+  background-color: var(--vjs-theme-color);
+}
+
+.vjs-kagami-theme .vjs-big-play-button {
+  @apply bg-void/80 border-2 border-colony-crystal rounded-full;
+  @apply transition-transform duration-normal ease-overshoot;
+}
+
+.vjs-kagami-theme .vjs-big-play-button:hover {
+  @apply bg-void border-colony-crystal;
+  transform: scale(1.1);
+}
+
+/* Print styles */
+@media print {
+  body {
+    @apply bg-white text-black;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .card {
+    @apply bg-gray-100 shadow-none border border-gray-300;
+  }
+}

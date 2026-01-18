@@ -1,0 +1,387 @@
+name: Canvas Course Deployment
+
+# Automatically deploy Canvas courses when changes are pushed to main
+# Supports Tool Time University and future courses
+#
+# Colony: Beacon (e₅) — Outreach, deployment
+#
+# η → s → μ → a → η′
+# h(x) ≥ 0. Always.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/canvas-courses/**'
+  workflow_dispatch:
+    inputs:
+      course:
+        description: 'Course to deploy (leave empty for all changed)'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Dry run (build only, no deploy)'
+        required: false
+        default: 'false'
+        type: boolean
+
+concurrency:
+  group: canvas-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ============================================================================
+  # DETECT CHANGED COURSES
+  # ============================================================================
+  detect_changes:
+    name: Detect Changed Courses
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      courses: ${{ steps.detect.outputs.courses }}
+      has_changes: ${{ steps.detect.outputs.has_changes }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect course changes
+        id: detect
+        run: |
+          # If manual dispatch with specific course
+          if [ -n "${{ github.event.inputs.course }}" ]; then
+            echo "Manual dispatch for course: ${{ github.event.inputs.course }}"
+            echo "courses=[\"${{ github.event.inputs.course }}\"]" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Get changed files
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          HEAD="${{ github.sha }}"
+
+          CHANGED=$(git diff --name-only $BASE $HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # Find unique courses with changes
+          COURSES=$(echo "$CHANGED" | grep "^apps/canvas-courses/" | cut -d'/' -f3 | sort -u | grep -v "^$" || true)
+
+          if [ -z "$COURSES" ]; then
+            echo "No canvas course changes detected"
+            echo "courses=[]" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            # Convert to JSON array
+            JSON_COURSES=$(echo "$COURSES" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            echo "Detected courses: $JSON_COURSES"
+            echo "courses=$JSON_COURSES" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+  # ============================================================================
+  # BUILD IMSCC PACKAGES
+  # ============================================================================
+  build:
+    name: Build ${{ matrix.course }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.has_changes == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        course: ${{ fromJson(needs.detect_changes.outputs.courses) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate course structure
+        run: |
+          COURSE_DIR="apps/canvas-courses/${{ matrix.course }}"
+
+          echo "Validating course: ${{ matrix.course }}"
+
+          # Check required directories
+          if [ ! -d "${COURSE_DIR}/canvas-export" ]; then
+            echo "ERROR: canvas-export directory not found"
+            exit 1
+          fi
+
+          # Check required files
+          REQUIRED_FILES=(
+            "canvas-export/imsmanifest.xml"
+            "canvas-export/course_settings/course_settings.xml"
+          )
+
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "${COURSE_DIR}/${file}" ]; then
+              echo "ERROR: Required file missing: ${file}"
+              exit 1
+            fi
+            echo "  ✓ ${file}"
+          done
+
+          echo "✅ Course structure validated"
+
+      - name: Build IMSCC package
+        run: |
+          COURSE_DIR="apps/canvas-courses/${{ matrix.course }}"
+          OUTPUT_FILE="${COURSE_DIR}/${{ matrix.course }}.imscc"
+
+          echo "Building IMSCC for ${{ matrix.course }}..."
+
+          cd "${COURSE_DIR}/canvas-export"
+
+          # Create IMSCC package
+          zip -r "../${{ matrix.course }}.imscc" . \
+            -x "*.DS_Store" \
+            -x "__MACOSX/*" \
+            -x "*.git*" \
+            -x "*.sh"
+
+          echo "✅ Package built: ${{ matrix.course }}.imscc"
+
+          # Show package info
+          unzip -l "../${{ matrix.course }}.imscc" | head -20
+          echo "..."
+
+      - name: Validate IMSCC structure
+        run: |
+          IMSCC_FILE="apps/canvas-courses/${{ matrix.course }}/${{ matrix.course }}.imscc"
+
+          # Check that imsmanifest.xml is at root
+          if ! unzip -l "$IMSCC_FILE" | grep -q "^ *[0-9].*imsmanifest.xml$"; then
+            echo "ERROR: imsmanifest.xml not at package root"
+            exit 1
+          fi
+
+          # Validate XML structure
+          unzip -p "$IMSCC_FILE" imsmanifest.xml | head -5
+
+          echo "✅ IMSCC structure validated"
+
+      - name: Upload IMSCC artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: imscc-${{ matrix.course }}
+          path: apps/canvas-courses/${{ matrix.course }}/${{ matrix.course }}.imscc
+          retention-days: 30
+
+  # ============================================================================
+  # DEPLOY TO CANVAS (via API)
+  # ============================================================================
+  deploy:
+    name: Deploy ${{ matrix.course }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [detect_changes, build]
+    if: |
+      needs.build.result == 'success' &&
+      github.event.inputs.dry_run != 'true' &&
+      github.ref == 'refs/heads/main'
+    environment: canvas-production
+    strategy:
+      fail-fast: false
+      matrix:
+        course: ${{ fromJson(needs.detect_changes.outputs.courses) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install requests
+
+      - name: Download IMSCC artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: imscc-${{ matrix.course }}
+          path: ./imscc/
+
+      - name: Get course configuration
+        id: config
+        run: |
+          COURSE_DIR="apps/canvas-courses/${{ matrix.course }}"
+
+          # Read course code from settings if available
+          if [ -f "${COURSE_DIR}/canvas-export/course_settings/course_settings.xml" ]; then
+            COURSE_CODE=$(grep -oP '(?<=<course_code>)[^<]+' "${COURSE_DIR}/canvas-export/course_settings/course_settings.xml" || echo "${{ matrix.course }}")
+          else
+            COURSE_CODE="${{ matrix.course }}"
+          fi
+
+          echo "course_code=${COURSE_CODE}" >> $GITHUB_OUTPUT
+          echo "Course code: ${COURSE_CODE}"
+
+      - name: Deploy to Canvas
+        env:
+          CANVAS_API_URL: https://canvas.instructure.com
+          CANVAS_API_TOKEN: ${{ secrets.CANVAS_API_TOKEN }}
+          CANVAS_COURSE_ID: 13716705
+        run: |
+          python << 'EOF'
+          import os
+          import sys
+          import time
+          import requests
+
+          API_URL = os.environ.get('CANVAS_API_URL', 'https://canvas.instructure.com')
+          API_TOKEN = os.environ.get('CANVAS_API_TOKEN')
+          COURSE_ID = os.environ.get('CANVAS_COURSE_ID')
+          IMSCC_FILE = 'imscc/${{ matrix.course }}.imscc'
+
+          if not API_TOKEN:
+              print("⚠️  CANVAS_API_TOKEN not set - skipping deployment")
+              print("   To enable auto-deploy, add CANVAS_API_TOKEN secret")
+              sys.exit(0)
+
+          if not COURSE_ID:
+              print("⚠️  CANVAS_COURSE_ID not set - skipping deployment")
+              print("   To enable auto-deploy, add CANVAS_COURSE_ID variable")
+              sys.exit(0)
+
+          headers = {
+              'Authorization': f'Bearer {API_TOKEN}'
+          }
+
+          print(f"🚀 Deploying to Canvas course {COURSE_ID}...")
+
+          # Step 1: Request upload URL
+          print("   Requesting upload URL...")
+          response = requests.post(
+              f'{API_URL}/api/v1/courses/{COURSE_ID}/content_migrations',
+              headers=headers,
+              data={
+                  'migration_type': 'common_cartridge_importer',
+                  'pre_attachment[name]': '${{ matrix.course }}.imscc',
+                  'pre_attachment[size]': os.path.getsize(IMSCC_FILE),
+                  'pre_attachment[content_type]': 'application/zip'
+              }
+          )
+
+          if response.status_code != 200:
+              print(f"❌ Failed to create migration: {response.status_code}")
+              print(response.text)
+              sys.exit(1)
+
+          migration = response.json()
+          migration_id = migration['id']
+          upload_url = migration.get('pre_attachment', {}).get('upload_url')
+          upload_params = migration.get('pre_attachment', {}).get('upload_params', {})
+
+          if not upload_url:
+              print("❌ No upload URL returned")
+              sys.exit(1)
+
+          # Step 2: Upload the file
+          print(f"   Uploading {IMSCC_FILE}...")
+          with open(IMSCC_FILE, 'rb') as f:
+              files = {'file': ('${{ matrix.course }}.imscc', f, 'application/zip')}
+              response = requests.post(upload_url, data=upload_params, files=files)
+
+          if response.status_code not in [200, 201, 301, 302, 303]:
+              print(f"❌ Upload failed: {response.status_code}")
+              print(response.text)
+              sys.exit(1)
+
+          # Step 3: Confirm and start migration
+          print("   Confirming upload...")
+
+          # Handle redirect if needed
+          if response.status_code in [301, 302, 303]:
+              confirm_url = response.headers.get('Location')
+              if confirm_url:
+                  response = requests.post(confirm_url, headers=headers)
+
+          # Step 4: Wait for migration to complete
+          print("   Waiting for migration to complete...")
+          max_wait = 300  # 5 minutes
+          start_time = time.time()
+
+          while time.time() - start_time < max_wait:
+              status_response = requests.get(
+                  f'{API_URL}/api/v1/courses/{COURSE_ID}/content_migrations/{migration_id}',
+                  headers=headers
+              )
+
+              if status_response.status_code != 200:
+                  print(f"⚠️  Could not check migration status")
+                  break
+
+              status = status_response.json()
+              workflow_state = status.get('workflow_state')
+              progress = status.get('progress', 0)
+
+              print(f"   Progress: {progress}% - {workflow_state}")
+
+              if workflow_state == 'completed':
+                  print("✅ Migration completed successfully!")
+                  break
+              elif workflow_state == 'failed':
+                  print("❌ Migration failed")
+                  print(status.get('migration_issues', []))
+                  sys.exit(1)
+              elif workflow_state in ['pre_processing', 'pre_processed', 'running', 'queued']:
+                  time.sleep(5)
+              else:
+                  print(f"⚠️  Unknown state: {workflow_state}")
+                  time.sleep(5)
+          else:
+              print("⚠️  Migration timed out - check Canvas for status")
+
+          print(f"🎉 Deployment complete: {API_URL}/courses/{COURSE_ID}")
+          EOF
+
+      - name: Post deployment summary
+        if: always()
+        run: |
+          echo "## Canvas Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Course | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| ${{ matrix.course }} | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # NOTIFY ON COMPLETION
+  # ============================================================================
+  notify:
+    name: Deployment Notification
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [detect_changes, build, deploy]
+    if: always() && needs.detect_changes.outputs.has_changes == 'true'
+    steps:
+      - name: Create summary
+        run: |
+          echo "# 📚 Canvas Course Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Courses" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '${{ needs.detect_changes.outputs.courses }}' | jq -r '.[]' | while read course; do
+            echo "- $course" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*DOES EVERYBODY KNOW WHAT TIME IT IS? TOOL TIME!*" >> $GITHUB_STEP_SUMMARY

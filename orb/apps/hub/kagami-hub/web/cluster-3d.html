@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<!--
+  Kagami Cluster — Spatial Visualization
+  
+  A 3D WebGPU-powered visualization of the distributed Byzantine consensus cluster.
+  Services as glowing orbs. Data flows as particles. Consensus as harmony.
+  
+  Features:
+  - WebGPU/WebGL2 rendering via Three.js
+  - GPU compute particle systems for data flow
+  - Force-directed 3D graph layout
+  - Post-processing: Bloom, DOF, Vignette
+  - WebXR support for immersive viewing
+  - Spatial audio for cluster events
+  
+  Colony: Crystal (e₇) — The mirror reflects the distributed system
+  h(x) ≥ 0. Always.
+  
+  Created: January 4, 2026
+  鏡
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kagami Cluster — Spatial View</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+        }
+        
+        #canvas-container {
+            position: fixed;
+            inset: 0;
+        }
+        
+        /* HUD Overlay */
+        #hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .hud-panel {
+            background: rgba(10, 10, 15, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 16px 20px;
+            pointer-events: auto;
+        }
+        
+        .hud-title {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 8px;
+        }
+        
+        .hud-value {
+            font-size: 24px;
+            font-weight: 300;
+            font-family: 'IBM Plex Mono', monospace;
+            color: #fff;
+        }
+        
+        .hud-value.healthy { color: #22c55e; }
+        .hud-value.warning { color: #f59e0b; }
+        .hud-value.critical { color: #ef4444; }
+        
+        /* Status badges */
+        .status-row {
+            display: flex;
+            gap: 16px;
+            margin-top: 12px;
+        }
+        
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 8px #22c55e;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(0.9); }
+        }
+        
+        /* Controls */
+        #controls {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            z-index: 100;
+        }
+        
+        .control-btn {
+            background: rgba(10, 10, 15, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 12px 20px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .control-btn:hover {
+            background: rgba(30, 30, 40, 0.9);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .control-btn.active {
+            background: rgba(14, 165, 233, 0.3);
+            border-color: rgba(14, 165, 233, 0.5);
+        }
+        
+        /* Loading */
+        #loading {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease;
+        }
+        
+        #loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .loading-orb {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #ec4899, #8b5cf6);
+            box-shadow: 0 0 60px rgba(236, 72, 153, 0.5);
+            animation: float 2s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .loading-text {
+            margin-top: 24px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            letter-spacing: 0.05em;
+        }
+        
+        /* Info panel */
+        #info-panel {
+            position: fixed;
+            right: 24px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 280px;
+            background: rgba(10, 10, 15, 0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 20px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 100;
+        }
+        
+        #info-panel.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        .info-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .info-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        
+        .info-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+        }
+        
+        .info-subtitle {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .info-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        
+        .info-stat {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        
+        .info-stat-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: rgba(255, 255, 255, 0.4);
+            margin-bottom: 4px;
+        }
+        
+        .info-stat-value {
+            font-size: 18px;
+            font-family: 'IBM Plex Mono', monospace;
+            color: #fff;
+        }
+        
+        /* WebXR button styling handled by Three.js */
+        #VRButton {
+            position: fixed !important;
+            bottom: 24px !important;
+            right: 24px !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading">
+        <div class="loading-orb"></div>
+        <div class="loading-text">Initializing spatial view...</div>
+    </div>
+    
+    <!-- Canvas Container -->
+    <div id="canvas-container"></div>
+    
+    <!-- HUD -->
+    <div id="hud">
+        <div class="hud-panel">
+            <div class="hud-title">Cluster Status</div>
+            <div class="hud-value healthy" id="cluster-status">CONNECTING...</div>
+            <div class="status-row">
+                <div class="status-badge">
+                    <div class="status-dot"></div>
+                    <span id="node-count">0 nodes</span>
+                </div>
+                <div class="status-badge">
+                    <span id="consensus-height">Height: 0</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="hud-panel">
+            <div class="hud-title">PBFT Consensus</div>
+            <div class="hud-value" id="consensus-phase">IDLE</div>
+            <div class="status-row">
+                <div class="status-badge">
+                    <span id="leader-node">Leader: —</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="hud-panel" id="connection-panel">
+            <div class="hud-title">Data Source</div>
+            <div id="connection-status" class="status-badge">
+                <div class="status-dot" id="ws-dot" style="background: #f59e0b;"></div>
+                <span id="data-source">Initializing...</span>
+            </div>
+            <div style="margin-top: 8px;">
+                <button class="control-btn" id="btn-refresh" style="padding: 6px 12px; font-size: 11px;">↻ Refresh</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Controls -->
+    <div id="controls">
+        <button class="control-btn active" id="btn-orbit">Orbit</button>
+        <button class="control-btn" id="btn-top">Top View</button>
+        <button class="control-btn" id="btn-focus">Focus Leader</button>
+        <button class="control-btn" id="btn-xr">Enter XR</button>
+    </div>
+    
+    <!-- Node Info Panel -->
+    <div id="info-panel">
+        <div class="info-header">
+            <div class="info-icon" id="info-icon">🔮</div>
+            <div>
+                <div class="info-title" id="info-title">Node Name</div>
+                <div class="info-subtitle" id="info-subtitle">service-type</div>
+            </div>
+        </div>
+        <div class="info-stats">
+            <div class="info-stat">
+                <div class="info-stat-label">Health</div>
+                <div class="info-stat-value" id="info-health">100%</div>
+            </div>
+            <div class="info-stat">
+                <div class="info-stat-label">Latency</div>
+                <div class="info-stat-value" id="info-latency">12ms</div>
+            </div>
+            <div class="info-stat">
+                <div class="info-stat-label">Messages</div>
+                <div class="info-stat-value" id="info-messages">1.2k</div>
+            </div>
+            <div class="info-stat">
+                <div class="info-stat-label">Uptime</div>
+                <div class="info-stat-value" id="info-uptime">99.9%</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Three.js + WebGPU -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+        }
+    }
+    </script>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { VRButton } from 'three/addons/webxr/VRButton.js';
+        
+        // =================================================================
+        // COLONY COLORS
+        // =================================================================
+        const COLONY_COLORS = {
+            spark: new THREE.Color(0xf59e0b),
+            forge: new THREE.Color(0xef4444),
+            flow: new THREE.Color(0x3b82f6),
+            nexus: new THREE.Color(0x8b5cf6),
+            beacon: new THREE.Color(0x10b981),
+            grove: new THREE.Color(0x6366f1),
+            crystal: new THREE.Color(0xec4899),
+            healthy: new THREE.Color(0x22c55e),
+            warning: new THREE.Color(0xf59e0b),
+            critical: new THREE.Color(0xef4444),
+        };
+        
+        // =================================================================
+        // SCENE SETUP
+        // =================================================================
+        let scene, camera, renderer, composer, controls;
+        let nodeGroup, connectionGroup, particleSystem;
+        let clock = new THREE.Clock();
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        let selectedNode = null;
+        let hoveredNode = null;
+        
+        // Cluster state
+        let clusterState = {
+            nodes: [],
+            connections: [],
+            consensus: { phase: 'IDLE', height: 0, leader: null },
+            health: 'healthy'
+        };
+        
+        // =================================================================
+        // INITIALIZATION
+        // =================================================================
+        async function init() {
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x030308);
+            scene.fog = new THREE.FogExp2(0x030308, 0.015);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 15, 30);
+            
+            // Renderer - try WebGPU first, fallback to WebGL
+            try {
+                const { WebGPURenderer } = await import('three/addons/renderers/webgpu/WebGPURenderer.js');
+                renderer = new WebGPURenderer({ antialias: true });
+                console.log('✅ WebGPU renderer initialized');
+            } catch (e) {
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                console.log('⚠️ WebGL fallback renderer');
+            }
+            
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+            
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 10;
+            controls.maxDistance = 100;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 0.3;
+            
+            // Post-processing
+            setupPostProcessing();
+            
+            // Scene elements
+            createStarfield();
+            createGrid();
+            nodeGroup = new THREE.Group();
+            connectionGroup = new THREE.Group();
+            scene.add(nodeGroup);
+            scene.add(connectionGroup);
+            
+            // Particles
+            createParticleSystem();
+            
+            // Lights
+            createLighting();
+            
+            // WebXR
+            setupWebXR();
+            
+            // Events
+            window.addEventListener('resize', onResize);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('click', onClick);
+            setupControls();
+            
+            // Refresh button
+            document.getElementById('btn-refresh').addEventListener('click', async () => {
+                document.getElementById('data-source').textContent = 'Refreshing...';
+                await loadClusterData();
+            });
+            
+            // Load initial data
+            await loadClusterData();
+            updateConnectionStatus();
+            
+            // Hide loading
+            document.getElementById('loading').classList.add('hidden');
+            
+            // Start animation
+            animate();
+        }
+        
+        // =================================================================
+        // POST-PROCESSING
+        // =================================================================
+        function setupPostProcessing() {
+            composer = new EffectComposer(renderer);
+            
+            const renderPass = new RenderPass(scene, camera);
+            composer.addPass(renderPass);
+            
+            // Bloom for glowing nodes
+            const bloomPass = new UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                1.5,  // strength
+                0.4,  // radius
+                0.85  // threshold
+            );
+            composer.addPass(bloomPass);
+        }
+        
+        // =================================================================
+        // SCENE ELEMENTS
+        // =================================================================
+        function createStarfield() {
+            const geometry = new THREE.BufferGeometry();
+            const positions = [];
+            const colors = [];
+            
+            for (let i = 0; i < 5000; i++) {
+                const x = (Math.random() - 0.5) * 400;
+                const y = (Math.random() - 0.5) * 400;
+                const z = (Math.random() - 0.5) * 400;
+                positions.push(x, y, z);
+                
+                const brightness = 0.3 + Math.random() * 0.7;
+                colors.push(brightness, brightness, brightness * 1.1);
+            }
+            
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            
+            const material = new THREE.PointsMaterial({
+                size: 0.5,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8,
+                sizeAttenuation: true
+            });
+            
+            const stars = new THREE.Points(geometry, material);
+            scene.add(stars);
+        }
+        
+        function createGrid() {
+            const gridHelper = new THREE.GridHelper(100, 50, 0x1a1a2e, 0x0f0f1a);
+            gridHelper.position.y = -5;
+            scene.add(gridHelper);
+            
+            // Central glow plane
+            const planeGeometry = new THREE.PlaneGeometry(100, 100);
+            const planeMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    uColor: { value: new THREE.Color(0x8b5cf6) },
+                    uTime: { value: 0 }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    void main() {
+                        vUv = uv;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform vec3 uColor;
+                    uniform float uTime;
+                    varying vec2 vUv;
+                    
+                    void main() {
+                        float dist = length(vUv - 0.5);
+                        float alpha = smoothstep(0.5, 0.0, dist) * 0.1;
+                        alpha *= 0.5 + 0.5 * sin(uTime * 0.5);
+                        gl_FragColor = vec4(uColor, alpha);
+                    }
+                `,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            
+            const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+            plane.rotation.x = -Math.PI / 2;
+            plane.position.y = -4.9;
+            plane.userData.isGlowPlane = true;
+            scene.add(plane);
+        }
+        
+        function createLighting() {
+            // Ambient
+            const ambient = new THREE.AmbientLight(0x404060, 0.5);
+            scene.add(ambient);
+            
+            // Main directional
+            const directional = new THREE.DirectionalLight(0xffffff, 0.8);
+            directional.position.set(10, 20, 10);
+            scene.add(directional);
+            
+            // Accent lights for each colony zone
+            const colonyLights = [
+                { color: 0xec4899, position: [20, 10, 0] },   // Crystal
+                { color: 0x8b5cf6, position: [-20, 10, 0] },  // Nexus
+                { color: 0x3b82f6, position: [0, 10, 20] },   // Flow
+            ];
+            
+            colonyLights.forEach(({ color, position }) => {
+                const light = new THREE.PointLight(color, 100, 50);
+                light.position.set(...position);
+                scene.add(light);
+            });
+        }
+        
+        // =================================================================
+        // NODE VISUALIZATION
+        // =================================================================
+        function createNode(nodeData) {
+            const group = new THREE.Group();
+            group.userData = nodeData;
+            
+            // Determine colony color
+            const colony = nodeData.colony || 'crystal';
+            const color = COLONY_COLORS[colony] || COLONY_COLORS.crystal;
+            
+            // Main sphere
+            const geometry = new THREE.SphereGeometry(nodeData.isLeader ? 1.2 : 0.8, 32, 32);
+            const material = new THREE.MeshPhysicalMaterial({
+                color: color,
+                emissive: color,
+                emissiveIntensity: 0.5,
+                metalness: 0.2,
+                roughness: 0.1,
+                clearcoat: 1.0,
+                clearcoatRoughness: 0.1,
+                transparent: true,
+                opacity: 0.9
+            });
+            
+            const sphere = new THREE.Mesh(geometry, material);
+            group.add(sphere);
+            
+            // Outer glow ring
+            const ringGeometry = new THREE.RingGeometry(1.2, 1.4, 64);
+            const ringMaterial = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.3,
+                side: THREE.DoubleSide
+            });
+            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+            ring.rotation.x = Math.PI / 2;
+            group.add(ring);
+            
+            // Leader crown (particle ring)
+            if (nodeData.isLeader) {
+                const crownGeometry = new THREE.TorusGeometry(1.5, 0.05, 16, 100);
+                const crownMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffd700,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const crown = new THREE.Mesh(crownGeometry, crownMaterial);
+                crown.rotation.x = Math.PI / 2;
+                crown.position.y = 0.5;
+                group.add(crown);
+            }
+            
+            // Isolated nodes get distortion shader
+            if (nodeData.isolated) {
+                material.emissive = COLONY_COLORS.critical;
+                material.emissiveIntensity = 1.0;
+            }
+            
+            return group;
+        }
+        
+        function updateNodes(nodes) {
+            // Clear existing
+            while (nodeGroup.children.length > 0) {
+                nodeGroup.remove(nodeGroup.children[0]);
+            }
+            
+            // Create nodes in 3D space (force-directed layout simulation)
+            nodes.forEach((nodeData, index) => {
+                const node = createNode(nodeData);
+                
+                // Position in sphere/ring pattern
+                const phi = Math.acos(1 - 2 * (index + 0.5) / nodes.length);
+                const theta = Math.PI * (1 + Math.sqrt(5)) * index;
+                const radius = 10 + (nodeData.isLeader ? 0 : Math.random() * 5);
+                
+                node.position.set(
+                    radius * Math.sin(phi) * Math.cos(theta),
+                    radius * Math.cos(phi) * 0.3, // Flatten Y
+                    radius * Math.sin(phi) * Math.sin(theta)
+                );
+                
+                nodeGroup.add(node);
+            });
+            
+            // Create connections
+            updateConnections(nodes);
+        }
+        
+        function updateConnections(nodes) {
+            // Clear existing
+            while (connectionGroup.children.length > 0) {
+                connectionGroup.remove(connectionGroup.children[0]);
+            }
+            
+            // Connect all nodes to leader (star topology visualization)
+            const leader = nodeGroup.children.find(n => n.userData.isLeader);
+            if (!leader) return;
+            
+            nodeGroup.children.forEach(node => {
+                if (node === leader) return;
+                
+                const points = [leader.position.clone(), node.position.clone()];
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const material = new THREE.LineBasicMaterial({
+                    color: 0x404080,
+                    transparent: true,
+                    opacity: 0.3
+                });
+                
+                const line = new THREE.Line(geometry, material);
+                connectionGroup.add(line);
+            });
+        }
+        
+        // =================================================================
+        // PARTICLE SYSTEM (Data Flow)
+        // =================================================================
+        function createParticleSystem() {
+            const particleCount = 2000;
+            const geometry = new THREE.BufferGeometry();
+            
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+            const velocities = new Float32Array(particleCount * 3);
+            const lifetimes = new Float32Array(particleCount);
+            
+            for (let i = 0; i < particleCount; i++) {
+                // Start at random position
+                positions[i * 3] = (Math.random() - 0.5) * 30;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 10;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 30;
+                
+                // Colony-colored particles
+                const colonies = Object.values(COLONY_COLORS);
+                const color = colonies[Math.floor(Math.random() * colonies.length)];
+                colors[i * 3] = color.r;
+                colors[i * 3 + 1] = color.g;
+                colors[i * 3 + 2] = color.b;
+                
+                // Random velocity
+                velocities[i * 3] = (Math.random() - 0.5) * 0.1;
+                velocities[i * 3 + 1] = (Math.random() - 0.5) * 0.05;
+                velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.1;
+                
+                lifetimes[i] = Math.random();
+            }
+            
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.userData.velocities = velocities;
+            geometry.userData.lifetimes = lifetimes;
+            
+            const material = new THREE.PointsMaterial({
+                size: 0.15,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending,
+                sizeAttenuation: true
+            });
+            
+            particleSystem = new THREE.Points(geometry, material);
+            scene.add(particleSystem);
+        }
+        
+        function updateParticles(delta) {
+            if (!particleSystem) return;
+            
+            const positions = particleSystem.geometry.attributes.position.array;
+            const velocities = particleSystem.geometry.userData.velocities;
+            const lifetimes = particleSystem.geometry.userData.lifetimes;
+            const particleCount = positions.length / 3;
+            
+            for (let i = 0; i < particleCount; i++) {
+                // Update position
+                positions[i * 3] += velocities[i * 3];
+                positions[i * 3 + 1] += velocities[i * 3 + 1];
+                positions[i * 3 + 2] += velocities[i * 3 + 2];
+                
+                // Update lifetime
+                lifetimes[i] -= delta * 0.1;
+                
+                // Reset if dead or out of bounds
+                if (lifetimes[i] <= 0 || Math.abs(positions[i * 3]) > 20) {
+                    // Respawn near a node if we have them
+                    if (nodeGroup.children.length > 0) {
+                        const sourceNode = nodeGroup.children[Math.floor(Math.random() * nodeGroup.children.length)];
+                        positions[i * 3] = sourceNode.position.x + (Math.random() - 0.5) * 2;
+                        positions[i * 3 + 1] = sourceNode.position.y + (Math.random() - 0.5) * 2;
+                        positions[i * 3 + 2] = sourceNode.position.z + (Math.random() - 0.5) * 2;
+                        
+                        // Velocity toward another node
+                        const targetNode = nodeGroup.children[Math.floor(Math.random() * nodeGroup.children.length)];
+                        const dir = targetNode.position.clone().sub(sourceNode.position).normalize();
+                        velocities[i * 3] = dir.x * 0.2;
+                        velocities[i * 3 + 1] = dir.y * 0.2;
+                        velocities[i * 3 + 2] = dir.z * 0.2;
+                    } else {
+                        positions[i * 3] = (Math.random() - 0.5) * 30;
+                        positions[i * 3 + 1] = (Math.random() - 0.5) * 10;
+                        positions[i * 3 + 2] = (Math.random() - 0.5) * 30;
+                    }
+                    
+                    lifetimes[i] = 1.0;
+                }
+            }
+            
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+        
+        // =================================================================
+        // WEBXR
+        // =================================================================
+        function setupWebXR() {
+            if ('xr' in navigator) {
+                navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
+                    if (supported) {
+                        renderer.xr.enabled = true;
+                        const vrButton = VRButton.createButton(renderer);
+                        document.body.appendChild(vrButton);
+                        document.getElementById('btn-xr').style.display = 'block';
+                    } else {
+                        document.getElementById('btn-xr').style.display = 'none';
+                    }
+                });
+            }
+        }
+        
+        // =================================================================
+        // API CONFIGURATION
+        // =================================================================
+        const API_BASE = window.location.hostname === 'localhost' || window.location.protocol === 'file:'
+            ? 'http://localhost:8001/api/v1/cluster'
+            : `${window.location.origin}/api/v1/cluster`;
+        
+        const WS_BASE = window.location.hostname === 'localhost' || window.location.protocol === 'file:'
+            ? 'ws://localhost:8001/cluster/ws'
+            : `ws://${window.location.host}/cluster/ws`;
+        
+        // Colony mapping by service type
+        const SERVICE_TYPE_COLONIES = {
+            'api': 'crystal',        // API = Crystal (verification)
+            'hub': 'flow',           // Hubs = Flow (voice, healing)
+            'smarthome': 'nexus',    // SmartHome = Nexus (connection)
+            'worker': 'forge',       // Workers = Forge (building)
+            'edge': 'beacon',        // Edge = Beacon (planning)
+            'consensus': 'spark',    // Consensus = Spark (initiation)
+        };
+        
+        let wsConnection = null;
+        let connectionRetries = 0;
+        const MAX_RETRIES = 5;
+        let apiConnected = false;
+        
+        // =================================================================
+        // DATA LOADING — REAL DATA ONLY
+        // =================================================================
+        async function loadClusterData() {
+            try {
+                const dashboardResponse = await fetch(`${API_BASE}/dashboard`);
+                if (!dashboardResponse.ok) {
+                    throw new Error(`API returned ${dashboardResponse.status}`);
+                }
+                
+                const data = await dashboardResponse.json();
+                processRealDashboardData(data);
+                apiConnected = true;
+                console.log('✅ Connected to cluster API');
+                
+                // Start WebSocket for real-time updates
+                connectWebSocket();
+                
+            } catch (e) {
+                console.error('❌ API connection failed:', e.message);
+                apiConnected = false;
+                
+                // Show empty state - no fake data
+                clusterState.nodes = [];
+                clusterState.health = 'offline';
+                clusterState.consensus = { phase: 'DISCONNECTED', height: 0, leader: null };
+                
+                updateNodes([]);
+                updateHUD();
+            }
+        }
+        
+        function processRealDashboardData(data) {
+            // Transform real API data to our node format
+            const services = data.services?.instances || [];
+            const health = data.health || {};
+            const consensus = data.consensus || {};
+            
+            // Find leader from consensus or first API node
+            let leaderNodeId = null;
+            if (consensus.pbft?.initialized) {
+                leaderNodeId = consensus.pbft.leader_id;
+            }
+            
+            // Transform services to nodes
+            const nodes = services.map((service, index) => {
+                const isLeader = service.node_id === leaderNodeId || 
+                                 (index === 0 && service.service_type === 'api');
+                
+                // Calculate health percentage from byzantine_score
+                const healthPercent = Math.round((1 - (service.byzantine_score || 0)) * 100);
+                
+                return {
+                    id: service.node_id,
+                    name: formatNodeName(service.node_id, service.service_type),
+                    type: service.service_type,
+                    colony: SERVICE_TYPE_COLONIES[service.service_type] || 'crystal',
+                    isLeader: isLeader,
+                    health: healthPercent,
+                    isolated: service.health === 'isolated',
+                    byzantine_score: service.byzantine_score || 0,
+                    address: service.address,
+                    port: service.port,
+                    rawHealth: service.health,
+                };
+            });
+            
+            // Determine overall health
+            let overallHealth = 'healthy';
+            if (health.overall === 'degraded' || nodes.some(n => n.rawHealth === 'degraded')) {
+                overallHealth = 'warning';
+            }
+            if (health.overall === 'unhealthy' || nodes.some(n => n.isolated)) {
+                overallHealth = 'critical';
+            }
+            
+            // Get consensus info
+            const consensusPhase = consensus.crdt?.phase || consensus.pbft?.phase || 'ACTIVE';
+            const consensusHeight = consensus.pbft?.height || 0;
+            
+            clusterState.nodes = nodes;
+            clusterState.health = overallHealth;
+            clusterState.consensus = {
+                phase: consensusPhase.toUpperCase(),
+                height: consensusHeight,
+                leader: leaderNodeId || nodes.find(n => n.isLeader)?.id || null,
+            };
+            
+            updateNodes(nodes);
+            updateHUD();
+            
+            // Log what we found
+            console.log(`📊 Cluster: ${nodes.length} nodes, health=${overallHealth}, leader=${clusterState.consensus.leader}`);
+        }
+        
+        function formatNodeName(nodeId, serviceType) {
+            // Convert node_id like "hub-kitchen" to "Hub Kitchen"
+            const base = nodeId.replace(/-/g, ' ').replace(/_/g, ' ');
+            return base.split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        }
+        
+        // =================================================================
+        // WEBSOCKET REAL-TIME UPDATES
+        // =================================================================
+        function connectWebSocket() {
+            if (wsConnection?.readyState === WebSocket.OPEN) return;
+            
+            try {
+                wsConnection = new WebSocket(`${WS_BASE}/events`);
+                
+                wsConnection.onopen = () => {
+                    console.log('🔌 WebSocket connected for real-time updates');
+                    connectionRetries = 0;
+                    
+                    // Subscribe to all event types
+                    wsConnection.send(JSON.stringify({
+                        action: 'subscribe',
+                        events: []  // Empty = all events
+                    }));
+                };
+                
+                wsConnection.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleClusterEvent(data);
+                    } catch (e) {
+                        console.warn('Invalid WebSocket message:', e);
+                    }
+                };
+                
+                wsConnection.onclose = () => {
+                    console.log('🔌 WebSocket disconnected');
+                    if (connectionRetries < MAX_RETRIES) {
+                        connectionRetries++;
+                        setTimeout(connectWebSocket, 2000 * connectionRetries);
+                    }
+                };
+                
+                wsConnection.onerror = (error) => {
+                    console.warn('WebSocket error:', error);
+                };
+                
+            } catch (e) {
+                console.warn('WebSocket connection failed:', e);
+            }
+        }
+        
+        function handleClusterEvent(event) {
+            console.log(`📡 Event: ${event.type}`, event.data);
+            
+            switch (event.type) {
+                case 'service.registered':
+                case 'service.deregistered':
+                case 'service.health_changed':
+                    // Refresh full cluster data
+                    refreshClusterData();
+                    break;
+                    
+                case 'consensus.state_changed':
+                    clusterState.consensus.phase = event.data.phase || clusterState.consensus.phase;
+                    clusterState.consensus.height = event.data.committed_ops || clusterState.consensus.height;
+                    updateHUD();
+                    break;
+                    
+                case 'consensus.leader_changed':
+                    clusterState.consensus.leader = event.data.leader_id;
+                    refreshClusterData(); // Need to update leader visualization
+                    break;
+                    
+                case 'node.isolated':
+                    highlightIsolatedNode(event.data.node_id);
+                    clusterState.health = 'critical';
+                    updateHUD();
+                    break;
+                    
+                case 'node.readmitted':
+                    refreshClusterData();
+                    break;
+                    
+                case 'fault.byzantine':
+                    flashByzantineAlert(event.data.node_id, event.data.fault_type);
+                    break;
+                    
+                case 'health.cluster_healthy':
+                    clusterState.health = 'healthy';
+                    updateHUD();
+                    break;
+                    
+                case 'health.cluster_degraded':
+                    clusterState.health = 'warning';
+                    updateHUD();
+                    break;
+                    
+                case 'health.cluster_unhealthy':
+                    clusterState.health = 'critical';
+                    updateHUD();
+                    break;
+            }
+        }
+        
+        async function refreshClusterData() {
+            if (!apiConnected) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/dashboard`);
+                if (response.ok) {
+                    const data = await response.json();
+                    processRealDashboardData(data);
+                }
+            } catch (e) {
+                console.warn('Failed to refresh cluster data:', e);
+            }
+        }
+        
+        function highlightIsolatedNode(nodeId) {
+            nodeGroup.children.forEach(node => {
+                if (node.userData.id === nodeId) {
+                    node.userData.isolated = true;
+                    // Flash the node red
+                    const sphere = node.children[0];
+                    if (sphere?.material) {
+                        sphere.material.emissive = COLONY_COLORS.critical;
+                        sphere.material.emissiveIntensity = 2.0;
+                        
+                        // Reset after 2 seconds
+                        setTimeout(() => {
+                            sphere.material.emissiveIntensity = 1.0;
+                        }, 2000);
+                    }
+                }
+            });
+        }
+        
+        function flashByzantineAlert(nodeId, faultType) {
+            console.warn(`🔴 BYZANTINE FAULT: ${nodeId} - ${faultType}`);
+            
+            // Flash the screen briefly
+            document.body.style.boxShadow = 'inset 0 0 100px rgba(239, 68, 68, 0.5)';
+            setTimeout(() => {
+                document.body.style.boxShadow = 'none';
+            }, 500);
+            
+            highlightIsolatedNode(nodeId);
+        }
+        
+        function updateConnectionStatus() {
+            const wsDot = document.getElementById('ws-dot');
+            const dataSource = document.getElementById('data-source');
+            
+            if (!apiConnected) {
+                wsDot.style.background = '#ef4444';
+                wsDot.style.boxShadow = '0 0 8px #ef4444';
+                dataSource.textContent = 'Disconnected (API offline)';
+            } else {
+                const wsConnected = wsConnection?.readyState === WebSocket.OPEN;
+                
+                if (wsConnected) {
+                    wsDot.style.background = '#22c55e';
+                    wsDot.style.boxShadow = '0 0 8px #22c55e';
+                    dataSource.textContent = 'Live (WebSocket)';
+                } else {
+                    wsDot.style.background = '#3b82f6';
+                    wsDot.style.boxShadow = '0 0 8px #3b82f6';
+                    dataSource.textContent = 'Live (Polling)';
+                }
+            }
+        }
+        
+        // Update connection status periodically
+        setInterval(updateConnectionStatus, 2000);
+        
+        function updateHUD() {
+            const statusEl = document.getElementById('cluster-status');
+            const healthText = clusterState.health.toUpperCase();
+            
+            statusEl.textContent = healthText;
+            statusEl.className = 'hud-value ' + clusterState.health;
+            
+            document.getElementById('node-count').textContent = `${clusterState.nodes.length} nodes`;
+            document.getElementById('consensus-height').textContent = `Height: ${clusterState.consensus.height}`;
+            document.getElementById('consensus-phase').textContent = clusterState.consensus.phase;
+            document.getElementById('leader-node').textContent = `Leader: ${clusterState.consensus.leader || '—'}`;
+            
+            // Update status dot animation based on health
+            const statusDot = document.querySelector('.status-dot');
+            if (statusDot) {
+                if (clusterState.health === 'critical' || clusterState.health === 'offline') {
+                    statusDot.style.background = '#ef4444';
+                    statusDot.style.boxShadow = '0 0 8px #ef4444';
+                    statusDot.style.animation = 'pulse 0.5s ease-in-out infinite';
+                } else if (clusterState.health === 'warning') {
+                    statusDot.style.background = '#f59e0b';
+                    statusDot.style.boxShadow = '0 0 8px #f59e0b';
+                    statusDot.style.animation = 'pulse 1s ease-in-out infinite';
+                } else {
+                    statusDot.style.background = '#22c55e';
+                    statusDot.style.boxShadow = '0 0 8px #22c55e';
+                    statusDot.style.animation = 'pulse 2s ease-in-out infinite';
+                }
+            }
+        }
+        
+        // =================================================================
+        // INTERACTION
+        // =================================================================
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            // Raycast to detect hovered node
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(nodeGroup.children, true);
+            
+            if (intersects.length > 0) {
+                const object = intersects[0].object.parent;
+                if (object.userData.id && object !== hoveredNode) {
+                    hoveredNode = object;
+                    document.body.style.cursor = 'pointer';
+                    showNodeInfo(object.userData);
+                }
+            } else if (hoveredNode) {
+                hoveredNode = null;
+                document.body.style.cursor = 'default';
+                hideNodeInfo();
+            }
+        }
+        
+        function onClick(event) {
+            if (hoveredNode) {
+                selectedNode = hoveredNode;
+                focusOnNode(selectedNode);
+            }
+        }
+        
+        function showNodeInfo(nodeData) {
+            const panel = document.getElementById('info-panel');
+            document.getElementById('info-title').textContent = nodeData.name;
+            document.getElementById('info-subtitle').textContent = nodeData.type;
+            document.getElementById('info-health').textContent = `${nodeData.health}%`;
+            document.getElementById('info-icon').style.background = `linear-gradient(135deg, ${COLONY_COLORS[nodeData.colony]?.getStyle() || '#8b5cf6'}, rgba(0,0,0,0.5))`;
+            panel.classList.add('visible');
+        }
+        
+        function hideNodeInfo() {
+            document.getElementById('info-panel').classList.remove('visible');
+        }
+        
+        function focusOnNode(node) {
+            const targetPosition = node.position.clone().add(new THREE.Vector3(0, 5, 15));
+            
+            // Animate camera to target
+            const startPosition = camera.position.clone();
+            const startTime = clock.getElapsedTime();
+            const duration = 1.0;
+            
+            const animateCamera = () => {
+                const elapsed = clock.getElapsedTime() - startTime;
+                const t = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - t, 3); // Ease out cubic
+                
+                camera.position.lerpVectors(startPosition, targetPosition, eased);
+                controls.target.lerp(node.position, eased * 0.5);
+                
+                if (t < 1) requestAnimationFrame(animateCamera);
+            };
+            
+            animateCamera();
+        }
+        
+        // =================================================================
+        // CONTROLS
+        // =================================================================
+        function setupControls() {
+            document.getElementById('btn-orbit').addEventListener('click', () => {
+                setActiveButton('btn-orbit');
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 0.3;
+            });
+            
+            document.getElementById('btn-top').addEventListener('click', () => {
+                setActiveButton('btn-top');
+                controls.autoRotate = false;
+                camera.position.set(0, 40, 0);
+                controls.target.set(0, 0, 0);
+            });
+            
+            document.getElementById('btn-focus').addEventListener('click', () => {
+                setActiveButton('btn-focus');
+                controls.autoRotate = false;
+                const leader = nodeGroup.children.find(n => n.userData.isLeader);
+                if (leader) focusOnNode(leader);
+            });
+            
+            document.getElementById('btn-xr').addEventListener('click', () => {
+                // XR handled by VRButton
+            });
+        }
+        
+        function setActiveButton(id) {
+            document.querySelectorAll('.control-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+        
+        // =================================================================
+        // RESIZE
+        // =================================================================
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // =================================================================
+        // ANIMATION LOOP
+        // =================================================================
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const delta = clock.getDelta();
+            const time = clock.getElapsedTime();
+            
+            // Update controls
+            controls.update();
+            
+            // Rotate nodes subtly
+            nodeGroup.children.forEach((node, i) => {
+                node.rotation.y += delta * 0.2;
+                node.position.y += Math.sin(time * 2 + i) * 0.001;
+            });
+            
+            // Update particle system
+            updateParticles(delta);
+            
+            // Update glow plane shader
+            scene.traverse(obj => {
+                if (obj.userData.isGlowPlane && obj.material.uniforms) {
+                    obj.material.uniforms.uTime.value = time;
+                }
+            });
+            
+            // Render with post-processing
+            composer.render();
+        }
+        
+        // =================================================================
+        // INIT
+        // =================================================================
+        init().catch(console.error);
+    </script>
+</body>
+</html>

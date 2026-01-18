@@ -1,0 +1,213 @@
+# OAuth Provider Deployment Configuration for awkronos.com
+#
+# This configuration defines the OAuth2/OpenID Connect provider settings
+# for production deployment at awkronos.com
+#
+# Colony: Nexus (e4) — Integration
+# Created: January 7, 2026
+# 鏡
+
+# =============================================================================
+# Domain Configuration
+# =============================================================================
+domain:
+  primary: awkronos.com
+  issuer: https://awkronos.com
+
+  # OAuth endpoints (relative to issuer)
+  endpoints:
+    authorization: /oauth/authorize
+    token: /oauth/token
+    userinfo: /oauth/userinfo
+    revocation: /oauth/revoke
+    jwks: /.well-known/jwks.json
+    discovery: /.well-known/openid-configuration
+    registration: /oauth/register
+
+# =============================================================================
+# Security Configuration
+# =============================================================================
+security:
+  # Require HTTPS for all redirect URIs (except localhost for dev)
+  require_https: true
+
+  # PKCE enforcement
+  pkce:
+    required_for_public_clients: true
+    required_for_confidential_clients: false
+    supported_methods:
+      - S256
+      - plain
+
+  # Token settings
+  tokens:
+    access_token_ttl: 3600        # 1 hour
+    refresh_token_ttl: 2592000    # 30 days
+    authorization_code_ttl: 600   # 10 minutes
+    id_token_ttl: 3600            # 1 hour
+
+  # Rate limiting
+  rate_limits:
+    token_endpoint: 100/minute
+    authorization_endpoint: 50/minute
+    userinfo_endpoint: 200/minute
+    discovery_endpoint: 1000/minute
+
+  # JWT signing
+  jwt:
+    algorithm: RS256
+    key_rotation_days: 90
+
+  # CORS settings
+  cors:
+    allowed_origins:
+      - https://awkronos.com
+      - https://*.awkronos.com
+    allowed_methods:
+      - GET
+      - POST
+      - OPTIONS
+    allowed_headers:
+      - Authorization
+      - Content-Type
+    max_age: 86400
+
+# =============================================================================
+# Supported Scopes
+# =============================================================================
+scopes:
+  openid:
+    description: "Verify your identity"
+    claims: [sub]
+    required: true
+
+  profile:
+    description: "Access your profile information"
+    claims: [name, preferred_username, picture, updated_at]
+
+  email:
+    description: "Access your email address"
+    claims: [email, email_verified]
+
+  agents:
+    description: "Access your AI agents"
+    claims: [agent_ids]
+
+  offline_access:
+    description: "Stay logged in (refresh token)"
+    claims: []
+
+# =============================================================================
+# Default Clients (Development Only)
+# =============================================================================
+# Production clients should be registered via the API
+development_clients:
+  - client_id: kagami-dev-client
+    client_secret: "${KAGAMI_DEV_CLIENT_SECRET}"
+    client_name: "Kagami Development"
+    redirect_uris:
+      - http://localhost:3000/callback
+      - http://localhost:8000/callback
+      - http://127.0.0.1:3000/callback
+    allowed_scopes:
+      - openid
+      - profile
+      - email
+      - agents
+    client_type: confidential
+    require_pkce: false  # Allow without PKCE for dev
+
+# =============================================================================
+# Monitoring & Logging
+# =============================================================================
+monitoring:
+  # Metrics endpoints
+  metrics:
+    enabled: true
+    path: /metrics
+
+  # Health check
+  health:
+    enabled: true
+    path: /health
+
+  # Logging
+  logging:
+    level: INFO
+    format: json
+    include_request_id: true
+    redact_secrets: true
+
+  # Alerting thresholds
+  alerts:
+    error_rate_threshold: 0.01      # 1%
+    latency_p99_threshold_ms: 500   # 500ms
+    token_failure_threshold: 10     # per minute
+
+# =============================================================================
+# SDK Configuration
+# =============================================================================
+sdk:
+  # CDN URL for JavaScript SDK
+  cdn_url: https://cdn.awkronos.com/sdk/v1/kagami-login.js
+
+  # SDK version
+  version: "1.1.0"
+
+  # Default configuration
+  defaults:
+    scopes:
+      - openid
+      - profile
+      - email
+    response_type: code
+    use_pkce: true
+    storage_type: localStorage
+    enable_audio: true
+    enable_haptics: true
+
+# =============================================================================
+# Deployment Environment Variables
+# =============================================================================
+# These should be set in the deployment environment (secrets manager, etc.)
+required_env_vars:
+  - JWT_SECRET                    # JWT signing secret
+  - KAGAMI_OAUTH_ISSUER          # Override issuer (defaults to awkronos.com)
+  - KAGAMI_DEV_CLIENT_SECRET     # Dev client secret (dev only)
+  - DATABASE_URL                  # For persistent client storage
+  - REDIS_URL                     # For session/token caching
+  - SENTRY_DSN                    # Error tracking (optional)
+
+# =============================================================================
+# Infrastructure Requirements
+# =============================================================================
+infrastructure:
+  # Minimum replicas
+  replicas:
+    min: 2
+    max: 10
+
+  # Resource requirements
+  resources:
+    cpu:
+      request: 100m
+      limit: 500m
+    memory:
+      request: 256Mi
+      limit: 512Mi
+
+  # Auto-scaling
+  autoscaling:
+    metric: cpu
+    target_utilization: 70
+
+  # Health probes
+  probes:
+    liveness:
+      path: /health
+      interval: 10s
+      timeout: 5s
+    readiness:
+      path: /health
+      interval: 5s
+      timeout: 3s

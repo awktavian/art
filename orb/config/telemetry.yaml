@@ -1,0 +1,219 @@
+# Kagami Telemetry Configuration
+# Optimal W&B + GCS logging setup for TPU training
+#
+# Created: Jan 4, 2026
+# Updated: Jan 8, 2026 - Added TPU-specific metrics, validation alerts
+# Purpose: Unified telemetry for training, monitoring, and debugging
+
+wandb:
+  # Project settings
+  project: "kagami-world-model"
+  entity: "kagami-ai"
+
+  # Metric groups to log
+  metrics:
+    # Core training losses (every step)
+    loss:
+      - "Loss/train"
+      - "Loss/prediction"
+      - "Loss/rssm_kl"
+      - "Loss/h_jepa_loss"
+      - "Loss/e8_commitment"
+      - "Loss/seq_ib_recon"
+      - "Loss/loop_closure"
+      - "Loss/language_caption"
+      - "Loss/language_contrastive"
+      - "Loss/grounding_mse"
+      - "Loss/grounding_contrastive"
+
+    # CRITICAL: KL health monitoring (Jan 8, 2026 - root cause of v6e failure)
+    kl_health:
+      - "KL/value"                    # Current KL divergence
+      - "KL/collapsed"                # Boolean: is KL < 1e-4
+      - "KL/warning"                  # Boolean: is KL < 0.1
+      - "KL/consecutive_warnings"     # Count of consecutive low-KL steps
+      - "KL/free_nats"               # Current free_nats setting (should be 3.0)
+
+    # Plateau detection (Jan 8, 2026 - prevented 40K step plateau)
+    plateau:
+      - "Plateau/detected"            # Boolean: is loss plateaued
+      - "Plateau/loss_velocity"       # Rate of change of loss
+      - "Plateau/lr_reductions"       # Number of LR reductions triggered
+      - "Plateau/window_mean"         # Rolling average loss
+
+    # Curriculum tracking
+    curriculum:
+      - "Curriculum/phase"
+      - "Curriculum/phase_step"
+      - "Curriculum/loss_velocity"
+
+    # Safety metrics (CBF)
+    safety:
+      - "Safety/h_mean"
+      - "Safety/h_min"
+      - "Safety/h_std"
+      - "Safety/violation_rate"
+
+    # Gradient health
+    gradients:
+      - "Gradients/total_norm"
+      - "Gradients/max_norm"
+      - "Gradients/explosion"          # Boolean: norm > 100
+      - "Gradients/vanishing"          # Boolean: norm < 1e-7
+      - "Gradients/prediction_norm"
+      - "Gradients/rssm_kl_norm"
+
+    # TPU-specific metrics (Jan 8, 2026)
+    tpu:
+      - "TPU/mfu"                      # Model FLOP Utilization
+      - "TPU/chip_utilization"         # Per-chip compute utilization
+      - "TPU/hbm_usage_gb"            # HBM memory usage
+      - "TPU/ici_throughput_gbps"     # Inter-chip interconnect
+      - "TPU/step_time_ms"            # Time per training step
+      - "TPU/tokens_per_second"       # Throughput
+
+    # Throughput metrics
+    throughput:
+      - "Throughput/samples_per_sec"
+      - "Throughput/tokens_per_sec"
+      - "Throughput/step_time_ms"
+
+    # Memory metrics (GPU/TPU)
+    memory:
+      - "Memory/allocated_gb"
+      - "Memory/reserved_gb"
+      - "Memory/utilization"
+      - "Memory/peak_gb"
+
+    # Validation metrics
+    validation:
+      - "Validation/total"
+      - "Validation/prediction"
+      - "Validation/integration_score"
+      - "Validation/level"             # ok/warning/critical/fatal
+
+    # Uncertainty weights (Kendall 2017)
+    uncertainty:
+      - "Uncertainty/recon"
+      - "Uncertainty/kl"
+      - "Uncertainty/bottleneck"
+      - "Uncertainty/efe"
+      - "Uncertainty/cbf"
+
+    # Fano routing
+    routing:
+      - "Routing/complexity"
+      - "Routing/num_colonies"
+      - "Routing/mode"
+
+  # Logging intervals
+  intervals:
+    loss: 1           # Every step
+    kl_health: 1      # Every step (CRITICAL)
+    plateau: 10       # Every 10 steps
+    gradients: 10     # Every 10 steps
+    tpu: 10           # Every 10 steps
+    validation: 100   # Every 100 steps
+    checkpoint: 1000  # Every 1000 steps
+    model_stats: 100  # Every 100 steps
+
+  # Dashboard panels
+  panels:
+    - name: "Training Overview"
+      metrics: ["Loss/train", "Loss/prediction", "Learning_rate"]
+    - name: "KL Health (CRITICAL)"
+      metrics: ["KL/value", "KL/collapsed", "KL/consecutive_warnings"]
+    - name: "Plateau Detection"
+      metrics: ["Plateau/detected", "Plateau/loss_velocity", "Plateau/lr_reductions"]
+    - name: "RSSM Health"
+      metrics: ["Loss/rssm_kl", "Loss/h_jepa_loss", "RSSM/kl_balanced"]
+    - name: "Safety Monitoring"
+      metrics: ["Safety/h_mean", "Safety/h_min", "Safety/violation_rate"]
+    - name: "Curriculum Progress"
+      metrics: ["Curriculum/phase", "Curriculum/loss_velocity"]
+    - name: "TPU Performance"
+      metrics: ["TPU/mfu", "TPU/step_time_ms", "TPU/tokens_per_second"]
+
+gcs:
+  # Checkpoint storage
+  bucket: "kagami-training-schizodactyl-2026"
+  checkpoint_prefix: "checkpoints/"
+  artifact_prefix: "artifacts/"
+
+  # Retention policy
+  retention:
+    keep_best_n: 3
+    keep_latest_n: 5
+    max_age_days: 30
+
+prometheus:
+  # Metrics endpoint (for production monitoring)
+  enabled: false
+  port: 9090
+  metrics:
+    - name: "kagami_training_loss"
+      type: "gauge"
+      help: "Current training loss"
+    - name: "kagami_training_step"
+      type: "counter"
+      help: "Training step counter"
+    - name: "kagami_safety_h_min"
+      type: "gauge"
+      help: "Minimum CBF h(x) value"
+    - name: "kagami_memory_allocated_bytes"
+      type: "gauge"
+      help: "GPU memory allocated"
+
+alerts:
+  # Alert thresholds
+  loss_spike:
+    threshold: 10.0  # Alert if loss > 10x recent average
+    window: 100      # Steps to compute average
+    action: "reduce_lr"
+
+  gradient_explosion:
+    threshold: 100.0  # Alert if grad norm > 100
+    action: "skip_step"
+
+  safety_violation:
+    threshold: 0.01   # Alert if h(x) < 0 for > 1% of samples
+    action: "alert"
+
+  memory_pressure:
+    threshold: 0.95   # Alert if GPU/TPU memory > 95%
+    action: "alert"
+
+  # CRITICAL: KL collapse detection (Jan 8, 2026)
+  kl_collapse:
+    threshold: 0.0001       # KL < 1e-4 is collapse
+    warning_threshold: 0.1  # KL < 0.1 is warning
+    consecutive_limit: 100  # Fatal after 100 consecutive warnings
+    action: "stop_training"
+
+  # Plateau detection (Jan 8, 2026)
+  loss_plateau:
+    velocity_threshold: 0.000001  # Loss velocity below this is plateau
+    window: 1000                   # Steps to compute rolling average
+    cooldown: 2000                 # Steps between LR reductions
+    action: "reduce_lr_by_half"
+
+# TPU-specific configuration (Jan 8, 2026)
+tpu:
+  # Performance targets
+  targets:
+    mfu: 0.4           # Target MFU (40%+ is good for RSSM)
+    step_time_ms: 500  # Target step time
+    hbm_usage: 0.8     # Target HBM utilization
+
+  # Preemption handling
+  preemption:
+    checkpoint_timeout_sec: 25  # Save checkpoint within 25s of SIGTERM
+    graceful_shutdown: true
+    save_optimizer: true
+
+  # Auto-scaling
+  autoscale:
+    enabled: false
+    min_chips: 4
+    max_chips: 256
+    scale_on_mfu_below: 0.3

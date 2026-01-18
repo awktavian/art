@@ -1,0 +1,439 @@
+/**
+ * Prism Sheet
+ *
+ * Bottom sheet overlay with glass styling,
+ * drag-to-dismiss, and chromatic effects.
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SHEET BACKDROP
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--prism-z-modal-backdrop);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--prism-dur-normal) var(--prism-ease-cusp),
+    visibility var(--prism-dur-normal);
+}
+
+.prism-sheet-backdrop--open {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SHEET CONTAINER
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--prism-z-modal);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 40px);
+
+  /* VOLUMETRIC glass with noise texture */
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    var(--prism-surface);
+  background-blend-mode: overlay, normal;
+  backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+  -webkit-backdrop-filter: blur(var(--prism-blur)) saturate(var(--prism-saturation)) brightness(1.02);
+
+  /* Glass edge beveling - top edge */
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  ) 1;
+  border-radius: var(--prism-radius-xl) var(--prism-radius-xl) 0 0;
+
+  /* Rich volumetric shadow */
+  box-shadow:
+    0 -25px 50px -12px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 1px 0 rgba(255, 255, 255, 0.12) inset;
+  transform: translateY(100%);
+  transition: transform var(--prism-dur-slow) var(--prism-ease-spring);
+
+  /* GPU acceleration */
+  will-change: transform;
+}
+
+.prism-sheet--open {
+  transform: translateY(0);
+}
+
+/* Chromatic top edge */
+.prism-sheet::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: 10%;
+  right: 10%;
+  height: 6px;
+  background: var(--prism-gradient-spectrum);
+  filter: blur(10px);
+  opacity: 0.5;
+  pointer-events: none;
+  border-radius: var(--prism-radius-full);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * DRAG HANDLE
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-sheet__handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  cursor: grab;
+  touch-action: none;
+  flex-shrink: 0;
+}
+
+.prism-sheet__handle:active {
+  cursor: grabbing;
+}
+
+.prism-sheet__handle-bar {
+  width: 36px;
+  height: 4px;
+  background: var(--prism-text-tertiary);
+  border-radius: var(--prism-radius-full);
+  transition: background var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-sheet__handle:hover .prism-sheet__handle-bar {
+  background: var(--prism-text-secondary);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SHEET HEADER
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 24px 16px;
+  flex-shrink: 0;
+}
+
+.prism-sheet__header--bordered {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--prism-border);
+}
+
+.prism-sheet__title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--prism-text);
+  margin: 0;
+}
+
+.prism-sheet__description {
+  font-size: 0.875rem;
+  color: var(--prism-text-secondary);
+  margin: 4px 0 0;
+}
+
+/* Close button */
+.prism-sheet__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--prism-radius-full);
+  color: var(--prism-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color var(--prism-dur-fast) var(--prism-ease-cusp),
+    background var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-sheet__close:hover {
+  color: var(--prism-text);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.prism-sheet__close-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SHEET CONTENT
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-sheet__content {
+  flex: 1;
+  padding: 0 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--prism-text-secondary);
+  line-height: 1.6;
+}
+
+/* Custom scrollbar */
+.prism-sheet__content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.prism-sheet__content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.prism-sheet__content::-webkit-scrollbar-thumb {
+  background: var(--prism-border);
+  border-radius: var(--prism-radius-full);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SHEET FOOTER
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-sheet__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--prism-border);
+  flex-shrink: 0;
+}
+
+.prism-sheet__footer--stacked {
+  flex-direction: column;
+}
+
+.prism-sheet__footer--stacked > * {
+  width: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * HEIGHT VARIANTS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Auto height (content-based) */
+.prism-sheet--auto {
+  max-height: calc(100vh - 40px);
+}
+
+/* Fixed heights */
+.prism-sheet--sm {
+  height: 30vh;
+  max-height: 300px;
+}
+
+.prism-sheet--md {
+  height: 50vh;
+  max-height: 500px;
+}
+
+.prism-sheet--lg {
+  height: 70vh;
+  max-height: 700px;
+}
+
+.prism-sheet--full {
+  height: calc(100vh - 40px);
+  max-height: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SNAP POINTS (for draggable sheets)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-sheet--snap {
+  /* JavaScript will handle snap points */
+  transition: transform var(--prism-dur-normal) var(--prism-ease-spring);
+}
+
+/* Visual indicator for snap points */
+.prism-sheet__snap-indicator {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: var(--prism-text-tertiary);
+  border-radius: var(--prism-radius-full);
+  opacity: 0;
+  transition: opacity var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-sheet--dragging .prism-sheet__snap-indicator {
+  opacity: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * DETENT STATES (peek, half, full)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-sheet--detent-peek {
+  transform: translateY(calc(100% - 100px));
+}
+
+.prism-sheet--detent-peek.prism-sheet--open {
+  transform: translateY(calc(100% - 100px));
+}
+
+.prism-sheet--detent-half {
+  transform: translateY(50%);
+}
+
+.prism-sheet--detent-half.prism-sheet--open {
+  transform: translateY(50%);
+}
+
+.prism-sheet--detent-full.prism-sheet--open {
+  transform: translateY(0);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * MENU VARIANT (list of options)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-sheet--menu .prism-sheet__content {
+  padding: 8px;
+}
+
+.prism-sheet__menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 1rem;
+  color: var(--prism-text);
+  background: transparent;
+  border: none;
+  border-radius: var(--prism-radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background var(--prism-dur-fast) var(--prism-ease-cusp),
+    color var(--prism-dur-fast) var(--prism-ease-cusp);
+}
+
+.prism-sheet__menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.prism-sheet__menu-item:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.prism-sheet__menu-item-icon {
+  width: 22px;
+  height: 22px;
+  opacity: 0.7;
+}
+
+.prism-sheet__menu-item--destructive {
+  color: var(--prism-spark);
+}
+
+.prism-sheet__menu-divider {
+  height: 1px;
+  margin: 8px 0;
+  background: var(--prism-border);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * NO DRAG VARIANT
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-sheet--no-drag .prism-sheet__handle {
+  cursor: default;
+  padding: 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * INSET VARIANT (with padding from edges)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prism-sheet--inset {
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  border-radius: var(--prism-radius-xl);
+  border: 1px solid var(--prism-border);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * DESKTOP VARIANT (centered modal-like)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (min-width: 768px) {
+  .prism-sheet--desktop-modal {
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(0.96);
+    width: 100%;
+    max-width: 500px;
+    max-height: calc(100vh - 80px);
+    border-radius: var(--prism-radius-xl);
+    border: 1px solid var(--prism-border);
+  }
+
+  .prism-sheet--desktop-modal.prism-sheet--open {
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  .prism-sheet--desktop-modal .prism-sheet__handle {
+    display: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SAFE AREA SUPPORT
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .prism-sheet__footer {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  .prism-sheet--menu .prism-sheet__content {
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * REDUCED MOTION
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .prism-sheet {
+    transition: none;
+  }
+
+  .prism-sheet--snap {
+    transition: none;
+  }
+}

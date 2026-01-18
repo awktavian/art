@@ -1,0 +1,152 @@
+# Cloud Run Service with WireGuard VPN Sidecar
+#
+# Provides secure tunnel to home network via UniFi WireGuard VPN.
+# The WireGuard sidecar must start before the main container.
+#
+# Deploy: gcloud run services replace service-wireguard.yaml --region=us-west1
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: kagami-smarthome
+  labels:
+    app: kagami
+    component: smarthome
+  annotations:
+    run.googleapis.com/launch-stage: BETA
+    run.googleapis.com/description: "Smart Home controller with WireGuard VPN to home network"
+spec:
+  template:
+    metadata:
+      annotations:
+        # Keep warm for instant response
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "3"
+        # Don't throttle CPU
+        run.googleapis.com/cpu-throttling: "false"
+        run.googleapis.com/startup-cpu-boost: "true"
+        # Gen2 required for sidecars
+        run.googleapis.com/execution-environment: gen2
+        # WireGuard must start before main app
+        run.googleapis.com/container-dependencies: '{"kagami-smarthome":["wireguard"]}'
+    spec:
+      containerConcurrency: 100
+      timeoutSeconds: 300
+      serviceAccountName: kagami-smarthome@gen-lang-client-0509316009.iam.gserviceaccount.com
+      
+      containers:
+        # ============================================
+        # Main Application Container
+        # ============================================
+        - name: kagami-smarthome
+          image: gcr.io/gen-lang-client-0509316009/kagami-smarthome:latest
+          ports:
+            - name: http1
+              containerPort: 8080
+          resources:
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          env:
+            - name: KAGAMI_ENVIRONMENT
+              value: "production"
+            - name: KAGAMI_LOG_LEVEL
+              value: "INFO"
+            # Home device IPs (reachable via WireGuard tunnel)
+            - name: CONTROL4_HOST
+              value: "192.168.1.100"
+            - name: UNIFI_HOST
+              value: "192.168.1.1"
+            - name: DENON_HOST
+              value: "192.168.1.101"
+            # Secrets from Secret Manager
+            - name: CONTROL4_BEARER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: kagami-control4-token
+                  key: latest
+            - name: UNIFI_LOCAL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: kagami-unifi-username
+                  key: latest
+            - name: UNIFI_LOCAL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kagami-unifi-password
+                  key: latest
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 3
+
+        # ============================================
+        # WireGuard VPN Sidecar
+        # ============================================
+        - name: wireguard
+          image: gcr.io/gen-lang-client-0509316009/kagami-wireguard:latest
+          resources:
+            limits:
+              cpu: "0.25"
+              memory: "128Mi"
+          env:
+            - name: WG_INTERFACE
+              value: "wg0"
+            - name: WG_USERSPACE
+              value: "1"
+            - name: HOME_GATEWAY
+              value: "192.168.1.1"
+            # WireGuard secrets
+            - name: WG_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: wireguard-private-key
+                  key: latest
+            - name: WG_PEER_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: wireguard-peer-pubkey
+                  key: latest
+            - name: WG_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: wireguard-endpoint
+                  key: latest
+            - name: WG_ADDRESS
+              value: "10.0.0.2/32"
+            - name: WG_ALLOWED_IPS
+              value: "192.168.1.0/24"
+            - name: WG_DNS
+              value: "192.168.1.1"
+          # Security context for network namespace
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+          volumeMounts:
+            - name: wireguard-state
+              mountPath: /var/lib/wireguard
+
+      volumes:
+        - name: wireguard-state
+          emptyDir:
+            sizeLimit: 10Mi
+
+  traffic:
+    - percent: 100
+      latestRevision: true

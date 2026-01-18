@@ -1,0 +1,332 @@
+name: Nightly Stress & Adversarial Tests
+
+# Runs extended test suites that are too slow for regular CI:
+# - 10M sample adversarial robustness tests
+# - Long-running chaos engineering
+# - Soak tests
+# - Mutation testing
+
+on:
+  schedule:
+    # Run at 2 AM UTC every day
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - adversarial
+          - chaos
+          - soak
+          - mutation
+          - load
+
+env:
+  PYTHON_VERSION: "3.11"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  # ============================================================================
+  # ADVERSARIAL ROBUSTNESS TESTS (10M samples)
+  # ============================================================================
+  adversarial:
+    name: Adversarial Robustness
+    runs-on: ubuntu-latest
+    timeout-minutes: 120  # 2 hours
+    if: ${{ github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'adversarial' || github.event_name == 'schedule' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+          python -m pip install -e .
+
+      - name: Run adversarial stress tests
+        env:
+          KAGAMI_ADVERSARIAL_SAMPLES: "10000000"  # 10M samples
+          KAGAMI_TEST_MODE: "1"
+        run: |
+          pytest tests/verification/test_cbf_adversarial.py \
+            -v \
+            --timeout=7200 \
+            -m "verification or safety" \
+            --tb=short \
+            2>&1 | tee adversarial-results.log
+
+      - name: Upload adversarial results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: adversarial-results
+          path: adversarial-results.log
+          retention-days: 30
+
+  # ============================================================================
+  # CHAOS ENGINEERING TESTS
+  # ============================================================================
+  chaos:
+    name: Chaos Engineering
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: ${{ github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'chaos' || github.event_name == 'schedule' }}
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+          python -m pip install -e .
+
+      - name: Run chaos tests
+        env:
+          REDIS_URL: redis://localhost:6379
+          KAGAMI_USE_REAL_SERVICES: "1"
+        run: |
+          pytest tests/chaos/ \
+            -v \
+            --timeout=300 \
+            -m chaos \
+            --tb=short \
+            2>&1 | tee chaos-results.log
+
+      - name: Upload chaos results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chaos-results
+          path: chaos-results.log
+          retention-days: 30
+
+  # ============================================================================
+  # SOAK TESTS (Long-running stability)
+  # ============================================================================
+  soak:
+    name: Soak Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 180  # 3 hours
+    if: ${{ github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'soak' || github.event_name == 'schedule' }}
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+          python -m pip install -e .
+
+      - name: Run soak tests
+        env:
+          REDIS_URL: redis://localhost:6379
+          SOAK_DURATION_MINUTES: "60"
+        run: |
+          pytest tests/soak/ \
+            -v \
+            --timeout=10800 \
+            -m soak \
+            --tb=short \
+            2>&1 | tee soak-results.log
+
+      - name: Upload soak results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: soak-results
+          path: soak-results.log
+          retention-days: 30
+
+  # ============================================================================
+  # MUTATION TESTING
+  # ============================================================================
+  mutation:
+    name: Mutation Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 120  # 2 hours
+    if: ${{ github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'mutation' || github.event_name == 'schedule' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+          python -m pip install -e .
+          python -m pip install mutmut
+
+      - name: Run mutation tests on safety-critical code
+        run: |
+          mutmut run \
+            --paths-to-mutate=kagami/core/safety \
+            --tests-dir=tests/safety \
+            --runner="python -m pytest -x --tb=no -q tests/safety/" \
+            --no-progress \
+            2>&1 | tee mutation-results.log || true
+
+      - name: Generate mutation report
+        run: |
+          mutmut results > mutation-summary.txt || true
+          mutmut html || true
+
+      - name: Upload mutation results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-results
+          path: |
+            mutation-results.log
+            mutation-summary.txt
+            html/
+          retention-days: 30
+
+  # ============================================================================
+  # LOAD TESTS (100+ agents)
+  # ============================================================================
+  load:
+    name: Load Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: ${{ github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'load' || github.event_name == 'schedule' }}
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+          python -m pip install -e .
+
+      - name: Run load tests
+        env:
+          REDIS_URL: redis://localhost:6379
+          KAGAMI_LOAD_AGENTS: "100"
+        run: |
+          pytest tests/load/ \
+            -v \
+            --timeout=1800 \
+            -m load \
+            --tb=short \
+            2>&1 | tee load-results.log
+
+      - name: Upload load results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-results
+          path: load-results.log
+          retention-days: 30
+
+  # ============================================================================
+  # NIGHTLY REPORT
+  # ============================================================================
+  report:
+    name: Generate Nightly Report
+    runs-on: ubuntu-latest
+    needs: [adversarial, chaos, soak, mutation, load]
+    if: always()
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: results/
+
+      - name: Generate summary report
+        run: |
+          echo "# Nightly Test Report - $(date -u +%Y-%m-%d)" > report.md
+          echo "" >> report.md
+          echo "## Test Results Summary" >> report.md
+          echo "" >> report.md
+          echo "| Suite | Status |" >> report.md
+          echo "|-------|--------|" >> report.md
+          echo "| Adversarial | ${{ needs.adversarial.result }} |" >> report.md
+          echo "| Chaos | ${{ needs.chaos.result }} |" >> report.md
+          echo "| Soak | ${{ needs.soak.result }} |" >> report.md
+          echo "| Mutation | ${{ needs.mutation.result }} |" >> report.md
+          echo "| Load | ${{ needs.load.result }} |" >> report.md
+          echo "" >> report.md
+          echo "## Artifacts" >> report.md
+          ls -la results/ >> report.md || true
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-report
+          path: report.md
+          retention-days: 90
+
+      - name: Post to Slack (on failure)
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "⚠️ Nightly tests failed! Check: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true

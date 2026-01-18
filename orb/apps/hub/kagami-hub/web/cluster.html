@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<!--
+  Kagami Cluster Observability Dashboard
+
+  Real-time monitoring of distributed Byzantine consensus cluster.
+  Shows service health, consensus metrics, CRDT state, and homeostasis.
+
+  Colony: Grove (D₄⁻) — Observation and documentation
+  h(x) ≥ 0. Always.
+
+  Created: January 4, 2026
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Kagami Cluster Observability Dashboard">
+    <title>Kagami Cluster Dashboard</title>
+    <style>
+        /* Import IBM Plex (Kagami identity font) */
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+        :root {
+            /* Colony colors */
+            --color-spark: #f59e0b;
+            --color-forge: #ef4444;
+            --color-flow: #3b82f6;
+            --color-nexus: #8b5cf6;
+            --color-beacon: #10b981;
+            --color-grove: #6366f1;
+            --color-crystal: #ec4899;
+
+            /* Base colors */
+            --color-bg: #0a0a0b;
+            --color-surface: #12121a;
+            --color-surface-raised: #1a1a24;
+            --color-border: rgba(255, 255, 255, 0.08);
+            --color-primary: #0ea5e9;
+            --color-success: #22c55e;
+            --color-warning: #f59e0b;
+            --color-error: #ef4444;
+            --color-text: #f8fafc;
+            --color-text-muted: #94a3b8;
+
+            /* Spacing (8px grid) */
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 16px;
+            --space-lg: 24px;
+            --space-xl: 32px;
+
+            /* Typography */
+            --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+
+            /* Motion (Fibonacci timing) */
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+            --duration-fast: 144ms;
+            --duration-normal: 233ms;
+            --duration-slow: 377ms;
+
+            /* Elevation */
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--color-bg);
+            color: var(--color-text);
+            min-height: 100vh;
+            line-height: 1.5;
+            /* Subtle radial gradient for depth */
+            background-image: radial-gradient(ellipse at 50% 0%, rgba(14, 165, 233, 0.03) 0%, transparent 50%);
+        }
+
+        /* Header */
+        header {
+            padding: var(--space-md) var(--space-lg);
+            background: var(--color-surface);
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .cluster-status {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+        }
+
+        .status-badge {
+            padding: var(--space-xs) var(--space-md);
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-badge.healthy { background: var(--color-success); }
+        .status-badge.degraded { background: var(--color-warning); color: #000; }
+        .status-badge.critical { background: var(--color-error); }
+
+        /* Main Grid */
+        main {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: var(--space-lg);
+            padding: var(--space-lg);
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        /* Card */
+        .card {
+            background: var(--color-surface);
+            border-radius: 12px;
+            border: 1px solid var(--color-border);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            transition: transform var(--duration-normal) var(--ease-out),
+                        box-shadow var(--duration-normal) var(--ease-out);
+            animation: cardReveal var(--duration-slow) var(--ease-out) backwards;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        @keyframes cardReveal {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+        }
+
+        /* Staggered reveal */
+        main .card:nth-child(1) { animation-delay: 0ms; }
+        main .card:nth-child(2) { animation-delay: 55ms; }
+        main .card:nth-child(3) { animation-delay: 89ms; }
+        main .card:nth-child(4) { animation-delay: 144ms; }
+        main .card:nth-child(5) { animation-delay: 233ms; }
+        main .card:nth-child(6) { animation-delay: 377ms; }
+
+        .card-header {
+            padding: var(--space-md);
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .card-body {
+            padding: var(--space-md);
+        }
+
+        /* Service List */
+        .service-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-sm);
+        }
+
+        .service-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-sm) var(--space-md);
+            background: var(--color-surface-raised);
+            border-radius: 8px;
+            transition: background var(--duration-fast) var(--ease-out);
+            cursor: default;
+        }
+
+        .service-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .service-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .service-name {
+            font-weight: 500;
+        }
+
+        .service-address {
+            font-size: 0.75rem;
+            color: var(--color-text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .health-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .health-dot.healthy {
+            background: var(--color-success);
+            box-shadow: 0 0 8px var(--color-success);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        .health-dot.unhealthy {
+            background: var(--color-error);
+            box-shadow: 0 0 8px var(--color-error);
+        }
+        .health-dot.isolated {
+            background: var(--color-warning);
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-md);
+        }
+
+        .metric-card {
+            background: var(--color-surface-raised);
+            padding: var(--space-md);
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            background: linear-gradient(135deg, var(--color-text) 0%, var(--color-text-muted) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--color-text-muted);
+            margin-top: var(--space-xs);
+        }
+
+        /* Consensus Visualization */
+        .consensus-viz {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
+        }
+
+        .phase-indicator {
+            display: flex;
+            gap: var(--space-sm);
+        }
+
+        .phase-step {
+            flex: 1;
+            height: 4px;
+            background: var(--color-surface-raised);
+            border-radius: 2px;
+            position: relative;
+        }
+
+        .phase-step.active {
+            background: var(--color-primary);
+        }
+
+        .phase-step.completed {
+            background: var(--color-success);
+        }
+
+        .node-votes {
+            display: flex;
+            gap: var(--space-sm);
+            flex-wrap: wrap;
+        }
+
+        .node-vote {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: var(--font-mono);
+            background: var(--color-surface-raised);
+            border: 2px solid transparent;
+        }
+
+        .node-vote.voted { border-color: var(--color-success); }
+        .node-vote.leader { background: var(--color-primary); }
+
+        /* CRDT State */
+        .crdt-state {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+        }
+
+        .crdt-entry {
+            display: flex;
+            justify-content: space-between;
+            padding: var(--space-xs) 0;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .crdt-key {
+            color: var(--color-text-muted);
+        }
+
+        /* Homeostasis */
+        .homeostasis-viz {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
+        }
+
+        .colony-bar {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .colony-label {
+            width: 60px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .colony-progress {
+            flex: 1;
+            height: 8px;
+            background: var(--color-surface-raised);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .colony-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width var(--duration-slow) var(--ease-out);
+            position: relative;
+        }
+
+        .colony-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .spark .colony-fill { background: var(--color-spark); }
+        .forge .colony-fill { background: var(--color-forge); }
+        .flow .colony-fill { background: var(--color-flow); }
+        .nexus .colony-fill { background: var(--color-nexus); }
+        .beacon .colony-fill { background: var(--color-beacon); }
+        .grove .colony-fill { background: var(--color-grove); }
+        .crystal .colony-fill { background: var(--color-crystal); }
+
+        .colony-value {
+            width: 40px;
+            text-align: right;
+            font-size: 0.75rem;
+            font-family: var(--font-mono);
+        }
+
+        /* Alert Banner */
+        .alert-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: var(--space-md);
+            background: var(--color-error);
+            color: white;
+            text-align: center;
+            font-weight: 500;
+            z-index: 1000;
+            display: none;
+        }
+
+        .alert-banner.visible { display: block; }
+
+        /* Byzantine Faults */
+        .byzantine-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-xs);
+        }
+
+        .byzantine-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            padding: var(--space-sm);
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 6px;
+            font-size: 0.875rem;
+        }
+
+        .byzantine-item .icon { color: var(--color-error); }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100px;
+            color: var(--color-text-muted);
+        }
+
+        .loading::after {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--color-border);
+            border-top-color: var(--color-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: var(--space-sm);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="alert-banner" id="alertBanner">
+        <span id="alertText"></span>
+    </div>
+
+    <header>
+        <div class="logo">
+            <span>🪞</span>
+            <span>Kagami Cluster</span>
+        </div>
+        <div class="cluster-status">
+            <span id="lastUpdate" style="font-size: 0.75rem; color: var(--color-text-muted);">Loading...</span>
+            <span class="status-badge healthy" id="clusterHealth">HEALTHY</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Service Registry -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Service Registry</span>
+                <span id="serviceCount" style="font-size: 0.875rem;">0 services</span>
+            </div>
+            <div class="card-body">
+                <div class="service-list" id="serviceList">
+                    <div class="loading">Loading services</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Consensus Metrics -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">PBFT Consensus</span>
+                <span id="consensusPhase" style="font-size: 0.875rem;">—</span>
+            </div>
+            <div class="card-body">
+                <div class="consensus-viz" id="consensusViz">
+                    <div class="phase-indicator">
+                        <div class="phase-step" data-phase="new_round">New Round</div>
+                        <div class="phase-step" data-phase="pre_vote">Pre-Vote</div>
+                        <div class="phase-step" data-phase="pre_commit">Pre-Commit</div>
+                        <div class="phase-step" data-phase="commit">Commit</div>
+                    </div>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-value" id="consensusHeight">0</div>
+                            <div class="metric-label">Height</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="consensusRound">0</div>
+                            <div class="metric-label">Round</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="quorumSize">0</div>
+                            <div class="metric-label">Quorum Size</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="validatorCount">0</div>
+                            <div class="metric-label">Validators</div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: var(--space-sm);">Node Votes</div>
+                        <div class="node-votes" id="nodeVotes">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CRDT State -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">CRDT State</span>
+                <span id="syncCount" style="font-size: 0.875rem;">0 syncs</span>
+            </div>
+            <div class="card-body">
+                <div class="crdt-state" id="crdtState">
+                    <div class="loading">Loading CRDT state</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Homeostasis -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Organism Homeostasis</span>
+                <span id="homeostasisStatus" style="font-size: 0.875rem;">—</span>
+            </div>
+            <div class="card-body">
+                <div class="homeostasis-viz" id="homeostasisViz">
+                    <div class="colony-bar spark">
+                        <span class="colony-label">🔥 Spark</span>
+                        <div class="colony-progress"><div class="colony-fill" style="width: 50%"></div></div>
+                        <span class="colony-value">50%</span>
+                    </div>
+                    <div class="colony-bar forge">
+                        <span class="colony-label">⚒️ Forge</span>
+                        <div class="colony-progress"><div class="colony-fill" style="width: 50%"></div></div>
+                        <span class="colony-value">50%</span>
+                    </div>
+                    <div class="colony-bar flow">
+                        <span class="colony-label">🌊 Flow</span>
+                        <div class="colony-progress"><div class="colony-fill" style="width: 50%"></div></div>
+                        <span class="colony-value">50%</span>
+                    </div>
+                    <div class="colony-bar nexus">
+                        <span class="colony-label">🔗 Nexus</span>
+                        <div class="colony-progress"><div class="colony-fill" style="width: 50%"></div></div>
+                        <span class="colony-value">50%</span>
+                    </div>
+                    <div class="colony-bar beacon">
+                        <span class="colony-label">🗼 Beacon</span>
+                        <div class="colony-progress"><div class="colony-fill" style="width: 50%"></div></div>
+                        <span class="colony-value">50%</span>
+                    </div>
+                    <div class="colony-bar grove">
+                        <span class="colony-label">🌿 Grove</span>
+                        <div class="colony-progress"><div class="colony-fill" style="width: 50%"></div></div>
+                        <span class="colony-value">50%</span>
+                    </div>
+                    <div class="colony-bar crystal">
+                        <span class="colony-label">💎 Crystal</span>
+                        <div class="colony-progress"><div class="colony-fill" style="width: 50%"></div></div>
+                        <span class="colony-value">50%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Performance</span>
+            </div>
+            <div class="card-body">
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value" id="avgLatency">—</div>
+                        <div class="metric-label">Avg Latency (ms)</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="requestRate">—</div>
+                        <div class="metric-label">Req/sec</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="errorRate">—</div>
+                        <div class="metric-label">Error Rate</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="cacheHitRate">—</div>
+                        <div class="metric-label">Cache Hit</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Byzantine Faults -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Byzantine Faults</span>
+                <span id="faultCount" style="font-size: 0.875rem; color: var(--color-success);">0 faults</span>
+            </div>
+            <div class="card-body">
+                <div class="byzantine-list" id="byzantineList">
+                    <div style="text-align: center; color: var(--color-text-muted); padding: var(--space-lg);">
+                        No Byzantine faults detected ✓
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Kagami Cluster Dashboard
+        const API_BASE = window.location.hostname === 'localhost'
+            ? 'http://localhost:8001/api/v1/cluster'
+            : `/api/v1/cluster`;
+
+        // Poll interval (ms)
+        const POLL_INTERVAL = 5000;
+
+        // Dashboard state
+        const state = {
+            services: [],
+            consensus: null,
+            crdt: null,
+            homeostasis: null,
+            performance: null,
+            byzantineFaults: []
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchDashboard();
+            setInterval(fetchDashboard, POLL_INTERVAL);
+        });
+
+        // Fetch all dashboard data
+        async function fetchDashboard() {
+            try {
+                const response = await fetch(`${API_BASE}/dashboard`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+                updateUI(data);
+                updateLastUpdate();
+            } catch (error) {
+                console.error('Dashboard fetch failed:', error);
+                showAlert(`Failed to fetch dashboard: ${error.message}`);
+            }
+        }
+
+        // Update all UI components
+        function updateUI(data) {
+            updateClusterHealth(data.health);
+            updateServices(data.services);
+            updateConsensus(data.consensus);
+            updatePerformance(data.performance);
+            updateHomeostasis(data.homeostasis);
+
+            // Clear alert if successful
+            hideAlert();
+        }
+
+        // Update cluster health badge
+        function updateClusterHealth(health) {
+            const badge = document.getElementById('clusterHealth');
+            if (!health) return;
+
+            badge.className = 'status-badge';
+            if (health.is_healthy) {
+                badge.classList.add('healthy');
+                badge.textContent = 'HEALTHY';
+            } else if (health.degraded) {
+                badge.classList.add('degraded');
+                badge.textContent = 'DEGRADED';
+            } else {
+                badge.classList.add('critical');
+                badge.textContent = 'CRITICAL';
+            }
+        }
+
+        // Update service registry
+        function updateServices(services) {
+            const container = document.getElementById('serviceList');
+            const countEl = document.getElementById('serviceCount');
+
+            if (!services || !services.by_type) {
+                container.innerHTML = '<div class="loading">No service data</div>';
+                return;
+            }
+
+            let totalServices = 0;
+            let html = '';
+
+            for (const [type, nodes] of Object.entries(services.by_type)) {
+                if (!nodes || nodes.length === 0) continue;
+
+                for (const node of nodes) {
+                    totalServices++;
+                    const healthClass = node.health || 'healthy';
+                    html += `
+                        <div class="service-item">
+                            <div class="service-info">
+                                <span class="service-name">${node.node_id || 'Unknown'}</span>
+                                <span class="service-address">${type} • ${node.address || '?'}:${node.port || '?'}</span>
+                            </div>
+                            <div class="health-dot ${healthClass}"></div>
+                        </div>
+                    `;
+                }
+            }
+
+            container.innerHTML = html || '<div style="text-align: center; color: var(--color-text-muted);">No services registered</div>';
+            countEl.textContent = `${totalServices} services`;
+        }
+
+        // Update consensus visualization
+        function updateConsensus(consensus) {
+            if (!consensus) return;
+
+            document.getElementById('consensusPhase').textContent = consensus.phase || '—';
+            document.getElementById('consensusHeight').textContent = consensus.height || 0;
+            document.getElementById('consensusRound').textContent = consensus.round || 0;
+            document.getElementById('quorumSize').textContent = consensus.quorum_size || 0;
+            document.getElementById('validatorCount').textContent = consensus.validator_count || 0;
+
+            // Update phase indicators
+            const phases = ['new_round', 'pre_vote', 'pre_commit', 'commit'];
+            const currentPhaseIndex = phases.indexOf(consensus.phase?.toLowerCase().replace(/ /g, '_'));
+
+            document.querySelectorAll('.phase-step').forEach((el, index) => {
+                el.classList.remove('active', 'completed');
+                if (index < currentPhaseIndex) {
+                    el.classList.add('completed');
+                } else if (index === currentPhaseIndex) {
+                    el.classList.add('active');
+                }
+            });
+
+            // Update node votes
+            const nodeVotesEl = document.getElementById('nodeVotes');
+            if (consensus.votes) {
+                nodeVotesEl.innerHTML = Object.entries(consensus.votes)
+                    .map(([nodeId, voted]) => `
+                        <div class="node-vote ${voted ? 'voted' : ''} ${nodeId === consensus.leader ? 'leader' : ''}">
+                            ${nodeId.slice(-2)}
+                        </div>
+                    `).join('');
+            }
+        }
+
+        // Update performance metrics
+        function updatePerformance(perf) {
+            if (!perf) return;
+
+            document.getElementById('avgLatency').textContent =
+                perf.avg_latency_ms ? `${perf.avg_latency_ms.toFixed(1)}` : '—';
+            document.getElementById('requestRate').textContent =
+                perf.requests_per_second ? `${perf.requests_per_second.toFixed(1)}` : '—';
+            document.getElementById('errorRate').textContent =
+                perf.error_rate !== undefined ? `${(perf.error_rate * 100).toFixed(1)}%` : '—';
+            document.getElementById('cacheHitRate').textContent =
+                perf.cache_hit_rate !== undefined ? `${(perf.cache_hit_rate * 100).toFixed(0)}%` : '—';
+        }
+
+        // Update homeostasis
+        function updateHomeostasis(homeostasis) {
+            if (!homeostasis || !homeostasis.colony_populations) return;
+
+            const colonies = ['spark', 'forge', 'flow', 'nexus', 'beacon', 'grove', 'crystal'];
+            const populations = homeostasis.colony_populations;
+
+            colonies.forEach(colony => {
+                const bar = document.querySelector(`.colony-bar.${colony}`);
+                if (!bar) return;
+
+                const value = populations[colony] || 50;
+                const fill = bar.querySelector('.colony-fill');
+                const valueEl = bar.querySelector('.colony-value');
+
+                if (fill) fill.style.width = `${value}%`;
+                if (valueEl) valueEl.textContent = `${value}%`;
+            });
+
+            document.getElementById('homeostasisStatus').textContent =
+                homeostasis.status || 'balanced';
+        }
+
+        // Update last update timestamp
+        function updateLastUpdate() {
+            const el = document.getElementById('lastUpdate');
+            const now = new Date();
+            el.textContent = `Updated ${now.toLocaleTimeString()}`;
+        }
+
+        // Show alert
+        function showAlert(message) {
+            const banner = document.getElementById('alertBanner');
+            const text = document.getElementById('alertText');
+            text.textContent = message;
+            banner.classList.add('visible');
+        }
+
+        // Hide alert
+        function hideAlert() {
+            const banner = document.getElementById('alertBanner');
+            banner.classList.remove('visible');
+        }
+    </script>
+</body>
+</html>

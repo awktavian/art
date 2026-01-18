@@ -1,0 +1,62 @@
+[Unit]
+Description=Kagami OS Celery Beat Scheduler
+After=network.target redis.service kagami-celery-worker.service
+Requires=redis.service kagami-celery-worker.service
+
+[Service]
+Type=forking
+User=kagami
+Group=kagami
+WorkingDirectory=/opt/kagami
+
+# Environment
+Environment="PATH=/opt/kagami/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/opt/kagami/packages"
+
+# =============================================================================
+# UNIFIED CLUSTER CONFIGURATION
+# Celery uses Redis as broker - cluster-aware via UnifiedClusterManager
+# =============================================================================
+Environment="REDIS_URL=redis://localhost:6379/0"
+Environment="CELERY_BROKER_URL=redis://localhost:6379/0"
+Environment="CELERY_RESULT_BACKEND=redis://localhost:6379/1"
+Environment="KAGAMI_BOOT_MODE=full"
+
+# Scheduler process
+ExecStart=/opt/kagami/.venv/bin/celery \
+    -A kagami.core.tasks.app \
+    beat \
+    --loglevel=info \
+    --schedule=/var/lib/kagami/celerybeat-schedule \
+    --logfile=/var/log/kagami/celery-beat.log \
+    --pidfile=/var/run/kagami/celery-beat.pid \
+    --detach
+
+ExecStop=/bin/kill -TERM $MAINPID
+
+# Process management
+PIDFile=/var/run/kagami/celery-beat.pid
+Restart=on-failure
+RestartSec=10s
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/kagami /var/log/kagami /var/run/kagami /var/lib/kagami
+
+# Resource limits
+LimitNOFILE=4096
+LimitNPROC=512
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kagami-celery-beat
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,93 @@
+[Unit]
+Description=Kagami OS API Server
+After=network.target etcd.service redis.service cockroachdb.service
+# Cluster services are optional - UnifiedClusterManager handles graceful degradation
+Wants=etcd.service redis.service cockroachdb.service
+
+[Service]
+Type=simple
+User=kagami
+Group=kagami
+WorkingDirectory=/opt/kagami
+
+# Environment - include all package paths
+Environment="PATH=/opt/kagami/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/opt/kagami/packages"
+Environment="HOME=/opt/kagami"
+Environment="LANG=en_US.UTF-8"
+
+# =============================================================================
+# UNIFIED CLUSTER CONFIGURATION
+# All clustering coordinated via kagami.core.cluster.UnifiedClusterManager
+# =============================================================================
+
+# Cluster identity (auto-generated if not set)
+Environment="KAGAMI_CLUSTER_NAME=kagami"
+# Environment="KAGAMI_NODE_ID=kagami-api-1"
+
+# etcd (Consensus, Leader Election, Distributed Locks)
+# Set to actual endpoints for production
+Environment="ETCD_ENDPOINTS=http://localhost:2379"
+Environment="ETCD_TIMEOUT=5"
+Environment="ETCD_PREFIX=/kagami"
+
+# Redis (Cache, Job Queues, Pub/Sub, Sessions)
+Environment="REDIS_URL=redis://localhost:6379/0"
+Environment="REDIS_MAX_CONNECTIONS=200"
+
+# CockroachDB (Distributed SQL Persistence)
+Environment="DATABASE_URL=cockroachdb://root@localhost:26257/kagami?sslmode=disable"
+Environment="DB_POOL_SIZE=100"
+Environment="DB_MAX_OVERFLOW=100"
+
+# Cluster behavior (auto-managed by UnifiedClusterManager)
+Environment="CLUSTER_AUTO_FAILOVER=true"
+Environment="CLUSTER_AUTO_REBALANCE=true"
+Environment="CLUSTER_HEARTBEAT_INTERVAL=10"
+Environment="CLUSTER_HEALTH_CHECK_INTERVAL=30"
+Environment="CLUSTER_LEADER_LEASE_TTL=30"
+
+# Application settings
+Environment="ENVIRONMENT=production"
+Environment="KAGAMI_BOOT_MODE=full"
+Environment="LOG_LEVEL=INFO"
+Environment="METRICS_PORT=9090"
+
+# Main API server
+ExecStart=/opt/kagami/.venv/bin/python3 -m uvicorn \
+    kagami_api:create_app_v2 \
+    --factory \
+    --host 0.0.0.0 \
+    --port 8001 \
+    --workers 4 \
+    --log-level info
+
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Process management
+Restart=on-failure
+RestartSec=10s
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+TimeoutStartSec=120
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/kagami /var/log/kagami /var/run/kagami
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=8G
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kagami-api
+
+[Install]
+WantedBy=multi-user.target

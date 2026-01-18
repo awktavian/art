@@ -1,0 +1,705 @@
+/**
+ * Animation Performance Optimizations
+ *
+ * GPU-accelerated animations with:
+ * - will-change hints for composited layers
+ * - GPU layer promotion
+ * - Reduced paint complexity
+ * - RequestAnimationFrame batching helpers
+ * - Contain property for layout isolation
+ *
+ * Focus:
+ *
+ * Principles:
+ * 1. Only animate transform and opacity (GPU-accelerated)
+ * 2. Use will-change sparingly and remove after animation
+ * 3. Promote to compositor layer only when needed
+ * 4. Reduce paint areas with contain property
+ * 5. Respect prefers-reduced-motion
+ *
+ *
+ */
+
+/* ============================================================================
+ * GPU LAYER PROMOTION
+ * Use translateZ(0) or will-change to promote to compositor layer
+ * ============================================================================ */
+
+/* Elements that always need GPU acceleration */
+.gpu-accelerated {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+}
+
+/* Force compositor layer for frequently animated elements */
+.compositor-layer {
+    will-change: transform, opacity;
+    transform: translateZ(0);
+}
+
+/* ============================================================================
+ * WILL-CHANGE HINTS
+ * Applied just before animation, removed after
+ * ============================================================================ */
+
+/* Prepare for transform animation */
+.will-animate-transform {
+    will-change: transform;
+}
+
+/* Prepare for opacity animation */
+.will-animate-opacity {
+    will-change: opacity;
+}
+
+/* Prepare for combined animation */
+.will-animate-both {
+    will-change: transform, opacity;
+}
+
+/* Prepare for filter/backdrop animation (expensive!) */
+.will-animate-filter {
+    will-change: filter, backdrop-filter;
+}
+
+/* Remove will-change after animation completes */
+.animation-complete {
+    will-change: auto;
+}
+
+/* ============================================================================
+ * CONTAINMENT FOR LAYOUT ISOLATION
+ * Prevents layout recalculation from propagating
+ * ============================================================================ */
+
+/* Strict containment - element won't affect outside layout */
+.contain-strict {
+    contain: strict;
+}
+
+/* Layout containment only */
+.contain-layout {
+    contain: layout;
+}
+
+/* Paint containment - clipped, won't paint outside */
+.contain-paint {
+    contain: paint;
+}
+
+/* Content containment - layout + paint */
+.contain-content {
+    contain: content;
+}
+
+/* Size containment - intrinsic size won't change */
+.contain-size {
+    contain: size;
+}
+
+/* Inline-size containment for resize-responsive elements */
+.contain-inline-size {
+    contain: inline-size;
+}
+
+/* ============================================================================
+ * OPTIMIZED ANIMATION CLASSES
+ * Pre-composed animations with GPU hints
+ * ============================================================================ */
+
+/* Optimized fade in */
+.perf-fade-in {
+    animation: perf-fade-in 0.3s ease-out both;
+    will-change: opacity;
+}
+
+@keyframes perf-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Optimized slide up */
+.perf-slide-up {
+    animation: perf-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+    will-change: transform, opacity;
+}
+
+@keyframes perf-slide-up {
+    from {
+        opacity: 0;
+        transform: translateY(20px) translateZ(0);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) translateZ(0);
+    }
+}
+
+/* Optimized scale up */
+.perf-scale-up {
+    animation: perf-scale-up 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    will-change: transform, opacity;
+}
+
+@keyframes perf-scale-up {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateZ(0);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateZ(0);
+    }
+}
+
+/* Optimized spinner (uses transform only) */
+.perf-spinner {
+    animation: perf-spin 1s linear infinite;
+    will-change: transform;
+    transform-origin: center center;
+}
+
+@keyframes perf-spin {
+    from { transform: rotate(0deg) translateZ(0); }
+    to { transform: rotate(360deg) translateZ(0); }
+}
+
+/* Optimized pulse (scale only, no box-shadow) */
+.perf-pulse {
+    animation: perf-pulse 2s ease-in-out infinite;
+    will-change: transform, opacity;
+}
+
+@keyframes perf-pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1) translateZ(0);
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.05) translateZ(0);
+    }
+}
+
+/* Optimized skeleton shimmer (background-position, GPU-friendly) */
+.perf-skeleton {
+    animation: perf-shimmer 1.5s linear infinite;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.06) 0%,
+        rgba(255, 255, 255, 0.15) 50%,
+        rgba(255, 255, 255, 0.06) 100%
+    );
+    background-size: 200% 100%;
+    will-change: background-position;
+}
+
+@keyframes perf-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ============================================================================
+ * TRANSITION OPTIMIZATIONS
+ * Use these instead of box-shadow/filter transitions
+ * ============================================================================ */
+
+/* Hover elevation using transform (not box-shadow) */
+.perf-hover-lift {
+    transition: transform 0.15s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.perf-hover-lift:hover {
+    transform: translateY(-2px) translateZ(0);
+}
+
+/* Use pseudo-element for shadow animation */
+.perf-hover-shadow {
+    position: relative;
+}
+
+.perf-hover-shadow::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    transition: opacity 0.15s ease-out;
+    pointer-events: none;
+    z-index: -1;
+}
+
+.perf-hover-shadow:hover::after {
+    opacity: 1;
+}
+
+/* Scale on press (touch feedback) */
+.perf-press {
+    transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.perf-press:active {
+    transform: scale(0.97) translateZ(0);
+}
+
+/* ============================================================================
+ * PAINT REDUCTION
+ * Reduce areas that need repainting
+ * ============================================================================ */
+
+/* Isolate scrollable areas */
+.scroll-container {
+    contain: paint layout;
+    overflow: auto;
+    overscroll-behavior: contain;
+}
+
+/* Isolate modal/overlay from main content */
+.overlay-container {
+    contain: layout paint;
+    isolation: isolate;
+}
+
+/* Fixed elements shouldn't cause repaints */
+.fixed-element {
+    position: fixed;
+    will-change: transform;
+    transform: translateZ(0);
+    contain: layout paint;
+}
+
+/* ============================================================================
+ * OFFSCREEN/HIDDEN OPTIMIZATIONS
+ * Reduce work for non-visible elements
+ * ============================================================================ */
+
+/* Content visibility for virtualized lists */
+.virtual-item {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 60px; /* Estimated height */
+}
+
+/* Skip rendering for hidden items */
+.offscreen {
+    content-visibility: hidden;
+}
+
+/* Lazy render below fold */
+.below-fold {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 200px;
+}
+
+/* ============================================================================
+ * DEBOUNCED ANIMATION TRIGGERS
+ * CSS classes for JS animation scheduling
+ * ============================================================================ */
+
+/* Mark element as pending animation (JS will apply actual animation) */
+.animation-pending {
+    /* No visual change - marker class */
+}
+
+/* Animation frame boundary marker */
+.animation-frame-boundary {
+    /* Used by RAF batching system */
+}
+
+/* ============================================================================
+ * TOUR AND ONBOARDING ANIMATIONS
+ * ============================================================================ */
+
+/* Tour overlay - full GPU layer */
+.tour-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    pointer-events: all;
+    opacity: 0;
+    transition: opacity 0.3s ease-out;
+    will-change: opacity;
+}
+
+.tour-overlay.visible {
+    opacity: 1;
+}
+
+.tour-overlay-bg {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+}
+
+/* Tour spotlight - GPU accelerated positioning */
+.tour-spotlight {
+    position: fixed;
+    z-index: 9999;
+    border-radius: 8px;
+    box-shadow:
+        0 0 0 9999px rgba(0, 0, 0, 0.75),
+        0 0 0 4px var(--prism-beacon, #00D4FF);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity, top, left, width, height;
+    pointer-events: none;
+}
+
+.tour-spotlight.visible {
+    opacity: 1;
+}
+
+/* Tour tooltip - compositor layer */
+.tour-tooltip {
+    position: fixed;
+    z-index: 10000;
+    max-width: 360px;
+    padding: 0;
+    background: var(--prism-surface-elevated, rgba(30, 30, 30, 0.98));
+    border: 1px solid var(--prism-border, rgba(255, 255, 255, 0.1));
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transform: translateY(10px) scale(0.98) translateZ(0);
+    transition: opacity 0.3s ease-out, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    will-change: transform, opacity;
+}
+
+.tour-tooltip.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1) translateZ(0);
+}
+
+.tour-tooltip.tour-tooltip-center {
+    transform: translate(-50%, -50%) translateZ(0);
+}
+
+.tour-tooltip.tour-tooltip-center.visible {
+    transform: translate(-50%, -50%) scale(1) translateZ(0);
+}
+
+.tour-tooltip-content {
+    padding: 24px;
+}
+
+.tour-tooltip-title {
+    margin: 0 0 8px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--prism-text-primary, #fff);
+}
+
+.tour-tooltip-description {
+    margin: 0 0 16px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--prism-text-secondary, rgba(255, 255, 255, 0.7));
+}
+
+.tour-tooltip-progress {
+    margin-bottom: 16px;
+    font-size: 12px;
+    color: var(--prism-text-tertiary, rgba(255, 255, 255, 0.5));
+}
+
+.tour-tooltip-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.tour-tooltip-nav {
+    display: flex;
+    gap: 8px;
+}
+
+.tour-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease-out, opacity 0.15s ease-out;
+}
+
+.tour-btn-skip {
+    background: transparent;
+    color: var(--prism-text-tertiary, rgba(255, 255, 255, 0.5));
+}
+
+.tour-btn-skip:hover {
+    color: var(--prism-text-secondary, rgba(255, 255, 255, 0.7));
+}
+
+.tour-btn-prev,
+.tour-btn-next {
+    background: var(--prism-surface, rgba(255, 255, 255, 0.1));
+    color: var(--prism-text-primary, #fff);
+}
+
+.tour-btn-prev:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.tour-btn-primary {
+    background: var(--prism-beacon, #00D4FF);
+    color: #000;
+}
+
+.tour-btn-primary:hover {
+    background: var(--prism-beacon-hover, #00b8e0);
+}
+
+/* Tour animation variants */
+.tour-anim-fade-scale {
+    animation: tour-fade-scale 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes tour-fade-scale {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.9) translateZ(0);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1) translateZ(0);
+    }
+}
+
+.tour-anim-slide-up {
+    animation: tour-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tour-slide-up {
+    from {
+        opacity: 0;
+        transform: translateY(30px) translateZ(0);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) translateZ(0);
+    }
+}
+
+.tour-anim-slide-right {
+    animation: tour-slide-right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tour-slide-right {
+    from {
+        opacity: 0;
+        transform: translateX(-30px) translateZ(0);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) translateZ(0);
+    }
+}
+
+.tour-anim-pulse .tour-spotlight {
+    animation: tour-spotlight-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes tour-spotlight-pulse {
+    0%, 100% {
+        box-shadow:
+            0 0 0 9999px rgba(0, 0, 0, 0.75),
+            0 0 0 4px var(--prism-beacon, #00D4FF);
+    }
+    50% {
+        box-shadow:
+            0 0 0 9999px rgba(0, 0, 0, 0.75),
+            0 0 0 8px var(--prism-beacon, #00D4FF),
+            0 0 20px 4px var(--prism-beacon, #00D4FF);
+    }
+}
+
+.tour-anim-glow .tour-tooltip {
+    animation: tour-glow 2s ease-in-out infinite;
+}
+
+@keyframes tour-glow {
+    0%, 100% {
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    }
+    50% {
+        box-shadow:
+            0 20px 60px rgba(0, 0, 0, 0.4),
+            0 0 40px rgba(0, 212, 255, 0.3);
+    }
+}
+
+/* Confetti container */
+.tour-confetti-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10001;
+    overflow: hidden;
+}
+
+/* ============================================================================
+ * WELCOME ANIMATION
+ * ============================================================================ */
+
+.welcome-animation-container {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--prism-bg, #0a0a0a);
+    z-index: 10002;
+    opacity: 0;
+    transition: opacity 0.5s ease-out;
+    will-change: opacity;
+}
+
+.welcome-animation-container.visible {
+    opacity: 1;
+}
+
+.welcome-animation-container.fade-out {
+    opacity: 0;
+}
+
+.welcome-animation {
+    text-align: center;
+}
+
+.welcome-logo {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 24px;
+    color: var(--prism-beacon, #00D4FF);
+}
+
+.kagami-logo-animated .logo-outer {
+    stroke-dasharray: 400;
+    stroke-dashoffset: 400;
+    animation: logo-draw 1s ease-out forwards;
+}
+
+.kagami-logo-animated .logo-inner {
+    stroke-dasharray: 240;
+    stroke-dashoffset: 240;
+    animation: logo-draw 1s ease-out 0.2s forwards;
+}
+
+.kagami-logo-animated .logo-center {
+    opacity: 0;
+    transform: scale(0);
+    transform-origin: center;
+    animation: logo-center-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.6s forwards;
+}
+
+@keyframes logo-draw {
+    to { stroke-dashoffset: 0; }
+}
+
+@keyframes logo-center-pop {
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.welcome-title {
+    margin: 0 0 8px;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--prism-text-primary, #fff);
+    opacity: 0;
+    transform: translateY(10px);
+    animation: welcome-text 0.5s ease-out 0.8s forwards;
+}
+
+.welcome-subtitle {
+    margin: 0 0 24px;
+    font-size: 16px;
+    color: var(--prism-text-secondary, rgba(255, 255, 255, 0.7));
+    opacity: 0;
+    transform: translateY(10px);
+    animation: welcome-text 0.5s ease-out 1s forwards;
+}
+
+@keyframes welcome-text {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.welcome-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+.welcome-dots .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--prism-beacon, #00D4FF);
+    opacity: 0;
+    animation: dot-appear 0.3s ease-out forwards;
+}
+
+.welcome-dots .dot-1 { animation-delay: 1.2s; }
+.welcome-dots .dot-2 { animation-delay: 1.35s; }
+.welcome-dots .dot-3 { animation-delay: 1.5s; }
+
+@keyframes dot-appear {
+    from {
+        opacity: 0;
+        transform: scale(0);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ============================================================================
+ * REDUCED MOTION
+ * Respect user preferences
+ * ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+    .gpu-accelerated,
+    .compositor-layer,
+    .will-animate-transform,
+    .will-animate-opacity,
+    .will-animate-both,
+    .will-animate-filter,
+    .perf-fade-in,
+    .perf-slide-up,
+    .perf-scale-up,
+    .perf-spinner,
+    .perf-pulse,
+    .perf-skeleton,
+    .tour-tooltip,
+    .tour-spotlight,
+    .welcome-animation-container {
+        animation: none !important;
+        transition: none !important;
+        will-change: auto !important;
+    }
+
+    /* Still allow opacity for state changes */
+    .tour-overlay,
+    .tour-spotlight,
+    .tour-tooltip {
+        transition: opacity 0.01ms !important;
+    }
+}
+
+/*
+ * Spark ignites. Spark accelerates. Spark performs.
+ *
+ */

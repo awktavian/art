@@ -1,0 +1,183 @@
+# K os Production-Optimized Dockerfile
+# Multi-stage build for maximum efficiency and security
+# Supports multi-platform builds: linux/amd64, linux/arm64
+
+# ============================================================================
+# STAGE 1: Base Builder - Install system dependencies and Python packages
+# ============================================================================
+# Use buildx for multi-platform support
+# Build with: docker buildx build --platform linux/amd64,linux/arm64 -t kagami:latest .
+FROM python:3.11-slim AS base-builder
+
+# Declare build arguments for multi-platform support
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
+# Prevent Python from writing pyc files and buffering stdout/stderr
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies in single layer for efficiency
+# Add platform-specific optimizations
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    pkg-config \
+    libmariadb-dev \
+    libffi-dev \
+    libssl-dev \
+    libasound2-dev \
+    curl \
+    git \
+    wget \
+    ca-certificates \
+    $([ "$TARGETPLATFORM" = "linux/arm64" ] && echo "libopenblas-dev" || echo "") \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* /var/tmp/*
+
+WORKDIR /build
+
+# Copy and install Python dependencies first (for Docker layer caching)
+COPY requirements.txt pyproject.toml README.md ./
+
+# Platform-specific dependency handling
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+        # ARM64-specific optimizations (e.g., for Apple Silicon in Docker)
+        pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+        pip install --no-cache-dir -r requirements.txt; \
+    else \
+        # AMD64 standard installation
+        pip install --no-cache-dir -r requirements.txt; \
+    fi
+
+# ============================================================================
+# STAGE 2: Repository Builder - Clone and setup external repositories
+# ============================================================================
+FROM base-builder AS repo-builder
+
+# External repositories (Makefile-aligned)
+# - Motion-Agent: https://github.com/modelscope/MotionAgent
+RUN mkdir -p external && \
+    git clone --depth 1 https://github.com/modelscope/MotionAgent.git external/motion_agent_repo && \
+    echo "External repos cloned" && true
+
+# Skip problematic ML dependencies that cause conflicts in Docker
+# These can be installed separately if needed for specific use cases
+RUN echo "OpenPSG removed; using DETR via Transformers"
+
+# ============================================================================
+# STAGE 3: Application Builder - Install K os application
+# ============================================================================
+FROM repo-builder AS app-builder
+
+# Copy application source
+COPY . .
+
+# Install K os application without problematic dependencies
+ENV SETUPTOOLS_SCM_PRETEND_VERSION=2.0.0
+RUN pip install --no-cache-dir -e . --no-deps && \
+    echo "K os core application installed successfully"
+
+# ============================================================================
+# STAGE 4: Web Builder - Build K os Control (React) assets
+# ============================================================================
+FROM node:20-alpine AS web-builder
+
+WORKDIR /web
+
+# Copy only web app sources first for better layer caching
+COPY kagami/web/package*.json ./
+
+RUN npm ci --no-audit --prefer-offline
+
+COPY kagami/web .
+
+# Build production assets
+RUN npm run build
+
+# ============================================================================
+# STAGE 5: Production Runtime - Minimal production image
+# ============================================================================
+FROM python:3.11-slim AS production
+
+# Declare build arguments for multi-platform support
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
+# Runtime environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH="/app" \
+    PATH="/app/.local/bin:$PATH" \
+    DEBIAN_FRONTEND=noninteractive
+
+# Install minimal runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libmariadb3 \
+    curl \
+    git \
+    ca-certificates \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* /var/tmp/*
+
+# Create kagami user and group
+RUN groupadd -r kagami && \
+    useradd -r -g kagami -d /home/kagami -s /bin/bash kagami
+
+# Set up application directory
+WORKDIR /app
+RUN chown kagami:kagami /app
+
+# Copy Python packages from builder
+COPY --from=app-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=app-builder /usr/local/bin /usr/local/bin
+
+# Copy external repositories (Makefile-aligned layout)
+COPY --from=app-builder --chown=kagami:kagami /build/external/motion_agent_repo ./external/motion_agent_repo
+
+# Copy application code
+COPY --chown=kagami:kagami . .
+
+# Create comprehensive directory structure
+RUN mkdir -p \
+    /home/kagami/.kagami \
+    /home/kagami/.cache/forge_ai_models/{voice,multimodal,embeddings} \
+    /home/kagami/.cache/huggingface/hub \
+    /app/{files,models,logs,temp,models/embeddings} \
+    && chown -R kagami:kagami /home/kagami /app
+
+# Set K os environment variables
+ENV HF_HOME=/app/models/embeddings \
+    TRANSFORMERS_CACHE=/app/models/embeddings \
+    KAGAMI_CONFIG_DIR=/home/kagami/.kagami \
+    MODELS_DIR=/home/kagami/.cache/forge_ai_models \
+    TORCH_HOME=/app/models/torch
+
+# Switch to non-root user
+USER kagami
+
+# Copy optimized startup script
+COPY --chown=kagami:kagami docker-entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Expose application port (K os API defaults to 8001)
+EXPOSE 8001
+
+# Health check with proper timeout (readiness reflects critical deps)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD curl -fsS http://localhost:8001/health || exit 1
+
+# Set entrypoint
+ENTRYPOINT ["/app/entrypoint.sh"]
+
+# Metadata
+LABEL maintainer="K os Development Team" \
+      version="2.0.0" \
+      description="K os AI Companion Platform with State-of-the-Art Embeddings" \
+      org.opencontainers.image.source="https://github.com/awkronos/kagami" \
+      org.opencontainers.image.documentation="https://github.com/awkronos/kagami/blob/main/DOCKER.md"

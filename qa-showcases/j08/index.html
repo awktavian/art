@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kagami - Automation Rules</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Colors - Dark theme with warm accents */
+      --bg-primary: #0a0a0b;
+      --bg-secondary: #111113;
+      --bg-card: rgba(22, 22, 24, 0.6);
+      --bg-card-hover: rgba(28, 28, 31, 0.8);
+      --border: rgba(255, 255, 255, 0.06);
+      --border-hover: rgba(255, 107, 74, 0.3);
+      
+      --text-primary: #fafafa;
+      --text-secondary: rgba(255, 255, 255, 0.7);
+      --text-tertiary: rgba(255, 255, 255, 0.45);
+      
+      --accent-primary: #ff6b4a;
+      --accent-secondary: #ff8f73;
+      --accent-glow: rgba(255, 107, 74, 0.15);
+      
+      --success: #22c55e;
+      --success-bg: rgba(34, 197, 94, 0.15);
+      --warning: #eab308;
+      --warning-bg: rgba(234, 179, 8, 0.15);
+      --error: #ef4444;
+      --error-bg: rgba(239, 68, 68, 0.15);
+      
+      /* Typography */
+      --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'IBM Plex Mono', 'SF Mono', monospace;
+      
+      /* Spacing - 8px grid */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+      --space-8: 32px;
+      --space-10: 40px;
+      --space-12: 48px;
+      --space-16: 64px;
+      
+      /* Radii */
+      --radius-sm: 6px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 24px;
+      
+      /* Fibonacci timing */
+      --dur-233: 233ms;
+      --dur-377: 377ms;
+      --dur-610: 610ms;
+      --dur-987: 987ms;
+      
+      /* Easing */
+      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+    
+    html {
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.5;
+      position: relative;
+    }
+    
+    /* Noise texture overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      opacity: 0.025;
+      pointer-events: none;
+      z-index: 0;
+    }
+    
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: var(--space-10) var(--space-8);
+      position: relative;
+      z-index: 1;
+    }
+    
+    /* Header with radial glow */
+    .header {
+      text-align: center;
+      margin-bottom: var(--space-12);
+      position: relative;
+      padding: var(--space-8) 0;
+    }
+    
+    .header::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px;
+      height: 400px;
+      background: radial-gradient(ellipse at center, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+    }
+    
+    .header__eyebrow {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin-bottom: var(--space-4);
+    }
+    
+    .header__title {
+      font-size: clamp(48px, 8vw, 64px);
+      font-weight: 300;
+      letter-spacing: -1px;
+      margin-bottom: var(--space-3);
+      background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 50%, var(--text-primary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: title-glow 3s ease-in-out infinite alternate;
+    }
+    
+    @keyframes title-glow {
+      from { filter: drop-shadow(0 0 20px var(--accent-glow)); }
+      to { filter: drop-shadow(0 0 40px rgba(255, 107, 74, 0.25)); }
+    }
+    
+    .header__title span {
+      font-weight: 400;
+    }
+    
+    .header__subtitle {
+      font-size: 20px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      margin-bottom: var(--space-6);
+    }
+    
+    .header__badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-4);
+      background: var(--success-bg);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--success);
+      backdrop-filter: blur(8px);
+    }
+    
+    .header__badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: var(--success);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.3); }
+    }
+    
+    /* Stats with animated counters */
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-12);
+      margin-top: var(--space-8);
+    }
+    
+    .stat {
+      text-align: center;
+    }
+    
+    .stat__value {
+      font-size: 40px;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    
+    .stat__value--accent {
+      color: var(--accent-primary);
+    }
+    
+    .stat__label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin-top: var(--space-2);
+    }
+    
+    /* Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-6);
+    }
+    
+    @media (max-width: 1400px) {
+      .grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    
+    @media (max-width: 1000px) {
+      .grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    
+    /* Cards with glassmorphism */
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      position: relative;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(30px);
+      animation: card-reveal var(--dur-610) var(--ease-out-expo) forwards;
+      transition: 
+        transform var(--dur-377) var(--ease-smooth),
+        background var(--dur-377) var(--ease-smooth),
+        border-color var(--dur-377) var(--ease-smooth),
+        box-shadow var(--dur-377) var(--ease-smooth);
+    }
+    
+    /* Staggered reveal delays */
+    .card:nth-child(1) { animation-delay: 100ms; }
+    .card:nth-child(2) { animation-delay: 200ms; }
+    .card:nth-child(3) { animation-delay: 300ms; }
+    .card:nth-child(4) { animation-delay: 400ms; }
+    .card:nth-child(5) { animation-delay: 500ms; }
+    .card:nth-child(6) { animation-delay: 600ms; }
+    .card:nth-child(7) { animation-delay: 700ms; }
+    .card:nth-child(8) { animation-delay: 800ms; }
+    
+    @keyframes card-reveal {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    /* Top shine line */
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    }
+    
+    .card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-hover);
+      transform: translateY(-8px) scale(1.01);
+      box-shadow: 
+        0 20px 60px rgba(0, 0, 0, 0.4),
+        0 0 40px var(--accent-glow);
+    }
+    
+    /* Device Frame */
+    .card__device {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: var(--space-5);
+      min-height: 200px;
+    }
+    
+    .card__image {
+      max-width: 100%;
+      max-height: 200px;
+      object-fit: contain;
+      border-radius: var(--radius-md);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+    
+    /* Device-specific frames */
+    .card--phone .card__image {
+      border-radius: 24px;
+      max-height: 220px;
+      box-shadow: 
+        0 0 0 2px rgba(255,255,255,0.08),
+        0 12px 40px rgba(0, 0, 0, 0.5);
+    }
+    
+    .card--tablet .card__image {
+      border-radius: 16px;
+      max-height: 180px;
+      box-shadow: 
+        0 0 0 2px rgba(255,255,255,0.06),
+        0 10px 36px rgba(0, 0, 0, 0.45);
+    }
+    
+    .card--watch-apple .card__image {
+      border-radius: 38%;
+      max-height: 160px;
+      box-shadow: 
+        0 0 0 3px rgba(255,255,255,0.1),
+        0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+    
+    .card--watch-round .card__image {
+      border-radius: 50%;
+      max-height: 160px;
+      box-shadow: 
+        0 0 0 3px rgba(255,255,255,0.1),
+        0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+    
+    .card--tv .card__image {
+      border-radius: 6px;
+      max-height: 160px;
+      box-shadow: 
+        0 0 0 4px #1a1a1a,
+        0 0 0 6px rgba(255,255,255,0.05),
+        0 16px 48px rgba(0, 0, 0, 0.5);
+    }
+    
+    .card--vision .card__image {
+      border-radius: 48px;
+      max-height: 140px;
+      box-shadow: 
+        0 0 0 2px rgba(255,255,255,0.1),
+        0 0 40px rgba(100, 100, 255, 0.1),
+        0 12px 40px rgba(0, 0, 0, 0.5);
+    }
+    
+    .card--desktop .card__image {
+      border-radius: 8px;
+      max-height: 160px;
+      box-shadow: 
+        0 -20px 0 0 #2a2a2a,
+        0 0 0 2px rgba(255,255,255,0.06),
+        0 16px 48px rgba(0, 0, 0, 0.5);
+    }
+    
+    /* Card Meta */
+    .card__meta {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+    
+    .card__platform {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .card__name {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .card__icon {
+      width: 20px;
+      height: 20px;
+      opacity: 0.5;
+      transition: opacity var(--dur-233) var(--ease-smooth);
+    }
+    
+    .card:hover .card__icon {
+      opacity: 0.8;
+    }
+    
+    .card__device-name {
+      font-size: 13px;
+      color: var(--text-tertiary);
+      font-weight: 400;
+    }
+    
+    .card__status {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-top: var(--space-3);
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--border);
+    }
+    
+    .card__status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+    }
+    
+    .card__status-dot--warning {
+      background: var(--warning);
+      box-shadow: 0 0 8px var(--warning);
+    }
+    
+    .card__status-dot--error {
+      background: var(--error);
+      box-shadow: 0 0 8px var(--error);
+    }
+    
+    .card__status-text {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--success);
+    }
+    
+    /* Score badges with gradients */
+    .card__scores {
+      margin-left: auto;
+      display: flex;
+      gap: var(--space-2);
+    }
+    
+    .card__score {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      padding: 3px 7px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    
+    .card__score--high {
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.05) 100%);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: #22c55e;
+    }
+    
+    .card__score--medium {
+      background: linear-gradient(135deg, rgba(234, 179, 8, 0.2) 0%, rgba(234, 179, 8, 0.05) 100%);
+      border: 1px solid rgba(234, 179, 8, 0.3);
+      color: #eab308;
+    }
+    
+    .card__score--low {
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.05) 100%);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #ef4444;
+    }
+    
+    /* Footer */
+    .footer {
+      text-align: center;
+      margin-top: var(--space-12);
+      padding-top: var(--space-8);
+      border-top: 1px solid var(--border);
+    }
+    
+    .footer__text {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      letter-spacing: 0.5px;
+    }
+    
+    .footer__text strong {
+      color: var(--accent-primary);
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <p class="header__eyebrow">Cross-Platform E2E Testing</p>
+      <h1 class="header__title">鏡 <span>Kagami</span></h1>
+      <p class="header__subtitle">J08 Automation Rules</p>
+      
+      <span class="header__badge">5 Platforms Verified</span>
+      
+      <div class="stats">
+        <div class="stat">
+          <div class="stat__value stat__value--accent" data-count="1">1</div>
+          <div class="stat__label">Passed</div>
+        </div>
+        <div class="stat">
+          <div class="stat__value" data-count="4">4</div>
+          <div class="stat__label">Failed</div>
+        </div>
+        <div class="stat">
+          <div class="stat__value" data-count="73">73</div>
+          <div class="stat__label">Avg Score</div>
+        </div>
+      </div>
+    </header>
+    
+    <main class="grid">
+      
+      <article class="card card--phone">
+        <div class="card__device">
+          <img class="card__image" src="ios.png" alt="iOS">
+        </div>
+        <div class="card__meta">
+          <div class="card__platform">
+            <span class="card__name">iOS</span>
+            <svg class="card__icon" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+          </div>
+          <span class="card__device-name">iPhone 16 Pro</span>
+          <div class="card__status">
+            <span class="card__status-dot card__status-dot--error"></span>
+            <span class="card__status-text">Failed</span>
+            <div class="card__scores">
+              <span class="card__score card__score--low" title="Technical">T:30</span>
+              <span class="card__score card__score--high" title="Accessibility">A:90</span>
+              <span class="card__score card__score--high" title="Visual">V:90</span>
+            </div>
+          </div>
+        </div>
+      </article>
+      
+
+      <article class="card card--tablet">
+        <div class="card__device">
+          <img class="card__image" src="ipad.png" alt="iPadOS">
+        </div>
+        <div class="card__meta">
+          <div class="card__platform">
+            <span class="card__name">iPadOS</span>
+            <svg class="card__icon" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+          </div>
+          <span class="card__device-name">iPad Pro 13"</span>
+          <div class="card__status">
+            <span class="card__status-dot card__status-dot--error"></span>
+            <span class="card__status-text">Failed</span>
+            <div class="card__scores">
+              <span class="card__score card__score--low" title="Technical">T:30</span>
+              <span class="card__score card__score--medium" title="Accessibility">A:85</span>
+              <span class="card__score card__score--high" title="Visual">V:90</span>
+            </div>
+          </div>
+        </div>
+      </article>
+      
+
+      <article class="card card--phone">
+        <div class="card__device">
+          <img class="card__image" src="android.png" alt="Android">
+        </div>
+        <div class="card__meta">
+          <div class="card__platform">
+            <span class="card__name">Android</span>
+            <svg class="card__icon" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zM3.5 8C2.67 8 2 8.67 2 9.5v7c0 .83.67 1.5 1.5 1.5S5 17.33 5 16.5v-7C5 8.67 4.33 8 3.5 8zm17 0c-.83 0-1.5.67-1.5 1.5v7c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5zm-4.97-5.84l1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48C13.85 1.23 12.95 1 12 1c-.96 0-1.86.23-2.66.63L7.85.15c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.31 1.31C6.97 3.26 6 5.01 6 7h12c0-1.99-.97-3.75-2.47-4.84zM10 5H9V4h1v1zm5 0h-1V4h1v1z"/></svg>
+          </div>
+          <span class="card__device-name">Pixel 8 Pro</span>
+          <div class="card__status">
+            <span class="card__status-dot card__status-dot--error"></span>
+            <span class="card__status-text">Failed</span>
+            <div class="card__scores">
+              <span class="card__score card__score--low" title="Technical">T:30</span>
+              <span class="card__score card__score--medium" title="Accessibility">A:85</span>
+              <span class="card__score card__score--medium" title="Visual">V:80</span>
+            </div>
+          </div>
+        </div>
+      </article>
+      
+
+      <article class="card card--vision">
+        <div class="card__device">
+          <img class="card__image" src="visionos.png" alt="visionOS">
+        </div>
+        <div class="card__meta">
+          <div class="card__platform">
+            <span class="card__name">visionOS</span>
+            <svg class="card__icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+          </div>
+          <span class="card__device-name">Apple Vision Pro</span>
+          <div class="card__status">
+            <span class="card__status-dot "></span>
+            <span class="card__status-text">Passed</span>
+            <div class="card__scores">
+              <span class="card__score card__score--high" title="Technical">T:100</span>
+              <span class="card__score card__score--high" title="Accessibility">A:100</span>
+              <span class="card__score card__score--high" title="Visual">V:100</span>
+            </div>
+          </div>
+        </div>
+      </article>
+      
+
+      <article class="card card--desktop">
+        <div class="card__device">
+          <img class="card__image" src="desktop.png" alt="Desktop">
+        </div>
+        <div class="card__meta">
+          <div class="card__platform">
+            <span class="card__name">Desktop</span>
+            <svg class="card__icon" viewBox="0 0 24 24" fill="currentColor"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+          </div>
+          <span class="card__device-name">macOS (Tauri)</span>
+          <div class="card__status">
+            <span class="card__status-dot card__status-dot--error"></span>
+            <span class="card__status-text">Failed</span>
+            <div class="card__scores">
+              <span class="card__score card__score--low" title="Technical">T:50</span>
+              <span class="card__score card__score--medium" title="Accessibility">A:70</span>
+              <span class="card__score card__score--medium" title="Visual">V:70</span>
+            </div>
+          </div>
+        </div>
+      </article>
+      
+    </main>
+    
+    <footer class="footer">
+      <p class="footer__text">
+        E2E Test Results • <strong>January 16, 2026</strong>
+      </p>
+    </footer>
+  </div>
+  
+  <script>
+    // Animated counter on load
+    document.querySelectorAll('[data-count]').forEach(el => {
+      const target = parseInt(el.dataset.count) || 0;
+      if (isNaN(target)) return;
+      
+      const duration = 1200;
+      const start = performance.now();
+      
+      const animate = (now) => {
+        const elapsed = now - start;
+        const progress = Math.min(elapsed / duration, 1);
+        // Ease out expo
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = Math.floor(eased * target);
+        el.textContent = current;
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          el.textContent = target;
+        }
+      };
+      
+      requestAnimationFrame(animate);
+    });
+  </script>
+</body>
+</html>
