@@ -5467,7 +5467,7 @@
             
             // Draw label if enabled and node is large enough or highlighted
             if (SEMANTIC_LAYERS.labels && (size > 6 || isHighlighted)) {
-                drawNodeLabel(ctx, file, sx, sy + size + 8, alpha);
+                drawNodeLabel(ctx, file, sx, sy + size + 10, alpha, size);
             }
         }
         
@@ -5583,19 +5583,27 @@
         ctx.globalAlpha = 1;
     }
     
-    function drawNodeLabel(ctx, file, x, y, alpha) {
-        const name = file.name || file.path.split('/').pop() || '';
-        const pal = PALETTES[file.category] || PALETTES.default;
+    function drawNodeLabel(ctx, file, x, y, alpha, size) {
+        const filePath = file.path || '';
+        const name = file.name || filePath.split('/').pop() || '';
+        if (!name) return;
         
-        // Draw text shadow for readability
-        ctx.font = '9px "IBM Plex Mono"';
+        const pal = PALETTES[file.category] || PALETTES.default;
+        const displayName = name.length > 18 ? name.slice(0, 16) + '…' : name;
+        
+        // Scale font size based on node size
+        const fontSize = Math.max(7, Math.min(11, size * 1.2));
+        ctx.font = `${fontSize}px "IBM Plex Mono"`;
         ctx.textAlign = 'center';
-        ctx.fillStyle = `rgba(0,0,0,${alpha * 0.5})`;
-        ctx.fillText(name.length > 20 ? name.slice(0, 18) + '…' : name, x + 1, y + 1);
+        
+        // Draw glow/shadow for readability
+        ctx.fillStyle = `rgba(0,0,0,${alpha * 0.6})`;
+        ctx.fillText(displayName, x + 1, y + 1);
+        ctx.fillText(displayName, x - 1, y + 1);
         
         // Draw text with category color
-        ctx.fillStyle = `hsla(${pal.h}, ${pal.s}%, ${Math.min(90, pal.l + 20)}%, ${alpha * 0.85})`;
-        ctx.fillText(name.length > 20 ? name.slice(0, 18) + '…' : name, x, y);
+        ctx.fillStyle = `hsla(${pal.h}, ${pal.s}%, ${Math.min(90, pal.l + 25)}%, ${alpha})`;
+        ctx.fillText(displayName, x, y);
     }
     
     function drawSizeHeatmap(ctx, projected, w, h) {
