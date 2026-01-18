@@ -1,12 +1,106 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#06060a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>鏡 Code</title>
+    <title>鏡 Code Map</title>
+    <meta name="description" content="Interactive code visualization for the Kagami codebase">
+    
+    <!-- i18n: Supported languages: en, ja -->
+    <script>
+        // Internationalization system
+        const I18N = {
+            en: {
+                title: 'Code Map',
+                search: 'Search files, folders, classes, functions...',
+                files: 'Files',
+                folders: 'Folders',
+                classes: 'Classes',
+                functions: 'Functions',
+                all: 'All',
+                matches: 'matches',
+                match: 'match',
+                lines: 'lines',
+                items: 'items',
+                semanticSpace: 'Semantic Space',
+                semanticExplorer: 'Semantic Explorer',
+                explore3d: 'Click to explore in 3D',
+                closePanel: 'Close panel',
+                relatedFiles: 'Related Files',
+                sharedImports: 'shared imports',
+                // Relevance explanations
+                matchExact: 'exact name match',
+                matchPrefix: 'starts with query',
+                matchContains: 'name contains query',
+                matchPath: 'path contains query',
+                matchDoc: 'documentation match',
+                matchSemantic: 'semantic similarity',
+                matchCategory: 'category match',
+            },
+            ja: {
+                title: 'コードマップ',
+                search: 'ファイル、フォルダ、クラス、関数を検索...',
+                files: 'ファイル',
+                folders: 'フォルダ',
+                classes: 'クラス',
+                functions: '関数',
+                all: '全て',
+                matches: '件',
+                match: '件',
+                lines: '行',
+                items: '項目',
+                semanticSpace: '意味空間',
+                semanticExplorer: '意味エクスプローラー',
+                explore3d: '3Dで探索するにはクリック',
+                closePanel: 'パネルを閉じる',
+                relatedFiles: '関連ファイル',
+                sharedImports: '共有インポート',
+                matchExact: '完全一致',
+                matchPrefix: '前方一致',
+                matchContains: '部分一致',
+                matchPath: 'パス一致',
+                matchDoc: 'ドキュメント一致',
+                matchSemantic: '意味的類似',
+                matchCategory: 'カテゴリ一致',
+            }
+        };
+        
+        function t(key) {
+            const lang = document.documentElement.dataset.lang || 'en';
+            return I18N[lang]?.[key] || I18N.en[key] || key;
+        }
+        
+        function setLanguage(lang) {
+            if (I18N[lang]) {
+                document.documentElement.dataset.lang = lang;
+                document.documentElement.lang = lang;
+                localStorage.setItem('kagami-lang', lang);
+                updateI18nElements();
+            }
+        }
+        
+        function updateI18nElements() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.textContent = t(el.dataset.i18n);
+            });
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                el.placeholder = t(el.dataset.i18nPlaceholder);
+            });
+            document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+                el.setAttribute('aria-label', t(el.dataset.i18nAria));
+            });
+        }
+        
+        // Initialize language from localStorage or browser
+        (function() {
+            const stored = localStorage.getItem('kagami-lang');
+            const browser = navigator.language?.startsWith('ja') ? 'ja' : 'en';
+            document.documentElement.dataset.lang = stored || browser;
+        })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
@@ -802,24 +896,35 @@
             position: fixed;
             bottom: var(--space-4);
             right: var(--space-4);
-            width: 140px;
-            height: 140px;
-            background: var(--surface-2);
+            width: 160px;
+            height: 160px;
+            background: linear-gradient(145deg, var(--surface-2), var(--surface-1));
             border: 1px solid var(--border-medium);
-            border-radius: 12px;
+            border-radius: 16px;
             overflow: hidden;
             z-index: 80;
             opacity: 0;
             transform: scale(0.9) translateY(10px);
             transition: all var(--duration-normal) var(--ease-spring);
             pointer-events: none;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            box-shadow: 
+                0 4px 20px rgba(0,0,0,0.4),
+                inset 0 1px 0 rgba(255,255,255,0.05);
+            cursor: pointer;
         }
         
         .embedding-map.visible {
             opacity: 1;
             transform: scale(1) translateY(0);
             pointer-events: auto;
+        }
+        
+        .embedding-map:hover {
+            border-color: var(--gold-dim);
+            box-shadow: 
+                0 8px 32px rgba(0,0,0,0.5),
+                0 0 0 1px var(--gold-glow),
+                inset 0 1px 0 rgba(255,255,255,0.08);
         }
         
         .embedding-map canvas {
@@ -829,14 +934,233 @@
         
         .embedding-map-label {
             position: absolute;
-            bottom: 6px;
-            left: 8px;
+            bottom: 8px;
+            left: 10px;
+            font-family: var(--font-mono);
+            font-size: 0.5625rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .embedding-map-label::before {
+            content: '◉';
+            font-size: 6px;
+            color: var(--gold);
+            animation: pulseDot 2s ease infinite;
+        }
+        
+        @keyframes pulseDot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        
+        .embedding-map-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 10px;
             font-family: var(--font-mono);
             font-size: 0.5rem;
             color: var(--text-quaternary);
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
+            opacity: 0;
+            transition: opacity var(--duration-fast);
         }
+        
+        .embedding-map:hover .embedding-map-hint {
+            opacity: 1;
+        }
+        
+        /* Full-screen Semantic Explorer (3D) */
+        .semantic-explorer {
+            position: fixed;
+            inset: 0;
+            background: var(--void);
+            z-index: 500;
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--duration-slow) var(--ease-out);
+        }
+        
+        .semantic-explorer.open {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .semantic-explorer canvas {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .semantic-explorer-header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--touch-min);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 var(--space-4);
+            background: linear-gradient(180deg, rgba(5,5,10,0.95) 0%, rgba(5,5,10,0) 100%);
+            z-index: 10;
+        }
+        
+        .semantic-explorer-title {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--gold);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+        
+        .semantic-explorer-close {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: var(--surface-3);
+            border-radius: 50%;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            transition: all var(--duration-fast);
+        }
+        
+        .semantic-explorer-close:hover {
+            background: var(--gold);
+            color: var(--void);
+        }
+        
+        .semantic-explorer-controls {
+            position: absolute;
+            bottom: var(--space-5);
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: var(--space-2);
+            background: var(--surface-2);
+            border: 1px solid var(--border-medium);
+            border-radius: 24px;
+            padding: var(--space-2);
+        }
+        
+        .semantic-control-btn {
+            padding: 8px 16px;
+            background: transparent;
+            border: none;
+            border-radius: 16px;
+            font-family: var(--font-mono);
+            font-size: 0.625rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--duration-fast);
+        }
+        
+        .semantic-control-btn:hover {
+            background: var(--surface-4);
+        }
+        
+        .semantic-control-btn.active {
+            background: var(--gold);
+            color: var(--void);
+        }
+        
+        .semantic-explorer-legend {
+            position: absolute;
+            bottom: var(--space-5);
+            right: var(--space-5);
+            background: var(--surface-2);
+            border: 1px solid var(--border-medium);
+            border-radius: 12px;
+            padding: var(--space-3);
+        }
+        
+        .semantic-legend-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            font-family: var(--font-mono);
+            font-size: 0.5625rem;
+            color: var(--text-tertiary);
+            margin-bottom: var(--space-1);
+        }
+        
+        .semantic-legend-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .semantic-legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        
+        /* Tooltip for 3D nodes */
+        .semantic-tooltip {
+            position: absolute;
+            background: var(--surface-3);
+            border: 1px solid var(--border-strong);
+            border-radius: 8px;
+            padding: var(--space-2) var(--space-3);
+            font-family: var(--font-mono);
+            font-size: 0.625rem;
+            color: var(--text-primary);
+            pointer-events: none;
+            z-index: 20;
+            max-width: 280px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            opacity: 0;
+            transform: translateY(4px);
+            transition: all var(--duration-fast);
+        }
+        
+        .semantic-tooltip.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .semantic-tooltip-name {
+            color: var(--gold);
+            font-weight: 500;
+        }
+        
+        .semantic-tooltip-path {
+            color: var(--text-tertiary);
+            margin-top: 2px;
+        }
+        
+        /* Typeahead relevance explanation */
+        .typeahead-relevance {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px;
+        }
+        
+        .relevance-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            padding: 1px 6px;
+            background: var(--surface-3);
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.5rem;
+            color: var(--text-quaternary);
+        }
+        
+        .relevance-tag.exact { color: var(--gold); background: var(--gold-subtle); }
+        .relevance-tag.prefix { color: var(--green); background: rgba(142,212,168,0.1); }
+        .relevance-tag.contains { color: var(--blue); background: rgba(126,184,232,0.1); }
+        .relevance-tag.semantic { color: var(--purple); background: rgba(196,168,232,0.1); }
+        .relevance-tag.doc { color: var(--orange); background: rgba(232,200,168,0.1); }
         
         /* Mobile search */
         @media (max-width: 640px) {
@@ -1581,9 +1905,30 @@
         <div class="map loading" id="map"></div>
         
         <!-- Embedding Space Mini-Map -->
-        <div class="embedding-map" id="embedding-map">
+        <div class="embedding-map" id="embedding-map" onclick="openSemanticExplorer()" tabindex="0" role="button" aria-label="Open 3D semantic explorer">
             <canvas id="embedding-canvas"></canvas>
-            <span class="embedding-map-label">Semantic Space</span>
+            <span class="embedding-map-label" data-i18n="semanticSpace">Semantic Space</span>
+            <span class="embedding-map-hint">↗ 3D</span>
+        </div>
+        
+        <!-- Full-Screen 3D Semantic Explorer -->
+        <div class="semantic-explorer" id="semantic-explorer">
+            <div class="semantic-explorer-header">
+                <div class="semantic-explorer-title">
+                    <span>◉</span>
+                    <span data-i18n="semanticExplorer">Semantic Explorer</span>
+                </div>
+                <button class="semantic-explorer-close" onclick="closeSemanticExplorer()" data-i18n-aria="closePanel">✕</button>
+            </div>
+            <canvas id="semantic-canvas-3d"></canvas>
+            <div class="semantic-explorer-controls">
+                <button class="semantic-control-btn active" data-view="orbit">Orbit</button>
+                <button class="semantic-control-btn" data-view="top">Top</button>
+                <button class="semantic-control-btn" data-view="front">Front</button>
+                <button class="semantic-control-btn" data-view="clusters">Clusters</button>
+            </div>
+            <div class="semantic-explorer-legend" id="semantic-legend"></div>
+            <div class="semantic-tooltip" id="semantic-tooltip"></div>
         </div>
     </div>
     
@@ -1753,6 +2098,39 @@
     function buildSearchIndex() {
         allSearchItems = [];
         
+        // Add folders from directory analysis
+        if (DATA.directories) {
+            Object.entries(DATA.directories).forEach(([path, dir]) => {
+                // Calculate folder embedding as average of contained files
+                const containedFiles = DATA.files.filter(f => f.path.startsWith(path + '/'));
+                let folderEmbedding = null;
+                if (containedFiles.length > 0 && containedFiles[0].embedding) {
+                    folderEmbedding = new Array(containedFiles[0].embedding.length).fill(0);
+                    containedFiles.forEach(f => {
+                        if (f.embedding) {
+                            f.embedding.forEach((v, i) => folderEmbedding[i] += v);
+                        }
+                    });
+                    const count = containedFiles.length;
+                    folderEmbedding = folderEmbedding.map(v => v / count);
+                }
+                
+                allSearchItems.push({
+                    type: 'folder',
+                    name: dir.name,
+                    path: path,
+                    icon: '📁',
+                    lines: dir.total_lines || 0,
+                    fileCount: dir.file_count || 0,
+                    category: dir.primary_category || '',
+                    summary: dir.summary || '',
+                    tags: dir.tags || [],
+                    embedding: folderEmbedding,
+                    data: { path, name: dir.name, lines: dir.total_lines, category: dir.primary_category, isFolder: true }
+                });
+            });
+        }
+        
         // Add files
         DATA.files.forEach(f => {
             allSearchItems.push({
@@ -1762,6 +2140,9 @@
                 icon: getFileIcon(f.path),
                 lines: f.lines,
                 category: f.category,
+                summary: f.summary || '',
+                purpose: f.purpose || '',
+                tags: f.tags || [],
                 embedding: f.embedding,
                 data: f
             });
@@ -1774,8 +2155,9 @@
                     path: f.path,
                     icon: '◆',
                     signature: c.bases?.length ? `: ${c.bases.join(', ')}` : '',
-                    docstring: c.docstring?.substring(0, 80),
+                    docstring: c.docstring?.substring(0, 100),
                     line: c.line,
+                    methods: c.methods?.length || 0,
                     embedding: f.embedding,
                     data: f
                 });
@@ -1789,7 +2171,7 @@
                     path: f.path,
                     icon: 'ƒ',
                     signature: fn.signature,
-                    docstring: fn.docstring?.substring(0, 80),
+                    docstring: fn.docstring?.substring(0, 100),
                     line: fn.line,
                     isAsync: fn.is_async,
                     embedding: f.embedding,
@@ -1797,6 +2179,8 @@
                 });
             });
         });
+        
+        console.log(`Search index: ${allSearchItems.length} items (${allSearchItems.filter(i=>i.type==='folder').length} folders, ${allSearchItems.filter(i=>i.type==='file').length} files, ${allSearchItems.filter(i=>i.type==='class').length} classes, ${allSearchItems.filter(i=>i.type==='func').length} functions)`);
     }
     
     function getFileIcon(path) {
@@ -1849,7 +2233,7 @@
         
         if (!SEARCH_QUERY) {
             body.innerHTML = '';
-            countEl.textContent = '0 matches';
+            countEl.textContent = `0 ${t('matches')}`;
             SEARCH_RESULTS = [];
             clearHighlighting();
             updateEmbeddingMap();
@@ -1859,40 +2243,99 @@
         typeahead.classList.add('open');
         SEARCH_EMBEDDING = generateQueryEmbedding(SEARCH_QUERY);
         const queryLower = SEARCH_QUERY.toLowerCase();
+        const queryTokens = queryLower.split(/[\s_\-\/]+/).filter(t => t.length > 0);
         
-        // Score all items
+        // Advanced scoring with relevance reasons
         let scored = allSearchItems
-            .filter(item => !SEARCH_FILTER || item.type === SEARCH_FILTER)
+            .filter(item => {
+                if (!SEARCH_FILTER) return true;
+                if (SEARCH_FILTER === 'file') return item.type === 'file';
+                if (SEARCH_FILTER === 'folder') return item.type === 'folder';
+                if (SEARCH_FILTER === 'class') return item.type === 'class';
+                if (SEARCH_FILTER === 'func') return item.type === 'func';
+                return true;
+            })
             .map(item => {
-                // Embedding similarity
-                const embSim = item.embedding ? cosineSimilarity(SEARCH_EMBEDDING, item.embedding) : 0;
-                
-                // Fuzzy name match
                 const nameLower = item.name.toLowerCase();
                 const pathLower = item.path.toLowerCase();
-                const exactName = nameLower === queryLower ? 1.0 : 0;
-                const startsWithName = nameLower.startsWith(queryLower) ? 0.8 : 0;
-                const containsName = nameLower.includes(queryLower) ? 0.5 : 0;
-                const containsPath = pathLower.includes(queryLower) ? 0.3 : 0;
+                const reasons = [];
+                let score = 0;
                 
-                // Docstring match
-                const docMatch = item.docstring?.toLowerCase().includes(queryLower) ? 0.2 : 0;
+                // 1. Exact name match (highest priority)
+                if (nameLower === queryLower) {
+                    score += 1.0;
+                    reasons.push({ type: 'exact', text: t('matchExact') });
+                }
+                // 2. Prefix match
+                else if (nameLower.startsWith(queryLower)) {
+                    score += 0.8;
+                    reasons.push({ type: 'prefix', text: t('matchPrefix') });
+                }
+                // 3. Contains in name
+                else if (nameLower.includes(queryLower)) {
+                    score += 0.6;
+                    reasons.push({ type: 'contains', text: t('matchContains') });
+                }
+                // 4. Token match (e.g., "embed service" matches "embedding_service")
+                else {
+                    const tokenMatches = queryTokens.filter(token => 
+                        nameLower.includes(token) || pathLower.includes(token)
+                    );
+                    if (tokenMatches.length > 0) {
+                        score += 0.4 * (tokenMatches.length / queryTokens.length);
+                        reasons.push({ type: 'contains', text: `${tokenMatches.length}/${queryTokens.length} ${t('matchContains')}` });
+                    }
+                }
                 
-                // Type boost (files slightly higher)
-                const typeBoost = item.type === 'file' ? 0.1 : 0;
+                // 5. Path contains query
+                if (pathLower.includes(queryLower) && !nameLower.includes(queryLower)) {
+                    score += 0.3;
+                    reasons.push({ type: 'contains', text: t('matchPath') });
+                }
                 
-                const score = Math.max(exactName, startsWithName, containsName, containsPath) * 0.5 +
-                              embSim * 0.3 + docMatch * 0.1 + typeBoost;
+                // 6. Docstring/summary match
+                const doc = (item.docstring || item.summary || '').toLowerCase();
+                if (doc.includes(queryLower)) {
+                    score += 0.25;
+                    reasons.push({ type: 'doc', text: t('matchDoc') });
+                }
                 
-                return { ...item, score };
+                // 7. Tag match
+                if (item.tags?.some(tag => tag.toLowerCase().includes(queryLower))) {
+                    score += 0.2;
+                    reasons.push({ type: 'contains', text: t('matchCategory') });
+                }
+                
+                // 8. Semantic similarity (embedding-based)
+                const embSim = item.embedding ? cosineSimilarity(SEARCH_EMBEDDING, item.embedding) : 0;
+                if (embSim > 0.15) {
+                    score += embSim * 0.4;
+                    if (embSim > 0.25) {
+                        reasons.push({ type: 'semantic', text: `${Math.round(embSim * 100)}% ${t('matchSemantic')}` });
+                    }
+                }
+                
+                // Type-based boosting
+                if (item.type === 'folder') score += 0.05;  // Folders slightly boosted
+                if (item.type === 'file') score += 0.03;
+                
+                // Size penalty for very large items (avoid noise)
+                if (item.lines > 5000) score *= 0.95;
+                
+                return { ...item, score, reasons };
             })
-            .filter(item => item.score > 0.1)
+            .filter(item => item.score > 0.08)
             .sort((a, b) => b.score - a.score)
-            .slice(0, 50);
+            .slice(0, 60);
         
-        SEARCH_RESULTS = scored.filter(s => s.type === 'file').map(s => s.data);
+        // Collect file results for visualization
+        SEARCH_RESULTS = scored.filter(s => s.type === 'file' || s.type === 'folder').map(s => ({
+            ...s.data,
+            score: s.score
+        }));
         
         // Group by type
+        const folders = scored.filter(s => s.type === 'folder').slice(0, 5);
         const files = scored.filter(s => s.type === 'file').slice(0, 8);
         const classes = scored.filter(s => s.type === 'class').slice(0, 6);
         const funcs = scored.filter(s => s.type === 'func').slice(0, 6);
@@ -1900,18 +2343,21 @@
         // Render
         body.innerHTML = '';
         
+        if (folders.length > 0) {
+            body.appendChild(createSection(t('folders'), '📁', folders));
+        }
         if (files.length > 0) {
-            body.appendChild(createSection('Files', '📄', files));
+            body.appendChild(createSection(t('files'), '📄', files));
         }
         if (classes.length > 0) {
-            body.appendChild(createSection('Classes', '◆', classes));
+            body.appendChild(createSection(t('classes'), '◆', classes));
         }
         if (funcs.length > 0) {
-            body.appendChild(createSection('Functions', 'ƒ', funcs));
+            body.appendChild(createSection(t('functions'), 'ƒ', funcs));
         }
         
-        const total = files.length + classes.length + funcs.length;
-        countEl.textContent = `${total} match${total !== 1 ? 'es' : ''}`;
+        const total = folders.length + files.length + classes.length + funcs.length;
+        countEl.textContent = `${total} ${total !== 1 ? t('matches') : t('match')}`;
         
         // Select first item
         SELECTED_INDEX = 0;
@@ -1944,12 +2390,37 @@
             const highlightedName = highlightMatch(item.name, SEARCH_QUERY);
             const shortPath = item.path.split('/').slice(-2).join('/');
             
+            // Build metadata line based on type
+            let metaInfo = '';
+            if (item.type === 'folder') {
+                metaInfo = `${formatNumber(item.fileCount || 0)} ${t('files')} · ${formatNumber(item.lines)} ${t('lines')}`;
+            } else if (item.type === 'file') {
+                metaInfo = `${formatNumber(item.lines)} ${t('lines')}`;
+            } else if (item.type === 'class') {
+                metaInfo = item.methods ? `${item.methods} methods` : '';
+            } else if (item.type === 'func') {
+                metaInfo = item.isAsync ? 'async' : '';
+            }
+            
+            // Build relevance tags
+            let relevanceTags = '';
+            if (item.reasons && item.reasons.length > 0) {
+                relevanceTags = `
+                    <div class="typeahead-relevance">
+                        ${item.reasons.slice(0, 3).map(r => 
+                            `<span class="relevance-tag ${r.type}">${r.text}</span>`
+                        ).join('')}
+                    </div>
+                `;
+            }
+            
             el.innerHTML = `
                 <div class="typeahead-icon">${item.icon}</div>
                 <div class="typeahead-content">
                     <div class="typeahead-name">${highlightedName}${item.signature ? `<span style="color:var(--text-tertiary);font-weight:400">${escapeHtml(item.signature)}</span>` : ''}</div>
-                    <div class="typeahead-path">${escapeHtml(shortPath)}</div>
-                    ${item.docstring ? `<div class="typeahead-meta">${escapeHtml(item.docstring)}</div>` : ''}
+                    <div class="typeahead-path">${escapeHtml(shortPath)}${metaInfo ? ` · ${metaInfo}` : ''}</div>
+                    ${item.docstring || item.summary ? `<div class="typeahead-meta">${escapeHtml(item.docstring || item.summary)}</div>` : ''}
+                    ${relevanceTags}
                 </div>
                 <span class="typeahead-similarity">${Math.round(item.score * 100)}%</span>
             `;
@@ -2028,1807 +2499,6 @@
             const badge = cell.querySelector('.similarity-badge');
             if (badge) badge.remove();
         });
-    }
-    
-    function highlightSearchResults() {
-        const cells = document.querySelectorAll('.cell');
-        const resultPaths = new Set(SEARCH_RESULTS.map(r => r.path));
-        const topScores = {};
-        SEARCH_RESULTS.forEach(r => topScores[r.path] = r.score);
-        
-        // Also check if directory contains results
-        const dirScores = {};
-        SEARCH_RESULTS.forEach(r => {
-            const parts = r.path.split('/');
-            for (let i = 1; i < parts.length; i++) {
-                const dirPath = parts.slice(0, i).join('/');
-                if (!dirScores[dirPath] || r.score > dirScores[dirPath]) {
-                    dirScores[dirPath] = r.score;
-                }
-            }
-        });
-        
-        cells.forEach(cell => {
-            const path = cell.dataset.path;
-            cell.classList.remove('search-match', 'search-similar', 'search-dim');
-            
-            // Remove existing badges
-            const existingBadge = cell.querySelector('.similarity-badge');
-            if (existingBadge) existingBadge.remove();
-            
-            // Direct file match
-            if (resultPaths.has(path)) {
-                const score = topScores[path];
-                if (score > 0.3) {
-                    cell.classList.add('search-match');
-                    // Add similarity badge for high matches
-                    const badge = document.createElement('span');
-                    badge.className = 'similarity-badge';
-                    badge.textContent = Math.round(score * 100) + '%';
-                    cell.appendChild(badge);
-                } else {
-                    cell.classList.add('search-similar');
-                }
-            } 
-            // Directory containing results
-            else if (dirScores[path]) {
-                const score = dirScores[path];
-                if (score > 0.3) {
-                    cell.classList.add('search-similar');
-                }
-            }
-            // No match - dim
-            else if (SEARCH_RESULTS.length > 0) {
-                cell.classList.add('search-dim');
-            }
-        });
-    }
-    
-    function initEmbeddingMap() {
-        const canvas = document.getElementById('embedding-canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = 240;  // 2x for retina
-        canvas.height = 240;
-        
-        updateEmbeddingMap();
-    }
-    
-    function updateEmbeddingMap() {
-        const canvas = document.getElementById('embedding-canvas');
-        const ctx = canvas.getContext('2d');
-        const w = canvas.width;
-        const h = canvas.height;
-        
-        ctx.clearRect(0, 0, w, h);
-        
-        // Draw all points dimly
-        ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        DATA.files.forEach(f => {
-            if (f.x !== undefined && f.y !== undefined) {
-                const x = f.x * w;
-                const y = f.y * h;
-                ctx.beginPath();
-                ctx.arc(x, y, 1.5, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        });
-        
-        // Highlight search results
-        if (SEARCH_RESULTS.length > 0) {
-            const topScores = {};
-            SEARCH_RESULTS.forEach(r => topScores[r.path] = r.score);
-            
-            SEARCH_RESULTS.forEach(f => {
-                if (f.x !== undefined && f.y !== undefined) {
-                    const x = f.x * w;
-                    const y = f.y * h;
-                    const score = topScores[f.path] || 0;
-                    
-                    const alpha = Math.min(1, score * 2);
-                    const size = 2 + score * 4;
-                    
-                    ctx.fillStyle = `rgba(240,200,96,${alpha})`;
-                    ctx.beginPath();
-                    ctx.arc(x, y, size, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            });
-            
-            // Draw query position (center of results)
-            if (SEARCH_RESULTS.length > 0) {
-                let qx = 0, qy = 0, count = 0;
-                SEARCH_RESULTS.slice(0, 10).forEach(f => {
-                    if (f.x !== undefined && f.y !== undefined) {
-                        qx += f.x * (f.score || 0.5);
-                        qy += f.y * (f.score || 0.5);
-                        count += (f.score || 0.5);
-                    }
-                });
-                if (count > 0) {
-                    qx = (qx / count) * w;
-                    qy = (qy / count) * h;
-                    
-                    // Query marker
-                    ctx.strokeStyle = '#f0c860';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.arc(qx, qy, 8, 0, Math.PI * 2);
-                    ctx.stroke();
-                    
-                    ctx.fillStyle = '#f0c860';
-                    ctx.beginPath();
-                    ctx.arc(qx, qy, 3, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-        }
-    }
-    
-    async function init() {
-        try {
-            const response = await fetch('codebase-analysis.json');
-            DATA = await response.json();
-            TREE = buildTree(DATA.files);
-            
-            document.getElementById('map').classList.remove('loading');
-            render();
-            
-            // Event listeners
-            window.addEventListener('resize', debounce(render, 100));
-            setupPanelGestures();
-            setupTooltip();
-            setupKeyboard();
-            setupSearch();
-            
-        } catch (error) {
-            console.error('Failed to load:', error);
-            document.getElementById('map').innerHTML = 
-                `<div style="padding:32px;color:var(--text-tertiary);font-family:var(--font-mono);font-size:0.75rem">
-                    Failed to load codebase-analysis.json
-                </div>`;
-        }
-    }
-    
-    function buildTree(files) {
-        const root = { name: 'kagami', path: '', lines: 0, children: {} };
-        
-        for (const file of files) {
-            const parts = file.path.split('/');
-            let node = root;
-            
-            for (let i = 0; i < parts.length - 1; i++) {
-                const part = parts[i];
-                if (!node.children[part]) {
-                    const dirPath = parts.slice(0, i + 1).join('/');
-                    node.children[part] = {
-                        name: part,
-                        path: dirPath,
-                        lines: 0,
-                        category: DATA.directories?.[dirPath]?.primary_category || '',
-                        children: {},
-                    };
-                }
-                node = node.children[part];
-            }
-            
-            const fileName = parts[parts.length - 1];
-            node.children[fileName] = { ...file, name: fileName, isFile: true };
-        }
-        
-        // Calculate totals
-        (function calcLines(n) {
-            if (n.isFile) return n.lines || 0;
-            let total = 0;
-            for (const child of Object.values(n.children)) {
-                total += calcLines(child);
-            }
-            return n.lines = total;
-        })(root);
-        
-        return root;
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // TREEMAP ALGORITHM (Squarified)
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    function computeTreemap(items, rect) {
-        const total = items.reduce((sum, item) => sum + item.value, 0);
-        if (!total || !items.length) return [];
-        
-        const result = [];
-        let remaining = items.map(i => ({ ...i }));
-        let r = { ...rect };
-        
-        while (remaining.length) {
-            const row = [];
-            const horizontal = r.w >= r.h;
-            const side = horizontal ? r.h : r.w;
-            const remainingTotal = remaining.reduce((s, i) => s + i.value, 0);
-            
-            let rowSum = 0;
-            
-            for (const item of remaining) {
-                const newSum = rowSum + item.value;
-                const newArea = (newSum / remainingTotal) * r.w * r.h;
-                
-                if (!row.length) {
-                    row.push(item);
-                    rowSum = newSum;
-                    continue;
-                }
-                
-                const currentWorst = worstRatio(row, (rowSum / remainingTotal) * r.w * r.h, side);
-                const nextWorst = worstRatio([...row, item], newArea, side);
-                
-                if (nextWorst <= currentWorst) {
-                    row.push(item);
-                    rowSum = newSum;
-                } else {
-                    break;
-                }
-            }
-            
-            // Layout the row
-            const rowArea = (rowSum / remainingTotal) * r.w * r.h;
-            const rowLength = rowArea / side;
-            let offset = 0;
-            
-            for (const item of row) {
-                const fraction = item.value / rowSum;
-                const length = fraction * side;
-                
-                const cellRect = horizontal
-                    ? { x: r.x, y: r.y + offset, w: rowLength, h: length }
-                    : { x: r.x + offset, y: r.y, w: length, h: rowLength };
-                
-                result.push({ data: item.data, rect: cellRect });
-                offset += length;
-            }
-            
-            // Update remaining rect
-            if (horizontal) {
-                r.x += rowLength;
-                r.w -= rowLength;
-            } else {
-                r.y += rowLength;
-                r.h -= rowLength;
-            }
-            
-            remaining = remaining.slice(row.length);
-        }
-        
-        return result;
-    }
-    
-    function worstRatio(row, area, side) {
-        const sum = row.reduce((s, i) => s + i.value, 0);
-        let worst = 0;
-        for (const item of row) {
-            const itemArea = (item.value / sum) * area;
-            const itemWidth = area / side;
-            const itemHeight = itemArea / itemWidth;
-            const ratio = Math.max(itemWidth / itemHeight, itemHeight / itemWidth);
-            worst = Math.max(worst, ratio);
-        }
-        return worst;
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // RENDERING
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    function render() {
-        const map = document.getElementById('map');
-        const { width: W, height: H } = map.getBoundingClientRect();
-        map.innerHTML = '';
-        
-        // Navigate to current path
-        let node = TREE;
-        for (const p of PATH) {
-            node = node.children?.[p];
-            if (!node) {
-                PATH = [];
-                node = TREE;
-                break;
-            }
-        }
-        
-        // Prepare items
-        const items = Object.values(node.children || {})
-            .filter(child => child.lines > 0)
-            .sort((a, b) => b.lines - a.lines)
-            .map(data => ({ data, value: data.lines }));
-        
-        // Compute layout
-        const layout = computeTreemap(items, { x: 0, y: 0, w: W, h: H });
-        
-        // Render cells
-        layout.forEach(({ data, rect }, index) => {
-            const cell = createCell(data, rect, index);
-            map.appendChild(cell);
-        });
-        
-        updateNavigation();
-        updateStats(node);
-        
-        // Re-apply search highlighting if active
-        if (SEARCH_RESULTS.length > 0) {
-            requestAnimationFrame(highlightSearchResults);
-        }
-    }
-    
-    function createCell(data, rect, index) {
-        const cell = document.createElement('div');
-        cell.className = 'cell';
-        cell.tabIndex = 0;
-        cell.setAttribute('role', 'button');
-        cell.setAttribute('aria-label', `${data.name}, ${formatNumber(data.lines)} lines`);
-        
-        // Staggered animation
-        cell.style.animationDelay = `${index * 20}ms`;
-        
-        // Size class
-        const area = rect.w * rect.h;
-        if (area < 500) cell.classList.add('xxs');
-        else if (area < 1500) cell.classList.add('xs');
-        else if (area < 4000) cell.classList.add('sm');
-        
-        // Store data for tooltip and search
-        cell.dataset.name = data.name;
-        cell.dataset.path = data.path || '';
-        cell.dataset.lines = data.lines;
-        cell.dataset.tiny = area < 1500 ? 'true' : '';
-        
-        // Position
-        cell.style.left = `${rect.x}px`;
-        cell.style.top = `${rect.y}px`;
-        cell.style.width = `${rect.w}px`;
-        cell.style.height = `${rect.h}px`;
-        
-        // Color
-        const category = data.category || getCategory(data);
-        const palette = PALETTES[category] || PALETTES.default;
-        const shift = ((index * 7) % palette.range) - palette.range / 2;
-        
-        const h = palette.h + shift;
-        const s = palette.s;
-        const l = palette.l;
-        
-        const lightColor = `hsl(${h}, ${s}%, ${l + 8}%)`;
-        const darkColor = `hsl(${h}, ${s + 4}%, ${l - 8}%)`;
-        const glowColor = `hsla(${h}, ${s + 12}%, ${l + 15}%, 0.3)`;
-        
-        cell.innerHTML = `
-            <div class="cell-bg" style="background: linear-gradient(145deg, ${lightColor} 0%, ${darkColor} 100%)"></div>
-            <div class="cell-glow" style="box-shadow: 0 0 40px ${glowColor}"></div>
-            <div class="cell-content">
-                <div class="cell-name">${escapeHtml(data.name)}</div>
-                <div class="cell-meta">${formatNumber(data.lines)}</div>
-            </div>
-        `;
-        
-        // Events
-        cell.addEventListener('click', () => handleCellClick(data));
-        cell.addEventListener('keydown', e => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleCellClick(data);
-            }
-        });
-        
-        return cell;
-    }
-    
-    function handleCellClick(data) {
-        if (data.isFile) {
-            openPanel(data);
-        } else {
-            PATH.push(data.name);
-            render();
-        }
-    }
-    
-    function getCategory(item) {
-        if (item.category) return item.category;
-        const name = (item.name || '').toLowerCase();
-        if (name.includes('test')) return 'Tests';
-        if (name.includes('api')) return 'API';
-        if (name.includes('service')) return 'Services';
-        if (name.includes('security') || name.includes('crypto')) return 'Security';
-        if (name.includes('ml') || name.includes('model')) return 'ML';
-        if (name.includes('config')) return 'Config';
-        if (name.includes('script')) return 'Scripts';
-        return 'Core';
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // NAVIGATION
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    function updateNavigation() {
-        const nav = document.getElementById('nav');
-        nav.innerHTML = '';
-        
-        // Container for connected pill effect
-        const crumbs = document.createElement('div');
-        crumbs.className = 'nav-crumbs';
-        
-        // Root/Home
-        const root = document.createElement('button');
-        root.className = 'nav-item home' + (!PATH.length ? ' active' : '');
-        root.innerHTML = `<span class="icon">⌂</span>${PATH.length ? '' : '<span class="label">kagami</span>'}`;
-        root.title = 'Root: kagami';
-        root.onclick = () => navigateTo(0);
-        crumbs.appendChild(root);
-        
-        // Path segments
-        PATH.forEach((segment, i) => {
-            // Separator
-            const sep = document.createElement('span');
-            sep.className = 'nav-sep';
-            sep.innerHTML = '‹';
-            sep.setAttribute('aria-hidden', 'true');
-            crumbs.appendChild(sep);
-            
-            // Segment
-            const isLast = i === PATH.length - 1;
-            const item = document.createElement('button');
-            item.className = 'nav-item' + (isLast ? ' active' : '');
-            
-            // Icon based on type
-            const icon = getNavIcon(segment, isLast);
-            item.innerHTML = `<span class="icon">${icon}</span><span class="label">${segment}</span>`;
-            item.title = PATH.slice(0, i + 1).join('/');
-            item.onclick = () => navigateTo(i + 1);
-            crumbs.appendChild(item);
-        });
-        
-        nav.appendChild(crumbs);
-        
-        // Scroll to show active item
-        requestAnimationFrame(() => {
-            const active = crumbs.querySelector('.active');
-            if (active) {
-                active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-            }
-        });
-    }
-    
-    function getNavIcon(name, isActive) {
-        const lower = name.toLowerCase();
-        if (lower === 'packages') return '📦';
-        if (lower === 'apps') return '📱';
-        if (lower === 'tests') return '🧪';
-        if (lower === 'scripts') return '⚡';
-        if (lower === 'tools') return '🔧';
-        if (lower === 'deploy') return '🚀';
-        if (lower === 'docs') return '📖';
-        if (lower === 'config') return '⚙️';
-        if (lower.includes('core')) return '💎';
-        if (lower.includes('api')) return '🔌';
-        if (lower.includes('hal')) return '🎛️';
-        if (lower.includes('studio')) return '🎬';
-        if (lower.includes('smart')) return '🏠';
-        if (lower.includes('service')) return '⚙️';
-        if (lower.includes('security')) return '🔐';
-        if (lower.includes('agent')) return '🤖';
-        return isActive ? '📂' : '📁';
-    }
-    
-    function navigateTo(depth) {
-        PATH = PATH.slice(0, depth);
-        closePanel();
-        render();
-    }
-    
-    function updateStats(node) {
-        let fileCount = 0;
-        (function count(n) {
-            if (n.isFile) fileCount++;
-            else if (n.children) Object.values(n.children).forEach(count);
-        })(node);
-        
-        document.getElementById('stat-files').textContent = fileCount.toLocaleString();
-        document.getElementById('stat-lines').textContent = formatNumber(node.lines);
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PANEL
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    function openPanel(item) {
-        document.getElementById('panel-title').textContent = item.name;
-        document.getElementById('panel-path').textContent = item.path;
-        
-        const ast = item.ast || {};
-        const classes = ast.classes || [];
-        const funcs = ast.functions || [];
-        const imports = ast.imports || [];
-        const doc = ast.module_docstring || item.summary || '';
-        
-        let html = `
-            <div class="pills">
-                <span class="pill accent">${escapeHtml(item.category || 'Code')}</span>
-                <span class="pill"><strong>${formatNumber(item.lines)}</strong> lines</span>
-                ${classes.length ? `<span class="pill"><strong>${classes.length}</strong> classes</span>` : ''}
-                ${funcs.length ? `<span class="pill"><strong>${funcs.length}</strong> functions</span>` : ''}
-            </div>
-        `;
-        
-        // Documentation
-        if (doc) {
-            html += `
-                <div class="doc">
-                    <p class="doc-text">${escapeHtml(summarize(doc))}</p>
-                </div>
-            `;
-        }
-        
-        // Imports
-        if (imports.length) {
-            html += `
-                <div class="section">
-                    <h3 class="section-title">Imports</h3>
-                    <div class="imports">
-                        ${imports.slice(0, 12).map(i => `<span class="import">${escapeHtml(i.module)}</span>`).join('')}
-                        ${imports.length > 12 ? `<span class="import">+${imports.length - 12}</span>` : ''}
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Classes
-        if (classes.length) {
-            html += `<div class="section"><h3 class="section-title">Classes</h3>`;
-            for (const cls of classes.slice(0, 3)) {
-                html += `
-                    <div class="code-block">
-                        <div class="code-header">
-                            <span class="code-tag class">CLASS</span>
-                            <span class="code-name">${escapeHtml(cls.name)}</span>
-                            ${cls.bases?.length ? `<span class="code-sig">(${escapeHtml(cls.bases.join(', '))})</span>` : ''}
-                        </div>
-                        ${cls.docstring ? `<p class="code-doc">${escapeHtml(cls.docstring.slice(0, 100))}${cls.docstring.length > 100 ? '…' : ''}</p>` : ''}
-                        ${cls.methods?.length ? `
-                            <div class="code-methods">
-                                ${cls.methods.slice(0, 4).map(m => `
-                                    <div class="method">
-                                        <span class="method-name">${escapeHtml(m.name)}</span>
-                                        <span>${escapeHtml(m.signature || '()')}</span>
-                                    </div>
-                                `).join('')}
-                                ${cls.methods.length > 4 ? `<div class="method" style="color:var(--text-quaternary)">+${cls.methods.length - 4} more</div>` : ''}
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
-            }
-            if (classes.length > 3) html += `<p class="more">+${classes.length - 3} more classes</p>`;
-            html += '</div>';
-        }
-        
-        // Functions
-        if (funcs.length) {
-            html += `<div class="section"><h3 class="section-title">Functions</h3>`;
-            for (const fn of funcs.slice(0, 4)) {
-                html += `
-                    <div class="code-block">
-                        <div class="code-header">
-                            <span class="code-tag fn">FN</span>
-                            <span class="code-name">${escapeHtml(fn.name)}</span>
-                            <span class="code-sig">${escapeHtml(fn.signature || '()')}</span>
-                        </div>
-                        ${fn.docstring ? `<p class="code-doc">${escapeHtml(fn.docstring.slice(0, 80))}${fn.docstring.length > 80 ? '…' : ''}</p>` : ''}
-                    </div>
-                `;
-            }
-            if (funcs.length > 4) html += `<p class="more">+${funcs.length - 4} more functions</p>`;
-            html += '</div>';
-        }
-        
-        // Related files
-        const related = findRelatedFiles(item).slice(0, 4);
-        if (related.length) {
-            html += `
-                <div class="section">
-                    <h3 class="section-title">Related Files</h3>
-                    <div class="related">
-                        ${related.map(r => {
-                            const cat = r.category || 'Core';
-                            const pal = PALETTES[cat] || PALETTES.default;
-                            const color = `hsl(${pal.h}, ${pal.s}%, ${pal.l + 8}%)`;
-                            return `
-                                <div class="related-item" onclick="navigateToFile('${escapeHtml(r.path)}')" role="button" tabindex="0">
-                                    <div class="related-dot" style="background:${color}"></div>
-                                    <div class="related-info">
-                                        <div class="related-name">${escapeHtml(r.name)}</div>
-                                        <div class="related-meta">${formatNumber(r.lines)} lines · ${r.shared} shared imports</div>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                </div>
-            `;
-        }
-        
-        document.getElementById('panel-body').innerHTML = html;
-        document.getElementById('overlay').classList.add('open');
-        document.getElementById('panel').classList.add('open');
-        document.body.style.overflow = 'hidden';
-        
-        // Focus trap
-        document.querySelector('.panel-close')?.focus();
-    }
-    
-    function closePanel() {
-        document.getElementById('overlay').classList.remove('open');
-        document.getElementById('panel').classList.remove('open');
-        document.body.style.overflow = '';
-    }
-    
-    function navigateToFile(path) {
-        const file = DATA.files.find(f => f.path === path);
-        if (file) {
-            closePanel();
-            setTimeout(() => openPanel(file), 300);
-        }
-    }
-    
-    function findRelatedFiles(item) {
-        if (!item.ast?.imports) return [];
-        const myImports = new Set(item.ast.imports.map(i => i.module));
-        if (!myImports.size) return [];
-        
-        return DATA.files
-            .filter(f => f.path !== item.path && f.ast?.imports)
-            .map(f => {
-                const theirImports = new Set(f.ast.imports.map(i => i.module));
-                const shared = [...myImports].filter(m => theirImports.has(m)).length;
-                return { ...f, shared };
-            })
-            .filter(f => f.shared > 0)
-            .sort((a, b) => b.shared - a.shared);
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // INTERACTIONS
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    function setupPanelGestures() {
-        const panel = document.getElementById('panel');
-        const overlay = document.getElementById('overlay');
-        
-        overlay.addEventListener('click', closePanel);
-        
-        // Swipe to close (mobile)
-        panel.addEventListener('touchstart', e => {
-            touchStartY = e.touches[0].clientY;
-        }, { passive: true });
-        
-        panel.addEventListener('touchmove', e => {
-            const delta = e.touches[0].clientY - touchStartY;
-            const body = document.getElementById('panel-body');
-            if (delta > 100 && body.scrollTop <= 0) {
-                closePanel();
-            }
-        }, { passive: true });
-    }
-    
-    function setupTooltip() {
-        const tooltip = document.getElementById('tooltip');
-        const map = document.getElementById('map');
-        
-        map.addEventListener('mouseover', e => {
-            const cell = e.target.closest('.cell');
-            if (cell && cell.dataset.tiny === 'true') {
-                tooltip.querySelector('.cell-tooltip-name').textContent = cell.dataset.name;
-                tooltip.querySelector('.cell-tooltip-meta').textContent = formatNumber(parseInt(cell.dataset.lines)) + ' lines';
-                tooltip.classList.add('visible');
-            }
-        });
-        
-        map.addEventListener('mouseout', e => {
-            const cell = e.target.closest('.cell');
-            if (cell) {
-                tooltip.classList.remove('visible');
-            }
-        });
-        
-        map.addEventListener('mousemove', e => {
-            if (tooltip.classList.contains('visible')) {
-                tooltip.style.left = `${e.clientX + 12}px`;
-                tooltip.style.top = `${e.clientY + 12}px`;
-            }
-        });
-    }
-    
-    function setupKeyboard() {
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') {
-                closePanel();
-            }
-            
-            // Backspace to go up a level (when panel closed)
-            if (e.key === 'Backspace' && !document.getElementById('panel').classList.contains('open')) {
-                if (PATH.length > 0 && document.activeElement === document.body) {
-                    e.preventDefault();
-                    PATH.pop();
-                    render();
-                }
-            }
-        });
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // UTILITIES
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    function formatNumber(n) {
-        if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
-        if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
-        return n?.toLocaleString() || '0';
-    }
-    
-    function escapeHtml(text) {
-        if (!text) return '';
-        return String(text)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-    
-    function summarize(text) {
-        const clean = text.replace(/\s+/g, ' ').trim();
-        const sentences = clean.split(/(?<=[.!?])\s+/);
-        let result = '';
-        for (const sentence of sentences) {
-            if (result.length + sentence.length > 200) break;
-            result += (result ? ' ' : '') + sentence;
-        }
-        return result || clean.slice(0, 200) + (clean.length > 200 ? '…' : '');
-    }
-    
-    function debounce(fn, delay) {
-        let timeout;
-        return (...args) => {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => fn(...args), delay);
-        };
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // START
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    init();
-    </script>
-</body>
-</html>
-
-            // Sort by score
-            filtered.sort((a, b) => b.score - a.score);
-            
-            // Take top results with meaningful scores
-            filtered = filtered.filter(f => f.score > 0.05).slice(0, 100);
-        }
-        
-        SEARCH_RESULTS = filtered;
-        
-        // Update results count
-        results.innerHTML = `<strong>${filtered.length}</strong> results`;
-        
-        // Update visualization
-        highlightSearchResults();
-        updateEmbeddingMap();
-    }
-    
-    function clearSearch() {
-        SEARCH_QUERY = '';
-        SEARCH_RESULTS = [];
-        SEARCH_EMBEDDING = null;
-        document.getElementById('search-results').innerHTML = '';
-        
-        // Remove highlighting
-        document.querySelectorAll('.cell').forEach(cell => {
-            cell.classList.remove('search-match', 'search-similar', 'search-dim');
-            const badge = cell.querySelector('.similarity-badge');
-            if (badge) badge.remove();
-        });
-        
-        updateEmbeddingMap();
-    }
-    
-    function highlightSearchResults() {
-        const cells = document.querySelectorAll('.cell');
-        const resultPaths = new Set(SEARCH_RESULTS.map(r => r.path));
-        const topScores = {};
-        SEARCH_RESULTS.forEach(r => topScores[r.path] = r.score);
-        
-        // Also check if directory contains results
-        const dirScores = {};
-        SEARCH_RESULTS.forEach(r => {
-            const parts = r.path.split('/');
-            for (let i = 1; i < parts.length; i++) {
-                const dirPath = parts.slice(0, i).join('/');
-                if (!dirScores[dirPath] || r.score > dirScores[dirPath]) {
-                    dirScores[dirPath] = r.score;
-                }
-            }
-        });
-        
-        cells.forEach(cell => {
-            const path = cell.dataset.path;
-            cell.classList.remove('search-match', 'search-similar', 'search-dim');
-            
-            // Remove existing badges
-            const existingBadge = cell.querySelector('.similarity-badge');
-            if (existingBadge) existingBadge.remove();
-            
-            // Direct file match
-            if (resultPaths.has(path)) {
-                const score = topScores[path];
-                if (score > 0.3) {
-                    cell.classList.add('search-match');
-                    // Add similarity badge for high matches
-                    const badge = document.createElement('span');
-                    badge.className = 'similarity-badge';
-                    badge.textContent = Math.round(score * 100) + '%';
-                    cell.appendChild(badge);
-                } else {
-                    cell.classList.add('search-similar');
-                }
-            } 
-            // Directory containing results
-            else if (dirScores[path]) {
-                const score = dirScores[path];
-                if (score > 0.3) {
-                    cell.classList.add('search-similar');
-                }
-            }
-            // No match - dim
-            else if (SEARCH_RESULTS.length > 0) {
-                cell.classList.add('search-dim');
-            }
-        });
-    }
-    
-    function initEmbeddingMap() {
-        const canvas = document.getElementById('embedding-canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = 240;  // 2x for retina
-        canvas.height = 240;
-        
-        updateEmbeddingMap();
-    }
-    
-    function updateEmbeddingMap() {
-        const canvas = document.getElementById('embedding-canvas');
-        const ctx = canvas.getContext('2d');
-        const w = canvas.width;
-        const h = canvas.height;
-        
-        ctx.clearRect(0, 0, w, h);
-        
-        // Draw all points dimly
-        ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        DATA.files.forEach(f => {
-            if (f.x !== undefined && f.y !== undefined) {
-                const x = f.x * w;
-                const y = f.y * h;
-                ctx.beginPath();
-                ctx.arc(x, y, 1.5, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        });
-        
-        // Highlight search results
-        if (SEARCH_RESULTS.length > 0) {
-            const topScores = {};
-            SEARCH_RESULTS.forEach(r => topScores[r.path] = r.score);
-            
-            SEARCH_RESULTS.forEach(f => {
-                if (f.x !== undefined && f.y !== undefined) {
-                    const x = f.x * w;
-                    const y = f.y * h;
-                    const score = topScores[f.path] || 0;
-                    
-                    const alpha = Math.min(1, score * 2);
-                    const size = 2 + score * 4;
-                    
-                    ctx.fillStyle = `rgba(240,200,96,${alpha})`;
-                    ctx.beginPath();
-                    ctx.arc(x, y, size, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            });
-            
-            // Draw query position (center of results)
-            if (SEARCH_RESULTS.length > 0) {
-                let qx = 0, qy = 0, count = 0;
-                SEARCH_RESULTS.slice(0, 10).forEach(f => {
-                    if (f.x !== undefined && f.y !== undefined) {
-                        qx += f.x * (f.score || 0.5);
-                        qy += f.y * (f.score || 0.5);
-                        count += (f.score || 0.5);
-                    }
-                });
-                if (count > 0) {
-                    qx = (qx / count) * w;
-                    qy = (qy / count) * h;
-                    
-                    // Query marker
-                    ctx.strokeStyle = '#f0c860';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.arc(qx, qy, 8, 0, Math.PI * 2);
-                    ctx.stroke();
-                    
-                    ctx.fillStyle = '#f0c860';
-                    ctx.beginPath();
-                    ctx.arc(qx, qy, 3, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-        }
-    }
-    
-    async function init() {
-        try {
-            const response = await fetch('codebase-analysis.json');
-            DATA = await response.json();
-            TREE = buildTree(DATA.files);
-            
-            document.getElementById('map').classList.remove('loading');
-            render();
-            
-            // Event listeners
-            window.addEventListener('resize', debounce(render, 100));
-            setupPanelGestures();
-            setupTooltip();
-            setupKeyboard();
-            setupSearch();
-            
-        } catch (error) {
-            console.error('Failed to load:', error);
-            document.getElementById('map').innerHTML = 
-                `<div style="padding:32px;color:var(--text-tertiary);font-family:var(--font-mono);font-size:0.75rem">
-                    Failed to load codebase-analysis.json
-                </div>`;
-        }
-    }
-    
-    function buildTree(files) {
-        const root = { name: 'kagami', path: '', lines: 0, children: {} };
-        
-        for (const file of files) {
-            const parts = file.path.split('/');
-            let node = root;
-            
-            for (let i = 0; i < parts.length - 1; i++) {
-                const part = parts[i];
-                if (!node.children[part]) {
-                    const dirPath = parts.slice(0, i + 1).join('/');
-                    node.children[part] = {
-                        name: part,
-                        path: dirPath,
-                        lines: 0,
-                        category: DATA.directories?.[dirPath]?.primary_category || '',
-                        children: {},
-                    };
-                }
-                node = node.children[part];
-            }
-            
-            const fileName = parts[parts.length - 1];
-            node.children[fileName] = { ...file, name: fileName, isFile: true };
-        }
-        
-        // Calculate totals
-        (function calcLines(n) {
-            if (n.isFile) return n.lines || 0;
-            let total = 0;
-            for (const child of Object.values(n.children)) {
-                total += calcLines(child);
-            }
-            return n.lines = total;
-        })(root);
-        
-        return root;
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // TREEMAP ALGORITHM (Squarified)
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    function computeTreemap(items, rect) {
-        const total = items.reduce((sum, item) => sum + item.value, 0);
-        if (!total || !items.length) return [];
-        
-        const result = [];
-        let remaining = items.map(i => ({ ...i }));
-        let r = { ...rect };
-        
-        while (remaining.length) {
-            const row = [];
-            const horizontal = r.w >= r.h;
-            const side = horizontal ? r.h : r.w;
-            const remainingTotal = remaining.reduce((s, i) => s + i.value, 0);
-            
-            let rowSum = 0;
-            
-            for (const item of remaining) {
-                const newSum = rowSum + item.value;
-                const newArea = (newSum / remainingTotal) * r.w * r.h;
-                
-                if (!row.length) {
-                    row.push(item);
-                    rowSum = newSum;
-                    continue;
-                }
-                
-                const currentWorst = worstRatio(row, (rowSum / remainingTotal) * r.w * r.h, side);
-                const nextWorst = worstRatio([...row, item], newArea, side);
-                
-                if (nextWorst <= currentWorst) {
-                    row.push(item);
-                    rowSum = newSum;
-                } else {
-                    break;
-                }
-            }
-            
-            // Layout the row
-            const rowArea = (rowSum / remainingTotal) * r.w * r.h;
-            const rowLength = rowArea / side;
-            let offset = 0;
-            
-            for (const item of row) {
-                const fraction = item.value / rowSum;
-                const length = fraction * side;
-                
-                const cellRect = horizontal
-                    ? { x: r.x, y: r.y + offset, w: rowLength, h: length }
-                    : { x: r.x + offset, y: r.y, w: length, h: rowLength };
-                
-                result.push({ data: item.data, rect: cellRect });
-                offset += length;
-            }
-            
-            // Update remaining rect
-            if (horizontal) {
-                r.x += rowLength;
-                r.w -= rowLength;
-            } else {
-                r.y += rowLength;
-                r.h -= rowLength;
-            }
-            
-            remaining = remaining.slice(row.length);
-        }
-        
-        return result;
-    }
-    
-    function worstRatio(row, area, side) {
-        const sum = row.reduce((s, i) => s + i.value, 0);
-        let worst = 0;
-        for (const item of row) {
-            const itemArea = (item.value / sum) * area;
-            const itemWidth = area / side;
-            const itemHeight = itemArea / itemWidth;
-            const ratio = Math.max(itemWidth / itemHeight, itemHeight / itemWidth);
-            worst = Math.max(worst, ratio);
-        }
-        return worst;
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // RENDERING
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    function render() {
-        const map = document.getElementById('map');
-        const { width: W, height: H } = map.getBoundingClientRect();
-        map.innerHTML = '';
-        
-        // Navigate to current path
-        let node = TREE;
-        for (const p of PATH) {
-            node = node.children?.[p];
-            if (!node) {
-                PATH = [];
-                node = TREE;
-                break;
-            }
-        }
-        
-        // Prepare items
-        const items = Object.values(node.children || {})
-            .filter(child => child.lines > 0)
-            .sort((a, b) => b.lines - a.lines)
-            .map(data => ({ data, value: data.lines }));
-        
-        // Compute layout
-        const layout = computeTreemap(items, { x: 0, y: 0, w: W, h: H });
-        
-        // Render cells
-        layout.forEach(({ data, rect }, index) => {
-            const cell = createCell(data, rect, index);
-            map.appendChild(cell);
-        });
-        
-        updateNavigation();
-        updateStats(node);
-        
-        // Re-apply search highlighting if active
-        if (SEARCH_RESULTS.length > 0) {
-            requestAnimationFrame(highlightSearchResults);
-        }
-    }
-    
-    function createCell(data, rect, index) {
-        const cell = document.createElement('div');
-        cell.className = 'cell';
-        cell.tabIndex = 0;
-        cell.setAttribute('role', 'button');
-        cell.setAttribute('aria-label', `${data.name}, ${formatNumber(data.lines)} lines`);
-        
-        // Staggered animation
-        cell.style.animationDelay = `${index * 20}ms`;
-        
-        // Size class
-        const area = rect.w * rect.h;
-        if (area < 500) cell.classList.add('xxs');
-        else if (area < 1500) cell.classList.add('xs');
-        else if (area < 4000) cell.classList.add('sm');
-        
-        // Store data for tooltip and search
-        cell.dataset.name = data.name;
-        cell.dataset.path = data.path || '';
-        cell.dataset.lines = data.lines;
-        cell.dataset.tiny = area < 1500 ? 'true' : '';
-        
-        // Position
-        cell.style.left = `${rect.x}px`;
-        cell.style.top = `${rect.y}px`;
-        cell.style.width = `${rect.w}px`;
-        cell.style.height = `${rect.h}px`;
-        
-        // Color
-        const category = data.category || getCategory(data);
-        const palette = PALETTES[category] || PALETTES.default;
-        const shift = ((index * 7) % palette.range) - palette.range / 2;
-        
-        const h = palette.h + shift;
-        const s = palette.s;
-        const l = palette.l;
-        
-        const lightColor = `hsl(${h}, ${s}%, ${l + 8}%)`;
-        const darkColor = `hsl(${h}, ${s + 4}%, ${l - 8}%)`;
-        const glowColor = `hsla(${h}, ${s + 12}%, ${l + 15}%, 0.3)`;
-        
-        cell.innerHTML = `
-            <div class="cell-bg" style="background: linear-gradient(145deg, ${lightColor} 0%, ${darkColor} 100%)"></div>
-            <div class="cell-glow" style="box-shadow: 0 0 40px ${glowColor}"></div>
-            <div class="cell-content">
-                <div class="cell-name">${escapeHtml(data.name)}</div>
-                <div class="cell-meta">${formatNumber(data.lines)}</div>
-            </div>
-        `;
-        
-        // Events
-        cell.addEventListener('click', () => handleCellClick(data));
-        cell.addEventListener('keydown', e => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleCellClick(data);
-            }
-        });
-        
-        return cell;
-    }
-    
-    function handleCellClick(data) {
-        if (data.isFile) {
-            openPanel(data);
-        } else {
-            PATH.push(data.name);
-            render();
-        }
-    }
-    
-    function getCategory(item) {
-        if (item.category) return item.category;
-        const name = (item.name || '').toLowerCase();
-        if (name.includes('test')) return 'Tests';
-        if (name.includes('api')) return 'API';
-        if (name.includes('service')) return 'Services';
-        if (name.includes('security') || name.includes('crypto')) return 'Security';
-        if (name.includes('ml') || name.includes('model')) return 'ML';
-        if (name.includes('config')) return 'Config';
-        if (name.includes('script')) return 'Scripts';
-        return 'Core';
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // NAVIGATION
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    function updateNavigation() {
-        const nav = document.getElementById('nav');
-        nav.innerHTML = '';
-        
-        // Container for connected pill effect
-        const crumbs = document.createElement('div');
-        crumbs.className = 'nav-crumbs';
-        
-        // Root/Home
-        const root = document.createElement('button');
-        root.className = 'nav-item home' + (!PATH.length ? ' active' : '');
-        root.innerHTML = `<span class="icon">⌂</span>${PATH.length ? '' : '<span class="label">kagami</span>'}`;
-        root.title = 'Root: kagami';
-        root.onclick = () => navigateTo(0);
-        crumbs.appendChild(root);
-        
-        // Path segments
-        PATH.forEach((segment, i) => {
-            // Separator
-            const sep = document.createElement('span');
-            sep.className = 'nav-sep';
-            sep.innerHTML = '‹';
-            sep.setAttribute('aria-hidden', 'true');
-            crumbs.appendChild(sep);
-            
-            // Segment
-            const isLast = i === PATH.length - 1;
-            const item = document.createElement('button');
-            item.className = 'nav-item' + (isLast ? ' active' : '');
-            
-            // Icon based on type
-            const icon = getNavIcon(segment, isLast);
-            item.innerHTML = `<span class="icon">${icon}</span><span class="label">${segment}</span>`;
-            item.title = PATH.slice(0, i + 1).join('/');
-            item.onclick = () => navigateTo(i + 1);
-            crumbs.appendChild(item);
-        });
-        
-        nav.appendChild(crumbs);
-        
-        // Scroll to show active item
-        requestAnimationFrame(() => {
-            const active = crumbs.querySelector('.active');
-            if (active) {
-                active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-            }
-        });
-    }
-    
-    function getNavIcon(name, isActive) {
-        const lower = name.toLowerCase();
-        if (lower === 'packages') return '📦';
-        if (lower === 'apps') return '📱';
-        if (lower === 'tests') return '🧪';
-        if (lower === 'scripts') return '⚡';
-        if (lower === 'tools') return '🔧';
-        if (lower === 'deploy') return '🚀';
-        if (lower === 'docs') return '📖';
-        if (lower === 'config') return '⚙️';
-        if (lower.includes('core')) return '💎';
-        if (lower.includes('api')) return '🔌';
-        if (lower.includes('hal')) return '🎛️';
-        if (lower.includes('studio')) return '🎬';
-        if (lower.includes('smart')) return '🏠';
-        if (lower.includes('service')) return '⚙️';
-        if (lower.includes('security')) return '🔐';
-        if (lower.includes('agent')) return '🤖';
-        return isActive ? '📂' : '📁';
-    }
-    
-    function navigateTo(depth) {
-        PATH = PATH.slice(0, depth);
-        closePanel();
-        render();
-    }
-    
-    function updateStats(node) {
-        let fileCount = 0;
-        (function count(n) {
-            if (n.isFile) fileCount++;
-            else if (n.children) Object.values(n.children).forEach(count);
-        })(node);
-        
-        document.getElementById('stat-files').textContent = fileCount.toLocaleString();
-        document.getElementById('stat-lines').textContent = formatNumber(node.lines);
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PANEL
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    function openPanel(item) {
-        document.getElementById('panel-title').textContent = item.name;
-        document.getElementById('panel-path').textContent = item.path;
-        
-        const ast = item.ast || {};
-        const classes = ast.classes || [];
-        const funcs = ast.functions || [];
-        const imports = ast.imports || [];
-        const doc = ast.module_docstring || item.summary || '';
-        
-        let html = `
-            <div class="pills">
-                <span class="pill accent">${escapeHtml(item.category || 'Code')}</span>
-                <span class="pill"><strong>${formatNumber(item.lines)}</strong> lines</span>
-                ${classes.length ? `<span class="pill"><strong>${classes.length}</strong> classes</span>` : ''}
-                ${funcs.length ? `<span class="pill"><strong>${funcs.length}</strong> functions</span>` : ''}
-            </div>
-        `;
-        
-        // Documentation
-        if (doc) {
-            html += `
-                <div class="doc">
-                    <p class="doc-text">${escapeHtml(summarize(doc))}</p>
-                </div>
-            `;
-        }
-        
-        // Imports
-        if (imports.length) {
-            html += `
-                <div class="section">
-                    <h3 class="section-title">Imports</h3>
-                    <div class="imports">
-                        ${imports.slice(0, 12).map(i => `<span class="import">${escapeHtml(i.module)}</span>`).join('')}
-                        ${imports.length > 12 ? `<span class="import">+${imports.length - 12}</span>` : ''}
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Classes
-        if (classes.length) {
-            html += `<div class="section"><h3 class="section-title">Classes</h3>`;
-            for (const cls of classes.slice(0, 3)) {
-                html += `
-                    <div class="code-block">
-                        <div class="code-header">
-                            <span class="code-tag class">CLASS</span>
-                            <span class="code-name">${escapeHtml(cls.name)}</span>
-                            ${cls.bases?.length ? `<span class="code-sig">(${escapeHtml(cls.bases.join(', '))})</span>` : ''}
-                        </div>
-                        ${cls.docstring ? `<p class="code-doc">${escapeHtml(cls.docstring.slice(0, 100))}${cls.docstring.length > 100 ? '…' : ''}</p>` : ''}
-                        ${cls.methods?.length ? `
-                            <div class="code-methods">
-                                ${cls.methods.slice(0, 4).map(m => `
-                                    <div class="method">
-                                        <span class="method-name">${escapeHtml(m.name)}</span>
-                                        <span>${escapeHtml(m.signature || '()')}</span>
-                                    </div>
-                                `).join('')}
-                                ${cls.methods.length > 4 ? `<div class="method" style="color:var(--text-quaternary)">+${cls.methods.length - 4} more</div>` : ''}
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
-            }
-            if (classes.length > 3) html += `<p class="more">+${classes.length - 3} more classes</p>`;
-            html += '</div>';
-        }
-        
-        // Functions
-        if (funcs.length) {
-            html += `<div class="section"><h3 class="section-title">Functions</h3>`;
-            for (const fn of funcs.slice(0, 4)) {
-                html += `
-                    <div class="code-block">
-                        <div class="code-header">
-                            <span class="code-tag fn">FN</span>
-                            <span class="code-name">${escapeHtml(fn.name)}</span>
-                            <span class="code-sig">${escapeHtml(fn.signature || '()')}</span>
-                        </div>
-                        ${fn.docstring ? `<p class="code-doc">${escapeHtml(fn.docstring.slice(0, 80))}${fn.docstring.length > 80 ? '…' : ''}</p>` : ''}
-                    </div>
-                `;
-            }
-            if (funcs.length > 4) html += `<p class="more">+${funcs.length - 4} more functions</p>`;
-            html += '</div>';
-        }
-        
-        // Related files
-        const related = findRelatedFiles(item).slice(0, 4);
-        if (related.length) {
-            html += `
-                <div class="section">
-                    <h3 class="section-title">Related Files</h3>
-                    <div class="related">
-                        ${related.map(r => {
-                            const cat = r.category || 'Core';
-                            const pal = PALETTES[cat] || PALETTES.default;
-                            const color = `hsl(${pal.h}, ${pal.s}%, ${pal.l + 8}%)`;
-                            return `
-                                <div class="related-item" onclick="navigateToFile('${escapeHtml(r.path)}')" role="button" tabindex="0">
-                                    <div class="related-dot" style="background:${color}"></div>
-                                    <div class="related-info">
-                                        <div class="related-name">${escapeHtml(r.name)}</div>
-                                        <div class="related-meta">${formatNumber(r.lines)} lines · ${r.shared} shared imports</div>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                </div>
-            `;
-        }
-        
-        document.getElementById('panel-body').innerHTML = html;
-        document.getElementById('overlay').classList.add('open');
-        document.getElementById('panel').classList.add('open');
-        document.body.style.overflow = 'hidden';
-        
-        // Focus trap
-        document.querySelector('.panel-close')?.focus();
-    }
-    
-    function closePanel() {
-        document.getElementById('overlay').classList.remove('open');
-        document.getElementById('panel').classList.remove('open');
-        document.body.style.overflow = '';
-    }
-    
-    function navigateToFile(path) {
-        const file = DATA.files.find(f => f.path === path);
-        if (file) {
-            closePanel();
-            setTimeout(() => openPanel(file), 300);
-        }
-    }
-    
-    function findRelatedFiles(item) {
-        if (!item.ast?.imports) return [];
-        const myImports = new Set(item.ast.imports.map(i => i.module));
-        if (!myImports.size) return [];
-        
-        return DATA.files
-            .filter(f => f.path !== item.path && f.ast?.imports)
-            .map(f => {
-                const theirImports = new Set(f.ast.imports.map(i => i.module));
-                const shared = [...myImports].filter(m => theirImports.has(m)).length;
-                return { ...f, shared };
-            })
-            .filter(f => f.shared > 0)
-            .sort((a, b) => b.shared - a.shared);
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // INTERACTIONS
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    function setupPanelGestures() {
-        const panel = document.getElementById('panel');
-        const overlay = document.getElementById('overlay');
-        
-        overlay.addEventListener('click', closePanel);
-        
-        // Swipe to close (mobile)
-        panel.addEventListener('touchstart', e => {
-            touchStartY = e.touches[0].clientY;
-        }, { passive: true });
-        
-        panel.addEventListener('touchmove', e => {
-            const delta = e.touches[0].clientY - touchStartY;
-            const body = document.getElementById('panel-body');
-            if (delta > 100 && body.scrollTop <= 0) {
-                closePanel();
-            }
-        }, { passive: true });
-    }
-    
-    function setupTooltip() {
-        const tooltip = document.getElementById('tooltip');
-        const map = document.getElementById('map');
-        
-        map.addEventListener('mouseover', e => {
-            const cell = e.target.closest('.cell');
-            if (cell && cell.dataset.tiny === 'true') {
-                tooltip.querySelector('.cell-tooltip-name').textContent = cell.dataset.name;
-                tooltip.querySelector('.cell-tooltip-meta').textContent = formatNumber(parseInt(cell.dataset.lines)) + ' lines';
-                tooltip.classList.add('visible');
-            }
-        });
-        
-        map.addEventListener('mouseout', e => {
-            const cell = e.target.closest('.cell');
-            if (cell) {
-                tooltip.classList.remove('visible');
-            }
-        });
-        
-        map.addEventListener('mousemove', e => {
-            if (tooltip.classList.contains('visible')) {
-                tooltip.style.left = `${e.clientX + 12}px`;
-                tooltip.style.top = `${e.clientY + 12}px`;
-            }
-        });
-    }
-    
-    function setupKeyboard() {
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') {
-                closePanel();
-            }
-            
-            // Backspace to go up a level (when panel closed)
-            if (e.key === 'Backspace' && !document.getElementById('panel').classList.contains('open')) {
-                if (PATH.length > 0 && document.activeElement === document.body) {
-                    e.preventDefault();
-                    PATH.pop();
-                    render();
-                }
-            }
-        });
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // UTILITIES
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    function formatNumber(n) {
-        if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
-        if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
-        return n?.toLocaleString() || '0';
-    }
-    
-    function escapeHtml(text) {
-        if (!text) return '';
-        return String(text)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-    
-    function summarize(text) {
-        const clean = text.replace(/\s+/g, ' ').trim();
-        const sentences = clean.split(/(?<=[.!?])\s+/);
-        let result = '';
-        for (const sentence of sentences) {
-            if (result.length + sentence.length > 200) break;
-            result += (result ? ' ' : '') + sentence;
-        }
-        return result || clean.slice(0, 200) + (clean.length > 200 ? '…' : '');
-    }
-    
-    function debounce(fn, delay) {
-        let timeout;
-        return (...args) => {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => fn(...args), delay);
-        };
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // START
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    init();
-    </script>
-</body>
-</html>
-
-                    <h3 class="section-title">Related Files</h3>
-                    <div class="related">
-                        ${related.map(r => {
-                            const cat = r.category || 'Core';
-                            const pal = PALETTES[cat] || PALETTES.default;
-                            const color = `hsl(${pal.h}, ${pal.s}%, ${pal.l + 8}%)`;
-                            return `
-                                <div class="related-item" onclick="navigateToFile('${escapeHtml(r.path)}')" role="button" tabindex="0">
-                                    <div class="related-dot" style="background:${color}"></div>
-                                    <div class="related-info">
-                                        <div class="related-name">${escapeHtml(r.name)}</div>
-                                        <div class="related-meta">${formatNumber(r.lines)} lines · ${r.shared} shared imports</div>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                </div>
-            `;
-        }
-        
-        document.getElementById('panel-body').innerHTML = html;
-        document.getElementById('overlay').classList.add('open');
-        document.getElementById('panel').classList.add('open');
-        document.body.style.overflow = 'hidden';
-        
-        // Focus trap
-        document.querySelector('.panel-close')?.focus();
-    }
-    
-    function closePanel() {
-        document.getElementById('overlay').classList.remove('open');
-        document.getElementById('panel').classList.remove('open');
-        document.body.style.overflow = '';
-    }
-    
-    function navigateToFile(path) {
-        const file = DATA.files.find(f => f.path === path);
-        if (file) {
-            closePanel();
-            setTimeout(() => openPanel(file), 300);
-        }
-    }
-    
-    function findRelatedFiles(item) {
-        if (!item.ast?.imports) return [];
-        const myImports = new Set(item.ast.imports.map(i => i.module));
-        if (!myImports.size) return [];
-        
-        return DATA.files
-            .filter(f => f.path !== item.path && f.ast?.imports)
-            .map(f => {
-                const theirImports = new Set(f.ast.imports.map(i => i.module));
-                const shared = [...myImports].filter(m => theirImports.has(m)).length;
-                return { ...f, shared };
-            })
-            .filter(f => f.shared > 0)
-            .sort((a, b) => b.shared - a.shared);
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // INTERACTIONS
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    function setupPanelGestures() {
-        const panel = document.getElementById('panel');
-        const overlay = document.getElementById('overlay');
-        
-        overlay.addEventListener('click', closePanel);
-        
-        // Swipe to close (mobile)
-        panel.addEventListener('touchstart', e => {
-            touchStartY = e.touches[0].clientY;
-        }, { passive: true });
-        
-        panel.addEventListener('touchmove', e => {
-            const delta = e.touches[0].clientY - touchStartY;
-            const body = document.getElementById('panel-body');
-            if (delta > 100 && body.scrollTop <= 0) {
-                closePanel();
-            }
-        }, { passive: true });
-    }
-    
-    function setupTooltip() {
-        const tooltip = document.getElementById('tooltip');
-        const map = document.getElementById('map');
-        
-        map.addEventListener('mouseover', e => {
-            const cell = e.target.closest('.cell');
-            if (cell && cell.dataset.tiny === 'true') {
-                tooltip.querySelector('.cell-tooltip-name').textContent = cell.dataset.name;
-                tooltip.querySelector('.cell-tooltip-meta').textContent = formatNumber(parseInt(cell.dataset.lines)) + ' lines';
-                tooltip.classList.add('visible');
-            }
-        });
-        
-        map.addEventListener('mouseout', e => {
-            const cell = e.target.closest('.cell');
-            if (cell) {
-                tooltip.classList.remove('visible');
-            }
-        });
-        
-        map.addEventListener('mousemove', e => {
-            if (tooltip.classList.contains('visible')) {
-                tooltip.style.left = `${e.clientX + 12}px`;
-                tooltip.style.top = `${e.clientY + 12}px`;
-            }
-        });
-    }
-    
-    function setupKeyboard() {
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') {
-                closePanel();
-            }
-            
-            // Backspace to go up a level (when panel closed)
-            if (e.key === 'Backspace' && !document.getElementById('panel').classList.contains('open')) {
-                if (PATH.length > 0 && document.activeElement === document.body) {
-                    e.preventDefault();
-                    PATH.pop();
-                    render();
-                }
-            }
-        });
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // UTILITIES
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    function formatNumber(n) {
-        if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
-        if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
-        return n?.toLocaleString() || '0';
-    }
-    
-    function escapeHtml(text) {
-        if (!text) return '';
-        return String(text)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-    
-    function summarize(text) {
-        const clean = text.replace(/\s+/g, ' ').trim();
-        const sentences = clean.split(/(?<=[.!?])\s+/);
-        let result = '';
-        for (const sentence of sentences) {
-            if (result.length + sentence.length > 200) break;
-            result += (result ? ' ' : '') + sentence;
-        }
-        return result || clean.slice(0, 200) + (clean.length > 200 ? '…' : '');
-    }
-    
-    function debounce(fn, delay) {
-        let timeout;
-        return (...args) => {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => fn(...args), delay);
-        };
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // START
-    // ═══════════════════════════════════════════════════════════════════════════
-    
-    init();
-    </script>
-</body>
-</html>
-
-            // Sort by score
-            filtered.sort((a, b) => b.score - a.score);
-            
-            // Take top results with meaningful scores
-            filtered = filtered.filter(f => f.score > 0.05).slice(0, 100);
-        }
-        
-        SEARCH_RESULTS = filtered;
-        
-        // Update results count
-        results.innerHTML = `<strong>${filtered.length}</strong> results`;
-        
-        // Update visualization
-        highlightSearchResults();
-        updateEmbeddingMap();
-    }
-    
-    function clearSearch() {
-        SEARCH_QUERY = '';
-        SEARCH_RESULTS = [];
-        SEARCH_EMBEDDING = null;
-        document.getElementById('search-results').innerHTML = '';
-        
-        // Remove highlighting
-        document.querySelectorAll('.cell').forEach(cell => {
-            cell.classList.remove('search-match', 'search-similar', 'search-dim');
-            const badge = cell.querySelector('.similarity-badge');
-            if (badge) badge.remove();
-        });
-        
-        updateEmbeddingMap();
     }
     
     function highlightSearchResults() {
