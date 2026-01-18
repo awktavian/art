@@ -24,7 +24,7 @@ const DATA_ASSETS = [
 
 // Install event - cache static assets
 self.addEventListener('install', event => {
-  console.log('[SW] Installing v5.0.0...');
+  console.log(`[SW] Installing ${CACHE_VERSION}...`);
   
   event.waitUntil(
     caches.open(STATIC_CACHE)
