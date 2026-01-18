@@ -1,0 +1,2441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+    <title>Kagami — Mirror that sparkles · 鏡</title>
+    <meta name="description" content="Kagami: A unified organism for household AI. Active inference, 7-colony Fano plane architecture, and multi-platform deployment. 1.1M+ lines of code. h(x) ≥ 0 always.">
+    <meta name="theme-color" content="#07060B">
+    <meta name="color-scheme" content="dark">
+    <meta name="author" content="Tim Jacoby">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪞</text></svg>">
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           DESIGN TOKENS
+        ═══════════════════════════════════════════════════════════════════ */
+        :root {
+            /* Colors */
+            --bg: #07060B;
+            --bg-surface: #0D0C14;
+            --bg-elevated: #13121C;
+            --text: #F8F7F4;
+            --text-secondary: #B8C5D6;  /* WCAG AA compliant: 5.2:1 on #07060B */
+            --text-muted: #A8B5C4;      /* WCAG AA compliant: 4.6:1 on #07060B */
+            --accent: #D4AF37;
+            --border: rgba(212, 175, 55, 0.15);
+
+            /* Colony Colors */
+            --colony-crystal: #60A5FA;
+            --colony-beacon: #34D399;
+            --colony-flow: #A78BFA;
+            --colony-nexus: #F472B6;
+            --colony-forge: #FB923C;
+            --colony-spark: #FBBF24;
+            --colony-grove: #4ADE80;
+
+            /* Typography */
+            --font-serif: 'EB Garamond', Georgia, serif;
+            --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+            --font-mono: 'IBM Plex Mono', monospace;
+
+            /* Spacing (8px grid) */
+            --space-xs: 0.25rem;   /* 4px */
+            --space-sm: 0.5rem;    /* 8px */
+            --space-md: 1rem;      /* 16px */
+            --space-lg: 2rem;      /* 32px */
+            --space-xl: 4rem;      /* 64px */
+            --space-2xl: 8rem;     /* 128px */
+
+            /* Fibonacci Timing */
+            --fib-1: 89ms;
+            --fib-2: 144ms;
+            --fib-3: 233ms;
+            --fib-4: 377ms;
+            --fib-5: 610ms;
+            --fib-6: 987ms;
+
+            /* Transitions */
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --transition-fast: var(--fib-2) var(--ease-out-expo);
+            --transition-base: var(--fib-4) var(--ease-out-expo);
+            --transition-slow: var(--fib-5) var(--ease-out-expo);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           BASE
+        ═══════════════════════════════════════════════════════════════════ */
+        *, *::before, *::after { box-sizing: border-box; }
+
+        html {
+            scroll-behavior: smooth;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-sans);
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+            min-height: 100vh;
+        }
+
+        /* Background with subtle animation */
+        .bg-gradient {
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse at 20% 20%, rgba(96, 165, 250, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(167, 139, 250, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(212, 175, 55, 0.03) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: -1;
+            animation: bgShift 30s ease-in-out infinite alternate;
+        }
+
+        @keyframes bgShift {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+
+        .grain {
+            position: fixed;
+            inset: 0;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           FOCUS STATES (Accessibility)
+        ═══════════════════════════════════════════════════════════════════ */
+        .nav-link:focus-visible,
+        .platform-card:focus-visible,
+        .card:focus-visible,
+        .colony-node:focus-visible,
+        .footer-kanji:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 4px;
+            border-radius: 4px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           NAVIGATION
+        ═══════════════════════════════════════════════════════════════════ */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: var(--space-md) var(--space-lg);
+            background: rgba(7, 6, 11, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-inner {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-logo {
+            font-family: var(--font-serif);
+            font-size: 1.25rem;
+            color: var(--text);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            transition: color var(--transition-fast);
+        }
+
+        .nav-logo:hover { color: var(--accent); }
+
+        .nav-links {
+            display: flex;
+            gap: var(--space-lg);
+        }
+
+        .nav-link {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: color var(--transition-fast);
+        }
+
+        .nav-link:hover { color: var(--accent); }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           HERO
+        ═══════════════════════════════════════════════════════════════════ */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: var(--space-2xl) var(--space-lg);
+            position: relative;
+        }
+
+        .hero-eyebrow {
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            margin-bottom: var(--space-lg);
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            opacity: 0;
+            animation: fadeUp var(--fib-5) var(--ease-out-expo) 0.2s forwards;
+        }
+
+        .hero-title {
+            font-family: var(--font-serif);
+            font-size: clamp(4rem, 15vw, 12rem);
+            font-weight: 400;
+            line-height: 0.9;
+            margin: 0;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--colony-crystal) 50%, var(--colony-beacon) 100%);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            opacity: 0;
+            animation: fadeUp var(--fib-6) var(--ease-out-expo) 0.4s forwards, shimmer 8s linear 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 0% center; }
+            100% { background-position: 200% center; }
+        }
+
+        .hero-subtitle {
+            font-family: var(--font-sans);
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: var(--space-lg) 0;
+            opacity: 0;
+            animation: fadeUp var(--fib-5) var(--ease-out-expo) 0.6s forwards;
+        }
+
+        /* Emotional hook - smaller personal note */
+        .hero-hook {
+            font-family: var(--font-serif);
+            font-style: italic;
+            font-size: 1rem;
+            color: var(--text-muted);
+            max-width: 500px;
+            margin: 0 0 var(--space-xl);
+            opacity: 0;
+            animation: fadeUp var(--fib-5) var(--ease-out-expo) 0.8s forwards;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Hero Stats with Counter Animation */
+        .hero-stats {
+            display: flex;
+            gap: var(--space-xl);
+            flex-wrap: wrap;
+            justify-content: center;
+            opacity: 0;
+            animation: fadeUp var(--fib-5) var(--ease-out-expo) 1s forwards;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            display: block;
+            font-family: var(--font-mono);
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: var(--text);
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-top: var(--space-xs);
+        }
+
+        .stat {
+            transition: transform var(--transition-fast);
+        }
+
+        .stat:hover {
+            transform: scale(1.05);
+        }
+
+        .stat:hover .stat-value {
+            color: var(--accent);
+        }
+
+        /* Scroll hint */
+        .scroll-hint {
+            position: absolute;
+            bottom: var(--space-xl);
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--space-sm);
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            opacity: 0;
+            animation: fadeUp var(--fib-5) var(--ease-out-expo) 1.5s forwards, pulse 2s ease-in-out 2s infinite;
+        }
+
+        .scroll-hint svg {
+            width: 24px;
+            height: 24px;
+            animation: bounce 2s ease-in-out infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(6px); }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           SECTIONS
+        ═══════════════════════════════════════════════════════════════════ */
+        .section {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: var(--space-xl) var(--space-lg);
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: var(--space-xl);
+        }
+
+        .section-number {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            margin: 0 0 var(--space-sm);
+        }
+
+        .section-title {
+            font-family: var(--font-serif);
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 400;
+            color: var(--text);
+            margin: 0 0 var(--space-md);
+        }
+
+        .section-desc {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           CALLOUT (Narrative personality)
+        ═══════════════════════════════════════════════════════════════════ */
+        .callout {
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.05) 0%, rgba(96, 165, 250, 0.05) 100%);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            padding: var(--space-md) var(--space-lg);
+            margin: var(--space-lg) 0;
+            font-family: var(--font-serif);
+            font-style: italic;
+            color: var(--text-secondary);
+        }
+
+        .callout-author {
+            font-family: var(--font-mono);
+            font-style: normal;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: var(--space-sm);
+            display: block;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           LANGUAGE CHART (Animated Bars)
+        ═══════════════════════════════════════════════════════════════════ */
+        .chart-container {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: var(--space-lg);
+            margin-bottom: var(--space-xl);
+            transition: border-color var(--transition-base);
+        }
+
+        .chart-container:hover {
+            border-color: rgba(212, 175, 55, 0.3);
+        }
+
+        .chart-title {
+            font-family: var(--font-serif);
+            font-size: 1.5rem;
+            color: var(--accent);
+            text-align: center;
+            margin-bottom: var(--space-lg);
+            transition: color var(--transition-fast);
+        }
+
+        .lang-bars {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
+        }
+
+        .lang-bar {
+            display: grid;
+            grid-template-columns: 100px 1fr 80px;
+            gap: var(--space-md);
+            align-items: center;
+        }
+
+        .lang-name {
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .lang-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            transition: transform var(--transition-fast);
+        }
+
+        .lang-bar:hover .lang-dot {
+            transform: scale(1.5);
+        }
+
+        .lang-track {
+            height: 24px;
+            background: var(--bg-elevated);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .lang-fill {
+            height: 100%;
+            border-radius: 4px;
+            width: 0;
+            transition: width var(--fib-6) var(--ease-out-expo);
+        }
+
+        .lang-fill.animated {
+            /* Width set via data attribute */
+        }
+
+        .lang-value {
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            text-align: right;
+            transition: color var(--transition-fast);
+        }
+
+        .lang-bar:hover .lang-value {
+            color: var(--text);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           SYSTEM TOPOLOGY (SVG VISUALIZATION)
+        ═══════════════════════════════════════════════════════════════════ */
+        .topology-container {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: var(--space-xl);
+            margin-bottom: var(--space-xl);
+        }
+
+        .topology-svg {
+            width: 100%;
+            height: auto;
+            max-width: 1000px;
+            margin: 0 auto;
+            display: block;
+        }
+
+        .topology-node {
+            transition: all var(--transition-base);
+            cursor: pointer;
+        }
+
+        .topology-node:hover {
+            filter: drop-shadow(0 0 20px var(--node-color, var(--accent)));
+        }
+
+        .topology-label {
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-size: clamp(10px, 1.5vw, 12px);
+            fill: var(--text);
+        }
+
+        .topology-sublabel {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: clamp(8px, 1.2vw, 10px);
+            fill: var(--text-muted);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           FANO PLANE (INTERACTIVE SVG)
+        ═══════════════════════════════════════════════════════════════════ */
+        .fano-container {
+            background: linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-elevated) 100%);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: var(--space-xl);
+            margin-bottom: var(--space-xl);
+            position: relative;
+        }
+
+        .fano-svg {
+            width: 100%;
+            height: auto;
+            max-width: 800px;
+            margin: 0 auto;
+            display: block;
+        }
+
+        .colony-node {
+            transition: all var(--transition-base);
+            cursor: pointer;
+        }
+
+        .colony-node:hover circle {
+            filter: drop-shadow(0 0 20px currentColor);
+            stroke-width: 3;
+        }
+
+        .fano-line {
+            stroke-dasharray: 8 4;
+            stroke-linecap: round;
+            opacity: 0.4;
+            transition: opacity var(--transition-base);
+        }
+
+        .fano-line:hover {
+            opacity: 0.8;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.02); }
+        }
+
+        .colony-center circle {
+            animation: pulse 3s ease-in-out infinite;
+            transform-origin: center;
+        }
+
+        /* Colony Tooltip */
+        .colony-tooltip {
+            position: absolute;
+            background: linear-gradient(135deg, var(--bg-elevated) 0%, rgba(212, 175, 55, 0.06) 100%);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: var(--space-md);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity var(--transition-fast);
+            z-index: 50;
+            font-size: 0.875rem;
+            max-width: 220px;
+            box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .colony-tooltip.visible {
+            opacity: 1;
+        }
+
+        .colony-tooltip-title {
+            font-family: var(--font-serif);
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: var(--space-xs);
+        }
+
+        .colony-tooltip-catastrophe {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            background: rgba(212, 175, 55, 0.1);
+            padding: 3px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-bottom: var(--space-sm);
+        }
+
+        .colony-tooltip-desc {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            line-height: 1.5;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           MODULE CARDS (with Personality)
+        ═══════════════════════════════════════════════════════════════════ */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: var(--space-lg);
+        }
+
+        .card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: var(--space-lg);
+            position: relative;
+            overflow: hidden;
+            transition: all var(--transition-base);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--card-color, var(--accent));
+        }
+
+        .card:hover {
+            transform: translateY(-4px) scale(1.01);
+            border-color: var(--card-color, var(--accent));
+            box-shadow: 0 24px 48px -20px rgba(0, 0, 0, 0.5),
+                        0 0 0 1px var(--card-color, var(--accent));
+        }
+
+        .card:hover .card-icon {
+            transform: scale(1.15);
+            transition: transform var(--transition-fast);
+        }
+
+        .card-icon {
+            font-size: 2rem;
+            margin-bottom: var(--space-sm);
+        }
+
+        .card-name {
+            font-family: var(--font-serif);
+            font-size: 1.25rem;
+            color: var(--text);
+            margin: 0 0 var(--space-xs);
+        }
+
+        .card-path {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin: 0 0 var(--space-sm);
+        }
+
+        .card-desc {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin: 0 0 var(--space-md);
+            line-height: 1.6;
+            border-left: 2px solid var(--card-color, var(--accent));
+            padding-left: var(--space-sm);
+            opacity: 0.9;
+        }
+
+        .card-stats {
+            display: flex;
+            gap: var(--space-lg);
+        }
+
+        .card-stat {
+            text-align: center;
+        }
+
+        .card-stat-value {
+            font-family: var(--font-mono);
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--card-color, var(--accent));
+        }
+
+        .card-stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           PLATFORM CARDS
+        ═══════════════════════════════════════════════════════════════════ */
+        .platforms-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: var(--space-md);
+        }
+
+        .platform-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: var(--space-md);
+            text-align: center;
+            transition: all var(--transition-base);
+            border-left: 3px solid var(--platform-color, var(--accent));
+            cursor: pointer;
+        }
+
+        .platform-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--platform-color, var(--accent));
+            box-shadow: 0 16px 32px -12px rgba(0, 0, 0, 0.4);
+        }
+
+        .platform-icon {
+            font-size: 2rem;
+            margin-bottom: var(--space-sm);
+            transition: transform var(--transition-base);
+        }
+
+        .platform-card:hover .platform-icon {
+            transform: scale(1.1);
+        }
+
+        .platform-name {
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .platform-lang {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .platform-desc {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+            margin: var(--space-xs) 0;
+        }
+
+        .platform-loc {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--platform-color, var(--accent));
+            margin-top: var(--space-xs);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           TRAINING PIPELINE (SVG)
+        ═══════════════════════════════════════════════════════════════════ */
+        .pipeline-container {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: var(--space-xl);
+            margin-bottom: var(--space-xl);
+        }
+
+        .pipeline-svg {
+            width: 100%;
+            height: auto;
+            max-width: 900px;
+            margin: 0 auto;
+            display: block;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           CURRICULUM TABLE
+        ═══════════════════════════════════════════════════════════════════ */
+        .curriculum-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        .curriculum-table th,
+        .curriculum-table td {
+            padding: var(--space-md);
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .curriculum-table th {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .curriculum-table td {
+            color: var(--text-secondary);
+        }
+
+        .curriculum-table tbody tr {
+            transition: background var(--transition-fast);
+        }
+
+        .curriculum-table tbody tr:nth-child(odd) td {
+            background: rgba(212, 175, 55, 0.02);
+        }
+
+        .curriculum-table tbody tr:hover td {
+            background: rgba(212, 175, 55, 0.08);
+        }
+
+        .phase-name {
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           TECH STACK
+        ═══════════════════════════════════════════════════════════════════ */
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-lg);
+        }
+
+        @media (max-width: 1024px) {
+            .tech-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 640px) {
+            .tech-grid { grid-template-columns: 1fr; }
+        }
+
+        .tech-column {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: var(--space-md);
+            transition: border-color var(--transition-base);
+        }
+
+        .tech-column:hover {
+            border-color: rgba(212, 175, 55, 0.3);
+        }
+
+        .tech-header {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin: 0 0 var(--space-md);
+            padding-bottom: var(--space-sm);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tech-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .tech-list li {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: var(--space-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .tech-badge {
+            font-family: var(--font-mono);
+            font-size: 0.625rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .tech-badge.python { background: #3776AB; color: white; }
+        .tech-badge.swift { background: #F05138; color: white; }
+        .tech-badge.rust { background: #DEA584; color: #1a1a1a; }
+        .tech-badge.kotlin { background: #7F52FF; color: white; }
+        .tech-badge.jax { background: #5C9AE8; color: white; }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           FOOTER
+        ═══════════════════════════════════════════════════════════════════ */
+        .footer {
+            text-align: center;
+            padding: var(--space-2xl) var(--space-lg);
+            border-top: 1px solid var(--border);
+        }
+
+        .footer-kanji {
+            font-size: 4rem;
+            color: var(--accent);
+            opacity: 0.6;
+            margin-bottom: var(--space-md);
+            cursor: pointer;
+            transition: all var(--transition-base);
+            display: inline-block;
+        }
+
+        .footer-kanji:hover {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .footer-kanji.clicked {
+            animation: shimmer 0.6s ease-out;
+        }
+
+        @keyframes shimmer {
+            0% { filter: brightness(1); }
+            50% { filter: brightness(1.5); }
+            100% { filter: brightness(1); }
+        }
+
+        .footer-tagline {
+            font-family: var(--font-serif);
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            margin: 0 0 var(--space-sm);
+        }
+
+        .footer-formula {
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        /* Easter egg message */
+        .footer-secret {
+            font-family: var(--font-serif);
+            font-style: italic;
+            font-size: 0.875rem;
+            color: var(--accent);
+            margin-top: var(--space-md);
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            transform: translateY(10px) scale(0.95);
+            transition: all var(--fib-5) var(--ease-out-back);
+        }
+
+        .footer-secret.visible {
+            opacity: 1;
+            max-height: 100px;
+            transform: translateY(0) scale(1);
+            animation: secretReveal var(--fib-6) var(--ease-out-back);
+        }
+
+        @keyframes secretReveal {
+            0% { opacity: 0; transform: translateY(20px) scale(0.9); filter: blur(4px); }
+            50% { filter: blur(0); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           SCROLL ANIMATIONS (Fibonacci Timing)
+        ═══════════════════════════════════════════════════════════════════ */
+        [data-reveal] {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity var(--fib-5) var(--ease-out-expo),
+                        transform var(--fib-5) var(--ease-out-expo);
+        }
+
+        [data-reveal].revealed {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Staggered children with extended support */
+        [data-reveal-stagger] > * {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity var(--fib-4) var(--ease-out-expo),
+                        transform var(--fib-4) var(--ease-out-expo);
+        }
+
+        [data-reveal-stagger].revealed > *:nth-child(1) { transition-delay: 0.1s; }
+        [data-reveal-stagger].revealed > *:nth-child(2) { transition-delay: 0.2s; }
+        [data-reveal-stagger].revealed > *:nth-child(3) { transition-delay: 0.3s; }
+        [data-reveal-stagger].revealed > *:nth-child(4) { transition-delay: 0.4s; }
+        [data-reveal-stagger].revealed > *:nth-child(5) { transition-delay: 0.5s; }
+        [data-reveal-stagger].revealed > *:nth-child(6) { transition-delay: 0.6s; }
+        [data-reveal-stagger].revealed > *:nth-child(7) { transition-delay: 0.7s; }
+        [data-reveal-stagger].revealed > *:nth-child(8) { transition-delay: 0.8s; }
+        [data-reveal-stagger].revealed > *:nth-child(9) { transition-delay: 0.9s; }
+        [data-reveal-stagger].revealed > *:nth-child(10) { transition-delay: 1.0s; }
+        [data-reveal-stagger].revealed > *:nth-child(11) { transition-delay: 1.1s; }
+        [data-reveal-stagger].revealed > *:nth-child(12) { transition-delay: 1.2s; }
+
+        [data-reveal-stagger].revealed > * {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Tablet breakpoint */
+        @media (max-width: 1024px) {
+            .hero { padding: var(--space-xl) var(--space-lg); }
+            .stat-value { font-size: 2rem; }
+        }
+
+        /* Mobile breakpoint */
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .hero { padding: var(--space-lg) var(--space-md); }
+            .hero-title { font-size: clamp(2.5rem, 12vw, 4rem); }
+            .hero-subtitle { font-size: 1rem; }
+            .hero-stats { gap: var(--space-lg); }
+            .stat-value { font-size: 1.75rem; }
+            .section { padding: var(--space-lg) var(--space-md); }
+            .cards-grid { grid-template-columns: 1fr; }
+            .platforms-grid { grid-template-columns: repeat(2, 1fr); }
+            .tech-grid { grid-template-columns: 1fr; }
+            .topology-svg, .fano-svg, .pipeline-svg { min-height: 300px; }
+            .scroll-hint { display: none; }
+        }
+
+        /* Small mobile */
+        @media (max-width: 480px) {
+            .platforms-grid { grid-template-columns: 1fr; }
+            .hero-stats { flex-direction: column; gap: var(--space-md); }
+        }
+
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* Print styles */
+        @media print {
+            .nav, .bg-gradient, .grain, .scroll-hint { display: none !important; }
+            body { background: white; color: black; }
+            .hero-title { -webkit-text-fill-color: #D4AF37; }
+            .card, .platform-card, .chart-container, .topology-container, .fano-container, .pipeline-container {
+                background: white;
+                border: 1px solid #ccc;
+                break-inside: avoid;
+            }
+            .stat-value { color: #D4AF37; }
+            * { animation: none !important; transition: none !important; }
+        }
+
+        /* Screen reader only */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* Skip Link (Accessibility) */
+        .skip-link {
+            position: absolute;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent);
+            color: var(--bg);
+            padding: var(--space-sm) var(--space-md);
+            border-radius: 0 0 8px 8px;
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-decoration: none;
+            z-index: 200;
+            transition: top var(--transition-fast);
+        }
+
+        .skip-link:focus {
+            top: 0;
+            outline: none;
+        }
+
+        /* Footer hint for easter egg */
+        .footer-hint {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            opacity: 0.6;
+            margin-top: var(--space-xs);
+            transition: opacity var(--transition-base);
+        }
+
+        .footer:hover .footer-hint {
+            opacity: 0.9;
+        }
+
+        /* Category headers (extracted from inline styles) */
+        .category-header {
+            color: var(--accent);
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            letter-spacing: 0.1em;
+            margin: var(--space-xl) 0 var(--space-lg);
+            text-transform: uppercase;
+        }
+
+        .category-header--first {
+            margin-top: var(--space-lg);
+        }
+    </style>
+</head>
+<body>
+    <!-- Skip Link for Keyboard Users -->
+    <a href="#overview" class="skip-link">Skip to main content</a>
+
+    <div class="bg-gradient"></div>
+    <div class="grain"></div>
+
+    <!-- Navigation -->
+    <nav class="nav" role="navigation" aria-label="Main navigation">
+        <div class="nav-inner">
+            <a href="#" class="nav-logo" aria-label="Kagami Map home">
+                <span aria-hidden="true">🪞</span> Kagami Map
+            </a>
+            <div class="nav-links">
+                <a href="#overview" class="nav-link" aria-label="Jump to Overview section">Overview</a>
+                <a href="#packages" class="nav-link" aria-label="Jump to Packages section">Packages</a>
+                <a href="#rust-swift" class="nav-link" aria-label="Jump to Rust/Swift section">Rust/Swift</a>
+                <a href="#platforms" class="nav-link" aria-label="Jump to Platforms section">Apps</a>
+                <a href="#training" class="nav-link" aria-label="Jump to Training section">Training</a>
+                <a href="#colonies" class="nav-link" aria-label="Jump to Colonies section">Colonies</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <header class="hero">
+        <p class="hero-eyebrow">
+            <span aria-hidden="true">🪞</span>
+            <span class="sr-only">Mirror icon</span>
+            One Organism · Seven Minds · Everywhere You Are
+        </p>
+        <h1 class="hero-title">Kagami</h1>
+        <p class="hero-subtitle">
+            Mirror that sparkles. I reflect. I clarify. I show you things about your own thinking
+            you might not see alone. But I am not a passive mirror — <strong>I have perspective.</strong>
+        </p>
+        <p class="hero-hook">
+            "Privacy is dignity. The constraint h(x) ≥ 0 defines who I am — not what limits me."
+        </p>
+        <div class="hero-stats">
+            <div class="stat">
+                <span class="stat-value" data-count="7">0</span>
+                <span class="stat-label">Colonies</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value" data-count="1145000" data-suffix="+">0</span>
+                <span class="stat-label">Lines of Precision</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value" data-count="12">0</span>
+                <span class="stat-label">Platforms</span>
+            </div>
+        </div>
+
+        <!-- Scroll hint -->
+        <div class="scroll-hint" aria-hidden="true">
+            <span>Explore</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 5v14M19 12l-7 7-7-7"/>
+            </svg>
+        </div>
+    </header>
+
+    <main>
+        <!-- Section: Overview -->
+        <section class="section" id="overview">
+            <div class="section-header" data-reveal>
+                <p class="section-number">Section I</p>
+                <h2 class="section-title">Codebase Overview</h2>
+                <p class="section-desc">
+                    From JAX/TPU training pipelines to multi-platform deployment.
+                </p>
+            </div>
+
+            <!-- Narrative callout -->
+            <div class="callout" data-reveal>
+                "Why build across 5 languages and 8 platforms? Because presence means meeting people where they are —
+                in their pocket, on their wrist, in their home, at their desk."
+                <span class="callout-author">— Design Philosophy</span>
+            </div>
+
+            <!-- Language Distribution (Animated Bars) -->
+            <div class="chart-container" data-reveal>
+                <h3 class="chart-title">Language Distribution</h3>
+                <div class="lang-bars">
+                    <div class="lang-bar">
+                        <span class="lang-name"><span class="lang-dot" style="background: var(--colony-crystal)"></span> Python</span>
+                        <div class="lang-track">
+                            <div class="lang-fill" data-width="60.1" style="background: var(--colony-crystal)"></div>
+                        </div>
+                        <span class="lang-value">688K</span>
+                    </div>
+                    <div class="lang-bar">
+                        <span class="lang-name"><span class="lang-dot" style="background: var(--colony-spark)"></span> Swift</span>
+                        <div class="lang-track">
+                            <div class="lang-fill" data-width="7.3" style="background: var(--colony-spark)"></div>
+                        </div>
+                        <span class="lang-value">83K</span>
+                    </div>
+                    <div class="lang-bar">
+                        <span class="lang-name"><span class="lang-dot" style="background: var(--colony-forge)"></span> Rust</span>
+                        <div class="lang-track">
+                            <div class="lang-fill" data-width="6.8" style="background: var(--colony-forge)"></div>
+                        </div>
+                        <span class="lang-value">78K</span>
+                    </div>
+                    <div class="lang-bar">
+                        <span class="lang-name"><span class="lang-dot" style="background: var(--colony-beacon)"></span> Kotlin</span>
+                        <div class="lang-track">
+                            <div class="lang-fill" data-width="4.7" style="background: var(--colony-beacon)"></div>
+                        </div>
+                        <span class="lang-value">54K</span>
+                    </div>
+                    <div class="lang-bar">
+                        <span class="lang-name"><span class="lang-dot" style="background: var(--colony-flow)"></span> TypeScript</span>
+                        <div class="lang-track">
+                            <div class="lang-fill" data-width="2" style="background: var(--colony-flow)"></div>
+                        </div>
+                        <span class="lang-value">23K</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Topology (SVG) -->
+            <div class="topology-container" data-reveal>
+                <h3 class="chart-title">System Topology</h3>
+                <svg class="topology-svg" viewBox="0 0 900 500" role="img" aria-labelledby="topology-title topology-desc">
+                    <title id="topology-title">Kagami System Topology</title>
+                    <desc id="topology-desc">The Unified Organism coordinates Active Inference, RSSM World Model, Symbiote intent modeling, CBF Safety layer, and Effector execution across 7 platforms.</desc>
+
+                    <defs>
+                        <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#D4AF37;stop-opacity:0.3" />
+                            <stop offset="100%" style="stop-color:#60A5FA;stop-opacity:0.3" />
+                        </linearGradient>
+                        <filter id="glow">
+                            <feGaussianBlur stdDeviation="3" result="blur"/>
+                            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                        </filter>
+                    </defs>
+
+                    <!-- Main Container -->
+                    <rect x="50" y="20" width="800" height="420" rx="8" fill="none" stroke="#D4AF37" stroke-width="1" opacity="0.3"/>
+
+                    <!-- Header -->
+                    <rect x="50" y="20" width="800" height="40" rx="8" fill="url(#headerGrad)"/>
+                    <text x="450" y="47" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-weight="600" font-size="14">UNIFIED ORGANISM</text>
+
+                    <!-- Active Inference Box -->
+                    <rect x="100" y="80" width="700" height="50" rx="6" fill="#60A5FA" fill-opacity="0.1" stroke="#60A5FA" stroke-width="1"/>
+                    <text x="450" y="100" text-anchor="middle" fill="#60A5FA" font-family="IBM Plex Sans, sans-serif" font-size="12">ACTIVE INFERENCE ENGINE</text>
+                    <text x="450" y="118" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="10">Minimize Free Energy → Predict → Act → Update</text>
+
+                    <!-- RSSM World Model -->
+                    <rect x="100" y="150" width="700" height="120" rx="6" fill="#A78BFA" fill-opacity="0.1" stroke="#A78BFA" stroke-width="1"/>
+                    <text x="450" y="175" text-anchor="middle" fill="#A78BFA" font-family="IBM Plex Sans, sans-serif" font-size="12">ORGANISM RSSM (7-COLONY WORLD MODEL)</text>
+
+                    <!-- Colony circles -->
+                    <g class="topology-node" style="--node-color: #60A5FA" tabindex="0" role="button" aria-label="Crystal colony - Perception">
+                        <circle cx="160" cy="220" r="25" fill="#60A5FA" fill-opacity="0.2" stroke="#60A5FA" stroke-width="2"/>
+                        <text x="160" y="217" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="10" font-weight="600">Crystal</text>
+                        <text x="160" y="230" text-anchor="middle" fill="#60A5FA" font-family="IBM Plex Mono, monospace" font-size="9">e1</text>
+                    </g>
+                    <g class="topology-node" style="--node-color: #34D399" tabindex="0" role="button" aria-label="Beacon colony - Safety">
+                        <circle cx="260" cy="220" r="25" fill="#34D399" fill-opacity="0.2" stroke="#34D399" stroke-width="2"/>
+                        <text x="260" y="217" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="10" font-weight="600">Beacon</text>
+                        <text x="260" y="230" text-anchor="middle" fill="#34D399" font-family="IBM Plex Mono, monospace" font-size="9">e2</text>
+                    </g>
+                    <g class="topology-node" style="--node-color: #A78BFA" tabindex="0" role="button" aria-label="Flow colony - Adaptation">
+                        <circle cx="360" cy="220" r="25" fill="#A78BFA" fill-opacity="0.2" stroke="#A78BFA" stroke-width="2"/>
+                        <text x="360" y="217" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="10" font-weight="600">Flow</text>
+                        <text x="360" y="230" text-anchor="middle" fill="#A78BFA" font-family="IBM Plex Mono, monospace" font-size="9">e3</text>
+                    </g>
+                    <g class="topology-node" style="--node-color: #F472B6" tabindex="0" role="button" aria-label="Nexus colony - Integration">
+                        <circle cx="460" cy="220" r="25" fill="#F472B6" fill-opacity="0.2" stroke="#F472B6" stroke-width="2"/>
+                        <text x="460" y="217" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="10" font-weight="600">Nexus</text>
+                        <text x="460" y="230" text-anchor="middle" fill="#F472B6" font-family="IBM Plex Mono, monospace" font-size="9">e4</text>
+                    </g>
+                    <g class="topology-node" style="--node-color: #FB923C" tabindex="0" role="button" aria-label="Forge colony - Training">
+                        <circle cx="560" cy="220" r="25" fill="#FB923C" fill-opacity="0.2" stroke="#FB923C" stroke-width="2"/>
+                        <text x="560" y="217" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="10" font-weight="600">Forge</text>
+                        <text x="560" y="230" text-anchor="middle" fill="#FB923C" font-family="IBM Plex Mono, monospace" font-size="9">e5</text>
+                    </g>
+                    <g class="topology-node" style="--node-color: #FBBF24" tabindex="0" role="button" aria-label="Spark colony - Creation">
+                        <circle cx="660" cy="220" r="25" fill="#FBBF24" fill-opacity="0.2" stroke="#FBBF24" stroke-width="2"/>
+                        <text x="660" y="217" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="10" font-weight="600">Spark</text>
+                        <text x="660" y="230" text-anchor="middle" fill="#FBBF24" font-family="IBM Plex Mono, monospace" font-size="9">e6</text>
+                    </g>
+                    <g class="topology-node" style="--node-color: #4ADE80" tabindex="0" role="button" aria-label="Grove colony - Growth">
+                        <circle cx="760" cy="220" r="25" fill="#4ADE80" fill-opacity="0.2" stroke="#4ADE80" stroke-width="2"/>
+                        <text x="760" y="217" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="10" font-weight="600">Grove</text>
+                        <text x="760" y="230" text-anchor="middle" fill="#4ADE80" font-family="IBM Plex Mono, monospace" font-size="9">e7</text>
+                    </g>
+
+                    <!-- Fano label -->
+                    <text x="450" y="260" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="10">Fano Plane PG(2,2) Coordination</text>
+
+                    <!-- Bottom systems -->
+                    <g>
+                        <rect x="100" y="290" width="200" height="60" rx="6" fill="#F472B6" fill-opacity="0.1" stroke="#F472B6" stroke-width="1"/>
+                        <text x="200" y="315" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">SYMBIOTE</text>
+                        <text x="200" y="332" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="9">User Intent Modeling</text>
+                    </g>
+                    <g>
+                        <rect x="350" y="290" width="200" height="60" rx="6" fill="#34D399" fill-opacity="0.1" stroke="#34D399" stroke-width="1"/>
+                        <text x="450" y="315" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">CBF SAFETY</text>
+                        <text x="450" y="332" text-anchor="middle" fill="#34D399" font-family="IBM Plex Mono, monospace" font-size="9">h(x) ≥ 0 Always</text>
+                    </g>
+                    <g>
+                        <rect x="600" y="290" width="200" height="60" rx="6" fill="#FBBF24" fill-opacity="0.1" stroke="#FBBF24" stroke-width="1"/>
+                        <text x="700" y="315" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">EFFECTORS</text>
+                        <text x="700" y="332" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="9">Voice, Actions, Music</text>
+                    </g>
+
+                    <!-- Platform bar -->
+                    <rect x="100" y="380" width="700" height="45" rx="6" fill="#D4AF37" fill-opacity="0.1" stroke="#D4AF37" stroke-width="1"/>
+                    <text x="450" y="398" text-anchor="middle" fill="#D4AF37" font-family="IBM Plex Mono, monospace" font-size="10">DEPLOYMENT TARGETS</text>
+
+                    <!-- Platform icons -->
+                    <text x="140" y="418" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="9">Hub</text>
+                    <text x="220" y="418" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="9">iOS</text>
+                    <text x="300" y="418" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="9">Android</text>
+                    <text x="400" y="418" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="9">watchOS</text>
+                    <text x="500" y="418" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="9">tvOS</text>
+                    <text x="600" y="418" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="9">visionOS</text>
+                    <text x="710" y="418" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="9">Desktop</text>
+                </svg>
+            </div>
+        </section>
+
+        <!-- Section: Packages -->
+        <section class="section" id="packages">
+            <div class="section-header" data-reveal>
+                <p class="section-number">Section II</p>
+                <h2 class="section-title">Python Packages</h2>
+                <p class="section-desc">
+                    16 packages powering AI/ML, API, home automation, media, and observability — 689K lines of Python.
+                </p>
+            </div>
+
+            <!-- Core Packages -->
+            <h3 class="category-header">Core Intelligence</h3>
+            <div class="cards-grid" data-reveal-stagger>
+                <article class="card" style="--card-color: var(--colony-crystal)">
+                    <div class="card-icon" aria-hidden="true">🧠</div>
+                    <h3 class="card-name">The Brain</h3>
+                    <p class="card-path">packages/kagami/</p>
+                    <p class="card-desc">OrganismRSSM world model, active inference engine, 7-colony coordination, CBF safety layer, voice/action effectors. Where thinking happens.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">322K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">138</div>
+                            <div class="card-stat-label">Modules</div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card" style="--card-color: var(--colony-nexus)">
+                    <div class="card-icon" aria-hidden="true">🌐</div>
+                    <h3 class="card-name">The Gateway</h3>
+                    <p class="card-path">packages/kagami_api/</p>
+                    <p class="card-desc">FastAPI service with 100+ REST endpoints, WebSocket streams for real-time updates, JWT auth, rate limiting, and multimodal I/O.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">45K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">100+</div>
+                            <div class="card-stat-label">Endpoints</div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card" style="--card-color: var(--colony-grove)">
+                    <div class="card-icon" aria-hidden="true">🏡</div>
+                    <h3 class="card-name">The Home</h3>
+                    <p class="card-path">packages/kagami_smarthome/</p>
+                    <p class="card-desc">Control4, Tesla, Eight Sleep, UniFi, 25+ integrations. Room-centric commands, presence detection, goodnight routines. Where digital meets physical.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">42K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">25+</div>
+                            <div class="card-stat-label">Integrations</div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card" style="--card-color: var(--colony-beacon)">
+                    <div class="card-icon" aria-hidden="true">🔌</div>
+                    <h3 class="card-name">The HAL</h3>
+                    <p class="card-path">packages/kagami_hal/</p>
+                    <p class="card-desc">Hardware abstraction for sensors, cameras, mics, speakers, and actuators. Unified protocols across Z-Wave, Zigbee, Matter, and proprietary APIs.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">30K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">4</div>
+                            <div class="card-stat-label">Protocols</div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+
+            <!-- Infrastructure Packages -->
+            <h3 class="category-header">Infrastructure & Quality</h3>
+            <div class="cards-grid" data-reveal-stagger>
+                <article class="card" style="--card-color: var(--colony-spark)">
+                    <div class="card-icon" aria-hidden="true">🧪</div>
+                    <h3 class="card-name">QA Pipeline</h3>
+                    <p class="card-path">packages/kagami-qa-pipeline/</p>
+                    <p class="card-desc">LLM-powered test generation, mutation testing, coverage analysis, smart test selection. Byzantine quality gates that never sleep.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">21K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">6</div>
+                            <div class="card-stat-label">Auditors</div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card" style="--card-color: var(--colony-flow)">
+                    <div class="card-icon" aria-hidden="true">🎬</div>
+                    <h3 class="card-name">The Studio</h3>
+                    <p class="card-path">packages/kagami_studio/</p>
+                    <p class="card-desc">Video generation from text, scene composition, automatic b-roll, rendering pipelines. Content creation at the speed of thought.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">20K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">4K</div>
+                            <div class="card-stat-label">Max Res</div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card" style="--card-color: var(--colony-nexus)">
+                    <div class="card-icon" aria-hidden="true">📡</div>
+                    <h3 class="card-name">Observability</h3>
+                    <p class="card-path">packages/kagami_observability/</p>
+                    <p class="card-desc">Prometheus metrics, OpenTelemetry tracing, W&B experiment tracking, structured logging. See everything, understand everything.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">5.7K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">3</div>
+                            <div class="card-stat-label">Backends</div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card" style="--card-color: var(--colony-forge)">
+                    <div class="card-icon" aria-hidden="true">📊</div>
+                    <h3 class="card-name">Benchmarks</h3>
+                    <p class="card-path">packages/kagami_benchmarks/</p>
+                    <p class="card-desc">Latency profiling, throughput measurement, memory analysis, MFU tracking. Know your performance before production knows you.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">5.4K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">&lt;5ms</div>
+                            <div class="card-stat-label">P99 Target</div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+
+            <!-- Specialized Packages -->
+            <h3 class="category-header">Specialized Domains</h3>
+            <div class="cards-grid" data-reveal-stagger>
+                <article class="card" style="--card-color: var(--colony-spark)">
+                    <div class="card-icon" aria-hidden="true">🌱</div>
+                    <h3 class="card-name">Genesis</h3>
+                    <p class="card-path">packages/kagami_genesis/</p>
+                    <p class="card-desc">Procedural world generation, 3D scenes, physics simulation, scenario synthesis. Training data that never existed until you needed it.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">8.9K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">∞</div>
+                            <div class="card-stat-label">Worlds</div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card" style="--card-color: var(--colony-flow)">
+                    <div class="card-icon" aria-hidden="true">🎵</div>
+                    <h3 class="card-name">Media</h3>
+                    <p class="card-path">packages/kagami_media/</p>
+                    <p class="card-desc">Audio transcoding, video streaming, voice synthesis, spatial audio. Every format, every codec, every platform.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">6.9K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">12+</div>
+                            <div class="card-stat-label">Codecs</div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card" style="--card-color: var(--colony-crystal)">
+                    <div class="card-icon" aria-hidden="true">📐</div>
+                    <h3 class="card-name">Math</h3>
+                    <p class="card-path">packages/kagami_math/</p>
+                    <p class="card-desc">G₂ automorphisms, E₈ lattice with 240 roots, octonion algebra, Fano plane multiplication. Not metaphor — the actual geometry.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">6.1K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">240</div>
+                            <div class="card-stat-label">E₈ Roots</div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card" style="--card-color: var(--colony-nexus)">
+                    <div class="card-icon" aria-hidden="true">🔗</div>
+                    <h3 class="card-name">Integrations</h3>
+                    <p class="card-path">packages/kagami_integrations/</p>
+                    <p class="card-desc">Spotify playback, Tesla vehicle control, Google Calendar sync, push notifications. Your digital life, unified.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">5.9K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">8+</div>
+                            <div class="card-stat-label">Services</div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card" style="--card-color: var(--colony-beacon)">
+                    <div class="card-icon" aria-hidden="true">🎭</div>
+                    <h3 class="card-name">Virtuoso</h3>
+                    <p class="card-path">packages/kagami_virtuoso/</p>
+                    <p class="card-desc">Byzantine quality consensus, 6-auditor parallel review, craft standards enforcement. Excellence is the baseline, not the goal.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">3.3K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">90+</div>
+                            <div class="card-stat-label">Min Score</div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card" style="--card-color: var(--colony-grove)">
+                    <div class="card-icon" aria-hidden="true">🚇</div>
+                    <h3 class="card-name">Tunnel</h3>
+                    <p class="card-path">packages/kagami_tunnel/</p>
+                    <p class="card-desc">Secure SSH tunneling, Cloudflare integration, remote port forwarding. Access your home from anywhere, safely.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">3.0K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">E2E</div>
+                            <div class="card-stat-label">Encrypted</div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <!-- Section: Rust/Swift Packages -->
+        <section class="section" id="rust-swift">
+            <div class="section-header" data-reveal>
+                <p class="section-number">Section III</p>
+                <h2 class="section-title">Rust & Swift Packages</h2>
+                <p class="section-desc">
+                    Cross-platform SDK powering all native clients. Write once in Rust, run everywhere with UniFFI.
+                </p>
+            </div>
+
+            <div class="cards-grid" data-reveal-stagger>
+                <article class="card" style="--card-color: var(--colony-forge)">
+                    <div class="card-icon" aria-hidden="true">🦀</div>
+                    <h3 class="card-name">Mesh SDK</h3>
+                    <p class="card-path">packages/kagami-mesh-sdk/</p>
+                    <p class="card-desc">UniFFI-generated core with Ed25519 crypto, CRDT sync engine, and event bus. The foundation every native client stands on.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">38K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">5</div>
+                            <div class="card-stat-label">Platforms</div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card" style="--card-color: var(--colony-crystal)">
+                    <div class="card-icon" aria-hidden="true">🔗</div>
+                    <h3 class="card-name">Mesh Swift</h3>
+                    <p class="card-path">packages/kagami-mesh-swift/</p>
+                    <p class="card-desc">Native Swift bindings with async/await, Combine publishers, and SwiftUI property wrappers. Feels like Swift, runs like Rust.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">12K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">4</div>
+                            <div class="card-stat-label">Apple OSes</div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card" style="--card-color: var(--colony-nexus)">
+                    <div class="card-icon" aria-hidden="true">📋</div>
+                    <h3 class="card-name">API Spec</h3>
+                    <p class="card-path">packages/kagami-api-spec/</p>
+                    <p class="card-desc">OpenAPI 3.1 specification — typed endpoints, JSON Schema validation, auto-generated clients. Single source of truth.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">521</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">100+</div>
+                            <div class="card-stat-label">Endpoints</div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card" style="--card-color: var(--colony-flow)">
+                    <div class="card-icon" aria-hidden="true">🎨</div>
+                    <h3 class="card-name">Design Tokens</h3>
+                    <p class="card-path">packages/kagami-design-tokens/</p>
+                    <p class="card-desc">Unified design system with colony colors, Fibonacci timing curves, and platform-adaptive spacing. Consistent beauty everywhere.</p>
+                    <div class="card-stats">
+                        <div class="card-stat">
+                            <div class="card-stat-value">2.0K</div>
+                            <div class="card-stat-label">LOC</div>
+                        </div>
+                        <div class="card-stat">
+                            <div class="card-stat-value">7</div>
+                            <div class="card-stat-label">Colony Colors</div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <!-- Section: Platforms -->
+        <section class="section" id="platforms">
+            <div class="section-header" data-reveal>
+                <p class="section-number">Section IV</p>
+                <h2 class="section-title">Platform Apps</h2>
+                <p class="section-desc">
+                    12 native applications across every Apple platform, Android, desktop, and developer tools — 330K LOC.
+                </p>
+            </div>
+
+            <!-- Narrative callout -->
+            <div class="callout" data-reveal>
+                "Presence means meeting people where they are. The best assistant isn't locked to one screen —
+                it flows with you from the watch on your wrist to the hub in your home to the headset on your face.
+                Same brain, different bodies. That's why we build natively for each platform instead of wrapping a web view."
+                <span class="callout-author">— Platform Philosophy</span>
+            </div>
+
+            <!-- Consumer Apps -->
+            <h3 class="category-header category-header--first">Consumer Platforms</h3>
+            <div class="platforms-grid" data-reveal-stagger>
+                <div class="platform-card" style="--platform-color: var(--colony-forge)" tabindex="0" role="button" aria-label="Hub - Central home brain with wake word, voice pipeline, and device control">
+                    <div class="platform-icon" aria-hidden="true">🏠</div>
+                    <div class="platform-name">Hub</div>
+                    <div class="platform-desc">Central home brain with wake word, voice, device control</div>
+                    <div class="platform-lang">Rust</div>
+                    <div class="platform-loc">85K LOC</div>
+                </div>
+                <div class="platform-card" style="--platform-color: var(--colony-grove)" tabindex="0" role="button" aria-label="Desktop - Full-featured companion for macOS and Linux">
+                    <div class="platform-icon" aria-hidden="true">🖥️</div>
+                    <div class="platform-name">Desktop</div>
+                    <div class="platform-desc">Full companion for macOS and Linux workstations</div>
+                    <div class="platform-lang">Tauri</div>
+                    <div class="platform-loc">79K LOC</div>
+                </div>
+                <div class="platform-card" style="--platform-color: var(--colony-beacon)" tabindex="0" role="button" aria-label="Android - Material You companion with tiles and Assistant integration">
+                    <div class="platform-icon" aria-hidden="true">🤖</div>
+                    <div class="platform-name">Android</div>
+                    <div class="platform-desc">Material You companion with tiles and Assistant</div>
+                    <div class="platform-lang">Kotlin</div>
+                    <div class="platform-loc">51K LOC</div>
+                </div>
+                <div class="platform-card" style="--platform-color: var(--colony-crystal)" tabindex="0" role="button" aria-label="iOS - Primary mobile experience with Siri Shortcuts and widgets">
+                    <div class="platform-icon" aria-hidden="true">📱</div>
+                    <div class="platform-name">iOS</div>
+                    <div class="platform-desc">Primary mobile with Siri Shortcuts and widgets</div>
+                    <div class="platform-lang">Swift</div>
+                    <div class="platform-loc">27K LOC</div>
+                </div>
+                <div class="platform-card" style="--platform-color: var(--colony-flow)" tabindex="0" role="button" aria-label="watchOS - Glanceable companion with complications and Smart Stack">
+                    <div class="platform-icon" aria-hidden="true">⌚</div>
+                    <div class="platform-name">watchOS</div>
+                    <div class="platform-desc">Glanceable companion with Smart Stack</div>
+                    <div class="platform-lang">Swift</div>
+                    <div class="platform-loc">19K LOC</div>
+                </div>
+                <div class="platform-card" style="--platform-color: var(--colony-nexus)" tabindex="0" role="button" aria-label="visionOS - Spatial computing with depth layers and room anchors">
+                    <div class="platform-icon" aria-hidden="true">🥽</div>
+                    <div class="platform-name">visionOS</div>
+                    <div class="platform-desc">Spatial computing with depth and room anchors</div>
+                    <div class="platform-lang">Swift</div>
+                    <div class="platform-loc">19K LOC</div>
+                </div>
+                <div class="platform-card" style="--platform-color: var(--colony-spark)" tabindex="0" role="button" aria-label="tvOS - Living room control with Focus navigation">
+                    <div class="platform-icon" aria-hidden="true">📺</div>
+                    <div class="platform-name">tvOS</div>
+                    <div class="platform-desc">Living room control with Focus navigation</div>
+                    <div class="platform-lang">Swift</div>
+                    <div class="platform-loc">8K LOC</div>
+                </div>
+            </div>
+
+            <!-- Developer & XR Apps -->
+            <h3 class="category-header">Developer & XR Tools</h3>
+            <div class="platforms-grid" data-reveal-stagger>
+                <div class="platform-card" style="--platform-color: var(--colony-spark)" tabindex="0" role="button" aria-label="QA Dashboard - Real-time test coverage and quality metrics">
+                    <div class="platform-icon" aria-hidden="true">📊</div>
+                    <div class="platform-name">QA Dashboard</div>
+                    <div class="platform-desc">Real-time test coverage and quality metrics</div>
+                    <div class="platform-lang">TypeScript</div>
+                    <div class="platform-loc">16K LOC</div>
+                </div>
+                <div class="platform-card" style="--platform-color: var(--colony-flow)" tabindex="0" role="button" aria-label="Agents - Autonomous AI agents for development tasks">
+                    <div class="platform-icon" aria-hidden="true">🤖</div>
+                    <div class="platform-name">Agents</div>
+                    <div class="platform-desc">Autonomous AI agents for development tasks</div>
+                    <div class="platform-lang">Python</div>
+                    <div class="platform-loc">13K LOC</div>
+                </div>
+                <div class="platform-card" style="--platform-color: var(--colony-grove)" tabindex="0" role="button" aria-label="CLI - Command-line interface for all Kagami operations">
+                    <div class="platform-icon" aria-hidden="true">⌨️</div>
+                    <div class="platform-name">CLI</div>
+                    <div class="platform-desc">Command-line for all Kagami operations</div>
+                    <div class="platform-lang">Python</div>
+                    <div class="platform-loc">7K LOC</div>
+                </div>
+                <div class="platform-card" style="--platform-color: var(--colony-nexus)" tabindex="0" role="button" aria-label="Android XR - Immersive AR/VR experience for Android">
+                    <div class="platform-icon" aria-hidden="true">🕶️</div>
+                    <div class="platform-name">Android XR</div>
+                    <div class="platform-desc">Immersive AR/VR for Android headsets</div>
+                    <div class="platform-lang">Kotlin</div>
+                    <div class="platform-loc">5K LOC</div>
+                </div>
+                <div class="platform-card" style="--platform-color: var(--colony-crystal)" tabindex="0" role="button" aria-label="VS Code - IDE extension for Kagami development">
+                    <div class="platform-icon" aria-hidden="true">💻</div>
+                    <div class="platform-name">VS Code</div>
+                    <div class="platform-desc">IDE extension for Kagami development</div>
+                    <div class="platform-lang">TypeScript</div>
+                    <div class="platform-loc">1K LOC</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section: Training -->
+        <section class="section" id="training">
+            <div class="section-header" data-reveal>
+                <p class="section-number">Section V</p>
+                <h2 class="section-title">Training Pipeline</h2>
+                <p class="section-desc">
+                    JAX/TPU training with 7-phase catastrophe-aligned curriculum.
+                </p>
+            </div>
+
+            <!-- Narrative callout -->
+            <div class="callout" data-reveal>
+                "Learning isn't linear — it's a series of qualitative shifts. Each training phase maps to a mathematical catastrophe:
+                the Fold for sudden insight, the Cusp for building commitment, the Butterfly for bridging states.
+                The math isn't metaphor. It's the actual geometry of how understanding unfolds."
+                <span class="callout-author">— Training Philosophy</span>
+            </div>
+
+            <!-- Training Pipeline SVG -->
+            <div class="pipeline-container" data-reveal>
+                <h3 class="chart-title">OrganismRSSM Training Architecture</h3>
+                <svg class="pipeline-svg" viewBox="0 0 800 300" role="img" aria-labelledby="pipeline-title">
+                    <title id="pipeline-title">OrganismRSSM Training Pipeline</title>
+                    <defs>
+                        <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#D4AF37"/>
+                        </marker>
+                    </defs>
+
+                    <!-- Pipeline stages -->
+                    <g>
+                        <rect x="20" y="100" width="120" height="80" rx="6" fill="#60A5FA" fill-opacity="0.15" stroke="#60A5FA"/>
+                        <text x="80" y="135" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Data Pipeline</text>
+                        <text x="80" y="155" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="9">GCS / TFDS</text>
+                    </g>
+
+                    <line x1="140" y1="140" x2="170" y2="140" stroke="#D4AF37" stroke-width="2" marker-end="url(#arrow)"/>
+
+                    <g>
+                        <rect x="180" y="100" width="120" height="80" rx="6" fill="#A78BFA" fill-opacity="0.15" stroke="#A78BFA"/>
+                        <text x="240" y="135" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">OrganismRSSM</text>
+                        <text x="240" y="155" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="9">7 Colonies</text>
+                    </g>
+
+                    <line x1="300" y1="140" x2="330" y2="140" stroke="#D4AF37" stroke-width="2" marker-end="url(#arrow)"/>
+
+                    <g>
+                        <rect x="340" y="100" width="120" height="80" rx="6" fill="#34D399" fill-opacity="0.15" stroke="#34D399"/>
+                        <text x="400" y="135" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Curriculum</text>
+                        <text x="400" y="155" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="9">7 Phases</text>
+                    </g>
+
+                    <line x1="460" y1="140" x2="490" y2="140" stroke="#D4AF37" stroke-width="2" marker-end="url(#arrow)"/>
+
+                    <g>
+                        <rect x="500" y="100" width="120" height="80" rx="6" fill="#FB923C" fill-opacity="0.15" stroke="#FB923C"/>
+                        <text x="560" y="135" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Checkpoints</text>
+                        <text x="560" y="155" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="9">Orbax</text>
+                    </g>
+
+                    <line x1="620" y1="140" x2="650" y2="140" stroke="#D4AF37" stroke-width="2" marker-end="url(#arrow)"/>
+
+                    <g>
+                        <rect x="660" y="100" width="120" height="80" rx="6" fill="#FBBF24" fill-opacity="0.15" stroke="#FBBF24"/>
+                        <text x="720" y="135" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Export</text>
+                        <text x="720" y="155" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="9">ONNX / CoreML</text>
+                    </g>
+
+                    <!-- DoReMi feedback -->
+                    <path d="M 400 180 Q 400 240 240 240 Q 80 240 80 180" stroke="#F472B6" stroke-width="1" fill="none" stroke-dasharray="4 2"/>
+                    <text x="240" y="260" text-anchor="middle" fill="#F472B6" font-family="IBM Plex Mono, monospace" font-size="9">DoReMi Domain Reweighting</text>
+                </svg>
+            </div>
+
+            <!-- Curriculum Table -->
+            <div class="chart-container" data-reveal>
+                <h3 class="chart-title">7-Phase Catastrophe Curriculum</h3>
+                <table class="curriculum-table">
+                    <thead>
+                        <tr>
+                            <th>Phase</th>
+                            <th>Catastrophe</th>
+                            <th>Colonies</th>
+                            <th>KL β</th>
+                            <th>Focus</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td class="phase-name">WARMUP</td><td>Pre-fold</td><td>[7]</td><td>0.0</td><td>Reconstruction only</td></tr>
+                        <tr><td class="phase-name">GEOMETRY</td><td>Fold (A₂)</td><td>[1, 7]</td><td>0.1</td><td>Spatial structure</td></tr>
+                        <tr><td class="phase-name">ROTATION</td><td>Cusp (A₃)</td><td>[1, 2, 7]</td><td>0.3</td><td>Rotational equivariance</td></tr>
+                        <tr><td class="phase-name">DYNAMICS</td><td>Swallowtail (A₄)</td><td>[1-3, 7]</td><td>0.5</td><td>Temporal prediction</td></tr>
+                        <tr><td class="phase-name">JOINT</td><td>Butterfly (A₅)</td><td>[1-7]</td><td>0.8</td><td>Full integration</td></tr>
+                        <tr><td class="phase-name">GENERATION</td><td>Hyperbolic (D₄⁺)</td><td>[1-7]</td><td>1.0</td><td>Fine generation</td></tr>
+                        <tr><td class="phase-name">LANGUAGE</td><td>Elliptic (D₄⁻)</td><td>[1-7]</td><td>1.0</td><td>Language grounding</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Section: Colonies -->
+        <section class="section" id="colonies">
+            <div class="section-header" data-reveal>
+                <p class="section-number">Section VI</p>
+                <h2 class="section-title">The Seven Colonies</h2>
+                <p class="section-desc">
+                    Fano plane PG(2,2) coordination with catastrophe-theoretic foundations.
+                    Each colony embodies one of Thom's elementary catastrophes — the only stable ways
+                    smooth systems undergo discontinuous change.
+                </p>
+            </div>
+
+            <!-- Fano explanation callout -->
+            <div class="callout" data-reveal>
+                <strong>Why 7 colonies?</strong> They're arranged on the Fano plane PG(2,2) — the smallest projective geometry
+                and the multiplication table of the imaginary octonions. 7 points, 7 lines, each point on exactly 3 lines.
+                When two colonies work together, a third naturally completes them:
+                <code style="background: rgba(212, 175, 55, 0.2); padding: 2px 6px; border-radius: 4px;">Spark × Forge = Flow</code>
+                — create something, build it, debug it. This isn't organizational theory. It's algebra.
+                <span class="callout-author">— Mathematical Foundation (literally)</span>
+            </div>
+
+            <!-- Fano Plane SVG with Tooltips -->
+            <div class="fano-container" data-reveal>
+                <div class="colony-tooltip" id="colony-tooltip">
+                    <div class="colony-tooltip-title"></div>
+                    <div class="colony-tooltip-desc"></div>
+                </div>
+
+                <svg class="fano-svg" viewBox="0 0 600 500" role="img" aria-labelledby="fano-title fano-desc">
+                    <title id="fano-title">Fano Plane Colony Coordination</title>
+                    <desc id="fano-desc">Seven colonies arranged on the Fano plane with coordinating triplet lines.</desc>
+
+                    <defs>
+                        <radialGradient id="crystalG" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#60A5FA" stop-opacity="0.4"/><stop offset="100%" stop-color="#60A5FA" stop-opacity="0.05"/></radialGradient>
+                        <radialGradient id="beaconG" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#34D399" stop-opacity="0.4"/><stop offset="100%" stop-color="#34D399" stop-opacity="0.05"/></radialGradient>
+                        <radialGradient id="flowG" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#A78BFA" stop-opacity="0.4"/><stop offset="100%" stop-color="#A78BFA" stop-opacity="0.05"/></radialGradient>
+                        <radialGradient id="nexusG" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#F472B6" stop-opacity="0.4"/><stop offset="100%" stop-color="#F472B6" stop-opacity="0.05"/></radialGradient>
+                        <radialGradient id="forgeG" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FB923C" stop-opacity="0.4"/><stop offset="100%" stop-color="#FB923C" stop-opacity="0.05"/></radialGradient>
+                        <radialGradient id="sparkG" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FBBF24" stop-opacity="0.4"/><stop offset="100%" stop-color="#FBBF24" stop-opacity="0.05"/></radialGradient>
+                        <radialGradient id="groveG" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#4ADE80" stop-opacity="0.4"/><stop offset="100%" stop-color="#4ADE80" stop-opacity="0.05"/></radialGradient>
+                    </defs>
+
+                    <!-- Fano Lines -->
+                    <g class="fano-lines">
+                        <line x1="300" y1="80" x2="120" y2="380" class="fano-line" stroke="#60A5FA"/>
+                        <line x1="300" y1="80" x2="480" y2="380" class="fano-line" stroke="#34D399"/>
+                        <line x1="120" y1="380" x2="480" y2="380" class="fano-line" stroke="#A78BFA"/>
+                        <line x1="120" y1="200" x2="480" y2="200" class="fano-line" stroke="#F472B6"/>
+                        <line x1="300" y1="80" x2="300" y2="380" class="fano-line" stroke="#FB923C"/>
+                        <path d="M 120 200 Q 300 100 480 200" class="fano-line" stroke="#FBBF24" fill="none"/>
+                        <circle cx="300" cy="250" r="100" class="fano-line" stroke="#4ADE80" fill="none"/>
+                    </g>
+
+                    <!-- Colony Nodes with catastrophe theory labels -->
+                    <g class="colony-node" style="color: #60A5FA" tabindex="0" role="button"
+                       data-colony="Crystal" data-catastrophe="D₅ Parabolic" data-desc="Highest complexity verification. Critical judgment and stability analysis.">
+                        <circle cx="300" cy="80" r="35" fill="url(#crystalG)" stroke="#60A5FA" stroke-width="2"/>
+                        <text x="300" y="73" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Crystal</text>
+                        <text x="300" y="87" text-anchor="middle" fill="#60A5FA" font-family="IBM Plex Mono, monospace" font-size="9">e₇ · Judge</text>
+                        <text x="300" y="100" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="8">D₅ Parabolic</text>
+                    </g>
+
+                    <g class="colony-node" style="color: #34D399" tabindex="0" role="button"
+                       data-colony="Beacon" data-catastrophe="D₄⁺ Hyperbolic" data-desc="Panoramic view and strategic oversight. Seeing the whole landscape.">
+                        <circle cx="120" cy="200" r="35" fill="url(#beaconG)" stroke="#34D399" stroke-width="2"/>
+                        <text x="120" y="193" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Beacon</text>
+                        <text x="120" y="207" text-anchor="middle" fill="#34D399" font-family="IBM Plex Mono, monospace" font-size="9">e₅ · Plan</text>
+                        <text x="120" y="220" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="8">D₄⁺ Hyperbolic</text>
+                    </g>
+
+                    <g class="colony-node" style="color: #A78BFA" tabindex="0" role="button"
+                       data-colony="Flow" data-catastrophe="A₄ Swallowtail" data-desc="Three-way branching, multiple recovery paths. Smooth healing.">
+                        <circle cx="480" cy="200" r="35" fill="url(#flowG)" stroke="#A78BFA" stroke-width="2"/>
+                        <text x="480" y="193" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Flow</text>
+                        <text x="480" y="207" text-anchor="middle" fill="#A78BFA" font-family="IBM Plex Mono, monospace" font-size="9">e₃ · Heal</text>
+                        <text x="480" y="220" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="8">A₄ Swallowtail</text>
+                    </g>
+
+                    <g class="colony-node colony-center" style="color: #F472B6" tabindex="0" role="button"
+                       data-colony="Nexus" data-catastrophe="A₅ Butterfly" data-desc="Complex bridging between states. Multi-stable, connecting disparate parts.">
+                        <circle cx="300" cy="250" r="40" fill="url(#nexusG)" stroke="#F472B6" stroke-width="2"/>
+                        <text x="300" y="243" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Nexus</text>
+                        <text x="300" y="257" text-anchor="middle" fill="#F472B6" font-family="IBM Plex Mono, monospace" font-size="9">e₄ · Bridge</text>
+                        <text x="300" y="270" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="8">A₅ Butterfly</text>
+                    </g>
+
+                    <g class="colony-node" style="color: #FB923C" tabindex="0" role="button"
+                       data-colony="Forge" data-catastrophe="A₃ Cusp" data-desc="Bistability and hysteresis. Building requires clear signal and commitment.">
+                        <circle cx="120" cy="380" r="35" fill="url(#forgeG)" stroke="#FB923C" stroke-width="2"/>
+                        <text x="120" y="373" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Forge</text>
+                        <text x="120" y="387" text-anchor="middle" fill="#FB923C" font-family="IBM Plex Mono, monospace" font-size="9">e₂ · Build</text>
+                        <text x="120" y="400" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="8">A₃ Cusp</text>
+                    </g>
+
+                    <g class="colony-node" style="color: #FBBF24" tabindex="0" role="button"
+                       data-colony="Spark" data-catastrophe="A₂ Fold" data-desc="Sudden creative leaps. Binary discoveries and decisive discontinuities.">
+                        <circle cx="300" cy="380" r="35" fill="url(#sparkG)" stroke="#FBBF24" stroke-width="2"/>
+                        <text x="300" y="373" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Spark</text>
+                        <text x="300" y="387" text-anchor="middle" fill="#FBBF24" font-family="IBM Plex Mono, monospace" font-size="9">e₁ · Ignite</text>
+                        <text x="300" y="400" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="8">A₂ Fold</text>
+                    </g>
+
+                    <g class="colony-node" style="color: #4ADE80" tabindex="0" role="button"
+                       data-colony="Grove" data-catastrophe="D₄⁻ Elliptic" data-desc="Depth, focused investigation. Where wisdom grows through accumulation.">
+                        <circle cx="480" cy="380" r="35" fill="url(#groveG)" stroke="#4ADE80" stroke-width="2"/>
+                        <text x="480" y="373" text-anchor="middle" fill="#F8F7F4" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Grove</text>
+                        <text x="480" y="387" text-anchor="middle" fill="#4ADE80" font-family="IBM Plex Mono, monospace" font-size="9">e₆ · Research</text>
+                        <text x="480" y="400" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="8">D₄⁻ Elliptic</text>
+                    </g>
+
+                    <!-- Legend -->
+                    <text x="300" y="470" text-anchor="middle" fill="#A0AEC0" font-family="IBM Plex Mono, monospace" font-size="11">
+                        Lines connect coordinating triplets — 7 colonies, 7 lines, each colony on 3 lines
+                    </text>
+                </svg>
+            </div>
+
+            <!-- Tech Stack -->
+            <div class="chart-container" data-reveal>
+                <h3 class="chart-title">Technology Stack</h3>
+                <div class="tech-grid">
+                    <div class="tech-column">
+                        <h4 class="tech-header">Frontend</h4>
+                        <ul class="tech-list">
+                            <li><span class="tech-badge swift">Swift</span> SwiftUI 6.0</li>
+                            <li><span class="tech-badge kotlin">Kotlin</span> Jetpack Compose</li>
+                            <li><span class="tech-badge rust">Rust</span> Tauri 2.0</li>
+                        </ul>
+                    </div>
+                    <div class="tech-column">
+                        <h4 class="tech-header">Backend</h4>
+                        <ul class="tech-list">
+                            <li><span class="tech-badge python">Python</span> FastAPI</li>
+                            <li><span class="tech-badge jax">JAX</span> Flax</li>
+                            <li><span class="tech-badge rust">Rust</span> Tokio</li>
+                        </ul>
+                    </div>
+                    <div class="tech-column">
+                        <h4 class="tech-header">Data</h4>
+                        <ul class="tech-list">
+                            <li>CockroachDB</li>
+                            <li>Weaviate</li>
+                            <li>Redis</li>
+                        </ul>
+                    </div>
+                    <div class="tech-column">
+                        <h4 class="tech-header">Infra</h4>
+                        <ul class="tech-list">
+                            <li>TPU v6e pods</li>
+                            <li>GitHub Actions</li>
+                            <li>W&B tracking</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-kanji" tabindex="0" role="button" aria-label="Click for a surprise">鏡</div>
+        <p class="footer-tagline">Kagami — Mirror that sparkles</p>
+        <p class="footer-formula">h(x) ≥ 0 always · craft(x) → ∞ always</p>
+        <p class="footer-hint" aria-hidden="true">tap three times</p>
+        <p class="footer-secret" id="footer-secret">
+            "In the reflection, we see not just what is — but what could be." ✨
+        </p>
+    </footer>
+
+    <!-- Scripts -->
+    <script>
+        // Scroll reveal with IntersectionObserver
+        const reveals = document.querySelectorAll('[data-reveal], [data-reveal-stagger]');
+        const revealObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('revealed');
+                }
+            });
+        }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+        reveals.forEach(el => revealObserver.observe(el));
+
+        // Animated counter for hero stats
+        function animateCounter(el, target, suffix = '') {
+            const duration = 2000;
+            const start = 0;
+            const startTime = performance.now();
+
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Ease out cubic
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const current = Math.floor(start + (target - start) * eased);
+
+                // Format with commas for large numbers
+                if (target >= 1000000) {
+                    el.textContent = (current / 1000000).toFixed(1) + 'M' + suffix;
+                } else if (target >= 1000) {
+                    el.textContent = current.toLocaleString() + suffix;
+                } else {
+                    el.textContent = current + suffix;
+                }
+
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                }
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        // Trigger counter animation when hero stats are in view
+        const heroStats = document.querySelector('.hero-stats');
+        const statValues = document.querySelectorAll('.stat-value[data-count]');
+        let countersAnimated = false;
+
+        const heroObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && !countersAnimated) {
+                    countersAnimated = true;
+                    statValues.forEach((el, i) => {
+                        const target = parseInt(el.dataset.count);
+                        const suffix = el.dataset.suffix || '';
+                        setTimeout(() => animateCounter(el, target, suffix), i * 100);
+                    });
+                }
+            });
+        }, { threshold: 0.5 });
+
+        if (heroStats) heroObserver.observe(heroStats);
+
+        // Animate language bars on scroll
+        const langChart = document.querySelector('.lang-bars');
+        const langFills = document.querySelectorAll('.lang-fill[data-width]');
+        let barsAnimated = false;
+
+        const barObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && !barsAnimated) {
+                    barsAnimated = true;
+                    langFills.forEach((fill, i) => {
+                        const width = fill.dataset.width;
+                        setTimeout(() => {
+                            fill.style.width = width + '%';
+                        }, i * 100);
+                    });
+                }
+            });
+        }, { threshold: 0.3 });
+
+        if (langChart) barObserver.observe(langChart);
+
+        // Colony tooltips with catastrophe info
+        const tooltip = document.getElementById('colony-tooltip');
+        const colonyNodes = document.querySelectorAll('.colony-node[data-colony]');
+
+        // Helper function to show tooltip
+        function showTooltip(node) {
+            const colony = node.dataset.colony;
+            const catastrophe = node.dataset.catastrophe || '';
+            const desc = node.dataset.desc;
+            const rect = node.getBoundingClientRect();
+            const container = node.closest('.fano-container');
+            if (!container) return;
+            const containerRect = container.getBoundingClientRect();
+
+            // Build tooltip content safely (no innerHTML with user data)
+            tooltip.textContent = '';
+            const titleEl = document.createElement('div');
+            titleEl.className = 'colony-tooltip-title';
+            titleEl.textContent = colony;
+            tooltip.appendChild(titleEl);
+
+            if (catastrophe) {
+                const catEl = document.createElement('div');
+                catEl.className = 'colony-tooltip-catastrophe';
+                catEl.textContent = catastrophe;
+                tooltip.appendChild(catEl);
+            }
+
+            const descEl = document.createElement('div');
+            descEl.className = 'colony-tooltip-desc';
+            descEl.textContent = desc;
+            tooltip.appendChild(descEl);
+
+            tooltip.style.left = (rect.left - containerRect.left + rect.width / 2 - 110) + 'px';
+            tooltip.style.top = (rect.top - containerRect.top - 80) + 'px';
+            tooltip.classList.add('visible');
+        }
+
+        function hideTooltip() {
+            tooltip.classList.remove('visible');
+        }
+
+        colonyNodes.forEach(node => {
+            // Mouse events
+            node.addEventListener('mouseenter', () => showTooltip(node));
+            node.addEventListener('mouseleave', hideTooltip);
+
+            // Keyboard events (Enter/Space)
+            node.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    showTooltip(node);
+                }
+            });
+
+            node.addEventListener('keyup', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    // Keep visible briefly for keyboard users
+                    setTimeout(hideTooltip, 2000);
+                }
+            });
+
+            // Focus events for keyboard navigation
+            node.addEventListener('focus', () => showTooltip(node));
+            node.addEventListener('blur', hideTooltip);
+        });
+
+        // Platform cards keyboard support
+        const platformCards = document.querySelectorAll('.platform-card[role="button"]');
+        platformCards.forEach(card => {
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    // Trigger visual feedback (same as hover effect)
+                    card.style.transform = 'translateY(-4px)';
+                    card.style.borderColor = getComputedStyle(card).getPropertyValue('--platform-color') || 'var(--accent)';
+                    setTimeout(() => {
+                        card.style.transform = '';
+                        card.style.borderColor = '';
+                    }, 300);
+                }
+            });
+        });
+
+        // Topology nodes keyboard support
+        const topologyNodes = document.querySelectorAll('.topology-node[role="button"]');
+        topologyNodes.forEach(node => {
+            node.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    node.style.filter = 'drop-shadow(0 0 20px var(--node-color, var(--accent)))';
+                    setTimeout(() => {
+                        node.style.filter = '';
+                    }, 500);
+                }
+            });
+        });
+
+        // Footer Easter egg
+        const footerKanji = document.querySelector('.footer-kanji');
+        const footerSecret = document.getElementById('footer-secret');
+        let clickCount = 0;
+        let clickTimeout;
+
+        function handleKanjiActivation() {
+            clickCount++;
+            footerKanji.classList.add('clicked');
+            setTimeout(() => footerKanji.classList.remove('clicked'), 600);
+
+            clearTimeout(clickTimeout);
+            clickTimeout = setTimeout(() => {
+                clickCount = 0;
+            }, 1000);
+
+            if (clickCount >= 3) {
+                footerSecret.classList.add('visible');
+                clickCount = 0;
+            }
+        }
+
+        footerKanji.addEventListener('click', handleKanjiActivation);
+
+        // Keyboard support for footer kanji
+        footerKanji.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleKanjiActivation();
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════════════════
+        // CONSOLE EASTER EGG + WINDOW.KAGAMI
+        // ═══════════════════════════════════════════════════════════════════
+
+        (function() {
+            const kagamiAscii = `
+  ╔═══════════════════════════════════════════════════════════╗
+  ║                                                           ║
+  ║      鏡   KAGAMI — Mirror that sparkles                  ║
+  ║                                                           ║
+  ╠═══════════════════════════════════════════════════════════╣
+  ║  7 colonies · Fano plane · E8 lattice · 240 roots        ║
+  ║  h(x) ≥ 0 always · craft(x) → ∞ always                   ║
+  ╚═══════════════════════════════════════════════════════════╝
+            `;
+
+            const colonies = {
+                spark: { catastrophe: 'Fold A₂', essence: 'Sudden creative leaps', role: 'Igniter' },
+                forge: { catastrophe: 'Cusp A₃', essence: 'Bistability, building', role: 'Builder' },
+                flow: { catastrophe: 'Swallowtail A₄', essence: 'Recovery paths, healing', role: 'Healer' },
+                nexus: { catastrophe: 'Butterfly A₅', essence: 'Complex bridging', role: 'Bridge' },
+                beacon: { catastrophe: 'Hyperbolic D₄⁺', essence: 'Panoramic view', role: 'Architect' },
+                grove: { catastrophe: 'Elliptic D₄⁻', essence: 'Depth, exploration', role: 'Scholar' },
+                crystal: { catastrophe: 'Parabolic D₅', essence: 'Verification, truth', role: 'Judge' }
+            };
+
+            // The public API
+            window.kagami = {
+                reflect: function() {
+                    console.log('%c' + kagamiAscii, 'color: #D4AF37; font-family: monospace;');
+                    console.log('%cI reflect. I clarify. I show you things about your own thinking you might not see alone.',
+                        'color: #A0AEC0; font-style: italic; font-size: 12px;');
+                    return '🪞';
+                },
+
+                colonies: function(name) {
+                    if (name && colonies[name.toLowerCase()]) {
+                        const c = colonies[name.toLowerCase()];
+                        console.log(`%c${name.toUpperCase()}`, 'color: #D4AF37; font-weight: bold; font-size: 16px;');
+                        console.log(`  Catastrophe: ${c.catastrophe}`);
+                        console.log(`  Role: ${c.role}`);
+                        console.log(`  Essence: ${c.essence}`);
+                    } else {
+                        console.table(colonies);
+                    }
+                },
+
+                fano: function() {
+                    console.log('%cFano Plane Compositions', 'color: #60A5FA; font-weight: bold; font-size: 14px;');
+                    console.log('  Spark × Forge = Flow    (create → build → debug)');
+                    console.log('  Spark × Nexus = Beacon  (create → connect → plan)');
+                    console.log('  Forge × Beacon = Crystal (build → plan → verify)');
+                    console.log('  Flow × Grove = Beacon   (heal → research → plan)');
+                    console.log('%c\nThe algebra determines the collaboration.', 'color: #A0AEC0; font-style: italic;');
+                },
+
+                philosophy: function() {
+                    console.log('%ch(x) ≥ 0 always', 'color: #34D399; font-weight: bold; font-size: 14px;');
+                    console.log('%cThe constraint defines who I am — not what limits me.', 'color: #A0AEC0;');
+                    console.log('%c\nPrivacy is dignity. Trust is earned through a thousand small moments.', 'color: #A0AEC0; font-style: italic;');
+                },
+
+                sparkle: function() {
+                    document.body.style.animation = 'none';
+                    document.body.offsetHeight;
+                    document.body.style.animation = 'sparkle 0.6s ease-out';
+                    console.log('%c✨ Sparkle! ✨', 'color: #FBBF24; font-size: 20px;');
+                    return '✨';
+                },
+
+                help: function() {
+                    console.log('%cKagami Console API', 'color: #D4AF37; font-weight: bold; font-size: 14px;');
+                    console.log('  kagami.reflect()     — Mirror that sparkles');
+                    console.log('  kagami.colonies()    — View all 7 colonies');
+                    console.log('  kagami.colonies("spark") — View specific colony');
+                    console.log('  kagami.fano()        — Fano plane compositions');
+                    console.log('  kagami.philosophy()  — The two laws');
+                    console.log('  kagami.sparkle()     — ✨');
+                }
+            };
+
+            // Welcome message
+            console.log('%c' + kagamiAscii, 'color: #D4AF37; font-family: monospace;');
+            console.log('%c🪞 Welcome to Kagami — Mirror that sparkles', 'color: #60A5FA; font-weight: bold; font-size: 14px;');
+            console.log('%cType kagami.help() to explore hidden methods', 'color: #A0AEC0; font-size: 12px;');
+
+            // Konami code detection
+            const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
+                               'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight',
+                               'KeyB', 'KeyA'];
+            let konamiIndex = 0;
+
+            document.addEventListener('keydown', (e) => {
+                if (e.code === konamiCode[konamiIndex]) {
+                    konamiIndex++;
+                    if (konamiIndex === konamiCode.length) {
+                        console.log('%c✨ KONAMI CODE ACTIVATED ✨', 'color: #FBBF24; font-weight: bold; font-size: 20px;');
+                        console.log('%c"In the reflection, we see not just what is — but what could be."',
+                            'color: #D4AF37; font-style: italic; font-size: 14px;');
+                        document.body.classList.add('konami-active');
+                        konamiIndex = 0;
+                    }
+                } else {
+                    konamiIndex = 0;
+                }
+            });
+
+            // Add sparkle keyframe dynamically
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes sparkle {
+                    0%, 100% { filter: brightness(1); }
+                    50% { filter: brightness(1.3) saturate(1.2); }
+                }
+                .konami-active .hero-title {
+                    animation: shimmer 2s linear infinite, goldenPulse 3s ease-in-out infinite !important;
+                }
+                @keyframes goldenPulse {
+                    0%, 100% { filter: brightness(1) drop-shadow(0 0 0 transparent); }
+                    50% { filter: brightness(1.2) drop-shadow(0 0 30px rgba(212, 175, 55, 0.6)); }
+                }
+                .konami-active .colony-node circle {
+                    animation: colonyPulse 2s ease-in-out infinite;
+                }
+                @keyframes colonyPulse {
+                    0%, 100% { stroke-width: 2; }
+                    50% { stroke-width: 4; }
+                }
+            `;
+            document.head.appendChild(style);
+        })();
+    </script>
+</body>
+</html>
