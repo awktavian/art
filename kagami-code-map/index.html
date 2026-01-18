@@ -1321,7 +1321,52 @@
             .typeahead {
                 position: relative;
                 top: var(--space-3);
+                left: 0;
+                right: 0;
                 max-height: calc(100vh - 80px);
+                max-height: calc(100dvh - 80px);
+                border-radius: 12px;
+            }
+            
+            .typeahead-top {
+                flex-direction: column;
+                align-items: stretch;
+                gap: var(--space-2);
+            }
+            
+            .typeahead-filters {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                padding-bottom: var(--space-1);
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            .typeahead-status {
+                justify-content: space-between;
+            }
+            
+            .filter-chip {
+                padding: 8px 12px;
+                font-size: 0.75rem;
+            }
+            
+            .typeahead-item {
+                grid-template-columns: 36px 1fr auto;
+                padding: var(--space-3);
+            }
+            
+            .typeahead-icon {
+                width: 36px;
+                height: 36px;
+            }
+            
+            .typeahead-footer {
+                flex-wrap: wrap;
+                gap: var(--space-2);
+            }
+            
+            .typeahead-hint {
+                font-size: 0.5rem;
             }
             
             .search-shortcut {
@@ -2227,15 +2272,17 @@
             }
         });
         
-        // Filter chips
-        filterChips.forEach(chip => {
-            chip.addEventListener('click', () => {
-                filterChips.forEach(c => c.classList.remove('active'));
-                chip.classList.add('active');
-                SEARCH_FILTER = chip.dataset.filter;
-                performSearch();
-                input.focus();
-            });
+        // Filter chips (now at top of typeahead)
+        const filters = document.getElementById('typeahead-filters');
+        filters.addEventListener('click', (e) => {
+            const chip = e.target.closest('.filter-chip');
+            if (!chip) return;
+            
+            filters.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            SEARCH_FILTER = chip.dataset.filter;
+            performSearch();
+            input.focus();
         });
         
         // Initialize embedding mini-map
@@ -2379,8 +2426,15 @@
         const typeahead = document.getElementById('typeahead');
         
         if (!SEARCH_QUERY) {
-            body.innerHTML = '';
-            countEl.textContent = `0 ${t('matches')}`;
+            body.innerHTML = `
+                <div class="typeahead-empty">
+                    <div class="typeahead-empty-icon">⌘</div>
+                    <div>Type to search ${formatNumber(DATA.files?.length || 0)} files</div>
+                </div>
+            `;
+            countEl.textContent = `— ${t('matches')}`;
+            // Reset filter counts
+            document.querySelectorAll('[data-count]').forEach(el => el.textContent = '—');
             SEARCH_RESULTS = [];
             clearHighlighting();
             updateEmbeddingMap();
@@ -2487,23 +2541,39 @@
         const classes = scored.filter(s => s.type === 'class').slice(0, 6);
         const funcs = scored.filter(s => s.type === 'func').slice(0, 6);
         
-        // Render
+        // Update filter counts
+        document.querySelector('[data-count="file"]').textContent = files.length;
+        document.querySelector('[data-count="folder"]').textContent = folders.length;
+        document.querySelector('[data-count="class"]').textContent = classes.length;
+        document.querySelector('[data-count="func"]').textContent = funcs.length;
+        
+        // Render results
         body.innerHTML = '';
         
-        if (folders.length > 0) {
-            body.appendChild(createSection(t('folders'), '📁', folders));
-        }
-        if (files.length > 0) {
-            body.appendChild(createSection(t('files'), '📄', files));
-        }
-        if (classes.length > 0) {
-            body.appendChild(createSection(t('classes'), '◆', classes));
-        }
-        if (funcs.length > 0) {
-            body.appendChild(createSection(t('functions'), 'ƒ', funcs));
+        const total = folders.length + files.length + classes.length + funcs.length;
+        
+        if (total === 0) {
+            body.innerHTML = `
+                <div class="typeahead-empty">
+                    <div class="typeahead-empty-icon">🔍</div>
+                    <div>No results for "${escapeHtml(SEARCH_QUERY)}"</div>
+                </div>
+            `;
+        } else {
+            if (folders.length > 0) {
+                body.appendChild(createSection(t('folders'), '📁', folders));
+            }
+            if (files.length > 0) {
+                body.appendChild(createSection(t('files'), '📄', files));
+            }
+            if (classes.length > 0) {
+                body.appendChild(createSection(t('classes'), '◆', classes));
+            }
+            if (funcs.length > 0) {
+                body.appendChild(createSection(t('functions'), 'ƒ', funcs));
+            }
         }
         
-        const total = folders.length + files.length + classes.length + funcs.length;
         countEl.textContent = `${total} ${total !== 1 ? t('matches') : t('match')}`;
         
         // Select first item
@@ -2521,7 +2591,7 @@
         
         section.innerHTML = `
             <div class="typeahead-section-title">
-                <span>${icon}</span>
+                <span class="section-icon">${icon}</span>
                 <span>${title}</span>
                 <span class="badge">${items.length}</span>
             </div>
@@ -2535,41 +2605,53 @@
             el.dataset.line = item.line || 0;
             
             const highlightedName = highlightMatch(item.name, SEARCH_QUERY);
-            const shortPath = item.path.split('/').slice(-2).join('/');
+            const pathParts = item.path.split('/');
+            const shortPath = pathParts.length > 2 ? '…/' + pathParts.slice(-2).join('/') : item.path;
             
             // Build metadata line based on type
             let metaInfo = '';
             if (item.type === 'folder') {
-                metaInfo = `${formatNumber(item.fileCount || 0)} ${t('files')} · ${formatNumber(item.lines)} ${t('lines')}`;
+                metaInfo = `${formatNumber(item.fileCount || 0)} files · ${formatNumber(item.lines)} lines`;
             } else if (item.type === 'file') {
-                metaInfo = `${formatNumber(item.lines)} ${t('lines')}`;
+                metaInfo = `${formatNumber(item.lines)} lines`;
+                if (item.category) metaInfo += ` · ${item.category}`;
             } else if (item.type === 'class') {
                 metaInfo = item.methods ? `${item.methods} methods` : '';
             } else if (item.type === 'func') {
                 metaInfo = item.isAsync ? 'async' : '';
+                if (item.returnType) metaInfo += ` → ${item.returnType}`;
             }
             
-            // Build relevance tags
+            // Build relevance tags - only show most relevant
             let relevanceTags = '';
             if (item.reasons && item.reasons.length > 0) {
+                const primaryReason = item.reasons[0];
+                const isPrimary = primaryReason.type === 'exact' || primaryReason.type === 'prefix' || primaryReason.type === 'semantic';
                 relevanceTags = `
                     <div class="typeahead-relevance">
-                        ${item.reasons.slice(0, 3).map(r => 
-                            `<span class="relevance-tag ${r.type}">${r.text}</span>`
-                        ).join('')}
+                        <span class="relevance-tag ${isPrimary ? 'primary' : ''}">${primaryReason.text}</span>
+                        ${item.reasons.length > 1 ? `<span class="relevance-tag">+${item.reasons.length - 1}</span>` : ''}
                     </div>
                 `;
+            }
+            
+            // Truncate docstring/summary for cleaner display
+            let docPreview = '';
+            const doc = item.docstring || item.summary || '';
+            if (doc) {
+                const firstLine = doc.split(/[.\n]/)[0].trim();
+                docPreview = firstLine.length > 80 ? firstLine.slice(0, 77) + '…' : firstLine;
             }
             
             el.innerHTML = `
                 <div class="typeahead-icon">${item.icon}</div>
                 <div class="typeahead-content">
-                    <div class="typeahead-name">${highlightedName}${item.signature ? `<span style="color:var(--text-tertiary);font-weight:400">${escapeHtml(item.signature)}</span>` : ''}</div>
+                    <div class="typeahead-name">${highlightedName}${item.signature ? `<span style="color:var(--text-tertiary);font-weight:400;margin-left:4px">${escapeHtml(item.signature)}</span>` : ''}</div>
                     <div class="typeahead-path">${escapeHtml(shortPath)}${metaInfo ? ` · ${metaInfo}` : ''}</div>
-                    ${item.docstring || item.summary ? `<div class="typeahead-meta">${escapeHtml(item.docstring || item.summary)}</div>` : ''}
+                    ${docPreview ? `<div class="typeahead-meta">${escapeHtml(docPreview)}</div>` : ''}
                     ${relevanceTags}
                 </div>
-                <span class="typeahead-similarity">${Math.round(item.score * 100)}%</span>
+                <span class="typeahead-score">${Math.round(item.score * 100)}%</span>
             `;
             
             el.addEventListener('click', () => selectResult(el));
