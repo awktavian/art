@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generative Art Test Harness</title>
+    <meta name="description" content="Generate and evaluate 10 random test pieces for refinement.">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --void: #07060B;
+            --text: #F5F0E8;
+            --text-dim: rgba(245, 240, 232, 0.65);
+            --text-whisper: rgba(245, 240, 232, 0.35);
+            --amber: #F59E0B;
+            --emerald: #10B981;
+            --rose: #F43F5E;
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'IBM Plex Mono', monospace;
+            background: var(--void);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .header h1 {
+            font-size: 0.7rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--amber);
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+
+        button {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text);
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.233s var(--ease-out-expo);
+        }
+
+        button:hover {
+            background: var(--amber);
+            color: var(--void);
+            border-color: var(--amber);
+        }
+
+        button.primary {
+            background: var(--amber);
+            color: var(--void);
+            border-color: var(--amber);
+        }
+
+        button.primary:hover {
+            background: #FBBF24;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 2rem;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.4s var(--ease-out-expo);
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: var(--amber);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .card canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .card-info {
+            padding: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .card-seed {
+            font-size: 0.75rem;
+            color: var(--amber);
+            margin-bottom: 0.5rem;
+        }
+
+        .card-meta {
+            font-size: 0.65rem;
+            color: var(--text-whisper);
+            margin-bottom: 0.75rem;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .card-actions button {
+            flex: 1;
+            padding: 0.5rem;
+            font-size: 0.7rem;
+        }
+
+        .rating {
+            display: flex;
+            gap: 0.25rem;
+            margin-top: 0.75rem;
+        }
+
+        .rating button {
+            flex: none;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            font-size: 1rem;
+            border-radius: 4px;
+        }
+
+        .rating button.selected.good {
+            background: var(--emerald);
+            border-color: var(--emerald);
+        }
+
+        .rating button.selected.bad {
+            background: var(--rose);
+            border-color: var(--rose);
+        }
+
+        .summary {
+            margin-top: 3rem;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .summary h2 {
+            font-size: 0.7rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--amber);
+            margin-bottom: 1rem;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .stat-label {
+            font-size: 0.65rem;
+            color: var(--text-whisper);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .stat-value.good { color: var(--emerald); }
+        .stat-value.bad { color: var(--rose); }
+
+        .issues {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .issues h3 {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            margin-bottom: 0.5rem;
+        }
+
+        .issues ul {
+            list-style: none;
+            font-size: 0.75rem;
+            color: var(--text-whisper);
+        }
+
+        .issues li {
+            margin-bottom: 0.25rem;
+            padding-left: 1rem;
+            position: relative;
+        }
+
+        .issues li::before {
+            content: '•';
+            position: absolute;
+            left: 0;
+            color: var(--rose);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 4rem;
+            color: var(--text-dim);
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--amber);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>Generative Test Harness</h1>
+        <p>Generate 10 random pieces, rate them, identify patterns for refinement</p>
+    </header>
+
+    <div class="controls">
+        <button class="primary" id="generate-btn">Generate 10 Random</button>
+        <button id="clear-btn">Clear Ratings</button>
+        <button id="export-btn">Export Report</button>
+    </div>
+
+    <div class="grid" id="grid">
+        <div class="loading">Click "Generate 10 Random" to begin</div>
+    </div>
+
+    <div class="summary" id="summary" style="display: none;">
+        <h2>Quality Summary</h2>
+        <div class="summary-stats">
+            <div>
+                <div class="stat-value good" id="good-count">0</div>
+                <div class="stat-label">Gallery-worthy</div>
+            </div>
+            <div>
+                <div class="stat-value" id="neutral-count">0</div>
+                <div class="stat-label">Acceptable</div>
+            </div>
+            <div>
+                <div class="stat-value bad" id="bad-count">0</div>
+                <div class="stat-label">Needs Work</div>
+            </div>
+        </div>
+        <div class="issues" id="issues" style="display: none;">
+            <h3>Common Issues</h3>
+            <ul id="issues-list"></ul>
+        </div>
+    </div>
+
+    <script type="module">
+        import generate from './algorithms/spark/algo.js';
+
+        const grid = document.getElementById('grid');
+        const summary = document.getElementById('summary');
+        const results = [];
+        const ratings = new Map();
+
+        // Generate random seed
+        function randomSeed() {
+            return Math.random().toString(36).slice(2, 10);
+        }
+
+        // Create card for a generation
+        function createCard(seed, index) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.dataset.seed = seed;
+            card.dataset.index = index;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+
+            // Generate
+            const result = generate(canvas, seed);
+            results[index] = { seed, result };
+
+            card.innerHTML = `
+                <div class="canvas-wrap"></div>
+                <div class="card-info">
+                    <div class="card-seed">${seed}</div>
+                    <div class="card-meta">
+                        Bursts: ${result.burstCount} |
+                        Particles: ${result.params.particleCount} |
+                        Energy: ${(result.params.energyIntensity * 100).toFixed(0)}%
+                    </div>
+                    <div class="card-actions">
+                        <button class="view-btn">View Full</button>
+                        <button class="save-btn">Save</button>
+                    </div>
+                    <div class="rating">
+                        <button class="rate-btn" data-rating="good" title="Gallery-worthy">✓</button>
+                        <button class="rate-btn" data-rating="neutral" title="Acceptable">○</button>
+                        <button class="rate-btn" data-rating="bad" title="Needs work">✗</button>
+                    </div>
+                </div>
+            `;
+
+            card.querySelector('.canvas-wrap').appendChild(canvas);
+
+            // Event handlers
+            card.querySelector('.view-btn').onclick = () => {
+                window.open(`algorithms/spark/?seed=${seed}`, '_blank');
+            };
+
+            card.querySelector('.save-btn').onclick = () => {
+                const link = document.createElement('a');
+                link.download = `spark-${seed}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            };
+
+            card.querySelectorAll('.rate-btn').forEach(btn => {
+                btn.onclick = () => {
+                    // Clear previous
+                    card.querySelectorAll('.rate-btn').forEach(b => {
+                        b.classList.remove('selected', 'good', 'bad');
+                    });
+
+                    // Set new
+                    const rating = btn.dataset.rating;
+                    btn.classList.add('selected', rating);
+                    ratings.set(seed, rating);
+
+                    updateSummary();
+                };
+            });
+
+            return card;
+        }
+
+        // Generate batch
+        function generateBatch(count = 10) {
+            grid.innerHTML = '';
+            results.length = 0;
+            ratings.clear();
+
+            for (let i = 0; i < count; i++) {
+                const seed = randomSeed();
+                const card = createCard(seed, i);
+                grid.appendChild(card);
+            }
+
+            summary.style.display = 'block';
+            updateSummary();
+        }
+
+        // Update summary
+        function updateSummary() {
+            let good = 0, neutral = 0, bad = 0;
+
+            ratings.forEach(rating => {
+                if (rating === 'good') good++;
+                else if (rating === 'neutral') neutral++;
+                else if (rating === 'bad') bad++;
+            });
+
+            document.getElementById('good-count').textContent = good;
+            document.getElementById('neutral-count').textContent = neutral;
+            document.getElementById('bad-count').textContent = bad;
+
+            // Analyze bad ones for patterns
+            const issues = [];
+            results.forEach((r, i) => {
+                const seed = r.seed;
+                const rating = ratings.get(seed);
+                if (rating === 'bad') {
+                    // Analyze parameters
+                    const p = r.result.params;
+                    if (p.burstCount <= 3) issues.push(`Low burst count (${p.burstCount})`);
+                    if (p.particleCount < 100) issues.push(`Low particle count (${p.particleCount})`);
+                    if (p.energyIntensity < 0.7) issues.push(`Low energy (${(p.energyIntensity*100).toFixed(0)}%)`);
+                }
+            });
+
+            const issuesCounts = {};
+            issues.forEach(i => issuesCounts[i] = (issuesCounts[i] || 0) + 1);
+
+            const issuesList = document.getElementById('issues-list');
+            const issuesDiv = document.getElementById('issues');
+
+            if (Object.keys(issuesCounts).length > 0) {
+                issuesDiv.style.display = 'block';
+                issuesList.innerHTML = Object.entries(issuesCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([issue, count]) => `<li>${issue} (×${count})</li>`)
+                    .join('');
+            } else {
+                issuesDiv.style.display = 'none';
+            }
+        }
+
+        // Export report
+        function exportReport() {
+            const report = {
+                timestamp: new Date().toISOString(),
+                algorithm: 'spark',
+                results: results.map(r => ({
+                    seed: r.seed,
+                    rating: ratings.get(r.seed) || 'unrated',
+                    params: r.result.params,
+                    burstCount: r.result.burstCount
+                })),
+                summary: {
+                    good: [...ratings.values()].filter(r => r === 'good').length,
+                    neutral: [...ratings.values()].filter(r => r === 'neutral').length,
+                    bad: [...ratings.values()].filter(r => r === 'bad').length
+                }
+            };
+
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.download = `spark-test-${Date.now()}.json`;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+        }
+
+        // Event handlers
+        document.getElementById('generate-btn').onclick = () => generateBatch(10);
+        document.getElementById('clear-btn').onclick = () => {
+            ratings.clear();
+            document.querySelectorAll('.rate-btn').forEach(btn => {
+                btn.classList.remove('selected', 'good', 'bad');
+            });
+            updateSummary();
+        };
+        document.getElementById('export-btn').onclick = exportReport;
+
+        // Console
+        console.log('%c鏡 Test Harness', 'color: #F59E0B; font-size: 16px; font-weight: bold;');
+        console.log('Generate 10 pieces, rate them to identify refinement patterns.');
+    </script>
+</body>
+</html>

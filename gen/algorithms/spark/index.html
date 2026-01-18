@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spark Generator</title>
+    <meta name="description" content="Generative energy bursts and particle explosions. Spark colony (e1) — Ideation.">
+
+    <!-- Theme -->
+    <meta name="theme-color" content="#07060B">
+    <meta name="color-scheme" content="dark">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --void: #07060B;
+            --text: #F5F0E8;
+            --text-dim: rgba(245, 240, 232, 0.65);
+            --text-whisper: rgba(245, 240, 232, 0.35);
+            --spark: #FF6B35;
+            --spark-dim: rgba(255, 107, 53, 0.3);
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'IBM Plex Mono', monospace;
+            background: var(--void);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            gap: 2rem;
+        }
+
+        /* Breathing background */
+        .breath-layer {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .breath-layer-1 {
+            background: radial-gradient(ellipse 80% 60% at 50% 50%,
+                rgba(255, 107, 53, 0.03) 0%,
+                transparent 70%);
+            animation: breathe 8s ease-in-out infinite;
+        }
+
+        .breath-layer-2 {
+            background: radial-gradient(ellipse 100% 80% at 30% 70%,
+                rgba(245, 158, 11, 0.02) 0%,
+                transparent 60%);
+            animation: breathe 12s ease-in-out infinite reverse;
+        }
+
+        @keyframes breathe {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.05); }
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            max-width: 600px;
+        }
+
+        .header h1 {
+            font-size: 0.7rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--spark);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .header h1::before,
+        .header h1::after {
+            content: '';
+            width: 40px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--spark-dim), transparent);
+        }
+
+        .seed-display {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-top: 0.5rem;
+        }
+
+        .seed-value {
+            color: var(--spark);
+            font-weight: 500;
+        }
+
+        /* Canvas */
+        .canvas-container {
+            position: relative;
+            max-width: 90vmin;
+            max-height: 90vmin;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            transition: box-shadow 0.5s var(--ease-out-expo);
+        }
+
+        .canvas-container:hover {
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6),
+                        0 0 60px var(--spark-dim);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text);
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.233s var(--ease-out-expo);
+        }
+
+        button:hover {
+            background: var(--spark);
+            color: var(--void);
+            border-color: var(--spark);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--spark-dim);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        /* Seed input */
+        .seed-input-group {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        input[type="text"] {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text);
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.8rem;
+            width: 140px;
+            transition: all 0.233s var(--ease-out-expo);
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--spark);
+            box-shadow: 0 0 20px var(--spark-dim);
+        }
+
+        /* Metadata */
+        .metadata {
+            font-size: 0.7rem;
+            color: var(--text-whisper);
+            text-align: center;
+            max-width: 500px;
+        }
+
+        .metadata code {
+            color: var(--text-dim);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.1em 0.3em;
+            border-radius: 3px;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 2rem;
+            font-size: 2rem;
+            opacity: 0.1;
+            font-family: 'Noto Sans JP', serif;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .controls {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            button, input[type="text"] {
+                width: 100%;
+            }
+
+            .seed-input-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body data-colony="spark" data-basis="e1">
+    <!-- Breathing Background -->
+    <div class="breath-layer breath-layer-1" aria-hidden="true"></div>
+    <div class="breath-layer breath-layer-2" aria-hidden="true"></div>
+
+    <!-- Header -->
+    <header class="header">
+        <h1>Spark</h1>
+        <p class="seed-display">seed: <span id="seed-display" class="seed-value"></span></p>
+    </header>
+
+    <!-- Canvas -->
+    <div class="canvas-container">
+        <canvas id="canvas" width="1024" height="1024"></canvas>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <button id="random-btn">Random</button>
+        <div class="seed-input-group">
+            <input type="text" id="seed-input" placeholder="Enter seed...">
+            <button id="go-btn">Go</button>
+        </div>
+        <button id="save-btn">Save PNG</button>
+        <button id="copy-btn">Copy Link</button>
+    </div>
+
+    <!-- Metadata -->
+    <div class="metadata" id="metadata"></div>
+
+    <!-- Footer -->
+    <div class="footer" aria-hidden="true">鏡</div>
+
+    <script type="module">
+        import generate from './algo.js';
+
+        const canvas = document.getElementById('canvas');
+        const seedDisplay = document.getElementById('seed-display');
+        const seedInput = document.getElementById('seed-input');
+        const metadataEl = document.getElementById('metadata');
+
+        // Get seed from URL or generate random
+        function getSeed() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('seed') || generateRandomSeed();
+        }
+
+        function generateRandomSeed() {
+            return Math.random().toString(36).slice(2, 10);
+        }
+
+        // Render with seed
+        function render(seed) {
+            // Update URL
+            const url = new URL(window.location);
+            url.searchParams.set('seed', seed);
+            history.replaceState({}, '', url);
+
+            // Update display
+            seedDisplay.textContent = seed;
+            seedInput.value = seed;
+
+            // Generate
+            const result = generate(canvas, seed);
+
+            // Show metadata
+            metadataEl.innerHTML = `
+                Colony: <code>spark</code> |
+                Bursts: <code>${result.burstCount}</code> |
+                Particles: <code>${result.params.particleCount}</code> |
+                Energy: <code>${(result.params.energyIntensity * 100).toFixed(0)}%</code>
+            `;
+        }
+
+        // Event handlers
+        document.getElementById('random-btn').onclick = () => {
+            render(generateRandomSeed());
+        };
+
+        document.getElementById('go-btn').onclick = () => {
+            const seed = seedInput.value.trim() || generateRandomSeed();
+            render(seed);
+        };
+
+        seedInput.onkeypress = (e) => {
+            if (e.key === 'Enter') {
+                const seed = seedInput.value.trim() || generateRandomSeed();
+                render(seed);
+            }
+        };
+
+        document.getElementById('save-btn').onclick = () => {
+            const seed = getSeed();
+            const link = document.createElement('a');
+            link.download = `spark-${seed}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        };
+
+        document.getElementById('copy-btn').onclick = async () => {
+            await navigator.clipboard.writeText(window.location.href);
+            const btn = document.getElementById('copy-btn');
+            const original = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = original, 1500);
+        };
+
+        // Console easter egg
+        window.鏡 = {
+            gen: {
+                colony: 'spark',
+                render,
+                getSeed,
+                generateRandomSeed
+            }
+        };
+        console.log('%c鏡 Spark Generator', 'color: #FF6B35; font-size: 20px; font-weight: bold;');
+        console.log('window.鏡.gen.render("your-seed") to generate');
+
+        // Initial render
+        render(getSeed());
+    </script>
+</body>
+</html>

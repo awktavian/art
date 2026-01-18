@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鏡 Gen — Generative Art Gallery</title>
+    <meta name="description" content="Seven colony algorithms generating infinite unique variations. Hash-seeded deterministic art.">
+
+    <!-- Theme -->
+    <meta name="theme-color" content="#07060B">
+    <meta name="color-scheme" content="dark">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Noto+Sans+JP:wght@400&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --void: #07060B;
+            --text: #F5F0E8;
+            --text-dim: rgba(245, 240, 232, 0.65);
+            --text-whisper: rgba(245, 240, 232, 0.35);
+            --amber: #F59E0B;
+            --amber-dim: rgba(245, 158, 11, 0.3);
+            --spark: #FF6B35;
+            --forge: #FFB347;
+            --flow: #4DD0E1;
+            --nexus: #B388FF;
+            --beacon: #FFE082;
+            --grove: #81C784;
+            --crystal: #4FC3F7;
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'IBM Plex Mono', monospace;
+            background: var(--void);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* Breathing backgrounds */
+        .breath-layer {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .breath-layer-1 {
+            background: radial-gradient(ellipse 80% 60% at 50% 30%,
+                rgba(245, 158, 11, 0.03) 0%,
+                transparent 70%);
+            animation: breathe 8s ease-in-out infinite;
+        }
+
+        .breath-layer-2 {
+            background: radial-gradient(ellipse 100% 80% at 30% 70%,
+                rgba(6, 182, 212, 0.02) 0%,
+                transparent 60%);
+            animation: breathe 12s ease-in-out infinite reverse;
+        }
+
+        @keyframes breathe {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.05); }
+        }
+
+        /* Hero */
+        .hero {
+            min-height: 60vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 4rem 2rem;
+        }
+
+        .hero-kanji {
+            font-family: 'Noto Sans JP', serif;
+            font-size: 8rem;
+            color: var(--amber);
+            opacity: 0.15;
+            margin-bottom: -2rem;
+        }
+
+        .hero h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 3rem;
+            font-weight: 400;
+            letter-spacing: 0.02em;
+            margin-bottom: 1rem;
+        }
+
+        .hero h1 .accent {
+            color: var(--amber);
+            font-style: italic;
+        }
+
+        .hero p {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            max-width: 500px;
+            line-height: 1.7;
+        }
+
+        /* Section */
+        .section {
+            padding: 4rem 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .section-number {
+            font-size: 0.55rem;
+            letter-spacing: 0.5em;
+            color: var(--amber);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .section-number::before,
+        .section-number::after {
+            content: '';
+            width: 40px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--amber-dim), transparent);
+        }
+
+        .section-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2rem;
+            font-weight: 400;
+        }
+
+        .section-title .accent {
+            color: var(--amber);
+            font-style: italic;
+        }
+
+        /* Colony Grid */
+        .colony-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .colony-card {
+            position: relative;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 16px;
+            padding: 2rem;
+            transition: all 0.5s var(--ease-out-expo);
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .colony-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--colony-color);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.5s var(--ease-out-expo);
+            border-radius: 16px 16px 0 0;
+        }
+
+        .colony-card:hover {
+            transform: translateY(-8px);
+            border-color: var(--colony-color);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.35);
+        }
+
+        .colony-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .colony-emoji {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            transition: transform 0.5s var(--ease-out-expo);
+        }
+
+        .colony-card:hover .colony-emoji {
+            transform: scale(1.15) rotate(-5deg);
+        }
+
+        .colony-name {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--colony-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .colony-theme {
+            font-size: 0.7rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-whisper);
+            margin-bottom: 1rem;
+        }
+
+        .colony-desc {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            line-height: 1.6;
+        }
+
+        .colony-status {
+            margin-top: 1.5rem;
+            font-size: 0.65rem;
+            padding: 0.4rem 0.8rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .colony-status.active {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10B981;
+        }
+
+        .colony-status.coming {
+            background: rgba(245, 158, 11, 0.15);
+            color: #F59E0B;
+        }
+
+        /* Tools section */
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .tool-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.4s var(--ease-out-expo);
+        }
+
+        .tool-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--amber);
+        }
+
+        .tool-name {
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .tool-desc {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-whisper);
+            font-size: 0.75rem;
+        }
+
+        .footer-kanji {
+            font-family: 'Noto Sans JP', serif;
+            font-size: 3rem;
+            opacity: 0.1;
+            margin-bottom: 1rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero-kanji { font-size: 5rem; }
+            .hero h1 { font-size: 2rem; }
+            .colony-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body data-kagami="true">
+    <!-- Breathing Background -->
+    <div class="breath-layer breath-layer-1" aria-hidden="true"></div>
+    <div class="breath-layer breath-layer-2" aria-hidden="true"></div>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="hero-kanji" aria-hidden="true">鏡</div>
+        <h1>Generative <span class="accent">Art</span></h1>
+        <p>Seven colony algorithms generating infinite unique variations. Each piece is hash-seeded, deterministic, and unique. Same seed, same art. Forever.</p>
+    </section>
+
+    <!-- Colonies -->
+    <section class="section">
+        <div class="section-header">
+            <div class="section-number">01</div>
+            <h2 class="section-title">Colony <span class="accent">Algorithms</span></h2>
+        </div>
+
+        <div class="colony-grid">
+            <a href="algorithms/spark/" class="colony-card" style="--colony-color: var(--spark);">
+                <div class="colony-emoji">🔥</div>
+                <div class="colony-name">Spark</div>
+                <div class="colony-theme">Ideation</div>
+                <div class="colony-desc">Energy bursts and particle explosions. The ignition of new ideas. Stochastic spray patterns and radiant cores.</div>
+                <div class="colony-status active">Active</div>
+            </a>
+
+            <div class="colony-card" style="--colony-color: var(--forge);">
+                <div class="colony-emoji">⚒️</div>
+                <div class="colony-name">Forge</div>
+                <div class="colony-theme">Implementation</div>
+                <div class="colony-desc">Structural grids and blueprint patterns. The methodical construction of systems. Lattice formations and precise geometry.</div>
+                <div class="colony-status coming">Coming</div>
+            </div>
+
+            <div class="colony-card" style="--colony-color: var(--flow);">
+                <div class="colony-emoji">🌊</div>
+                <div class="colony-name">Flow</div>
+                <div class="colony-theme">Debugging</div>
+                <div class="colony-desc">Fluid simulations and stream lines. The patient untangling of complexity. Curl noise fields and wave patterns.</div>
+                <div class="colony-status coming">Coming</div>
+            </div>
+
+            <div class="colony-card" style="--colony-color: var(--nexus);">
+                <div class="colony-emoji">🔗</div>
+                <div class="colony-name">Nexus</div>
+                <div class="colony-theme">Integration</div>
+                <div class="colony-desc">Network graphs and connection diagrams. The weaving of disparate parts. Force-directed layouts and constellation patterns.</div>
+                <div class="colony-status coming">Coming</div>
+            </div>
+
+            <div class="colony-card" style="--colony-color: var(--beacon);">
+                <div class="colony-emoji">🗼</div>
+                <div class="colony-name">Beacon</div>
+                <div class="colony-theme">Planning</div>
+                <div class="colony-desc">Radial projections and lighthouse sweeps. The illumination of direction. Spotlight patterns and illumination gradients.</div>
+                <div class="colony-status coming">Coming</div>
+            </div>
+
+            <div class="colony-card" style="--colony-color: var(--grove);">
+                <div class="colony-emoji">🌿</div>
+                <div class="colony-name">Grove</div>
+                <div class="colony-theme">Research</div>
+                <div class="colony-desc">L-system trees and organic growth. The patient cultivation of knowledge. Cellular automata and branching patterns.</div>
+                <div class="colony-status coming">Coming</div>
+            </div>
+
+            <div class="colony-card" style="--colony-color: var(--crystal);">
+                <div class="colony-emoji">💎</div>
+                <div class="colony-name">Crystal</div>
+                <div class="colony-theme">Verification</div>
+                <div class="colony-desc">Voronoi tessellations and geometric facets. The clarity of proven truth. Recursive subdivisions and kaleidoscopic symmetry.</div>
+                <div class="colony-status coming">Coming</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tools -->
+    <section class="section">
+        <div class="section-header">
+            <div class="section-number">02</div>
+            <h2 class="section-title">Development <span class="accent">Tools</span></h2>
+        </div>
+
+        <div class="tools-grid">
+            <a href="test-harness.html" class="tool-card">
+                <div class="tool-name">Test Harness</div>
+                <div class="tool-desc">Generate 10 random pieces, rate them, identify patterns for algorithm refinement.</div>
+            </a>
+
+            <a href="algorithms/spark/?seed=kagami" class="tool-card">
+                <div class="tool-name">Reference Seed</div>
+                <div class="tool-desc">The canonical "kagami" seed — use for consistent testing across algorithm changes.</div>
+            </a>
+
+            <a href="../GENERATIVE_ARCHITECTURE.md" class="tool-card">
+                <div class="tool-name">Architecture Docs</div>
+                <div class="tool-desc">Technical documentation for the generative system architecture.</div>
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-kanji">鏡</div>
+        <p>Generative art is not about one perfect piece.<br>It's about a system that produces infinite perfect pieces.</p>
+    </footer>
+
+    <script>
+        // Console easter egg
+        window.鏡 = {
+            gen: {
+                version: '1.0.0',
+                colonies: ['spark', 'forge', 'flow', 'nexus', 'beacon', 'grove', 'crystal'],
+                active: ['spark']
+            }
+        };
+        console.log('%c鏡 Gen', 'color: #F59E0B; font-size: 24px; font-weight: bold;');
+        console.log('%cSeven colonies. Infinite variations.', 'color: #F5F0E8; font-size: 12px;');
+        console.log('window.鏡.gen for system info');
+    </script>
+</body>
+</html>
