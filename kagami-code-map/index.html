@@ -889,9 +889,10 @@
             const children = Object.values(node.children || {}).filter(c => c.lines > 0);
             if (!children.length) return;
             
-            // Layout with padding
+            // Layout with padding - account for legend width (200px) on left
+            const legendWidth = 200;
             const pad = 8;
-            state.treemap.cells = squarify(children, pad, pad, w - pad * 2, h - pad * 2);
+            state.treemap.cells = squarify(children, legendWidth + pad, pad, w - legendWidth - pad * 2, h - pad * 2);
             
             // Draw cells
             for (const cell of state.treemap.cells) {
@@ -902,7 +903,6 @@
         // Proper squarify implementation
         // Simple slice-and-dice treemap - reliable and predictable
         function squarify(items, x, y, w, h) {
-            console.log('squarify called with', items.length, 'items, area:', w, 'x', h);
             if (!items.length || w < 4 || h < 4) return [];
             
             // Sort by lines descending
@@ -910,12 +910,8 @@
             const total = sorted.reduce((s, c) => s + c.lines, 0);
             if (total === 0) return [];
             
-            console.log('Top 3 items:', sorted.slice(0, 3).map(s => s.name + ':' + s.lines));
-            
             const cells = [];
             sliceAndDice(sorted, x, y, w, h, total, cells, 0);
-            console.log('Generated', cells.length, 'cells');
-            console.log('First 3 cells:', cells.slice(0, 3).map(c => c.node.name + ' at ' + Math.round(c.x) + ',' + Math.round(c.y)));
             return cells;
         }
         
@@ -970,19 +966,12 @@
         }
         
         function drawTreemapCell(ctx, { node, x, y, w, h }) {
-            try {
-                if (w < 2 || h < 2 || !isFinite(w) || !isFinite(h) || !isFinite(x) || !isFinite(y)) return;
-                
-                // Debug: log only packages once
-                if (node.name === 'packages' && !window._pkgLogged) {
-                    window._pkgLogged = true;
-                    console.log('PACKAGES CELL:', x, y, w, h, 'node:', node);
-                }
-                
-                const hov = state.treemap.hovered === node;
-                const sel = state.treemap.selected === node;
-                const cat = node.category || node.file?.category || (node.isFile ? 'Other' : 'Folder');
-                const c = getHSL(cat);
+            if (w < 2 || h < 2 || !isFinite(w) || !isFinite(h) || !isFinite(x) || !isFinite(y)) return;
+            
+            const hov = state.treemap.hovered === node;
+            const sel = state.treemap.selected === node;
+            const cat = node.category || node.file?.category || (node.isFile ? 'Other' : 'Folder');
+            const c = getHSL(cat);
             
             // Calculate corner radius safely
             const r = Math.max(0, Math.min(8, Math.min(w, h) / 4));
@@ -1028,10 +1017,6 @@
                 const isLarge = w > 200 && h > 200;
                 const fontSize = isLarge ? 20 : (isFolder && w > 150 ? 16 : 13);
                 
-                if (isLarge) {
-                    console.log('Drawing large label for', node.name, 'at', x, y, 'fontSize', fontSize);
-                }
-                
                 ctx.font = `700 ${fontSize}px "IBM Plex Sans", sans-serif`;
                 
                 const maxChars = Math.floor((w - 24) / (fontSize * 0.55));
@@ -1067,9 +1052,6 @@
                 ctx.fillText(short, x + 5, y + 15);
                 ctx.fillStyle = '#ffffff';
                 ctx.fillText(short, x + 4, y + 14);
-            }
-            } catch (err) {
-                console.error('Error drawing cell', node?.name, err);
             }
         }
         
