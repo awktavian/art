@@ -736,6 +736,9 @@
             tooltipTimer: null,
         };
         
+        // Global debug access
+        window.DEBUG_STATE = state;
+        
         let treemapCanvas, treemapCtx;
         let semanticCanvas, semanticCtx;
         let dpr = 1;
@@ -1060,9 +1063,10 @@
         // ═══════════════════════════════════════════════════════════════════════════════
         
         function renderSemantic() {
+            console.log('[3D] renderSemantic called', { filesCount: state.files?.length, view: state.view, hasCtx: !!semanticCtx });
             window._debug3D = { filesCount: state.files?.length, view: state.view, hasCtx: !!semanticCtx };
-            if (!semanticCtx) return;
-            if (!state.files.length) return;
+            if (!semanticCtx) { console.log('[3D] No semanticCtx'); return; }
+            if (!state.files.length) { console.log('[3D] No files'); return; }
             
             const w = semanticCanvas.width / dpr;
             const h = semanticCanvas.height / dpr;
@@ -1095,6 +1099,11 @@
                 f.x !== undefined && f.y !== undefined && f.z !== undefined &&
                 isFinite(f.x) && isFinite(f.y) && isFinite(f.z)
             );
+            console.log('[3D] Files with coords:', files.length, '/', state.files.length);
+            
+            if (files.length === 0 && state.files.length > 0) {
+                console.log('[3D] Sample file without coords:', state.files[0]);
+            }
             
             if (state.filter) {
                 files = files.filter(f => f.category === state.filter);
@@ -1106,6 +1115,7 @@
                     (f.name && f.name.toLowerCase().includes(q))
                 );
             }
+            console.log('[3D] After filter/query:', files.length);
             
             // Camera parameters for STRONG perspective
             const fov = 1.2;
@@ -1149,6 +1159,7 @@
             // Sort back to front for proper occlusion
             projected.sort((a, b) => a.sz - b.sz);
             state.semantic.projected = projected;
+            console.log('[3D] Projected:', projected.length, 'first:', projected[0]?.sx, projected[0]?.sy);
             
             // Draw connections for selected file
             if (state.semantic.selected && state.semantic.related.length) {
@@ -1320,6 +1331,7 @@
         }
         
         function switchView(view) {
+            console.log('[VIEW] Switching to:', view);
             state.view = view;
             document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
             document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === view + '-view'));
