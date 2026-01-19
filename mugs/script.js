@@ -112,12 +112,16 @@
             if (isPlaying) {
                 audio.pause();
                 button.classList.remove('playing');
+                button.setAttribute('aria-pressed', 'false');
+                button.setAttribute('aria-label', 'Play JFK inaugural address');
                 icon.textContent = '▶';
                 label.textContent = 'Listen to JFK';
                 isPlaying = false;
             } else {
                 audio.play().then(() => {
                     button.classList.add('playing');
+                    button.setAttribute('aria-pressed', 'true');
+                    button.setAttribute('aria-label', 'Pause JFK inaugural address');
                     icon.textContent = '❚❚';
                     label.textContent = 'Playing...';
                     isPlaying = true;
@@ -126,7 +130,7 @@
                     label.textContent = 'Tap to play';
                 });
             }
-            
+
             // Haptic feedback
             if ('vibrate' in navigator) {
                 navigator.vibrate(15);
@@ -141,9 +145,17 @@
         });
         
         audio.addEventListener('error', () => {
-            label.textContent = 'Audio unavailable';
-            button.disabled = true;
-            button.style.opacity = '0.5';
+            const errorCode = audio.error ? audio.error.code : 0;
+            const messages = {
+                1: 'Loading stopped',
+                2: 'Network error',
+                3: 'Decoding failed',
+                4: 'Format not supported'
+            };
+            label.textContent = messages[errorCode] || 'Audio unavailable';
+            button.disabled = false;
+            button.style.opacity = '0.7';
+            // Allow retry on click
         });
     }
 
@@ -317,9 +329,25 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // SCROLL PROGRESS INDICATOR
+    // ═══════════════════════════════════════════════════════════════
+
+    function initScrollProgress() {
+        const progressBar = document.createElement('div');
+        progressBar.className = 'scroll-progress';
+        document.body.appendChild(progressBar);
+
+        window.addEventListener('scroll', () => {
+            const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const scrolled = (window.scrollY / scrollHeight) * 100;
+            progressBar.style.width = scrolled + '%';
+        }, { passive: true });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // INITIALIZATION
     // ═══════════════════════════════════════════════════════════════
-    
+
     function init() {
         initViewportFix();
         initScrollReveal();
@@ -331,6 +359,7 @@
         initTouchInteractions();
         initImageLazyLoad();
         initPullToRefreshPrevention();
+        initScrollProgress();
         
         // Small console message
         console.log(
