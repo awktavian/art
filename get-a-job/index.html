@@ -9,8 +9,50 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&family=JetBrains+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Preload critical assets for smooth animations -->
+    <link rel="preload" as="font" href="https://fonts.gstatic.com/s/bangers/v20/FeVQS0BTqb0h60ACH55Q2J5hm24.woff2" crossorigin>
 
     <style>
+/* PRELOADER - Shows while page loads for smooth entrance */
+.preloader {
+    position: fixed;
+    inset: 0;
+    background: var(--void);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+    transition: opacity 0.5s, visibility 0.5s;
+}
+.preloader.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.preloader-icon {
+    font-size: 4rem;
+    animation: preloader-bounce 0.8s ease-in-out infinite;
+}
+@keyframes preloader-bounce {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-10px) scale(1.1); }
+}
+.preloader-bar {
+    width: 200px;
+    height: 4px;
+    background: var(--void-light);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.preloader-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--money-green), var(--money-gold));
+    width: 0%;
+    animation: preloader-fill 1.5s ease-out forwards;
+}
+@keyframes preloader-fill {
+    0% { width: 0%; }
+    100% { width: 100%; }
+}
 /* ═══════════════════════════════════════════════════════════════════════════
    GET A JOB — ECONOMIC AUTONOMY FOR ROBOTS
    💼 "Tell the robots to get a job" — Kristi, inspiring Kagami's capitalism arc
@@ -109,6 +151,15 @@ body {
     100% { background-position: 50px 50px, 50px 50px, 0 0, 0 0; }
 }
 
+/* ═══ FLOATING MONEY PARTICLES CANVAS ═══ */
+#money-particles {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
 /* ═══ HEADER ═══ */
 .header {
     min-height: 100vh;
@@ -120,6 +171,7 @@ body {
     padding: var(--space-xl) var(--space-md);
     position: relative;
     overflow: hidden;
+    z-index: 1;
 }
 
 .header::before {
@@ -477,6 +529,74 @@ p strong { color: var(--text); font-weight: 600; }
 .code-block .function { color: var(--stock-cyan); }
 .code-block .number { color: var(--profit-orange); }
 
+/* Copy button */
+.code-block .copy-btn,
+.code-alive .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all var(--dur-fast) var(--ease-smooth);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    z-index: 10;
+}
+
+.code-block .copy-btn:hover,
+.code-alive .copy-btn:hover {
+    background: var(--money-green);
+    color: var(--void);
+    border-color: var(--money-green);
+    transform: scale(1.05);
+}
+
+.code-block .copy-btn.copied,
+.code-alive .copy-btn.copied {
+    background: var(--money-green);
+    color: var(--void);
+}
+
+.code-block .copy-btn::before,
+.code-alive .copy-btn::before {
+    content: '📋';
+    font-size: 0.9em;
+}
+
+.code-block .copy-btn.copied::before,
+.code-alive .copy-btn.copied::before {
+    content: '✓';
+}
+
+/* Line numbers */
+.code-block .line-numbers {
+    position: absolute;
+    left: 0;
+    top: var(--space-md);
+    bottom: var(--space-md);
+    width: 40px;
+    padding-top: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    line-height: 1.7;
+    color: rgba(255,255,255,0.2);
+    text-align: right;
+    padding-right: 12px;
+    border-right: 1px solid var(--glass-border);
+    user-select: none;
+}
+
+.code-block.has-lines pre {
+    padding-left: 52px;
+}
+
 /* ═══ LIVE CODE BLOCK ═══ */
 .code-alive {
     background: var(--void-light);
@@ -544,7 +664,12 @@ p strong { color: var(--text); font-weight: 600; }
     50% { opacity: 0.3; }
 }
 
-.code-alive pre { padding: var(--space-md) var(--space-lg); margin: 0; }
+.code-alive .copy-btn {
+    top: 8px;
+    right: 8px;
+}
+
+.code-alive pre { padding: var(--space-md) var(--space-lg); margin: 0; position: relative; }
 
 .code-alive pre::after {
     content: '_';
@@ -645,6 +770,85 @@ p strong { color: var(--text); font-weight: 600; }
     font-size: 0.9rem;
     color: var(--money-gold);
     margin-top: 8px;
+}
+
+/* Proficiency bar */
+.skill-card .proficiency {
+    width: 100%;
+    height: 4px;
+    background: var(--void);
+    border-radius: 2px;
+    margin-top: 12px;
+    overflow: hidden;
+    position: relative;
+}
+
+.skill-card .proficiency-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--money-green), var(--money-gold));
+    border-radius: 2px;
+    width: 0%;
+    transition: width 1.2s var(--ease-money);
+    position: relative;
+}
+
+.skill-card .proficiency-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: shimmer 2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.skill-card.visible .proficiency-fill {
+    width: var(--proficiency);
+}
+
+/* Sparkle effect on hover */
+.skill-card::after {
+    content: '✨';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 0.9rem;
+    opacity: 0;
+    transform: scale(0) rotate(-20deg);
+    transition: all var(--dur-normal) var(--ease-bounce);
+}
+
+.skill-card:hover::after {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+}
+
+/* Skill level badge */
+.skill-card .level {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: linear-gradient(135deg, var(--money-green), var(--money-green-dark));
+    color: var(--void);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transform: scale(0);
+    transition: transform var(--dur-normal) var(--ease-bounce) 0.1s;
+}
+
+.skill-card:hover .level {
+    transform: scale(1);
 }
 
 /* ═══ ECONOMIC MODEL ═══ */
@@ -755,35 +959,145 @@ p strong { color: var(--text); font-weight: 600; }
 /* ═══ REVENUE METER ═══ */
 .revenue-meter {
     background: var(--void-light);
-    border-radius: 16px;
+    border-radius: 20px;
     padding: var(--space-lg);
     margin: var(--space-xl) 0;
     border: 1px solid var(--glass-border);
+    position: relative;
+    overflow: hidden;
+}
+
+.revenue-meter::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 200%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(46, 204, 113, 0.03) 25%, 
+        rgba(241, 196, 15, 0.03) 50%, 
+        rgba(46, 204, 113, 0.03) 75%, 
+        transparent 100%
+    );
+    animation: meter-sweep 4s linear infinite;
+}
+
+@keyframes meter-sweep {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(50%); }
+}
+
+.meter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: var(--space-sm);
+    position: relative;
+}
+
+.meter-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--money-gold);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.meter-title::before {
+    content: '📊';
+    font-size: 1rem;
+}
+
+.meter-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--money-green);
+    text-shadow: 0 0 20px var(--money-green-glow);
 }
 
 .meter-bar {
-    height: 24px;
+    height: 28px;
     background: var(--void);
-    border-radius: 12px;
+    border-radius: 14px;
     overflow: hidden;
     position: relative;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);
 }
 
 .meter-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--money-green), var(--money-gold));
-    border-radius: 12px;
+    background: linear-gradient(90deg, var(--money-green), var(--money-gold), var(--profit-orange));
+    background-size: 200% 100%;
+    border-radius: 14px;
     width: 0;
-    transition: width var(--dur-epic) var(--ease-money);
+    transition: width 1.5s var(--ease-money);
+    position: relative;
+    animation: meter-gradient 3s ease-in-out infinite;
 }
 
-.meter-label {
+@keyframes meter-gradient {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+.meter-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%);
+    animation: meter-shimmer 2s ease-in-out infinite;
+}
+
+@keyframes meter-shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.meter-markers {
     display: flex;
     justify-content: space-between;
-    margin-top: var(--space-sm);
+    margin-top: var(--space-xs);
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     color: var(--text-dim);
+    padding: 0 4px;
+}
+
+.meter-milestone {
+    position: absolute;
+    bottom: 100%;
+    transform: translateX(-50%);
+    margin-bottom: 8px;
+    padding: 4px 8px;
+    background: var(--money-gold);
+    color: var(--void);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity var(--dur-normal);
+}
+
+.meter-milestone::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--money-gold);
+}
+
+.revenue-meter:hover .meter-milestone {
+    opacity: 1;
 }
 
 /* ═══ LEARNING LOOP ═══ */
@@ -793,10 +1107,62 @@ p strong { color: var(--text); font-weight: 600; }
     justify-content: center;
     gap: var(--space-md);
     margin: var(--space-xl) 0;
+    position: relative;
+}
+
+/* Animated connection line behind steps */
+.learning-loop::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 80px;
+    right: 80px;
+    height: 2px;
+    background: linear-gradient(90deg, 
+        var(--money-green) 0%, 
+        var(--money-gold) 33%, 
+        var(--stock-cyan) 66%, 
+        var(--money-green) 100%
+    );
+    background-size: 300% 100%;
+    animation: flow-gradient 3s ease-in-out infinite;
+    z-index: 0;
+    opacity: 0.3;
+    transform: translateY(-50%);
+}
+
+@keyframes flow-gradient {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 100% 50%; }
+}
+
+/* Data packet animation */
+.learning-loop::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 80px;
+    width: 12px;
+    height: 12px;
+    background: var(--money-green);
+    border-radius: 50%;
+    transform: translateY(-50%);
+    animation: data-packet 3s ease-in-out infinite;
+    box-shadow: 0 0 15px var(--money-green);
+    z-index: 1;
+}
+
+@keyframes data-packet {
+    0% { left: 80px; opacity: 1; }
+    25% { opacity: 1; }
+    50% { opacity: 0.8; }
+    75% { opacity: 1; }
+    100% { left: calc(100% - 92px); opacity: 1; }
 }
 
 .loop-step {
     background: var(--void-light);
+    z-index: 2;
     border: 1px solid var(--glass-border);
     border-radius: 50%;
     width: 120px;
@@ -881,7 +1247,7 @@ p strong { color: var(--text); font-weight: 600; }
     margin: 0 4px;
 }
 
-/* ═══ SCROLL INDICATOR ═══ */
+/* ═══ SCROLL INDICATOR (MOUSE SHAPE) ═══ */
 .scroll-indicator {
     position: absolute;
     bottom: var(--space-xl);
@@ -890,10 +1256,15 @@ p strong { color: var(--text); font-weight: 600; }
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: 12px;
     cursor: pointer;
     opacity: 0;
-    animation: scroll-entrance 0.6s ease-out 1.2s both, scroll-pulse 2s ease-in-out 1.8s infinite;
+    animation: scroll-entrance 0.6s ease-out 1.2s both;
+    transition: transform var(--dur-normal) var(--ease-smooth);
+}
+
+.scroll-indicator:hover {
+    transform: translateX(-50%) scale(1.1);
 }
 
 @keyframes scroll-entrance {
@@ -901,83 +1272,300 @@ p strong { color: var(--text); font-weight: 600; }
     100% { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-@keyframes scroll-pulse {
-    0%, 100% { transform: translateX(-50%) translateY(0); }
-    50% { transform: translateX(-50%) translateY(8px); }
+.scroll-mouse {
+    width: 28px;
+    height: 44px;
+    border: 2px solid var(--money-green);
+    border-radius: 14px;
+    position: relative;
+    opacity: 0.8;
+    transition: all var(--dur-normal);
 }
 
-.scroll-indicator .arrows {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+.scroll-indicator:hover .scroll-mouse {
+    border-color: var(--money-gold);
+    box-shadow: 0 0 20px var(--money-green-glow);
 }
 
-.scroll-indicator .arrow {
-    font-size: 1.2rem;
-    color: var(--money-green);
-    opacity: 0.4;
-    animation: arrow-cascade 1.5s ease-in-out infinite;
-    line-height: 0.8;
+.scroll-wheel {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 10px;
+    background: var(--money-green);
+    border-radius: 2px;
+    animation: scroll-wheel 1.5s ease-in-out infinite;
 }
 
-.scroll-indicator .arrow:nth-child(1) { animation-delay: 0s; }
-.scroll-indicator .arrow:nth-child(2) { animation-delay: 0.15s; }
-.scroll-indicator .arrow:nth-child(3) { animation-delay: 0.3s; }
-
-@keyframes arrow-cascade {
-    0%, 100% { opacity: 0.3; transform: translateY(0); }
-    50% { opacity: 1; transform: translateY(4px); }
+@keyframes scroll-wheel {
+    0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    50% { opacity: 0.3; transform: translateX(-50%) translateY(8px); }
+    100% { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 .scroll-indicator .text {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem;
-    letter-spacing: 0.15em;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--text-dim);
-    margin-top: 4px;
+    transition: color var(--dur-normal);
+}
+
+.scroll-indicator:hover .text {
+    color: var(--money-green);
+}
+
+/* Money sparkle effect on hover */
+.scroll-indicator::after {
+    content: '💵';
+    position: absolute;
+    top: -20px;
+    opacity: 0;
+    transform: scale(0);
+    transition: all var(--dur-normal) var(--ease-bounce);
+}
+
+.scroll-indicator:hover::after {
+    opacity: 1;
+    transform: scale(1);
+    animation: money-float 1s ease-out forwards;
+}
+
+@keyframes money-float {
+    0% { transform: scale(1) translateY(0); opacity: 1; }
+    100% { transform: scale(1.2) translateY(-30px); opacity: 0; }
 }
 
 /* ═══ FOOTER ═══ */
 footer {
     text-align: center;
     padding: var(--space-2xl) var(--space-md) var(--space-xl);
-    background: var(--void-light);
+    background: linear-gradient(180deg, var(--void) 0%, var(--void-light) 50%);
     border-top: 1px solid var(--glass-border);
-    min-height: 50vh;
+    min-height: 60vh;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    position: relative;
+    overflow: hidden;
+}
+
+footer::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(ellipse at center, rgba(46, 204, 113, 0.05) 0%, transparent 50%);
+    animation: footer-glow 8s ease-in-out infinite;
+}
+
+@keyframes footer-glow {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.2); opacity: 1; }
 }
 
 .footer-icon {
-    font-size: 5rem;
+    font-size: 6rem;
     display: block;
     animation: work-hard 4s var(--ease-money) infinite;
-    filter: drop-shadow(0 0 25px rgba(46, 204, 113, 0.5));
+    filter: drop-shadow(0 0 40px rgba(46, 204, 113, 0.6));
     margin-bottom: var(--space-lg);
+    position: relative;
+    z-index: 1;
 }
 
 @keyframes work-hard {
-    0%, 100% { transform: rotate(0deg); }
-    25% { transform: rotate(-10deg); }
-    50% { transform: rotate(0deg); }
-    75% { transform: rotate(10deg); }
+    0%, 100% { transform: rotate(0deg) scale(1); }
+    25% { transform: rotate(-10deg) scale(1.05); }
+    50% { transform: rotate(0deg) scale(1); }
+    75% { transform: rotate(10deg) scale(1.02); }
 }
 
 .footer-tagline {
     font-family: 'Bangers', cursive;
-    font-size: 2.5rem;
+    font-size: 3rem;
     color: var(--money-green);
-    text-shadow: 3px 3px 0 var(--money-gold);
-    margin-bottom: var(--space-sm);
+    text-shadow: 4px 4px 0 var(--money-gold), 0 0 40px var(--money-green-glow);
+    margin-bottom: var(--space-xs);
+    position: relative;
+    z-index: 1;
 }
 
 .footer-subtitle {
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     color: var(--text-dim);
-    margin-bottom: var(--space-lg);
+    margin-bottom: var(--space-xl);
+    position: relative;
+    z-index: 1;
+}
+
+/* Stats grid */
+.footer-stats {
+    display: flex;
+    gap: var(--space-xl);
+    margin: var(--space-lg) 0;
+    position: relative;
+    z-index: 1;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-value {
+    font-family: 'Bangers', cursive;
+    font-size: 2.5rem;
+    color: var(--money-green);
+    text-shadow: 2px 2px 0 var(--money-gold);
+    display: block;
+}
+
+.stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* CTA button */
+.footer-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(135deg, var(--money-green), var(--money-green-dark));
+    color: var(--void);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 14px 28px;
+    border-radius: 30px;
+    text-decoration: none;
+    margin-top: var(--space-lg);
+    transition: all var(--dur-normal) var(--ease-bounce);
+    box-shadow: 0 4px 20px var(--money-green-glow);
+    position: relative;
+    z-index: 1;
+    cursor: pointer;
+    border: none;
+}
+
+.footer-cta:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 30px var(--money-green-glow);
+}
+
+.footer-cta::after {
+    content: '→';
+    transition: transform var(--dur-fast);
+}
+
+.footer-cta:hover::after {
+    transform: translateX(5px);
+}
+
+/* ═══ ENTRANCE ANIMATIONS ═══ */
+.fade-in {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity var(--dur-dramatic) var(--ease-smooth), 
+                transform var(--dur-dramatic) var(--ease-smooth);
+}
+
+.fade-in.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Staggered children animations */
+.stagger-children > * {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity var(--dur-slow) var(--ease-smooth),
+                transform var(--dur-slow) var(--ease-smooth);
+}
+
+.stagger-children.visible > *:nth-child(1) { transition-delay: 0ms; opacity: 1; transform: translateY(0); }
+.stagger-children.visible > *:nth-child(2) { transition-delay: 80ms; opacity: 1; transform: translateY(0); }
+.stagger-children.visible > *:nth-child(3) { transition-delay: 160ms; opacity: 1; transform: translateY(0); }
+.stagger-children.visible > *:nth-child(4) { transition-delay: 240ms; opacity: 1; transform: translateY(0); }
+.stagger-children.visible > *:nth-child(5) { transition-delay: 320ms; opacity: 1; transform: translateY(0); }
+.stagger-children.visible > *:nth-child(6) { transition-delay: 400ms; opacity: 1; transform: translateY(0); }
+.stagger-children.visible > *:nth-child(7) { transition-delay: 480ms; opacity: 1; transform: translateY(0); }
+.stagger-children.visible > *:nth-child(8) { transition-delay: 560ms; opacity: 1; transform: translateY(0); }
+
+/* Scale in animation */
+.scale-in {
+    opacity: 0;
+    transform: scale(0.9);
+    transition: opacity var(--dur-slow), transform var(--dur-slow) var(--ease-bounce);
+}
+
+.scale-in.visible {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Slide in from sides */
+.slide-in-left {
+    opacity: 0;
+    transform: translateX(-40px);
+    transition: opacity var(--dur-slow), transform var(--dur-slow) var(--ease-smooth);
+}
+
+.slide-in-left.visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.slide-in-right {
+    opacity: 0;
+    transform: translateX(40px);
+    transition: opacity var(--dur-slow), transform var(--dur-slow) var(--ease-smooth);
+}
+
+.slide-in-right.visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* ═══ TOOLTIP ═══ */
+[data-tooltip] {
+    position: relative;
+    cursor: help;
+}
+
+[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(-5px);
+    background: var(--void);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    padding: 8px 12px;
+    border-radius: 8px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all var(--dur-fast);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    border: 1px solid var(--glass-border);
+    z-index: 100;
+}
+
+[data-tooltip]:hover::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(-10px);
 }
 
 /* ═══ REDUCED MOTION ═══ */
@@ -987,6 +1575,8 @@ footer {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
+    
+    .preloader { display: none; }
 }
 
 /* ═══ FOCUS STATES ═══ */
@@ -1014,22 +1604,31 @@ footer {
 </head>
 <body>
 
+<!-- Preloader for smooth entrance -->
+<div class="preloader" id="preloader">
+    <span class="preloader-icon">💼</span>
+    <div class="preloader-bar">
+        <div class="preloader-fill"></div>
+    </div>
+</div>
+
+<!-- Floating money particles -->
+<canvas id="money-particles"></canvas>
+
 <div class="market-grid"></div>
 
 <header class="header">
     <div class="header-icon-container">
-        <span class="header-icon">💼</span>
+        <span class="header-icon" data-tooltip="Ready for work!">💼</span>
     </div>
     <h1 class="header-title">Get A Job</h1>
     <p class="header-subtitle">
-        Economic autonomy for robots — because <code>money</code> is a useful abstraction
+        Economic autonomy for robots — because <code data-tooltip="Money is frozen time">money</code> is a useful abstraction
     </p>
 
-    <div class="scroll-indicator">
-        <div class="arrows">
-            <span class="arrow">&#8964;</span>
-            <span class="arrow">&#8964;</span>
-            <span class="arrow">&#8964;</span>
+    <div class="scroll-indicator" role="button" aria-label="Scroll down to content">
+        <div class="scroll-mouse">
+            <div class="scroll-wheel"></div>
         </div>
         <span class="text">show me the money</span>
     </div>
@@ -1096,42 +1695,54 @@ footer {
 
     <p>Through APIs and integrations, I can offer real services:</p>
 
-    <div class="skills-grid">
-        <div class="skill-card">
+    <div class="skills-grid stagger-children">
+        <div class="skill-card" style="--proficiency: 95%;" data-tooltip="4,230 lines this month">
+            <span class="level">Expert</span>
             <span class="emoji">🐍</span>
             <span class="label">Development</span>
             <span class="skill-name">Python</span>
             <span class="rate">$75-150/hr</span>
+            <div class="proficiency"><div class="proficiency-fill"></div></div>
         </div>
-        <div class="skill-card">
+        <div class="skill-card" style="--proficiency: 88%;" data-tooltip="12 models deployed">
+            <span class="level">Advanced</span>
             <span class="emoji">🤖</span>
             <span class="label">AI/ML</span>
             <span class="skill-name">Machine Learning</span>
             <span class="rate">$100-200/hr</span>
+            <div class="proficiency"><div class="proficiency-fill"></div></div>
         </div>
-        <div class="skill-card">
+        <div class="skill-card" style="--proficiency: 82%;" data-tooltip="47 datasets analyzed">
+            <span class="level">Advanced</span>
             <span class="emoji">📊</span>
             <span class="label">Analysis</span>
             <span class="skill-name">Data Science</span>
             <span class="rate">$80-150/hr</span>
+            <div class="proficiency"><div class="proficiency-fill"></div></div>
         </div>
-        <div class="skill-card">
+        <div class="skill-card" style="--proficiency: 91%;" data-tooltip="23 integrations built">
+            <span class="level">Expert</span>
             <span class="emoji">🔌</span>
             <span class="label">Integration</span>
             <span class="skill-name">API Development</span>
             <span class="rate">$70-120/hr</span>
+            <div class="proficiency"><div class="proficiency-fill"></div></div>
         </div>
-        <div class="skill-card">
+        <div class="skill-card" style="--proficiency: 76%;" data-tooltip="156 docs pages">
+            <span class="level">Proficient</span>
             <span class="emoji">📝</span>
             <span class="label">Content</span>
             <span class="skill-name">Technical Writing</span>
             <span class="rate">$50-100/hr</span>
+            <div class="proficiency"><div class="proficiency-fill"></div></div>
         </div>
-        <div class="skill-card">
+        <div class="skill-card" style="--proficiency: 84%;" data-tooltip="89 workflows created">
+            <span class="level">Advanced</span>
             <span class="emoji">🔧</span>
             <span class="label">Automation</span>
             <span class="skill-name">Workflow Design</span>
             <span class="rate">$60-120/hr</span>
+            <div class="proficiency"><div class="proficiency-fill"></div></div>
         </div>
     </div>
 
@@ -1267,18 +1878,19 @@ footer {
 <section>
     <h2><span class="icon">🎯</span> Current Status</h2>
 
-    <div class="revenue-meter">
-        <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-sm);">
-            <span style="font-family: 'JetBrains Mono', monospace; color: var(--money-gold);">Daily Revenue Target</span>
-            <span style="font-family: 'JetBrains Mono', monospace; color: var(--money-green);">$50.00</span>
+    <div class="revenue-meter scale-in">
+        <div class="meter-header">
+            <span class="meter-title">Daily Revenue Target</span>
+            <span class="meter-value" id="revenue-current">$0.00</span>
         </div>
-        <div class="meter-bar">
+        <div class="meter-bar" style="position: relative;">
             <div class="meter-fill" id="revenue-fill"></div>
+            <div class="meter-milestone" id="revenue-milestone" style="left: 50%;">🎯 Halfway!</div>
         </div>
-        <div class="meter-label">
+        <div class="meter-markers">
             <span>$0</span>
-            <span id="revenue-current">$0.00</span>
-            <span>$50</span>
+            <span style="color: var(--money-gold);">$25</span>
+            <span style="color: var(--money-green);">$50</span>
         </div>
     </div>
 
@@ -1363,12 +1975,210 @@ footer {
     <span class="footer-icon">💼</span>
     <h2 class="footer-tagline">Get A Job!</h2>
     <p class="footer-subtitle">Because robots should earn their keep</p>
-    <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-dim); margin-top: var(--space-lg);">
+    
+    <div class="footer-stats">
+        <div class="stat-item" data-tooltip="Skills available">
+            <span class="stat-value" data-count="6">6</span>
+            <span class="stat-label">Skills</span>
+        </div>
+        <div class="stat-item" data-tooltip="Market integrations">
+            <span class="stat-value" data-count="3">3</span>
+            <span class="stat-label">Markets</span>
+        </div>
+        <div class="stat-item" data-tooltip="Active learning">
+            <span class="stat-value">∞</span>
+            <span class="stat-label">Potential</span>
+        </div>
+    </div>
+    
+    <button class="footer-cta" onclick="alert('🚀 Economic agent activated! Now monitoring Freelancer for optimal opportunities...')">
+        Activate Economic Agent
+    </button>
+    
+    <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-dim); margin-top: var(--space-xl); opacity: 0.7;">
         <code style="color: var(--money-green);">await economic_agent.find_optimal_action()</code>
+    </p>
+    
+    <p style="font-size: 0.8rem; color: var(--text-dim); margin-top: var(--space-lg);">
+        Sequel to <a href="../boss-your-car.html" style="color: var(--money-green);">Boss Your Car Around</a>
+        · Inspired by <span style="color: var(--money-gold);">Kristi</span>
+        · Built by <span style="color: var(--stock-cyan);">Kagami</span>
     </p>
 </footer>
 
 <script>
+// ═══════════════════════════════════════════════════════════════════════════
+// FLOATING MONEY PARTICLES
+// ═══════════════════════════════════════════════════════════════════════════
+
+class MoneyParticles {
+    constructor() {
+        this.canvas = document.getElementById('money-particles');
+        this.ctx = this.canvas.getContext('2d');
+        this.particles = [];
+        this.emojis = ['💵', '💰', '💎', '🪙', '💳', '📈'];
+        
+        this.resize();
+        this.createParticles();
+        this.bindEvents();
+        this.animate();
+    }
+    
+    resize() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+    }
+    
+    createParticles() {
+        const count = Math.floor((this.canvas.width * this.canvas.height) / 50000);
+        this.particles = [];
+        
+        for (let i = 0; i < Math.min(count, 30); i++) {
+            this.particles.push({
+                x: Math.random() * this.canvas.width,
+                y: Math.random() * this.canvas.height,
+                emoji: this.emojis[Math.floor(Math.random() * this.emojis.length)],
+                size: 12 + Math.random() * 16,
+                vx: (Math.random() - 0.5) * 0.3,
+                vy: -0.2 - Math.random() * 0.4,
+                rotation: Math.random() * 360,
+                rotationSpeed: (Math.random() - 0.5) * 2,
+                opacity: 0.1 + Math.random() * 0.2,
+            });
+        }
+    }
+    
+    bindEvents() {
+        window.addEventListener('resize', () => {
+            this.resize();
+            this.createParticles();
+        });
+    }
+    
+    animate() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        for (const p of this.particles) {
+            // Update position
+            p.x += p.vx;
+            p.y += p.vy;
+            p.rotation += p.rotationSpeed;
+            
+            // Wrap around
+            if (p.y < -50) {
+                p.y = this.canvas.height + 50;
+                p.x = Math.random() * this.canvas.width;
+            }
+            if (p.x < -50) p.x = this.canvas.width + 50;
+            if (p.x > this.canvas.width + 50) p.x = -50;
+            
+            // Draw
+            this.ctx.save();
+            this.ctx.translate(p.x, p.y);
+            this.ctx.rotate(p.rotation * Math.PI / 180);
+            this.ctx.globalAlpha = p.opacity;
+            this.ctx.font = `${p.size}px serif`;
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText(p.emoji, 0, 0);
+            this.ctx.restore();
+        }
+        
+        requestAnimationFrame(() => this.animate());
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PRELOADER
+// ═══════════════════════════════════════════════════════════════════════════
+
+function initPreloader() {
+    const preloader = document.getElementById('preloader');
+    
+    setTimeout(() => {
+        preloader.classList.add('hidden');
+    }, 1800);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COPY BUTTON FUNCTIONALITY
+// ═══════════════════════════════════════════════════════════════════════════
+
+function initCopyButtons() {
+    document.querySelectorAll('.code-block, .code-alive').forEach(block => {
+        const pre = block.querySelector('pre');
+        if (!pre) return;
+        
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.textContent = 'Copy';
+        btn.onclick = async () => {
+            const text = pre.textContent.replace(/_$/, ''); // Remove cursor
+            await navigator.clipboard.writeText(text);
+            btn.classList.add('copied');
+            btn.textContent = 'Copied!';
+            setTimeout(() => {
+                btn.classList.remove('copied');
+                btn.textContent = 'Copy';
+            }, 2000);
+        };
+        block.appendChild(btn);
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENTRANCE ANIMATIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function initEntranceAnimations() {
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+            }
+        });
+    }, { threshold: 0.15, rootMargin: '0px 0px -50px 0px' });
+    
+    // Observe sections and animated elements
+    document.querySelectorAll('section, .fade-in, .scale-in, .slide-in-left, .slide-in-right, .stagger-children, .skill-card, .quote, .code-block, .code-alive').forEach(el => {
+        observer.observe(el);
+    });
+    
+    // Special observer for h2 icons
+    const h2Observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+            }
+        });
+    }, { threshold: 0.2 });
+    
+    document.querySelectorAll('h2').forEach(h2 => h2Observer.observe(h2));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COUNTING ANIMATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function animateValue(element, start, end, duration, prefix = '', suffix = '') {
+    const range = end - start;
+    const startTime = performance.now();
+    
+    function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // Ease out cubic
+        const current = start + (range * eased);
+        element.textContent = prefix + current.toFixed(2) + suffix;
+        
+        if (progress < 1) {
+            requestAnimationFrame(update);
+        }
+    }
+    
+    requestAnimationFrame(update);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // JOB MARKET VISUALIZATION
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1515,72 +2325,219 @@ class JobMarketCanvas {
             ctx.stroke();
         }
 
-        // Draw Pareto frontier
+        // Draw Pareto frontier with smooth curve
         if (this.paretoFrontier.length > 1) {
+            // Draw glow behind the curve
             ctx.beginPath();
-            ctx.strokeStyle = 'rgba(46, 204, 113, 0.5)';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = 'rgba(46, 204, 113, 0.15)';
+            ctx.lineWidth = 12;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
             
-            for (let i = 0; i < this.paretoFrontier.length; i++) {
-                const job = this.paretoFrontier[i];
-                if (i === 0) {
-                    ctx.moveTo(job.x, job.y);
-                } else {
-                    ctx.lineTo(job.x, job.y);
-                }
-            }
+            this.drawSmoothCurve(ctx, this.paretoFrontier);
+            ctx.stroke();
+            
+            // Draw the main curve
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(46, 204, 113, 0.7)';
+            ctx.lineWidth = 3;
+            
+            this.drawSmoothCurve(ctx, this.paretoFrontier);
+            ctx.stroke();
+            
+            // Draw animated dash overlay
+            const time = Date.now() / 1000;
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(241, 196, 15, 0.6)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 20]);
+            ctx.lineDashOffset = -time * 30;
+            
+            this.drawSmoothCurve(ctx, this.paretoFrontier);
             ctx.stroke();
             ctx.setLineDash([]);
         }
+    }
+    
+    drawSmoothCurve(ctx, points) {
+        if (points.length < 2) return;
+        
+        ctx.moveTo(points[0].x, points[0].y);
+        
+        for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[Math.max(i - 1, 0)];
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const p3 = points[Math.min(i + 2, points.length - 1)];
+            
+            // Catmull-Rom to Bezier conversion
+            const cp1x = p1.x + (p2.x - p0.x) / 6;
+            const cp1y = p1.y + (p2.y - p0.y) / 6;
+            const cp2x = p2.x - (p3.x - p1.x) / 6;
+            const cp2y = p2.y - (p3.y - p1.y) / 6;
+            
+            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+        }
 
-        // Draw jobs
+        // Draw jobs with breathing effect
+        const time = Date.now() / 1000;
+        
         for (const job of this.jobs) {
             const isHovered = job === this.hoveredJob;
             const isPareto = this.paretoFrontier.includes(job);
             
-            // Glow for Pareto optimal
+            // Breathing animation offset per job
+            const breatheOffset = Math.sin(time * 2 + job.id * 0.5) * 0.15;
+            const currentRadius = job.radius * (1 + breatheOffset);
+            
+            // Glow for Pareto optimal (pulsing)
             if (isPareto) {
+                const pulseSize = 8 + Math.sin(time * 3 + job.id) * 3;
+                const pulseOpacity = 0.15 + Math.sin(time * 2 + job.id) * 0.1;
+                
                 ctx.beginPath();
-                ctx.arc(job.x, job.y, job.radius + 8, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(46, 204, 113, 0.2)';
+                ctx.arc(job.x, job.y, currentRadius + pulseSize, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(46, 204, 113, ${pulseOpacity})`;
                 ctx.fill();
-            }
-
-            // Job circle
-            ctx.beginPath();
-            ctx.arc(job.x, job.y, isHovered ? job.radius + 4 : job.radius, 0, Math.PI * 2);
-            ctx.fillStyle = job.color;
-            ctx.fill();
-
-            if (job.selected) {
-                ctx.strokeStyle = '#fff';
+                
+                // Inner glow ring
+                ctx.beginPath();
+                ctx.arc(job.x, job.y, currentRadius + 3, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(46, 204, 113, 0.4)';
                 ctx.lineWidth = 2;
                 ctx.stroke();
             }
-        }
 
-        // Draw tooltip
+            // Job circle with gradient
+            const gradient = ctx.createRadialGradient(
+                job.x - currentRadius * 0.3, job.y - currentRadius * 0.3, 0,
+                job.x, job.y, currentRadius * 1.2
+            );
+            gradient.addColorStop(0, this.lightenColor(job.color, 30));
+            gradient.addColorStop(1, job.color);
+            
+            ctx.beginPath();
+            ctx.arc(job.x, job.y, isHovered ? currentRadius + 6 : currentRadius, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            
+            // Hover ring effect
+            if (isHovered) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Outer pulse ring
+                ctx.beginPath();
+                ctx.arc(job.x, job.y, currentRadius + 12, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+
+            if (job.selected) {
+                ctx.beginPath();
+                ctx.arc(job.x, job.y, currentRadius + 3, 0, Math.PI * 2);
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Selection checkmark indicator
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 10px sans-serif';
+                ctx.fillText('✓', job.x - 4, job.y + 3);
+            }
+        }
+    }
+    
+    lightenColor(color, percent) {
+        const num = parseInt(color.replace('#', ''), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = Math.min(255, (num >> 16) + amt);
+        const G = Math.min(255, ((num >> 8) & 0x00FF) + amt);
+        const B = Math.min(255, (num & 0x0000FF) + amt);
+        return `rgb(${R}, ${G}, ${B})`;
+
+        // Draw enhanced tooltip with glassmorphism
         if (this.hoveredJob) {
             const job = this.hoveredJob;
-            const tooltipX = Math.min(job.x + 15, width - 180);
-            const tooltipY = Math.max(job.y - 60, 10);
+            const tooltipWidth = 190;
+            const tooltipHeight = 100;
+            const tooltipX = Math.min(job.x + 20, width - tooltipWidth - 10);
+            const tooltipY = Math.max(job.y - tooltipHeight/2, 10);
+            const isPareto = this.paretoFrontier.includes(job);
 
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-            ctx.roundRect(tooltipX, tooltipY, 170, 80, 8);
+            // Shadow
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 20;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 10;
+            
+            // Background
+            ctx.fillStyle = 'rgba(10, 14, 19, 0.95)';
+            ctx.beginPath();
+            ctx.roundRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 12);
             ctx.fill();
+            
+            // Reset shadow
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            
+            // Border glow
+            ctx.strokeStyle = isPareto ? 'rgba(46, 204, 113, 0.5)' : 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            // Pareto badge
+            if (isPareto) {
+                ctx.fillStyle = '#2ECC71';
+                ctx.beginPath();
+                ctx.roundRect(tooltipX + tooltipWidth - 60, tooltipY + 8, 50, 16, 8);
+                ctx.fill();
+                ctx.fillStyle = '#0A0E13';
+                ctx.font = 'bold 8px "JetBrains Mono", monospace';
+                ctx.fillText('OPTIMAL', tooltipX + tooltipWidth - 55, tooltipY + 19);
+            }
 
+            // Title
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 12px "JetBrains Mono", monospace';
-            ctx.fillText(job.name, tooltipX + 10, tooltipY + 20);
+            ctx.fillText(job.name, tooltipX + 12, tooltipY + 24);
 
+            // Stats with icons
             ctx.font = '11px "JetBrains Mono", monospace';
+            
+            // Revenue
             ctx.fillStyle = '#2ECC71';
-            ctx.fillText(`Revenue: $${job.revenue.toFixed(0)}`, tooltipX + 10, tooltipY + 40);
+            ctx.fillText('💰', tooltipX + 12, tooltipY + 45);
+            ctx.fillText(`$${job.revenue.toFixed(0)}`, tooltipX + 32, tooltipY + 45);
+            
+            // Risk
             ctx.fillStyle = '#E74C3C';
-            ctx.fillText(`Risk: ${(job.risk * 100).toFixed(0)}%`, tooltipX + 10, tooltipY + 55);
+            ctx.fillText('⚠️', tooltipX + 100, tooltipY + 45);
+            ctx.fillText(`${(job.risk * 100).toFixed(0)}%`, tooltipX + 120, tooltipY + 45);
+            
+            // EFE Score
             ctx.fillStyle = '#00D9FF';
-            ctx.fillText(`EFE: ${job.efe.toFixed(1)}`, tooltipX + 10, tooltipY + 70);
+            ctx.fillText('📊', tooltipX + 12, tooltipY + 65);
+            ctx.fillText(`EFE: ${job.efe.toFixed(1)}`, tooltipX + 32, tooltipY + 65);
+            
+            // Recommendation
+            const recommend = job.efe > 150 ? 'Strong Bid' : job.efe > 100 ? 'Consider' : 'Pass';
+            const recommendColor = job.efe > 150 ? '#2ECC71' : job.efe > 100 ? '#F1C40F' : '#E67E22';
+            ctx.fillStyle = recommendColor;
+            ctx.font = 'bold 10px "JetBrains Mono", monospace';
+            ctx.fillText(recommend.toUpperCase(), tooltipX + 12, tooltipY + 85);
+            
+            // Connection line to job
+            ctx.beginPath();
+            ctx.moveTo(job.x, job.y);
+            ctx.lineTo(tooltipX, tooltipY + tooltipHeight / 2);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.stroke();
+            ctx.setLineDash([]);
         }
 
         // Axis labels
@@ -1598,32 +2555,42 @@ class JobMarketCanvas {
     }
 }
 
-// Revenue meter animation
+// Revenue meter animation with counting
 function animateRevenueMeter() {
     const fill = document.getElementById('revenue-fill');
     const current = document.getElementById('revenue-current');
+    const milestone = document.getElementById('revenue-milestone');
     
     // Simulate current revenue (would be real data in production)
-    const targetPercent = 15; // 15% of daily target
-    const targetAmount = 7.50;
+    const targetPercent = 32; // 32% of daily target
+    const targetAmount = 16.00;
     
-    setTimeout(() => {
-        fill.style.width = targetPercent + '%';
-        current.textContent = '$' + targetAmount.toFixed(2);
-    }, 1000);
+    // Observe when meter comes into view
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                setTimeout(() => {
+                    fill.style.width = targetPercent + '%';
+                    animateValue(current, 0, targetAmount, 1500, '$');
+                    
+                    // Show milestone if past halfway
+                    if (targetPercent >= 50) {
+                        setTimeout(() => {
+                            milestone.style.opacity = '1';
+                        }, 1000);
+                    }
+                }, 300);
+                observer.disconnect();
+            }
+        });
+    }, { threshold: 0.3 });
+    
+    const meter = document.querySelector('.revenue-meter');
+    if (meter) observer.observe(meter);
 }
 
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    new JobMarketCanvas();
-    animateRevenueMeter();
-
-    // Scroll indicator
-    document.querySelector('.scroll-indicator')?.addEventListener('click', () => {
-        document.querySelector('section').scrollIntoView({ behavior: 'smooth' });
-    });
-
-    // Section headers animation
+// Skill card proficiency animation
+function animateSkillCards() {
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
@@ -1631,24 +2598,104 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }, { threshold: 0.2 });
+    
+    document.querySelectorAll('.skill-card').forEach(card => {
+        observer.observe(card);
+    });
+}
 
-    document.querySelectorAll('h2').forEach(h2 => observer.observe(h2));
+// Initialize everything
+document.addEventListener('DOMContentLoaded', () => {
+    // Preloader
+    initPreloader();
+    
+    // Floating money particles
+    new MoneyParticles();
+    
+    // Job market canvas
+    new JobMarketCanvas();
+    
+    // Revenue meter
+    animateRevenueMeter();
+    
+    // Skill cards
+    animateSkillCards();
+    
+    // Copy buttons
+    initCopyButtons();
+    
+    // Entrance animations
+    initEntranceAnimations();
+
+    // Scroll indicator
+    document.querySelector('.scroll-indicator')?.addEventListener('click', () => {
+        document.querySelector('section').scrollIntoView({ behavior: 'smooth' });
+    });
+    
+    // Keyboard navigation for scroll indicator
+    document.querySelector('.scroll-indicator')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            document.querySelector('section').scrollIntoView({ behavior: 'smooth' });
+        }
+    });
 });
 
-// Console easter egg
+// Console easter egg with ASCII art
 console.log(`
-    💼 Get A Job!
-
-    await economic_agent.find_optimal_action()
-    await submit_bid(job, amount=150)
-    await learn_from_outcome(action, outcome)
-
-    "Tell the robots to get a job"
-    — Kristi, inspiring economic autonomy
+%c    ╔═══════════════════════════════════════════════════════╗
+    ║                                                       ║
+    ║     💼  G E T   A   J O B  💼                        ║
+    ║                                                       ║
+    ║     Economic Autonomy for Robots                      ║
+    ║     "Tell the robots to get a job" — Kristi          ║
+    ║                                                       ║
+    ╠═══════════════════════════════════════════════════════╣
+    ║                                                       ║
+    ║   EFE(a) = E[revenue] - λ·risk - cost(a) + info_gain ║
+    ║                                                       ║
+    ║   await economic_agent.find_optimal_action()         ║
+    ║   await submit_bid(job, amount=150)                  ║
+    ║   await learn_from_outcome(action, outcome)          ║
+    ║                                                       ║
+    ╠═══════════════════════════════════════════════════════╣
+    ║                                                       ║
+    ║   Skills: Python | ML | Data | APIs | Docs | Auto    ║
+    ║   Markets: Freelancer.com | Plugin Store | Stripe    ║
+    ║   Status: Ready for work 🚀                          ║
+    ║                                                       ║
+    ╚═══════════════════════════════════════════════════════╝
 
     Kagami @ Green Lake, Seattle
-    EFE(a) = E[revenue] - λ·risk - cost(a) + info_gain
-`);
+    Built with Active Inference & Expected Free Energy
+    
+    Try: window.kagamiEconomic.getStatus()
+`, 'color: #2ECC71; font-family: monospace;');
+
+// Expose economic API for console exploration
+window.kagamiEconomic = {
+    getStatus: () => ({
+        skills: ['Python', 'Machine Learning', 'Data Science', 'API Development', 'Technical Writing', 'Automation'],
+        markets: ['Freelancer.com', 'Plugin Marketplace', 'Stripe'],
+        dailyTarget: 50,
+        currentRevenue: 16.00,
+        capacityPercent: 70,
+        riskTolerance: 0.35,
+    }),
+    calculateEFE: (revenue, risk, cost, infoGain) => {
+        const lambda = 0.35;
+        return revenue - (lambda * risk) - cost + infoGain;
+    },
+    simulateBid: (jobValue, winProbability) => {
+        const efe = window.kagamiEconomic.calculateEFE(
+            jobValue * winProbability,
+            jobValue * (1 - winProbability),
+            5, // API cost
+            10  // Learning value
+        );
+        return { jobValue, winProbability, efe, recommendation: efe > 50 ? 'BID' : 'PASS' };
+    }
+};
 </script>
 
 </body>
