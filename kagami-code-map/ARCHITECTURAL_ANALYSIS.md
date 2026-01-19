@@ -1,7 +1,9 @@
 # Kagami Codebase Architectural Analysis
 
 **Generated:** 2026-01-18
-**Codebase:** 4,513 files, 1,811,810 lines, 18 semantic clusters
+**Codebase:** ~12,253 source files (py/rs/ts/swift/kt), ~814,655 lines Python in packages/, 18 semantic clusters
+
+> Note: File/line counts are approximate. Run `cloc` for precise metrics.
 
 ---
 
