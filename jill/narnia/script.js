@@ -60,6 +60,71 @@
         saveOrderState(state);
     }
 
+    // Badges: persist unseen counts; clear on drawer open
+    const BADGE_KEY = 'jill_badges_v1';
+
+    function loadBadges() {
+        try { return JSON.parse(localStorage.getItem(BADGE_KEY) || '{"favorites":0,"orders":0}'); }
+        catch { return { favorites: 0, orders: 0 }; }
+    }
+
+    function saveBadges(b) {
+        try { localStorage.setItem(BADGE_KEY, JSON.stringify(b)); } catch {}
+    }
+
+    function bumpBadge(kind, by = 1) {
+        const b = loadBadges();
+        b[kind] = Math.max(0, (b[kind] || 0) + by);
+        saveBadges(b);
+        renderBadges();
+    }
+
+    function clearBadge(kind) {
+        const b = loadBadges();
+        b[kind] = 0;
+        saveBadges(b);
+        renderBadges();
+    }
+
+    function renderBadges() {
+        const b = loadBadges();
+        document.querySelectorAll('.nav-action__badge').forEach(el => {
+            const kind = el.dataset.badge;
+            const val = Number(b[kind] || 0);
+            el.textContent = val > 9 ? '9+' : String(val);
+            el.classList.toggle('is-visible', val > 0);
+        });
+    }
+
+    // Drawers
+    function openDrawer(kind) {
+        const overlay = document.querySelector('.drawer-overlay');
+        const drawer = document.getElementById(`drawer-${kind}`);
+        if (!overlay || !drawer) return;
+
+        overlay.hidden = false;
+        drawer.classList.add('is-open');
+        drawer.setAttribute('aria-hidden','false');
+        document.body.style.overflow = 'hidden';
+
+        if (kind === 'favorites') renderFavoritesDrawer();
+        if (kind === 'orders') renderOrdersDrawer();
+
+        // Always clear badges in localStorage when opened
+        clearBadge(kind);
+    }
+
+    function closeDrawers() {
+        const overlay = document.querySelector('.drawer-overlay');
+        document.querySelectorAll('.drawer.is-open').forEach(d => {
+            d.classList.remove('is-open');
+            d.setAttribute('aria-hidden','true');
+        });
+        if (overlay) overlay.hidden = true;
+        document.body.style.overflow = '';
+    }
+
+
 
     // Product ID mappings between galleries (same product, different IDs)
     const PRODUCT_MAPPINGS = {
@@ -126,6 +191,7 @@
             hearts.delete(productId);
         } else {
             hearts.add(productId);
+            bumpBadge('favorites', 1);
             // Celebration particles
             createHeartParticles(document.querySelector(`[data-product-id="${productId}"]`));
         }
@@ -241,7 +307,7 @@
                         <div class="product-card__status" data-status="${getItemStatus(product.id) || ''}">
                           <button class="status-button" type="button" data-product-id="${product.id}" aria-label="Set status for ${product.name}">
                             <span class="status-dot"></span>
-                            <span class="status-label">${getItemStatus(product.id) || 'No status'}</span>
+                            <span class="status-label">${getItemStatus(product.id) || 'Just looking'}</span>
                           </button>
                           <div class="status-menu" role="menu" aria-hidden="true">
                             ${['wishlisted','considering','ordered','purchased','owned','returned'].map(st => `
@@ -356,21 +422,24 @@
     }
 
     function initCardTilt() {
+        const canTilt = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches && !document.documentElement.classList.contains('reduced-motion');
+        if (!canTilt) return;
+
         document.querySelectorAll('.product-card').forEach(card => {
             card.addEventListener('mousemove', (e) => {
                 const rect = card.getBoundingClientRect();
                 const x = (e.clientX - rect.left) / rect.width;
                 const y = (e.clientY - rect.top) / rect.height;
                 
-                const tiltX = (y - 0.5) * 8;
-                const tiltY = (x - 0.5) * -8;
+                const tiltX = (y - 0.5) * 3;
+                const tiltY = (x - 0.5) * -3;
                 
                 card.style.transform = `
                     translateY(-12px) 
                     perspective(1000px) 
                     rotateX(${tiltX}deg) 
                     rotateY(${tiltY}deg)
-                    scale(1.02)
+                    scale(1.01)
                 `;
                 
                 // Move shimmer
@@ -474,6 +543,7 @@
                 if (!productId || !status) return;
 
                 setItemStatus(productId, status);
+                if (['ordered','purchased','owned','returned'].includes(status)) bumpBadge('orders', 1);
 
                 // Update UI in-place
                 const card = document.querySelector(`.product-card[data-product-id="${productId}"]`);
@@ -499,6 +569,118 @@
             });
         });
     }
+
+    
+
+    function categorizeProducts(ids) {
+        const byCat = { dresses: [], pants: [], footwear: [], accessories: [], other: [] };
+        const productById = new Map((gallery?.products || []).map(p => [p.id, p]));
+        ids.forEach(id => {
+            const p = productById.get(id);
+            const cat = p?.category || 'other';
+            (byCat[cat] || byCat.other).push(p || { id, name: id, brand: '', price_display: '', local_image: '', category: 'other' });
+        });
+        return byCat;
+    }
+
+    function statusDot(status) {
+        const map = {
+            wishlisted: '#d4a574',
+            considering: '#e8c49a',
+            ordered: '#8aa7ff',
+            purchased: '#7fd3b7',
+            owned: '#59d38a',
+            returned: '#ff8a8a',
+        };
+        return map[status] || 'rgba(255,255,255,0.22)';
+    }
+
+    function renderFavoritesDrawer() {
+        const root = document.querySelector('[data-drawer-content="favorites"]');
+        if (!root) return;
+        const hearts = Array.from(getHeartedItems());
+        const productById = new Map((gallery?.products || []).map(p => [p.id, p]));
+        const inThisGallery = hearts.filter(id => productById.has(id));
+
+        if (!inThisGallery.length) {
+            root.innerHTML = `<div class="drawer-empty">No favorites yet. Tap ♥ on any piece — it syncs with your Wardrobe favorites.</div>`;
+            return;
+        }
+
+        const cats = categorizeProducts(inThisGallery);
+        const order = [ ['dresses','Dresses'], ['pants','Pants'], ['footwear','Footwear'], ['accessories','Accessories'], ['other','Other'] ];
+        root.innerHTML = order.map(([key,label]) => {
+            const items = cats[key];
+            if (!items.length) return '';
+            return `
+              <section class="drawer__section">
+                <div class="drawer__section-title">${label}</div>
+                ${items.map(p => {
+                    const st = getItemStatus(p.id) || '';
+                    return `
+                      <div class="drawer-item" data-product-id="${p.id}">
+                        <img class="drawer-item__img" src="./images/${p.local_image}" alt="${p.name}">
+                        <div>
+                          <div class="drawer-item__name">${p.name}</div>
+                          <div class="drawer-item__meta">${p.brand} · ${p.price_display || ''}</div>
+                        </div>
+                        <div class="drawer-item__right">
+                          <div class="drawer-pill"><span class="drawer-pill__dot" style="background:${statusDot(st)}"></span>${st || 'Just looking'}</div>
+                          <a class="product-card__cta" href="${p.product_url}" target="_blank" rel="noopener"><span>View</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg></a>
+                        </div>
+                      </div>
+                    `;
+                }).join('')}
+              </section>
+            `;
+        }).join('');
+    }
+
+    function renderOrdersDrawer() {
+        const root = document.querySelector('[data-drawer-content="orders"]');
+        if (!root) return;
+        const state = loadOrderState();
+        const orderedIds = Object.keys(state).filter(id => ['ordered','purchased','owned','returned'].includes(state[id]?.status));
+        const productById = new Map((gallery?.products || []).map(p => [p.id, p]));
+        const ids = orderedIds.filter(id => productById.has(id));
+
+        if (!ids.length) {
+            root.innerHTML = `<div class="drawer-empty">No orders tracked yet. Use the status pill on any card to mark Ordered / Purchased / Owned — it syncs across Jill galleries.</div>`;
+            return;
+        }
+
+        const cats = categorizeProducts(ids);
+        const order = [ ['ordered','Ordered'], ['purchased','Purchased'], ['owned','Owned'], ['returned','Returned'] ];
+        // Build by status, inside categories
+        root.innerHTML = order.map(([status,label]) => {
+            const items = ids
+                .map(id => productById.get(id))
+                .filter(p => (state[p.id]?.status === status));
+            if (!items.length) return '';
+            return `
+              <section class="drawer__section">
+                <div class="drawer__section-title">${label}</div>
+                ${items.map(p => {
+                    const st = state[p.id]?.status || '';
+                    return `
+                      <div class="drawer-item" data-product-id="${p.id}">
+                        <img class="drawer-item__img" src="./images/${p.local_image}" alt="${p.name}">
+                        <div>
+                          <div class="drawer-item__name">${p.name}</div>
+                          <div class="drawer-item__meta">${p.brand} · ${p.price_display || ''}</div>
+                        </div>
+                        <div class="drawer-item__right">
+                          <div class="drawer-pill"><span class="drawer-pill__dot" style="background:${statusDot(st)}"></span>${st}</div>
+                          <a class="product-card__cta" href="${p.product_url}" target="_blank" rel="noopener"><span>View</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg></a>
+                        </div>
+                      </div>
+                    `;
+                }).join('')}
+              </section>
+            `;
+        }).join('');
+    }
+
 
     // ═══════════════════════════════════════════════════════════════════════
     // INITIALIZATION
