@@ -1,24 +1,18 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * THE MIDNIGHT ATELIER — JavaScript
+ * THE EVENING EDIT — JavaScript
  * ═══════════════════════════════════════════════════════════════════════════
- * 
- * Features:
- * - Loads gallery data from JSON
- * - Renders product cards
- * - Heart functionality with local storage
- * - Dynamic total investment calculation
  */
 
 (async function() {
     'use strict';
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // GALLERY DATA
-    // ═══════════════════════════════════════════════════════════════════════
-
+    const HEARTS_KEY = 'jill_evening_hearts';
     let gallery = null;
-    const HEARTS_KEY = 'jill_narnia_hearts';
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // DATA LOADING
+    // ═══════════════════════════════════════════════════════════════════════
 
     async function loadGallery() {
         try {
@@ -32,190 +26,135 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // HEARTS (Local Storage)
+    // HEARTS / FAVORITES
     // ═══════════════════════════════════════════════════════════════════════
 
-    function getHearts() {
-        try {
-            return JSON.parse(localStorage.getItem(HEARTS_KEY)) || [];
-        } catch {
-            return [];
-        }
+    function getHeartedItems() {
+        const hearted = localStorage.getItem(HEARTS_KEY);
+        return hearted ? new Set(JSON.parse(hearted)) : new Set();
     }
 
-    function saveHearts(hearts) {
-        localStorage.setItem(HEARTS_KEY, JSON.stringify(hearts));
+    function saveHeartedItems(heartedSet) {
+        localStorage.setItem(HEARTS_KEY, JSON.stringify(Array.from(heartedSet)));
     }
 
     function toggleHeart(productId) {
-        const hearts = getHearts();
-        const index = hearts.indexOf(productId);
-        
-        if (index === -1) {
-            hearts.push(productId);
+        const heartedItems = getHeartedItems();
+        if (heartedItems.has(productId)) {
+            heartedItems.delete(productId);
         } else {
-            hearts.splice(index, 1);
+            heartedItems.add(productId);
         }
-        
-        saveHearts(hearts);
-        return hearts.includes(productId);
+        saveHeartedItems(heartedItems);
+        updateHeartButtons();
     }
 
-    function isHearted(productId) {
-        return getHearts().includes(productId);
+    function updateHeartButtons() {
+        const heartedItems = getHeartedItems();
+        document.querySelectorAll('.heart-button').forEach(button => {
+            const productId = button.dataset.productId;
+            if (heartedItems.has(productId)) {
+                button.classList.add('hearted');
+                button.innerHTML = '❤️';
+            } else {
+                button.classList.remove('hearted');
+                button.innerHTML = '🤍';
+            }
+        });
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PRODUCT CARD RENDERING
+    // RENDERING
     // ═══════════════════════════════════════════════════════════════════════
 
-    function createProductCard(product) {
-        const card = document.createElement('article');
-        card.className = `product-card${product.is_centerpiece ? ' product-card--centerpiece' : ''}`;
-        card.dataset.productId = product.id;
+    function renderProductCard(product) {
+        const heartedItems = getHeartedItems();
+        const isHearted = heartedItems.has(product.id);
 
-        const hearted = isHearted(product.id);
-        const priceDisplay = product.price_display || `$${product.price}`;
-        
-        // Determine image source
-        let imageHtml = '';
-        if (product.local_image) {
-            imageHtml = `<img class="product-card__image" src="./images/${product.local_image}" alt="${product.name}" loading="lazy">`;
-        } else {
-            // Placeholder with brand initial
-            const initial = product.brand ? product.brand[0] : '✦';
-            imageHtml = `<div class="product-card__placeholder">${initial}</div>`;
-        }
-
-        card.innerHTML = `
-            <a href="${product.product_url}" class="product-card__link-overlay" target="_blank" rel="noopener" aria-label="View ${product.name} on ${product.brand} website"></a>
-            <div class="product-card__media">
-                ${imageHtml}
-                ${product.badge ? `<span class="product-card__badge">${product.badge}</span>` : ''}
-                <button class="product-card__heart ${hearted ? 'is-hearted' : ''}" aria-label="Add to favorites">
-                    <span class="heart-icon">${hearted ? '♥' : '♡'}</span>
+        return `
+            <article class="product-card" data-product-id="${product.id}">
+                <button class="heart-button" data-product-id="${product.id}" aria-label="Add to favorites">
+                    ${isHearted ? '❤️' : '🤍'}
                 </button>
-            </div>
-            <div class="product-card__body">
-                <header class="product-card__header">
+                <a href="${product.product_url}" target="_blank" rel="noopener" class="product-card__link">
+                    <div class="product-card__image-container">
+                        <img 
+                            src="./images/${product.local_image}" 
+                            alt="${product.name} by ${product.brand}"
+                            class="product-card__image"
+                            loading="lazy"
+                        >
+                        ${product.badge ? `<span class="product-card__badge">${product.badge}</span>` : ''}
+                    </div>
+                </a>
+                <div class="product-card__content">
                     <span class="product-card__brand">${product.brand}</span>
                     <h3 class="product-card__name">${product.name}</h3>
-                </header>
-                <p class="product-card__description">${product.description}</p>
-                ${product.maker ? `<p class="product-card__maker">${product.maker}</p>` : ''}
-                <footer class="product-card__footer">
-                    <span class="product-card__price">${priceDisplay}</span>
-                    <a href="${product.product_url}" class="product-card__cta" target="_blank" rel="noopener">View piece ↗</a>
-                </footer>
-            </div>
+                    <p class="product-card__description">${product.description}</p>
+                    <footer class="product-card__footer">
+                        <span class="product-card__price">${product.price_display}</span>
+                        <a href="${product.product_url}" target="_blank" rel="noopener" class="product-card__cta">
+                            View
+                        </a>
+                    </footer>
+                </div>
+            </article>
         `;
-
-        // Heart button event
-        const heartBtn = card.querySelector('.product-card__heart');
-        heartBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const isNowHearted = toggleHeart(product.id);
-            heartBtn.classList.toggle('is-hearted', isNowHearted);
-            heartBtn.querySelector('.heart-icon').textContent = isNowHearted ? '♥' : '♡';
-            
-            updateTotalInvestment();
-        });
-
-        return card;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // RENDER PRODUCTS
-    // ═══════════════════════════════════════════════════════════════════════
+    function renderGallery() {
+        if (!gallery) return;
 
-    function renderProducts() {
-        if (!gallery || !gallery.products) return;
+        const grids = {
+            dresses: document.getElementById('dresses-grid'),
+            pants: document.getElementById('pants-grid'),
+            footwear: document.getElementById('footwear-grid'),
+            accessories: document.getElementById('accessories-grid')
+        };
 
-        const categories = ['dresses', 'pants', 'footwear', 'accessories'];
+        // Clear grids
+        Object.values(grids).forEach(grid => {
+            if (grid) grid.innerHTML = '';
+        });
 
-        categories.forEach(category => {
-            const grid = document.querySelector(`.products-grid[data-category="${category}"]`);
-            if (!grid) return;
+        // Populate grids
+        gallery.products.forEach(product => {
+            const grid = grids[product.category];
+            if (grid) {
+                grid.innerHTML += renderProductCard(product);
+            }
+        });
 
-            const products = gallery.products.filter(p => p.category === category);
-            grid.innerHTML = '';
-            
-            products.forEach(product => {
-                const card = createProductCard(product);
-                grid.appendChild(card);
+        // Attach heart button listeners
+        document.querySelectorAll('.heart-button').forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleHeart(button.dataset.productId);
             });
         });
-    }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // TOTAL INVESTMENT
-    // ═══════════════════════════════════════════════════════════════════════
+        // Update total investment
+        updateTotalInvestment();
+    }
 
     function updateTotalInvestment() {
-        if (!gallery || !gallery.products) return;
-
-        const hearts = getHearts();
-        let total = 0;
-
-        // If no hearts, show full gallery total
-        if (hearts.length === 0) {
-            total = gallery.products.reduce((sum, p) => sum + (p.price || 0), 0);
-        } else {
-            // Show only hearted items total
-            total = gallery.products
-                .filter(p => hearts.includes(p.id))
-                .reduce((sum, p) => sum + (p.price || 0), 0);
+        const el = document.getElementById('total-investment');
+        if (el && gallery && gallery.products) {
+            const total = gallery.products.reduce((sum, p) => sum + (p.price || 0), 0);
+            el.textContent = `$${total.toLocaleString()}`;
         }
-
-        const totalEl = document.getElementById('total-investment');
-        if (totalEl) {
-            totalEl.textContent = `$${total.toLocaleString()}`;
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // SCROLL ANIMATIONS (Intersection Observer)
-    // ═══════════════════════════════════════════════════════════════════════
-
-    function initScrollAnimations() {
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('is-visible');
-                    observer.unobserve(entry.target);
-                }
-            });
-        }, {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        });
-
-        document.querySelectorAll('.philosophy-card, .collection-header').forEach(el => {
-            observer.observe(el);
-        });
     }
 
     // ═══════════════════════════════════════════════════════════════════════
     // INITIALIZATION
     // ═══════════════════════════════════════════════════════════════════════
 
-    async function init() {
-        await loadGallery();
-        renderProducts();
-        updateTotalInvestment();
-        initScrollAnimations();
+    document.addEventListener('DOMContentLoaded', async () => {
+        gallery = await loadGallery();
+        if (gallery) {
+            renderGallery();
+        }
+    });
 
-        console.log('🌙 The Midnight Atelier initialized');
-        console.log(`📦 ${gallery?.products?.length || 0} pieces loaded`);
-        console.log(`💖 ${getHearts().length} items hearted`);
-    }
-
-    // Start
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
 })();
