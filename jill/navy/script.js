@@ -157,11 +157,9 @@
         if (!gallery?.products || !content) return;
 
         const categories = {
-            pants: { title: 'Pants', subtitle: 'The Foundation — styles for every moment', products: [] },
-            dresses: { title: 'Dresses', subtitle: 'Every Occasion — From boardroom to evening', products: [] },
-            outerwear: { title: 'Outerwear', subtitle: 'Including her asks', products: [] },
-            accessories: { title: 'Accessories', subtitle: 'Shoes and finishing touches', products: [] },
-            joy: { title: 'Joy Pieces', subtitle: "Novelty and delight", products: [] }
+            pants: { title: 'Pants', subtitle: 'The foundation — styles for every moment', products: [] },
+            dresses: { title: 'Dresses', subtitle: 'From boardroom to weekend', products: [] },
+            joy: { title: 'Joy Pieces', subtitle: 'Novelty and delight', products: [] }
         };
 
         gallery.products.forEach(product => {
@@ -175,7 +173,7 @@
             html += `
                 <section class="category-section" data-category="${key}">
                     <div class="category-header">
-                        <p class="category-eyebrow">${cat.products.length} Pieces</p>
+                        <p class="category-eyebrow">${cat.products.length} ${cat.products.length === 1 ? 'Piece' : 'Pieces'}</p>
                         <h2 class="category-title">${cat.title}</h2>
                         <p class="category-subtitle">${cat.subtitle}</p>
                     </div>
@@ -274,13 +272,10 @@
     function renderOrdersDrawer() {
         const root = document.getElementById('orders-content');
         if (!root) return;
-        const orders = gallery?.orders || { in_transit: [], delivered: [], custom_pending: [] };
+        const orders = gallery?.orders || { in_transit: [], custom_pending: [] };
 
-        function orderRow(order, statusIcon, statusClass) {
-            const product = order.product_ids ? gallery?.products?.find(p => order.product_ids.includes(p.id)) : null;
-            const img = product ? `images/${product.local_image}` : '../wardrobe/images/margaux-demi.jpg';
+        function orderRow(order) {
             return `<div class="order-card">
-                <img class="order-card__img" src="${img}" alt="${order.item}" onerror="this.src='https://via.placeholder.com/60x60/E0E5EC/415A77?text=·'">
                 <div class="order-card__body">
                     <div class="order-card__brand">${order.brand}</div>
                     <div class="order-card__name">${order.item}</div>
@@ -289,7 +284,7 @@
                         <span class="order-card__price">${order.total}</span>
                     </div>
                 </div>
-                <div class="order-card__status ${statusClass}">${statusIcon}</div>
+                <div class="order-card__status order-card__status--transit">📦</div>
             </div>`;
         }
 
@@ -312,20 +307,17 @@
         // Calculate totals
         const parsePrice = str => parseFloat((str || '').replace(/[^0-9.]/g, '')) || 0;
         const inTransitTotal = (orders.in_transit || []).reduce((sum, o) => sum + parsePrice(o.total), 0);
-        const deliveredTotal = (orders.delivered || []).reduce((sum, o) => sum + parsePrice(o.total), 0);
         const customTotal = (orders.custom_pending || []).reduce((sum, o) => sum + parsePrice(o.total), 0);
 
         root.innerHTML = `
             <div class="orders-summary">
                 <div class="orders-summary__row"><span>📦 In Transit</span><span class="orders-summary__value">$${inTransitTotal.toLocaleString()}</span></div>
-                <div class="orders-summary__row"><span>✓ Delivered</span><span class="orders-summary__value">$${deliveredTotal.toLocaleString()}</span></div>
                 <div class="orders-summary__row"><span>✨ Custom Orders</span><span class="orders-summary__value orders-summary__value--pending">$${customTotal.toLocaleString()}</span></div>
-                <div class="orders-summary__row orders-summary__row--total"><span>Total Invested</span><span class="orders-summary__value orders-summary__value--total">$${(inTransitTotal + deliveredTotal + customTotal).toLocaleString()}</span></div>
+                <div class="orders-summary__row orders-summary__row--total"><span>Total Invested</span><span class="orders-summary__value orders-summary__value--total">$${(inTransitTotal + customTotal).toLocaleString()}</span></div>
             </div>
-            ${(orders.in_transit || []).length > 0 ? `<section class="orders-group"><h3 class="orders-group__title">📦 In Transit (${orders.in_transit.length})</h3><div class="orders-group__list">${orders.in_transit.map(o => orderRow(o, '📦', 'order-card__status--transit')).join('')}</div></section>` : ''}
-            ${(orders.delivered || []).length > 0 ? `<section class="orders-group"><h3 class="orders-group__title">✓ Delivered (${orders.delivered.length})</h3><div class="orders-group__list">${orders.delivered.map(o => orderRow(o, '✓', 'order-card__status--confirmed')).join('')}</div></section>` : ''}
+            ${(orders.in_transit || []).length > 0 ? `<section class="orders-group"><h3 class="orders-group__title">📦 In Transit (${orders.in_transit.length})</h3><div class="orders-group__list">${orders.in_transit.map(orderRow).join('')}</div></section>` : ''}
             ${(orders.custom_pending || []).length > 0 ? `<section class="orders-group orders-group--custom"><h3 class="orders-group__title">✨ Custom Orders (${orders.custom_pending.length})</h3><div class="orders-group__list">${orders.custom_pending.map(customRow).join('')}</div></section>` : ''}
-            ${(orders.in_transit || []).length === 0 && (orders.delivered || []).length === 0 && (orders.custom_pending || []).length === 0 ? `<div class="drawer-empty"><p>No orders yet</p><p class="drawer-empty__hint">Orders will appear here when placed</p></div>` : ''}`;
+            ${(orders.in_transit || []).length === 0 && (orders.custom_pending || []).length === 0 ? `<div class="drawer-empty"><p>No orders yet</p><p class="drawer-empty__hint">Orders will appear here when placed</p></div>` : ''}`;
     }
 
     function renderFavoritesDrawer() {
