@@ -132,7 +132,7 @@
 
     // ═══════════════════════════════════════════════════════════════════════
     // Orders list (from Wardrobe / email updates). No shipping info stored.
-    const ORDERS_LIST_KEY = 'jill_orders_v1';
+    const ORDERS_LIST_KEY = 'jill_orders_v2';
 
     function loadOrdersList() {
         try { return JSON.parse(localStorage.getItem(ORDERS_LIST_KEY) || '[]'); }
@@ -278,7 +278,7 @@
     }
 
 
-    const BADGE_KEY = 'jill_badges_v1';
+    const BADGE_KEY = 'jill_badges_v2';
 
     function loadBadges() {
         try { return JSON.parse(localStorage.getItem(BADGE_KEY) || '{"favorites":0,"orders":0}'); }
@@ -406,7 +406,7 @@
         
         if (hearts.has(productId)) {
             hearts.delete(productId);
-        } else {
+                } else {
             hearts.add(productId);
             bumpBadge('favorites', 1);
             // Celebration particles
@@ -674,20 +674,20 @@
     }
 
     function initScrollReveal() {
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('revealed');
-                }
-            });
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('revealed');
+            }
+        });
         }, {
             threshold: 0.1,
             rootMargin: '0px 0px -50px 0px'
         });
 
         document.querySelectorAll('.collection-section, .philosophy-card').forEach(el => {
-            observer.observe(el);
-        });
+        observer.observe(el);
+    });
     }
 
     function initSmoothScroll() {
@@ -883,7 +883,7 @@
         }
 
         // Collapse state — auto-collapse sections with >3 items
-        const COLLAPSE_KEY = 'jill_orders_collapse_v1';
+        const COLLAPSE_KEY = 'jill_orders_collapse_v2';
         let collapsed = {};
         try { collapsed = JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '{}'); } catch {}
 

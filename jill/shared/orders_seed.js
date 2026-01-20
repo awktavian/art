@@ -1,15 +1,23 @@
 /*
-  Jill shared orders seed (PII-free)
-  Source: Wardrobe update screenshot (2026-01-19)
+  Jill shared orders (REAL DATA from Wardrobe confirmation emails)
+  Source: Order confirmations received 2026-01-19
 
   Stores ONLY: brand, item, size, totals, status, and product URLs.
-  NO address, NO email.
+  NO address, NO email, NO payment info.
 */
 (function () {
   'use strict';
 
-  const ORDERS_LIST_KEY = 'jill_orders_v1';
-  const BADGE_KEY = 'jill_badges_v1';
+  // New key - wipes old mock data
+  const ORDERS_LIST_KEY = 'jill_orders_v2';
+  const BADGE_KEY = 'jill_badges_v2';
+
+  // Clear old keys on first load
+  try {
+    localStorage.removeItem('jill_orders_v1');
+    localStorage.removeItem('jill_badges_v1');
+    localStorage.removeItem('jill_orders_collapse_v1');
+  } catch {}
 
   function safeParse(json, fallback) {
     try { return JSON.parse(json); } catch { return fallback; }
