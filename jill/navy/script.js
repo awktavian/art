@@ -200,12 +200,15 @@
     // RENDER FUNCTIONS
     // ═══════════════════════════════════════════════════════════════════════
 
+    // Fibonacci delays for staggered animations
+    const FIBONACCI_DELAYS = [0, 89, 144, 233, 377, 610, 987, 1597];
+
     function renderPhilosophy() {
         const grid = document.getElementById('philosophy-grid');
         if (!gallery?.philosophy || !grid) return;
-        
+
         grid.innerHTML = gallery.philosophy.map((p, i) => `
-            <div class="philosophy-card" style="animation-delay: ${i * 100}ms">
+            <div class="philosophy-card" style="animation-delay: ${FIBONACCI_DELAYS[i] || i * 144}ms">
                 <div class="philosophy-icon">${p.icon}</div>
                 <h3 class="philosophy-title">${p.title}</h3>
                 <p class="philosophy-text">${p.description}</p>
@@ -261,7 +264,11 @@
         return `
             <article class="product-card ${product.is_centerpiece ? 'centerpiece' : ''}" 
                      data-product-id="${product.id}"
-                     onclick="window.handleProductClick(event, '${product.product_url}')">
+                     tabindex="0"
+                     role="button"
+                     aria-label="${product.brand} ${product.name}, ${product.price_display}"
+                     onclick="window.handleProductClick(event, '${product.product_url}')"
+                     onkeydown="window.handleProductKeydown(event, '${product.product_url}')">
                 <div class="product-image-wrap">
                     <img class="product-image" 
                          src="images/${product.local_image}" 
@@ -481,6 +488,15 @@
         if (url) window.open(url, '_blank', 'noopener');
     };
 
+    // Keyboard handler for product cards (WCAG 2.1.1)
+    window.handleProductKeydown = function(event, url) {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            if (event.target.closest('.heart-button')) return;
+            if (url) window.open(url, '_blank', 'noopener');
+        }
+    };
+
     function updateHeartButtons() {
         document.querySelectorAll('.heart-button').forEach(button => {
             const card = button.closest('.product-card');
@@ -530,10 +546,16 @@
     // DRAWER CONTROLS
     // ═══════════════════════════════════════════════════════════════════════
 
+    // Track which button opened drawer for focus restoration
+    let lastFocusedDrawerTrigger = null;
+
     function openDrawer(kind) {
         const overlay = document.querySelector('.drawer-overlay');
         const drawer = document.getElementById(`${kind}-drawer`);
         const button = document.getElementById(`${kind}-btn`);
+
+        // Save trigger for focus restoration
+        lastFocusedDrawerTrigger = button;
 
         if (overlay) overlay.classList.add('active');
         if (drawer) {
@@ -542,6 +564,9 @@
             drawer.setAttribute('aria-hidden', 'false');
         }
         if (button) button.setAttribute('aria-expanded', 'true');
+
+        // Prevent body scroll while drawer is open
+        document.body.style.overflow = 'hidden';
 
         // Clear badge on open
         clearBadge(kind);
@@ -555,6 +580,11 @@
             const closeBtn = drawer?.querySelector('.drawer-close');
             if (closeBtn) closeBtn.focus();
         }, 100);
+
+        // Set up focus trap within drawer
+        if (drawer) {
+            drawer.addEventListener('keydown', trapFocus);
+        }
     }
 
     function closeDrawers() {
@@ -563,11 +593,41 @@
             d.classList.remove('active');
             d.setAttribute('hidden', '');
             d.setAttribute('aria-hidden', 'true');
+            d.removeEventListener('keydown', trapFocus);
         });
+
+        // Restore body scroll
+        document.body.style.overflow = '';
 
         // Reset aria-expanded on buttons
         document.getElementById('favorites-btn')?.setAttribute('aria-expanded', 'false');
         document.getElementById('orders-btn')?.setAttribute('aria-expanded', 'false');
+
+        // Restore focus to trigger button (WCAG 2.4.3)
+        if (lastFocusedDrawerTrigger) {
+            lastFocusedDrawerTrigger.focus();
+            lastFocusedDrawerTrigger = null;
+        }
+    }
+
+    // Focus trap helper (WCAG 2.1.2)
+    function trapFocus(event) {
+        if (event.key !== 'Tab') return;
+
+        const drawer = event.currentTarget;
+        const focusable = drawer.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
     }
 
     function setupDrawers() {
