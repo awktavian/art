@@ -75,37 +75,153 @@
             return null;
         }
 
-    function isEmptyObject(obj) {
-        return !obj || (Object.keys(obj).length === 0);
+    // Orders list (from Wardrobe / email updates). No shipping info stored.
+    const ORDERS_LIST_KEY = 'jill_orders_v1';
+
+    function loadOrdersList() {
+        try { return JSON.parse(localStorage.getItem(ORDERS_LIST_KEY) || '[]'); }
+        catch { return []; }
     }
 
-    function seedAllOrdersIfEmpty() {
-        // If there is no order state yet, assume “all orders” = active orders for every piece.
-        // This does NOT overwrite existing statuses.
-        const state = loadOrderState();
-        if (!isEmptyObject(state)) return;
-        if (!gallery || !Array.isArray(gallery.products)) return;
+    function saveOrdersList(list) {
+        try { localStorage.setItem(ORDERS_LIST_KEY, JSON.stringify(list)); }
+        catch (e) { console.warn('Could not save orders list', e); }
+    }
+
+
+    function seedWardrobeOrdersIfEmpty() {
+        const existing = loadOrdersList();
+        if (Array.isArray(existing) && existing.length > 0) return;
 
         const now = Date.now();
-        const next = {};
-        for (const p of gallery.products) {
-            next[p.id] = { status: 'ordered', updated_at: now, seeded: true };
-        }
-        saveOrderState(next);
-        setLastAction({ verb: 'Initialized', name: 'All pieces', status: 'ordered' });
+        const seeded = [
+            {
+                id: 'jk-bundle-2026-01-19',
+                kind: 'confirmed',
+                active: true,
+                brand: 'Jenni Kayne',
+                item: 'Brentwood Blazer + Cashmere Cocoon Cardigan',
+                size: '2 / XS',
+                total: '$765.56',
+                status: 'confirmed',
+                product_ids: ['jenni-kayne-blazer', 'jenni-kayne-cocoon'],
+                local_images: ['../wardrobe/images/jenni-kayne-blazer.jpg', '../wardrobe/images/jenni-kayne-cocoon.jpg'],
+                updated_at: now,
+            },
+            {
+                id: 'la-ligne-marin-2026-01-19',
+                kind: 'confirmed',
+                active: true,
+                brand: 'La Ligne',
+                item: 'Marin Stripe Sweater',
+                size: 'XS',
+                total: '$397.93',
+                status: 'confirmed',
+                product_ids: ['la-ligne-marin'],
+                local_images: ['../wardrobe/images/la-ligne-marin.jpg'],
+                updated_at: now,
+            },
+            {
+                id: 'sezane-eli-scarf-2026-01-19',
+                kind: 'confirmed',
+                active: true,
+                brand: 'Sézane',
+                item: 'Eli Scarf (Navy) + FREE Mon Amour Totebag',
+                size: '—',
+                total: '$135.98',
+                status: 'confirmed',
+                product_ids: ['sezane-scarf'],
+                local_images: ['../wardrobe/images/sezane-scarf.jpg'],
+                updated_at: now,
+            },
+            {
+                id: 'barbour-beadnell-2026-01-19',
+                kind: 'confirmed',
+                active: true,
+                brand: 'Barbour',
+                item: 'Cropped Beadnell Waxed Jacket',
+                size: 'US 6',
+                total: '$469.84',
+                status: 'confirmed',
+                product_ids: ['barbour-beadnell'],
+                local_images: ['../wardrobe/images/barbour-beadnell.jpg'],
+                updated_at: now,
+            },
+            {
+                id: 'saint-james-minquidame-2026-01-19',
+                kind: 'confirmed',
+                active: true,
+                brand: 'Saint James',
+                item: 'Minquidame Breton Striped Shirt',
+                size: '2',
+                total: '$97.00',
+                status: 'confirmed',
+                product_ids: ['saint-james-breton'],
+                local_images: ['../wardrobe/images/saint-james-breton.jpg'],
+                updated_at: now,
+            },
+            {
+                id: 'catbird-threadbare-2026-01-19',
+                kind: 'confirmed',
+                active: true,
+                brand: 'Catbird',
+                item: 'Threadbare Ring 14K Gold',
+                size: '7',
+                total: '$84.01',
+                status: 'confirmed',
+                product_ids: ['catbird-threadbare'],
+                local_images: ['../wardrobe/images/catbird-threadbare.jpg'],
+                updated_at: now,
+            },
+            {
+                id: 'margaux-demi-custom-2026-01-19',
+                kind: 'custom_pending',
+                active: true,
+                brand: 'Margaux',
+                item: 'The Demi Ballet Flat (custom)',
+                size: '38 (US 8) · Medium',
+                total: '$325',
+                status: 'contact submitted',
+                product_ids: ['margaux-demi'],
+                local_images: ['../wardrobe/images/margaux-demi.jpg'],
+                details: {
+                    color: 'Ivory Nappa',
+                    lining: 'Light Blue',
+                    monogram: 'JSH',
+                },
+                updated_at: now,
+            },
+            {
+                id: 'ahlem-one-of-one-2026-01-19',
+                kind: 'custom_pending',
+                active: true,
+                brand: 'Ahlem',
+                item: 'One of One Bespoke Frames',
+                size: '—',
+                total: '~$650',
+                status: 'consultation request drafted',
+                product_ids: ['ahlem-custom'],
+                local_images: ['../wardrobe/images/ahlem-custom.jpg'],
+                details: {
+                    program: 'One of One Custom',
+                    craftsmanship: 'MOF-certified artisan',
+                },
+                updated_at: now,
+            }
+        ];
 
-        // Set a badge so she sees it immediately; ALWAYS clears on open.
+        saveOrdersList(seeded);
+        setLastAction({ verb: 'Imported', name: 'Wardrobe orders', status: 'seeded' });
+
+        // Badge: show count of active orders until opened (always clears on open)
         try {
             const b = loadBadges();
-            b.orders = gallery.products.length;
+            b.orders = seeded.filter(o => o.active).length;
             saveBadges(b);
         } catch {}
     }
 
-    }
 
-
-    // Badges: persist unseen counts; clear on drawer open
     const BADGE_KEY = 'jill_badges_v1';
 
     function loadBadges() {
@@ -686,13 +802,7 @@
         const root = document.querySelector('[data-drawer-content="orders"]');
         if (!root) return;
 
-        const state = loadOrderState();
-        const productById = new Map((gallery?.products || []).map(p => [p.id, p]));
-
-        const orderedLike = ['ordered','purchased'];
-        const activeIds = Object.keys(state).filter(id => orderedLike.includes(state[id]?.status) && productById.has(id));
-        const pastIds = Object.keys(state).filter(id => ['owned','returned','cancelled'].includes(state[id]?.status) && productById.has(id));
-
+        const orders = loadOrdersList();
         const last = getLastAction();
         const banner = last ? `
           <div class="drawer-empty" style="border-style:solid;border-color:rgba(212,165,116,0.25)">
@@ -700,51 +810,54 @@
           </div>
         ` : '';
 
-        if (!activeIds.length && !pastIds.length) {
-            root.innerHTML = banner + `<div class="drawer-empty">No orders tracked yet. Use the status pill on any card to mark <strong>Ordered</strong> / <strong>Purchased</strong> / <strong>Owned</strong>.</div>`;
+        const active = orders.filter(o => o.active);
+        const past = orders.filter(o => !o.active);
+
+        if (!active.length && !past.length) {
+            root.innerHTML = banner + `<div class="drawer-empty">No Wardrobe orders found yet. (They’ll appear here once imported.)</div>`;
             return;
         }
 
-        function itemRow(p) {
-            const st = state[p.id]?.status || '';
-            const canCancel = st === 'ordered';
-            const canReturn = st === 'purchased' || st === 'owned';
+        // Helper to find image
+        const productById = new Map((gallery?.products || []).map(p => [p.id, p]));
+
+        function row(order) {
+            // Try to find image in this gallery first, then fallback to local_images from seed
+            let img = '';
+            if (order.local_images && order.local_images.length) {
+                img = order.local_images[0];
+            } else if (order.product_ids && order.product_ids.length) {
+                const p = productById.get(order.product_ids[0]);
+                if (p) img = `./images/${p.local_image}`;
+            }
+
+            const canCancel = order.active;
+            const canReturn = order.active && order.kind !== 'custom_pending';
+
+            const details = order.details ? Object.entries(order.details).map(([k,v]) => `${k}: ${v}`).join(' · ') : '';
 
             return `
-              <div class="drawer-item" data-product-id="${p.id}">
-                <img class="drawer-item__img" src="./images/${p.local_image}" alt="${p.name}">
+              <div class="drawer-item" data-order-id="${order.id}">
+                ${img ? `<img class="drawer-item__img" src="${img}" alt="${order.item}">` : `<div class="drawer-item__img" style="display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.35)">□</div>`}
                 <div>
-                  <div class="drawer-item__name">${p.name}</div>
-                  <div class="drawer-item__meta">${p.brand} · ${p.price_display || ''}</div>
-                  <div class="drawer-item__meta">Status: <strong>${st}</strong></div>
+                  <div class="drawer-item__name">${order.item}</div>
+                  <div class="drawer-item__meta">${order.brand} · ${order.size || '—'} · ${order.total || ''}</div>
+                  <div class="drawer-item__meta">Status: <strong>${order.status}</strong>${details ? ` · ${details}` : ''}</div>
                 </div>
                 <div class="drawer-item__right">
-                  <div class="drawer-pill"><span class="drawer-pill__dot" style="background:${statusDot(st)}"></span>${st}</div>
+                  <div class="drawer-pill"><span class="drawer-pill__dot" style="background:${statusDot(order.kind === 'custom_pending' ? 'considering' : 'ordered')}"></span>${order.kind === 'custom_pending' ? 'custom' : 'confirmed'}</div>
                   <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
-                    ${canCancel ? `<button class="order-action order-action--cancel" type="button" data-action="cancel" data-product-id="${p.id}">Cancel</button>` : ''}
-                    ${canReturn ? `<button class="order-action order-action--return" type="button" data-action="return" data-product-id="${p.id}">Return</button>` : ''}
+                    ${canCancel ? `<button class="order-action order-action--cancel" type="button" data-action="cancel" data-order-id="${order.id}">Cancel</button>` : ''}
+                    ${canReturn ? `<button class="order-action order-action--return" type="button" data-action="return" data-order-id="${order.id}">Return</button>` : ''}
                   </div>
-                  <a class="product-card__cta" href="${p.product_url}" target="_blank" rel="noopener"><span>View</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg></a>
                 </div>
               </div>
             `;
         }
 
-        const activeHtml = activeIds
-          .map(id => productById.get(id))
-          .filter(Boolean)
-          .map(itemRow)
-          .join('');
-
-        const pastHtml = pastIds
-          .map(id => productById.get(id))
-          .filter(Boolean)
-          .map(itemRow)
-          .join('');
-
         root.innerHTML = banner + `
-          ${activeHtml ? `<section class="drawer__section"><div class="drawer__section-title">Active orders</div>${activeHtml}</section>` : ''}
-          ${pastHtml ? `<section class="drawer__section"><div class="drawer__section-title">Past</div>${pastHtml}</section>` : ''}
+          ${active.length ? `<section class="drawer__section"><div class="drawer__section-title">Active</div>${active.map(row).join('')}</section>` : ''}
+          ${past.length ? `<section class="drawer__section"><div class="drawer__section-title">Past</div>${past.map(row).join('')}</section>` : ''}
         `;
 
         // Wire actions
@@ -752,25 +865,35 @@
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const productId = btn.dataset.productId;
+                const orderId = btn.dataset.orderId;
                 const action = btn.dataset.action;
-                const p = productById.get(productId);
-                if (!p) return;
+                const list = loadOrdersList();
+                const idx = list.findIndex(o => o.id === orderId);
+                if (idx === -1) return;
+                const o = { ...list[idx] };
 
                 if (action === 'cancel') {
-                    setItemStatus(productId, 'cancelled');
-                    setLastAction({ verb: 'Cancelled', name: p.name, status: 'cancelled', productId });
-                }
-                if (action === 'return') {
-                    setItemStatus(productId, 'returned');
-                    setLastAction({ verb: 'Marked return', name: p.name, status: 'returned', productId });
+                    o.active = false;
+                    o.status = 'cancelled';
+                    o.updated_at = Date.now();
+                    setLastAction({ verb: 'Cancelled', name: o.item, status: 'cancelled' });
                 }
 
-                // Rerender immediately so it’s screenshot-debuggable
+                if (action === 'return') {
+                    o.active = false;
+                    o.status = 'returned';
+                    o.updated_at = Date.now();
+                    setLastAction({ verb: 'Returned', name: o.item, status: 'returned' });
+                }
+
+                list[idx] = o;
+                saveOrdersList(list);
+
                 renderOrdersDrawer();
             });
         });
     }
+}
 
 
 
@@ -797,7 +920,8 @@
         
         // Load and render gallery
         gallery = await loadGallery();
-        seedAllOrdersIfEmpty();
+        seedWardrobeOrdersIfEmpty();
+
         if (gallery) {
             renderGallery();
         }
