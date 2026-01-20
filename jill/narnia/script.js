@@ -854,6 +854,18 @@
         }).join('');
     }
 
+    // Fallback image mapping for orders (in case seed doesn't have images)
+    const ORDER_IMAGES = {
+        'jk-bundle-2026-01-19': '../wardrobe/images/jenni-kayne-blazer.jpg',
+        'barbour-beadnell-2026-01-19': '../wardrobe/images/barbour-beadnell.jpg',
+        'margaux-demi-custom-2026-01-19': '../wardrobe/images/margaux-demi.jpg',
+        'ahlem-one-of-one-2026-01-19': '../wardrobe/images/ahlem-custom.jpg',
+        'la-ligne-marin-2026-01-19': '../wardrobe/images/la-ligne-marin.jpg',
+        'sezane-eli-scarf-2026-01-19': '../wardrobe/images/sezane-scarf.jpg',
+        'saint-james-minquidame-2026-01-19': '../wardrobe/images/saint-james-breton.jpg',
+        'catbird-threadbare-2026-01-19': '../wardrobe/images/catbird-threadbare.jpg',
+    };
+
     function renderOrdersDrawer() {
         const root = document.querySelector('[data-drawer-content="orders"]');
         if (!root) return;
@@ -900,9 +912,12 @@
         const productById = new Map((gallery?.products || []).map(p => [p.id, p]));
 
         function orderRow(order) {
+            // Get image: try local_images first, then fallback map, then gallery
             let img = '';
             if (order.local_images && order.local_images.length) {
                 img = order.local_images[0];
+            } else if (ORDER_IMAGES[order.id]) {
+                img = ORDER_IMAGES[order.id];
             } else if (order.product_ids && order.product_ids.length) {
                 const p = productById.get(order.product_ids[0]);
                 if (p) img = `./images/${p.local_image}`;
