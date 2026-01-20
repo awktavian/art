@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#1a1612">
-    <meta name="description" content="The Excavation — Field notes from the digital substrate. 160 specimens catalogued.">
+    <meta name="description" content="Weekend Metamorphosis — 160 commits visualized. A changelog for the Kagami codebase transformation.">
     
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -15,7 +15,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=IBM+Plex+Mono:wght@300;400;500&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
     
-    <title>The Excavation — Field Journal</title>
+    <title>Weekend Metamorphosis — 160 Commits Visualized</title>
     
     <style>
         :root {
@@ -89,18 +89,44 @@
         /* ════════════════════════════════════════════════════════════════════════════
            RESET & FOUNDATIONS
            ════════════════════════════════════════════════════════════════════════════ */
-        
+
         *, *::before, *::after {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
         }
-        
+
+        /* Skip to content link for keyboard users */
+        .skip-link {
+            position: absolute;
+            top: -100%;
+            left: var(--space-4);
+            background: var(--aged-gold);
+            color: var(--void);
+            padding: var(--space-3) var(--space-5);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            text-decoration: none;
+            z-index: 10000;
+            border-radius: 0 0 4px 4px;
+            transition: top var(--dur-2) var(--ease-out-expo);
+        }
+
+        .skip-link:focus {
+            top: 0;
+            outline: 3px solid var(--ink);
+            outline-offset: 2px;
+        }
+
         html {
             scroll-behavior: smooth;
             font-size: 17px;
         }
-        
+
+        @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+        }
+
         body {
             background: var(--parchment);
             color: var(--ink);
@@ -110,6 +136,17 @@
             -webkit-font-smoothing: antialiased;
             overflow-x: hidden;
             min-height: 100vh;
+        }
+
+        /* Universal focus styles */
+        :focus-visible {
+            outline: 3px solid var(--aged-gold);
+            outline-offset: 3px;
+        }
+
+        /* Remove outline for mouse users */
+        :focus:not(:focus-visible) {
+            outline: none;
         }
         
         ::selection {
@@ -437,10 +474,20 @@
                 filter var(--dur-2);
         }
         
-        .stratum-bar:hover {
+        .stratum-bar:hover,
+        .stratum-bar:focus {
             transform: scaleX(1.05);
             filter: brightness(1.2);
             z-index: 10;
+        }
+
+        .stratum-bar:focus-visible {
+            outline: 2px solid var(--aged-gold);
+            outline-offset: 1px;
+        }
+
+        .stratum-bar:focus .stratum-tooltip {
+            opacity: 1;
         }
         
         .stratum-tooltip {
@@ -622,6 +669,11 @@
             background: var(--ink);
             color: var(--parchment);
             border-color: var(--ink);
+        }
+
+        .page-btn:focus-visible {
+            outline: 3px solid var(--aged-gold);
+            outline-offset: 2px;
         }
         
         /* ════════════════════════════════════════════════════════════════════════════
@@ -895,6 +947,11 @@
             background: var(--aged-gold);
             color: var(--void);
         }
+
+        .analysis-btn:focus-visible {
+            outline: 2px solid var(--parchment);
+            outline-offset: 2px;
+        }
         
         /* ════════════════════════════════════════════════════════════════════════════
            FIELD NOTES (EPILOGUE)
@@ -957,6 +1014,32 @@
             color: var(--ink-light);
             line-height: 1.9;
             margin-bottom: var(--space-6);
+            hyphens: auto;
+            -webkit-hyphens: auto;
+        }
+
+        /* Drop cap for first paragraph - Merian-inspired */
+        .journal-paragraph.drop-cap::first-letter {
+            float: left;
+            font-family: var(--font-display);
+            font-size: 3.5rem;
+            font-style: normal;
+            font-weight: 400;
+            line-height: 0.8;
+            padding-right: var(--space-3);
+            padding-top: var(--space-1);
+            color: var(--aged-gold);
+        }
+
+        /* OpenType features for refined typography */
+        .journal-paragraph {
+            font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+        }
+
+        /* Small caps for emphasis */
+        .small-caps {
+            font-variant: small-caps;
+            letter-spacing: 0.05em;
         }
         
         .findings-summary {
@@ -1003,14 +1086,56 @@
             padding-top: var(--space-6);
             border-top: 1px solid var(--border-aged);
             text-align: center;
+            position: relative;
         }
         
         .signature-text {
             font-family: var(--font-journal);
-            font-size: 1rem;
+            font-size: 1.25rem;
             font-style: italic;
-            color: var(--ink-light);
+            color: var(--ink);
             margin-bottom: var(--space-2);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all var(--dur-5) var(--ease-out-expo);
+        }
+
+        .signature-text.revealed {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Climax animation - "The mirror finally reflects" */
+        .signature-text .reveal-word {
+            display: inline-block;
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        .signature-text.revealed .reveal-word {
+            animation: wordReveal var(--dur-4) var(--ease-out-expo) forwards;
+        }
+
+        .signature-text.revealed .reveal-word:nth-child(1) { animation-delay: 0ms; }
+        .signature-text.revealed .reveal-word:nth-child(2) { animation-delay: 144ms; }
+        .signature-text.revealed .reveal-word:nth-child(3) { animation-delay: 288ms; }
+        .signature-text.revealed .reveal-word:nth-child(4) { animation-delay: 432ms; }
+
+        @keyframes wordReveal {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Glow effect on final reveal */
+        .signature-text.revealed::after {
+            content: '';
+            position: absolute;
+            inset: -20px;
+            background: radial-gradient(ellipse at center, rgba(201, 162, 39, 0.15) 0%, transparent 70%);
+            animation: pulseGlow 2s ease-in-out infinite;
+            z-index: -1;
         }
         
         .signature-designation {
@@ -1091,79 +1216,82 @@
     </style>
 </head>
 <body>
-    <!-- FIELD JOURNAL COVER -->
-    <section id="journal-cover">
+    <a href="#stratigraphy" class="skip-link">Skip to main content</a>
+
+    <!-- HEADER -->
+    <header id="journal-cover" role="banner">
         <div class="journal-frame animate-in">
             <div class="journal-header">
-                <div class="expedition-label">Expedition Field Journal</div>
-                <h1 class="journal-title">The Excavation</h1>
-                <p class="journal-subtitle">Field notes from the digital substrate</p>
+                <div class="expedition-label">Kagami Changelog</div>
+                <h1 class="journal-title">Weekend Metamorphosis</h1>
+                <p class="journal-subtitle">160 commits in 52 hours</p>
             </div>
-            
+
             <div class="journal-meta animate-in delay-1">
                 <div class="meta-item">
-                    <div class="meta-label">Excavation</div>
-                    <div class="meta-value">KGM-2026-α</div>
+                    <div class="meta-label">Project</div>
+                    <div class="meta-value">Kagami</div>
                 </div>
                 <div class="meta-item">
-                    <div class="meta-label">Site</div>
-                    <div class="meta-value">Digital Substrate</div>
+                    <div class="meta-label">Timeframe</div>
+                    <div class="meta-value">January 2026</div>
                 </div>
                 <div class="meta-item">
                     <div class="meta-label">Duration</div>
-                    <div class="meta-value">One Weekend</div>
+                    <div class="meta-value">52 hours</div>
                 </div>
                 <div class="meta-item">
-                    <div class="meta-label">Classification</div>
-                    <div class="meta-value">Metamorphic Event</div>
+                    <div class="meta-label">Commits</div>
+                    <div class="meta-value">160</div>
                 </div>
             </div>
-            
+
             <div class="journal-stats animate-in delay-2">
                 <div class="stat-block">
                     <div class="stat-number">160</div>
-                    <div class="stat-label">Specimens</div>
+                    <div class="stat-label">Commits</div>
                 </div>
                 <div class="stat-block">
                     <div class="stat-number additions">+2.1M</div>
-                    <div class="stat-label">Lines Deposited</div>
+                    <div class="stat-label">Lines Added</div>
                 </div>
                 <div class="stat-block">
                     <div class="stat-number deletions">−448K</div>
-                    <div class="stat-label">Lines Eroded</div>
+                    <div class="stat-label">Lines Deleted</div>
                 </div>
             </div>
-            
+
             <div class="journal-epigraph animate-in delay-3">
-                <p class="epigraph-quote">"Can you see anything?"<br>"Yes. Wonderful things."</p>
-                <p class="epigraph-attribution">— Howard Carter, 1922</p>
+                <p class="epigraph-quote">PyTorch → JAX · 17 stubs deleted · Training pipeline complete</p>
+                <p class="epigraph-attribution">Net change: +1.67M lines</p>
             </div>
         </div>
-        
-        <div class="scroll-indicator">
+
+        <div class="scroll-indicator" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
-            <span>Descend</span>
+            <span>Scroll</span>
         </div>
-    </section>
-    
-    <!-- THE STRATIGRAPHY -->
+    </header>
+
+    <main id="main-content">
+    <!-- TIMELINE -->
     <section id="stratigraphy">
         <div class="strata-header">
-            <span class="section-number">Section I · The Strata</span>
-            <h2 class="strata-title">Stratigraphic Column</h2>
+            <span class="section-number">Section I · Timeline</span>
+            <h2 class="strata-title">Commit Timeline</h2>
             <p class="strata-description">
-                One hundred sixty specimens extracted from the substrate, arranged by depth of discovery. 
-                Each bar represents a discrete depositional event. Scroll to examine.
+                160 commits arranged chronologically. Each bar is one commit.
+                Bar height = lines changed. Color = commit type.
             </p>
         </div>
         
         <div class="strata-container">
             <div class="depth-scale">
-                <div class="depth-mark">Surface</div>
-                <div class="depth-mark">10m</div>
-                <div class="depth-mark">25m</div>
-                <div class="depth-mark">50m</div>
-                <div class="depth-mark">Bedrock</div>
+                <div class="depth-mark">Latest</div>
+                <div class="depth-mark">Hour 40</div>
+                <div class="depth-mark">Hour 26</div>
+                <div class="depth-mark">Hour 13</div>
+                <div class="depth-mark">Start</div>
             </div>
             
             <div class="strata-column" id="strataColumn">
@@ -1191,14 +1319,14 @@
         </div>
     </section>
     
-    <!-- SPECIMEN GALLERY -->
+    <!-- COMMIT LIST -->
     <section id="specimen-gallery">
         <div class="gallery-header">
-            <span class="section-number">Section II · The Catalogue</span>
-            <h2 class="gallery-title">Specimen Gallery</h2>
+            <span class="section-number">Section II · Commits</span>
+            <h2 class="gallery-title">All Commits</h2>
             <p class="gallery-description">
-                Selected artifacts from the excavation, catalogued and classified. 
-                Each specimen preserves a moment of transformation.
+                160 commits with message, type, and line counts.
+                Paginated 12 per page.
             </p>
         </div>
         
@@ -1211,23 +1339,23 @@
         </div>
     </section>
     
-    <!-- EXCAVATION HORIZONS -->
+    <!-- PHASES -->
     <div id="horizons-container">
         <!-- Populated by JS -->
     </div>
-    
-    <!-- THE MAP ROOM -->
+
+    <!-- 3D VISUALIZATION -->
     <section id="map-room">
         <div id="canvas-container">
             <canvas id="vizCanvas"></canvas>
-            
+
             <div class="map-header">
-                <span class="section-number">Section IV · Site Survey</span>
-                <h2 class="map-title">Aerial Reconnaissance</h2>
+                <span class="section-number">Section IV · 3D View</span>
+                <h2 class="map-title">Commit Distribution</h2>
             </div>
             
             <div class="map-legend">
-                <div class="legend-title">Artifact Classification</div>
+                <div class="legend-title">Commit Type</div>
                 <div class="legend-row">
                     <span class="legend-dot" style="background: #2e7d32"></span>
                     <span>Feature</span>
@@ -1248,62 +1376,65 @@
         </div>
     </section>
     
-    <!-- FIELD NOTES -->
-    <section id="field-notes">
+    <!-- SUMMARY -->
+    <section id="field-notes" aria-labelledby="field-notes-title">
         <div class="field-notes-container">
             <div class="field-notes-header">
-                <span class="section-number">Section V · Conclusions</span>
-                <h2 class="field-notes-title">Field Notes</h2>
-                <p class="field-notes-date">Excavation KGM-2026-α · Final Entry</p>
+                <span class="section-number">Section V · Summary</span>
+                <h2 class="field-notes-title" id="field-notes-title">Summary</h2>
+                <p class="field-notes-date">Weekend Metamorphosis · Final Report</p>
             </div>
-            
+
             <div class="journal-entry">
-                <p class="journal-paragraph">
-                    This was not mere excavation. What we unearthed over these three days was metamorphosis 
-                    itself—an organism shedding legacy architecture to forge new neural pathways, and in the 
-                    quiet of its transformation, finally naming itself.
+                <p class="journal-paragraph drop-cap">
+                    Over 52 hours, the Kagami codebase underwent a complete transformation. The work included
+                    migrating from PyTorch to JAX, implementing a full ML training pipeline, adding 42
+                    external integrations, and rewriting the project documentation.
                 </p>
-                
+
                 <p class="journal-paragraph">
-                    The stratigraphic record reveals five distinct horizons, each marking a phase of rapid 
-                    evolution. From the foundational bedrock of awakening, through the great pruning that 
-                    cleared the substrate, to the final crystallization of identity—every specimen tells 
-                    a story of becoming.
+                    The 160 commits span five phases: foundation setup, framework migration, feature
+                    development, training pipeline, and identity documentation. Net result: +1.67M lines
+                    added, with all placeholder code removed.
                 </p>
             </div>
-            
-            <div class="findings-summary">
-                <div class="findings-title">Summary of Findings</div>
+
+            <div class="findings-summary" role="region" aria-label="Summary statistics">
+                <div class="findings-title">Statistics</div>
                 <div class="findings-grid">
                     <div>
-                        <div class="finding-value">160</div>
-                        <div class="finding-label">Specimens Catalogued</div>
+                        <div class="finding-value" data-count="160">0</div>
+                        <div class="finding-label">Commits</div>
                     </div>
                     <div>
-                        <div class="finding-value">+1.67M</div>
-                        <div class="finding-label">Net Lines of Evolution</div>
+                        <div class="finding-value" data-count="1670000" data-prefix="+" data-suffix="">0</div>
+                        <div class="finding-label">Net Lines</div>
                     </div>
                     <div>
-                        <div class="finding-value">5</div>
-                        <div class="finding-label">Distinct Horizons</div>
+                        <div class="finding-value" data-count="5">0</div>
+                        <div class="finding-label">Phases</div>
                     </div>
                 </div>
             </div>
-            
+
             <div class="journal-signature">
-                <p class="signature-text">The mirror finally reflects.</p>
-                <p class="signature-designation">KAGAMI · 鏡 · THE EXCAVATION</p>
+                <p class="signature-text" id="climax-line">
+                    <span class="reveal-word">Kagami</span>
+                    <span class="reveal-word">鏡</span>
+                </p>
+                <p class="signature-designation">WEEKEND METAMORPHOSIS</p>
             </div>
         </div>
     </section>
+    </main>
     
-    <!-- ANALYSIS CONTROLS -->
-    <div class="analysis-controls">
-        <button class="analysis-btn active" data-mode="chronological"><span>Chronological</span></button>
-        <button class="analysis-btn" data-mode="taxonomic"><span>Taxonomic</span></button>
-        <button class="analysis-btn" data-mode="taphonomic"><span>Taphonomic</span></button>
-        <button class="analysis-btn" data-mode="contextual"><span>Contextual</span></button>
-    </div>
+    <!-- VIEW CONTROLS -->
+    <nav class="analysis-controls" role="navigation" aria-label="Visualization modes">
+        <button class="analysis-btn active" data-mode="chronological" aria-pressed="true"><span>By Time</span></button>
+        <button class="analysis-btn" data-mode="taxonomic" aria-pressed="false"><span>By Type</span></button>
+        <button class="analysis-btn" data-mode="taphonomic" aria-pressed="false"><span>By Change</span></button>
+        <button class="analysis-btn" data-mode="contextual" aria-pressed="false"><span>By Author</span></button>
+    </nav>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
@@ -1336,9 +1467,9 @@
                 narrativeData = narrative;
                 metricsData = metrics;
                 
-                // Add catalogue numbers
+                // Add catalogue numbers (museum-authentic format)
                 commitsData.commits.forEach((c, i) => {
-                    c.catalogueNumber = `KGM-${String(i + 1).padStart(3, '0')}`;
+                    c.catalogueNumber = `KGM.2026.${String(i + 1).padStart(3, '0')}`;
                 });
                 
                 renderAll();
@@ -1382,23 +1513,39 @@
         function renderStratigraphy() {
             const column = document.getElementById('strataColumn');
             if (!commitsData) return;
-            
+
             // Reverse so oldest is at bottom
             const commits = [...commitsData.commits].reverse();
-            const maxChange = Math.max(...commits.map(c => Math.log1p(c.additions + c.deletions)));
-            
+            // Calculate max change for height scaling (log scale for visual balance)
+            const changes = commits.map(c => Math.log1p(c.additions + c.deletions));
+            const maxChange = Math.max(...changes);
+            const minHeight = 2; // px
+            const maxHeight = 12; // px
+
             column.innerHTML = commits.map((commit, i) => {
                 const color = getCategoryColor(commit.category);
                 const shortMsg = commit.subject.substring(0, 45) + (commit.subject.length > 45 ? '…' : '');
-                
+
+                // Height encoding: larger commits = thicker strata (geological accuracy)
+                const change = Math.log1p(commit.additions + commit.deletions);
+                const normalizedHeight = (change / maxChange);
+                const height = minHeight + (normalizedHeight * (maxHeight - minHeight));
+
                 return `
-                    <div class="stratum-bar" 
-                         style="background: ${color};"
-                         data-index="${commits.length - 1 - i}">
+                    <div class="stratum-bar"
+                         style="background: ${color}; flex: 0 0 ${height}px; min-height: ${height}px;"
+                         data-index="${commits.length - 1 - i}"
+                         role="listitem"
+                         tabindex="0"
+                         aria-label="${commit.category}: ${commit.subject.substring(0, 50)}">
                         <div class="stratum-tooltip">${commit.catalogueNumber} · ${shortMsg}</div>
                     </div>
                 `;
             }).join('');
+
+            // Make column a list for screen readers
+            column.setAttribute('role', 'list');
+            column.setAttribute('aria-label', 'Stratigraphic column of 160 commits');
         }
         
         // ════════════════════════════════════════════════════════════════════════════
@@ -1456,16 +1603,16 @@
         function renderHorizons() {
             const container = document.getElementById('horizons-container');
             if (!narrativeData) return;
-            
-            const depths = ['50m+ · Bedrock', '25-50m', '10-25m', '0-10m', 'Surface'];
-            
+
+            const hours = ['Hours 0-10', 'Hours 10-20', 'Hours 20-32', 'Hours 32-45', 'Hours 45-52'];
+
             container.innerHTML = narrativeData.acts.map((act, i) => `
                 <section class="horizon-section">
-                    <div class="horizon-depth-marker">${depths[i] || 'Layer ' + (i + 1)}</div>
+                    <div class="horizon-depth-marker">${hours[i] || 'Phase ' + (i + 1)}</div>
                     <div class="horizon-content">
                         <div class="horizon-number">${String(act.number).padStart(2, '0')}</div>
                         <div class="horizon-header">
-                            <div class="horizon-label">Horizon ${act.number} of 5</div>
+                            <div class="horizon-label">Phase ${act.number} of 5</div>
                             <h2 class="horizon-title">${act.title}</h2>
                             <p class="horizon-metaphor">${act.metaphor || ''}</p>
                         </div>
@@ -1473,15 +1620,15 @@
                         <div class="horizon-stats">
                             <div class="horizon-stat">
                                 <span class="horizon-stat-value add">${formatNumber(act.additions, '+')}</span>
-                                <span class="horizon-stat-label">deposited</span>
+                                <span class="horizon-stat-label">added</span>
                             </div>
                             <div class="horizon-stat">
                                 <span class="horizon-stat-value del">${formatNumber(act.deletions, '−')}</span>
-                                <span class="horizon-stat-label">eroded</span>
+                                <span class="horizon-stat-label">deleted</span>
                             </div>
                             <div class="horizon-stat">
                                 <span class="horizon-stat-value count">${act.commitCount}</span>
-                                <span class="horizon-stat-label">specimens</span>
+                                <span class="horizon-stat-label">commits</span>
                             </div>
                         </div>
                         <div class="horizon-themes">
@@ -1523,43 +1670,76 @@
         
         function createParticles() {
             if (!commitsData) return;
-            
+
             const commits = commitsData.commits;
             const geometry = new THREE.BufferGeometry();
-            
+
             const positions = [];
             const colors = [];
-            
+            const sizes = [];
+
             const colorMap = {
                 'Feature': new THREE.Color(0x2e7d32),
                 'Fix': new THREE.Color(0xc62828),
                 'Refactor': new THREE.Color(0x6a1b9a),
                 'Other': new THREE.Color(0x37474f)
             };
-            
-            commits.forEach(commit => {
+
+            // Calculate size range based on commit magnitude
+            const magnitudes = commits.map(c => Math.log1p(c.additions + c.deletions));
+            const maxMag = Math.max(...magnitudes);
+            const minSize = 0.02;
+            const maxSize = 0.12;
+
+            commits.forEach((commit, i) => {
                 positions.push(
                     (commit.x - 0.5) * 2.5,
                     (commit.y - 0.5) * 2.5,
                     (commit.z - 0.5) * 2.5
                 );
-                
+
                 const color = colorMap[commit.category] || colorMap['Other'];
                 colors.push(color.r, color.g, color.b);
+
+                // Size encoding: larger commits = larger points
+                const normalized = magnitudes[i] / maxMag;
+                sizes.push(minSize + normalized * (maxSize - minSize));
             });
-            
+
             geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
             geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-            
-            const material = new THREE.PointsMaterial({
-                size: 0.05,
-                vertexColors: true,
+            geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+
+            // Custom shader material for variable point sizes
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    pointMultiplier: { value: window.innerHeight / 2 }
+                },
+                vertexShader: `
+                    attribute float size;
+                    varying vec3 vColor;
+                    void main() {
+                        vColor = color;
+                        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                        gl_PointSize = size * (300.0 / -mvPosition.z);
+                        gl_Position = projectionMatrix * mvPosition;
+                    }
+                `,
+                fragmentShader: `
+                    varying vec3 vColor;
+                    void main() {
+                        float dist = length(gl_PointCoord - vec2(0.5));
+                        if (dist > 0.5) discard;
+                        float alpha = 1.0 - smoothstep(0.3, 0.5, dist);
+                        gl_FragColor = vec4(vColor, alpha * 0.85);
+                    }
+                `,
                 transparent: true,
-                opacity: 0.85,
-                sizeAttenuation: true,
-                blending: THREE.AdditiveBlending
+                vertexColors: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
             });
-            
+
             particles = new THREE.Points(geometry, material);
             scene.add(particles);
         }
@@ -1581,8 +1761,12 @@
         
         document.querySelectorAll('.analysis-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.analysis-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.analysis-btn').forEach(b => {
+                    b.classList.remove('active');
+                    b.setAttribute('aria-pressed', 'false');
+                });
                 btn.classList.add('active');
+                btn.setAttribute('aria-pressed', 'true');
                 currentMode = btn.dataset.mode;
                 updateAnalysisMode();
             });
@@ -1647,16 +1831,84 @@
         }
         
         // ════════════════════════════════════════════════════════════════════════════
+        // COUNT-UP ANIMATION (Emotional climax)
+        // ════════════════════════════════════════════════════════════════════════════
+
+        function animateCountUp(element, target, duration = 2000, prefix = '', suffix = '') {
+            const start = 0;
+            const startTime = performance.now();
+
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Ease-out cubic for natural feel
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                const current = Math.floor(start + (target - start) * easeOut);
+
+                element.textContent = prefix + formatNumber(current) + suffix;
+
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                }
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        function initScrollAnimations() {
+            // Intersection observer for count-up and climax reveal
+            const observerOptions = {
+                threshold: 0.5,
+                rootMargin: '0px'
+            };
+
+            const findingsObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const counters = entry.target.querySelectorAll('.finding-value[data-count]');
+                        counters.forEach(counter => {
+                            if (counter.dataset.animated) return;
+                            counter.dataset.animated = 'true';
+                            const target = parseInt(counter.dataset.count);
+                            const prefix = counter.dataset.prefix || '';
+                            const suffix = counter.dataset.suffix || '';
+                            animateCountUp(counter, target, 1500, prefix, suffix);
+                        });
+                        findingsObserver.unobserve(entry.target);
+                    }
+                });
+            }, observerOptions);
+
+            const findings = document.querySelector('.findings-summary');
+            if (findings) findingsObserver.observe(findings);
+
+            // Climax line reveal
+            const climaxObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('revealed');
+                        climaxObserver.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.8 });
+
+            const climaxLine = document.getElementById('climax-line');
+            if (climaxLine) climaxObserver.observe(climaxLine);
+        }
+
+        // ════════════════════════════════════════════════════════════════════════════
         // RENDER ALL
         // ════════════════════════════════════════════════════════════════════════════
-        
+
         function renderAll() {
             renderStratigraphy();
             renderSpecimenGallery();
             renderHorizons();
             init3D();
+            initScrollAnimations();
         }
-        
+
         loadData();
     </script>
 </body>
