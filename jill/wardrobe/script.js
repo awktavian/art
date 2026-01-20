@@ -146,16 +146,66 @@ const outfits = {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// HEARTS SYSTEM — localStorage persistence
+// HEARTS SYSTEM — API-first with localStorage fallback
 // ═══════════════════════════════════════════════════════════════
 
+// Legacy keys for migration
 const HEARTS_KEY = 'jill_wardrobe_hearts';
 const HEARTS_HISTORY_KEY = 'jill_wardrobe_hearts_history';
 
+// Use CommerceClient if available (loaded from shared/commerce-client.js)
+const useCommerceClient = typeof CommerceClient !== 'undefined';
+
 /**
- * Get hearted items from localStorage
+ * Initialize commerce client (call on DOMContentLoaded)
+ */
+async function initCommerceClient() {
+    if (useCommerceClient) {
+        await CommerceClient.initialize();
+        // Migrate old hearts to new system
+        _migrateOldHearts();
+        console.log('✅ Commerce client initialized');
+    }
+}
+
+/**
+ * Migrate old localStorage hearts to new system
+ */
+function _migrateOldHearts() {
+    if (!useCommerceClient) return;
+    try {
+        const oldHearts = localStorage.getItem(HEARTS_KEY);
+        if (oldHearts) {
+            const hearts = JSON.parse(oldHearts);
+            hearts.forEach(productId => {
+                const product = products[productId];
+                if (product && !CommerceClient.isWishlisted(productId)) {
+                    CommerceClient.addToWishlist({
+                        product_id: productId,
+                        brand: product.brand,
+                        name: product.name,
+                        price: product.price,
+                        image: product.image,
+                        source_gallery: 'wardrobe',
+                    });
+                }
+            });
+            // Clear old storage after migration
+            // localStorage.removeItem(HEARTS_KEY);
+            console.log(`Migrated ${hearts.length} hearts to commerce client`);
+        }
+    } catch (e) {
+        console.warn('Hearts migration failed:', e);
+    }
+}
+
+/**
+ * Get hearted items — uses CommerceClient or localStorage
  */
 function getHeartedItems() {
+    if (useCommerceClient) {
+        return CommerceClient.getWishlist();
+    }
     try {
         const stored = localStorage.getItem(HEARTS_KEY);
         return stored ? JSON.parse(stored) : [];
@@ -165,7 +215,7 @@ function getHeartedItems() {
 }
 
 /**
- * Save hearted items to localStorage
+ * Save hearted items to localStorage (legacy)
  */
 function saveHeartedItems(items) {
     try {
@@ -197,9 +247,28 @@ function getHeartsHistory() {
 }
 
 /**
- * Toggle heart on a product
+ * Toggle heart on a product — uses CommerceClient or localStorage
  */
-function toggleHeart(productId) {
+async function toggleHeart(productId) {
+    const product = products[productId];
+    
+    if (useCommerceClient) {
+        const wasHearted = CommerceClient.isWishlisted(productId);
+        await CommerceClient.toggleWishlist({
+            product_id: productId,
+            brand: product?.brand,
+            name: product?.name,
+            price: product?.price,
+            image: product?.image,
+            source_gallery: 'wardrobe',
+        });
+        updateAllHeartStates();
+        updateNavHeartsCount();
+        updateHeartedPanel();
+        return !wasHearted;
+    }
+    
+    // Fallback to localStorage
     const hearts = getHeartedItems();
     const index = hearts.indexOf(productId);
     
@@ -214,13 +283,16 @@ function toggleHeart(productId) {
     updateNavHeartsCount();
     updateHeartedPanel();
     
-    return index === -1; // Returns true if hearted, false if unhearted
+    return index === -1;
 }
 
 /**
  * Check if a product is hearted
  */
 function isHearted(productId) {
+    if (useCommerceClient) {
+        return CommerceClient.isWishlisted(productId);
+    }
     return getHeartedItems().includes(productId);
 }
 
@@ -786,7 +858,10 @@ function initProductCardTilt() {
 // INITIALIZATION
 // ═══════════════════════════════════════════════════════════════
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Initialize commerce client first
+    await initCommerceClient();
+    
     // Core functionality
     initProductHearts();
     initProductCardNavigation();
@@ -803,9 +878,13 @@ document.addEventListener('DOMContentLoaded', () => {
     initPhilosophyCards();
     initProductCardTilt();
     
-    // Log hearts history for debugging
+    // Log commerce state for debugging
     console.log('💕 Jill\'s Wardrobe initialized');
-    console.log('Hearts history:', getHeartsHistory());
+    if (useCommerceClient) {
+        console.log('Commerce state:', CommerceClient.getState());
+    } else {
+        console.log('Hearts history:', getHeartsHistory());
+    }
 });
 
 // ═══════════════════════════════════════════════════════════════

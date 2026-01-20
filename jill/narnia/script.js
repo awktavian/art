@@ -350,11 +350,49 @@
     };
 
     let gallery = null;
+    const useCommerceClient = typeof CommerceClient !== 'undefined';
 
     /**
-     * Get hearted items from both galleries (union)
+     * Initialize commerce client integration
+     */
+    async function initCommerceIntegration() {
+        if (!useCommerceClient) return;
+        
+        try {
+            await CommerceClient.initialize();
+            
+            // Migrate old hearts to commerce client
+            const oldEvening = JSON.parse(localStorage.getItem(HEARTS_KEYS.evening) || '[]');
+            const oldWardrobe = JSON.parse(localStorage.getItem(HEARTS_KEYS.wardrobe) || '[]');
+            const allOld = [...new Set([...oldEvening, ...oldWardrobe])];
+            
+            for (const productId of allOld) {
+                if (!CommerceClient.isWishlisted(productId)) {
+                    // Find product data
+                    const product = gallery?.products?.find(p => p.id === productId);
+                    await CommerceClient.addToWishlist({
+                        product_id: productId,
+                        brand: product?.brand || 'Unknown',
+                        name: product?.name || productId,
+                        price: product?.price,
+                        source_gallery: 'evening',
+                    });
+                }
+            }
+            console.log('✅ Commerce integration initialized');
+        } catch (e) {
+            console.warn('Commerce integration failed:', e);
+        }
+    }
+
+    /**
+     * Get hearted items — uses CommerceClient or localStorage
      */
     function getHeartedItems() {
+        if (useCommerceClient) {
+            return new Set(CommerceClient.getWishlist());
+        }
+        
         try {
             const evening = JSON.parse(localStorage.getItem(HEARTS_KEYS.evening) || '[]');
             const wardrobe = JSON.parse(localStorage.getItem(HEARTS_KEYS.wardrobe) || '[]');
@@ -377,9 +415,12 @@
     }
 
     /**
-     * Save hearted item to evening storage + history
+     * Save hearted item to storage + history
      */
     function saveHeartedItems(heartedSet) {
+        // If using CommerceClient, it handles persistence
+        if (useCommerceClient) return;
+        
         try {
             const hearts = Array.from(heartedSet);
             localStorage.setItem(HEARTS_KEYS.evening, JSON.stringify(hearts));
@@ -399,9 +440,33 @@
     }
 
     /**
-     * Toggle heart on a product
+     * Toggle heart on a product — uses CommerceClient or localStorage
      */
-    function toggleHeart(productId) {
+    async function toggleHeart(productId) {
+        const product = gallery?.products?.find(p => p.id === productId);
+        
+        if (useCommerceClient) {
+            const wasHearted = CommerceClient.isWishlisted(productId);
+            await CommerceClient.toggleWishlist({
+                product_id: productId,
+                brand: product?.brand || 'Unknown',
+                name: product?.name || productId,
+                price: product?.price,
+                product_url: product?.product_url,
+                source_gallery: 'evening',
+            });
+            
+            if (!wasHearted) {
+                bumpBadge('favorites', 1);
+                createHeartParticles(document.querySelector(`[data-product-id="${productId}"]`));
+            }
+            
+            updateHeartButtons();
+            updateStats();
+            return !wasHearted;
+        }
+        
+        // Fallback to localStorage
         const hearts = getHeartedItems();
         
         if (hearts.has(productId)) {
@@ -409,7 +474,6 @@
                 } else {
             hearts.add(productId);
             bumpBadge('favorites', 1);
-            // Celebration particles
             createHeartParticles(document.querySelector(`[data-product-id="${productId}"]`));
         }
         
@@ -962,6 +1026,10 @@
         
         // Load and render gallery
         gallery = await loadGallery();
+        
+        // Initialize commerce integration (after gallery loads for product data)
+        await initCommerceIntegration();
+        
         seedWardrobeOrdersIfEmpty();
 
         if (gallery) {
