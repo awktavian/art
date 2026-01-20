@@ -74,6 +74,34 @@
         } catch {
             return null;
         }
+
+    function isEmptyObject(obj) {
+        return !obj || (Object.keys(obj).length === 0);
+    }
+
+    function seedAllOrdersIfEmpty() {
+        // If there is no order state yet, assume “all orders” = active orders for every piece.
+        // This does NOT overwrite existing statuses.
+        const state = loadOrderState();
+        if (!isEmptyObject(state)) return;
+        if (!gallery || !Array.isArray(gallery.products)) return;
+
+        const now = Date.now();
+        const next = {};
+        for (const p of gallery.products) {
+            next[p.id] = { status: 'ordered', updated_at: now, seeded: true };
+        }
+        saveOrderState(next);
+        setLastAction({ verb: 'Initialized', name: 'All pieces', status: 'ordered' });
+
+        // Set a badge so she sees it immediately; ALWAYS clears on open.
+        try {
+            const b = loadBadges();
+            b.orders = gallery.products.length;
+            saveBadges(b);
+        } catch {}
+    }
+
     }
 
 
@@ -769,6 +797,7 @@
         
         // Load and render gallery
         gallery = await loadGallery();
+        seedAllOrdersIfEmpty();
         if (gallery) {
             renderGallery();
         }
