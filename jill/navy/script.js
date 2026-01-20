@@ -270,49 +270,62 @@
         }).join('');
     }
 
-    // ORDERS DRAWER - NOW FROM gallery.json
+    // ORDERS DRAWER - Real order data from wardrobe updates
     function renderOrdersDrawer() {
         const root = document.getElementById('orders-content');
         if (!root) return;
-        const orders = gallery?.orders || { confirmed: [], pending_custom: [] };
-        const confirmedWithDetails = orders.confirmed.map(order => {
-            const product = gallery?.products?.find(p => p.id === order.product_id);
-            return { ...order, product };
-        });
+        const orders = gallery?.orders || { in_transit: [], delivered: [], custom_pending: [] };
 
-        function confirmedRow(order) {
-            const p = order.product;
+        function orderRow(order, statusIcon, statusClass) {
+            const product = order.product_ids ? gallery?.products?.find(p => order.product_ids.includes(p.id)) : null;
+            const img = product ? `images/${product.local_image}` : '../wardrobe/images/margaux-demi.jpg';
             return `<div class="order-card">
-                <img class="order-card__img" src="${p ? `images/${p.local_image}` : 'https://via.placeholder.com/70x70/E0E5EC/415A77?text=·'}" alt="${p?.name || order.product_id}" onerror="this.src='https://via.placeholder.com/70x70/E0E5EC/415A77?text=·'">
+                <img class="order-card__img" src="${img}" alt="${order.item}" onerror="this.src='https://via.placeholder.com/60x60/E0E5EC/415A77?text=·'">
                 <div class="order-card__body">
-                    <div class="order-card__brand">${p?.brand || 'Unknown'}</div>
-                    <div class="order-card__name">${p?.name || order.product_id}</div>
-                    <div class="order-card__meta">${order.notes ? `<span class="order-card__notes">${order.notes}</span>` : ''}${p?.price_display ? `<span class="order-card__price">${p.price_display}</span>` : ''}</div>
+                    <div class="order-card__brand">${order.brand}</div>
+                    <div class="order-card__name">${order.item}</div>
+                    <div class="order-card__meta">
+                        <span class="order-card__size">Size ${order.size}</span>
+                        <span class="order-card__price">${order.total}</span>
+                    </div>
                 </div>
-                <div class="order-card__status order-card__status--confirmed">✓</div>
+                <div class="order-card__status ${statusClass}">${statusIcon}</div>
             </div>`;
         }
 
         function customRow(order) {
+            const statusLabel = order.status.replace(/_/g, ' ');
+            const details = order.details ? Object.entries(order.details).map(([k, v]) => `${v}`).join(' · ') : '';
             return `<div class="order-card order-card--custom">
                 <div class="order-card__body">
-                    <div class="order-card__brand">Custom <span class="order-card__status order-card__status--pending">${order.status}</span></div>
-                    <div class="order-card__name">${order.description}</div>
-                    ${order.notes ? `<div class="order-card__notes">${order.notes}</div>` : ''}
+                    <div class="order-card__brand">${order.brand} <span class="order-card__status order-card__status--pending">${statusLabel}</span></div>
+                    <div class="order-card__name">${order.item}</div>
+                    <div class="order-card__meta">
+                        <span class="order-card__size">${order.size}</span>
+                        <span class="order-card__price">${order.total}</span>
+                    </div>
+                    ${details ? `<div class="order-card__specs">${details}</div>` : ''}
                 </div>
             </div>`;
         }
 
-        const confirmedTotal = confirmedWithDetails.reduce((sum, o) => sum + (o.product?.price || 0), 0);
+        // Calculate totals
+        const parsePrice = str => parseFloat((str || '').replace(/[^0-9.]/g, '')) || 0;
+        const inTransitTotal = (orders.in_transit || []).reduce((sum, o) => sum + parsePrice(o.total), 0);
+        const deliveredTotal = (orders.delivered || []).reduce((sum, o) => sum + parsePrice(o.total), 0);
+        const customTotal = (orders.custom_pending || []).reduce((sum, o) => sum + parsePrice(o.total), 0);
 
         root.innerHTML = `
             <div class="orders-summary">
-                <div class="orders-summary__row"><span>Confirmed Orders</span><span class="orders-summary__value">$${confirmedTotal.toLocaleString()}</span></div>
-                <div class="orders-summary__row"><span>Pending Custom</span><span class="orders-summary__value orders-summary__value--pending">${orders.pending_custom.length} items</span></div>
+                <div class="orders-summary__row"><span>📦 In Transit</span><span class="orders-summary__value">$${inTransitTotal.toLocaleString()}</span></div>
+                <div class="orders-summary__row"><span>✓ Delivered</span><span class="orders-summary__value">$${deliveredTotal.toLocaleString()}</span></div>
+                <div class="orders-summary__row"><span>✨ Custom Orders</span><span class="orders-summary__value orders-summary__value--pending">$${customTotal.toLocaleString()}</span></div>
+                <div class="orders-summary__row orders-summary__row--total"><span>Total Invested</span><span class="orders-summary__value orders-summary__value--total">$${(inTransitTotal + deliveredTotal + customTotal).toLocaleString()}</span></div>
             </div>
-            ${confirmedWithDetails.length > 0 ? `<section class="orders-group"><h3 class="orders-group__title">✓ Confirmed (${confirmedWithDetails.length})</h3><div class="orders-group__list">${confirmedWithDetails.map(confirmedRow).join('')}</div></section>` : ''}
-            ${orders.pending_custom.length > 0 ? `<section class="orders-group orders-group--custom"><h3 class="orders-group__title">⏳ Pending (${orders.pending_custom.length})</h3><div class="orders-group__list">${orders.pending_custom.map(customRow).join('')}</div></section>` : ''}
-            ${confirmedWithDetails.length === 0 && orders.pending_custom.length === 0 ? `<div class="drawer-empty"><p>No orders yet</p><p class="drawer-empty__hint">Orders will appear here when placed</p></div>` : ''}`;
+            ${(orders.in_transit || []).length > 0 ? `<section class="orders-group"><h3 class="orders-group__title">📦 In Transit (${orders.in_transit.length})</h3><div class="orders-group__list">${orders.in_transit.map(o => orderRow(o, '📦', 'order-card__status--transit')).join('')}</div></section>` : ''}
+            ${(orders.delivered || []).length > 0 ? `<section class="orders-group"><h3 class="orders-group__title">✓ Delivered (${orders.delivered.length})</h3><div class="orders-group__list">${orders.delivered.map(o => orderRow(o, '✓', 'order-card__status--confirmed')).join('')}</div></section>` : ''}
+            ${(orders.custom_pending || []).length > 0 ? `<section class="orders-group orders-group--custom"><h3 class="orders-group__title">✨ Custom Orders (${orders.custom_pending.length})</h3><div class="orders-group__list">${orders.custom_pending.map(customRow).join('')}</div></section>` : ''}
+            ${(orders.in_transit || []).length === 0 && (orders.delivered || []).length === 0 && (orders.custom_pending || []).length === 0 ? `<div class="drawer-empty"><p>No orders yet</p><p class="drawer-empty__hint">Orders will appear here when placed</p></div>` : ''}`;
     }
 
     function renderFavoritesDrawer() {
