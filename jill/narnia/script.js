@@ -74,7 +74,63 @@
         } catch {
             return null;
         }
+    }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // UNDO TOAST — "Gmail-style" undo banner
+    // ═══════════════════════════════════════════════════════════════════════
+
+    const UNDO_KEY = 'jill_orders_undo_v1';
+    let undoTimer = null;
+
+    function pushUndo(payload) {
+        try { localStorage.setItem(UNDO_KEY, JSON.stringify(payload)); } catch {}
+    }
+
+    function popUndo() {
+        try {
+            const p = JSON.parse(localStorage.getItem(UNDO_KEY) || 'null');
+            localStorage.removeItem(UNDO_KEY);
+            return p;
+        } catch {
+            return null;
+        }
+    }
+
+    function showUndoToast(message, onUndo) {
+        const toast = document.getElementById('undo-toast');
+        if (!toast) return;
+
+        const text = toast.querySelector('[data-undo-text]');
+        const btn = toast.querySelector('[data-undo-btn]');
+        if (text) text.textContent = message;
+
+        // Clear any existing timer
+        if (undoTimer) clearTimeout(undoTimer);
+
+        // Show
+        toast.hidden = false;
+        requestAnimationFrame(() => toast.classList.add('is-visible'));
+
+        const doHide = () => {
+            toast.classList.remove('is-visible');
+            setTimeout(() => { toast.hidden = true; }, 280);
+        };
+
+        if (btn) {
+            btn.onclick = (e) => {
+                e.preventDefault();
+                if (undoTimer) clearTimeout(undoTimer);
+                onUndo?.();
+                doHide();
+            };
+        }
+
+        // Auto-dismiss after 6s
+        undoTimer = setTimeout(doHide, 6000);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // Orders list (from Wardrobe / email updates). No shipping info stored.
     const ORDERS_LIST_KEY = 'jill_orders_v1';
 
@@ -872,29 +928,46 @@
                 if (idx === -1) return;
                 const o = { ...list[idx] };
 
+                // Snapshot for undo
+                const prevOrder = { ...o };
+
                 if (action === 'cancel') {
                     o.active = false;
                     o.status = 'cancelled';
                     o.updated_at = Date.now();
-                    setLastAction({ verb: 'Cancelled', name: o.item, status: 'cancelled' });
                 }
 
                 if (action === 'return') {
                     o.active = false;
                     o.status = 'returned';
                     o.updated_at = Date.now();
-                    setLastAction({ verb: 'Returned', name: o.item, status: 'returned' });
                 }
 
                 list[idx] = o;
                 saveOrdersList(list);
+                setLastAction({ verb: action === 'cancel' ? 'Cancelled' : 'Returned', name: o.item, status: o.status });
+
+                // Store undo payload
+                pushUndo({ orderId, prev: prevOrder, next: o });
 
                 renderOrdersDrawer();
+
+                // Show undo toast
+                const verb = action === 'cancel' ? 'Cancelled' : 'Returned';
+                showUndoToast(`${verb}: ${o.item}`, () => {
+                    const payload = popUndo();
+                    if (!payload) return;
+                    const currentList = loadOrdersList();
+                    const j = currentList.findIndex(x => x.id === payload.orderId);
+                    if (j === -1) return;
+                    currentList[j] = payload.prev;
+                    saveOrdersList(currentList);
+                    setLastAction({ verb: 'Undid', name: payload.prev.item, status: payload.prev.status });
+                    renderOrdersDrawer();
+                });
             });
         });
     }
-}
-
 
 
     // ═══════════════════════════════════════════════════════════════════════
