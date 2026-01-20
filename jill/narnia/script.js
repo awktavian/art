@@ -13,6 +13,9 @@
 (function() {
     'use strict';
 
+    // Boot marker (debug + sanity check)
+    window.__evening_edit_boot = Date.now();
+
     // ═══════════════════════════════════════════════════════════════════════
     // HEARTS PERSISTENCE — Synced across galleries
     // ═══════════════════════════════════════════════════════════════════════
@@ -22,6 +25,41 @@
         wardrobe: 'jill_wardrobe_hearts',
         history: 'jill_hearts_history'
     };
+
+    // Shared state across Jill galleries
+    const ORDER_STATE_KEY = 'jill_order_state_v1';
+    // Values: 'wishlisted' | 'considering' | 'ordered' | 'purchased' | 'owned' | 'returned'
+
+    function loadOrderState() {
+        try {
+            return JSON.parse(localStorage.getItem(ORDER_STATE_KEY) || '{}');
+        } catch {
+            return {};
+        }
+    }
+
+    function saveOrderState(state) {
+        try {
+            localStorage.setItem(ORDER_STATE_KEY, JSON.stringify(state));
+        } catch (e) {
+            console.warn('Could not save order state:', e);
+        }
+    }
+
+    function getItemStatus(productId) {
+        const state = loadOrderState();
+        return state[productId]?.status || null;
+    }
+
+    function setItemStatus(productId, status) {
+        const state = loadOrderState();
+        state[productId] = {
+            status,
+            updated_at: Date.now(),
+        };
+        saveOrderState(state);
+    }
+
 
     // Product ID mappings between galleries (same product, different IDs)
     const PRODUCT_MAPPINGS = {
@@ -89,7 +127,7 @@
         } else {
             hearts.add(productId);
             // Celebration particles
-            createHeartParticles(event?.target || document.querySelector(`[data-product-id="${productId}"]`));
+            createHeartParticles(document.querySelector(`[data-product-id="${productId}"]`));
         }
         
         saveHeartedItems(hearts);
@@ -200,6 +238,16 @@
                     <h3 class="product-card__name">${product.name}</h3>
                     <p class="product-card__description">${product.description}</p>
                     <footer class="product-card__footer">
+                        <div class="product-card__status" data-status="${getItemStatus(product.id) || ''}">
+                          <button class="status-button" type="button" data-product-id="${product.id}" aria-label="Set status for ${product.name}">
+                            <span class="status-dot"></span>
+                            <span class="status-label">${getItemStatus(product.id) || 'No status'}</span>
+                          </button>
+                          <div class="status-menu" role="menu" aria-hidden="true">
+                            ${['wishlisted','considering','ordered','purchased','owned','returned'].map(st => `
+                              <button class="status-option" type="button" role="menuitem" data-status="${st}" data-product-id="${product.id}">${st}</button>`).join('')}
+                          </div>
+                        </div>
                         <div class="product-card__price-container">
                             <span class="product-card__price">${product.price_display}</span>
                             ${product.material ? `<span class="product-card__material">${product.material}</span>` : ''}
@@ -397,6 +445,61 @@
         sections.forEach(section => observer.observe(section));
     }
 
+
+
+    function initStatusControls() {
+        // toggle menus
+        document.querySelectorAll('.status-button').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const wrapper = btn.closest('.product-card__status');
+                const menu = wrapper?.querySelector('.status-menu');
+                if (!menu) return;
+
+                const isOpen = menu.classList.contains('open');
+                document.querySelectorAll('.status-menu.open').forEach(m => m.classList.remove('open'));
+                menu.classList.toggle('open', !isOpen);
+                menu.setAttribute('aria-hidden', isOpen ? 'true' : 'false');
+            });
+        });
+
+        // select option
+        document.querySelectorAll('.status-option').forEach(opt => {
+            opt.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const productId = opt.dataset.productId;
+                const status = opt.dataset.status;
+                if (!productId || !status) return;
+
+                setItemStatus(productId, status);
+
+                // Update UI in-place
+                const card = document.querySelector(`.product-card[data-product-id="${productId}"]`);
+                const wrapper = card?.querySelector('.product-card__status');
+                if (wrapper) {
+                    wrapper.dataset.status = status;
+                    const label = wrapper.querySelector('.status-label');
+                    if (label) label.textContent = status;
+                    const menu = wrapper.querySelector('.status-menu');
+                    if (menu) {
+                        menu.classList.remove('open');
+                        menu.setAttribute('aria-hidden','true');
+                    }
+                }
+            });
+        });
+
+        // close on outside click
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.status-menu.open').forEach(m => {
+                m.classList.remove('open');
+                m.setAttribute('aria-hidden','true');
+            });
+        });
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // INITIALIZATION
     // ═══════════════════════════════════════════════════════════════════════
@@ -428,6 +531,7 @@
         initScrollReveal();
         initSmoothScroll();
         initNavHighlight();
+        initStatusControls();
         
         // Log for debugging
         console.log('✨ The Evening Edit initialized');
