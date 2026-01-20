@@ -533,21 +533,41 @@
     function openDrawer(kind) {
         const overlay = document.querySelector('.drawer-overlay');
         const drawer = document.getElementById(`${kind}-drawer`);
-        
+        const button = document.getElementById(`${kind}-btn`);
+
         if (overlay) overlay.classList.add('active');
-        if (drawer) drawer.classList.add('active');
-        
+        if (drawer) {
+            drawer.classList.add('active');
+            drawer.removeAttribute('hidden');
+            drawer.setAttribute('aria-hidden', 'false');
+        }
+        if (button) button.setAttribute('aria-expanded', 'true');
+
         // Clear badge on open
         clearBadge(kind);
-        
+
         // Render content
         if (kind === 'favorites') renderFavoritesDrawer();
         if (kind === 'orders') renderOrdersDrawer();
+
+        // Focus trap - focus first focusable element
+        setTimeout(() => {
+            const closeBtn = drawer?.querySelector('.drawer-close');
+            if (closeBtn) closeBtn.focus();
+        }, 100);
     }
 
     function closeDrawers() {
         document.querySelector('.drawer-overlay')?.classList.remove('active');
-        document.querySelectorAll('.drawer').forEach(d => d.classList.remove('active'));
+        document.querySelectorAll('.drawer').forEach(d => {
+            d.classList.remove('active');
+            d.setAttribute('hidden', '');
+            d.setAttribute('aria-hidden', 'true');
+        });
+
+        // Reset aria-expanded on buttons
+        document.getElementById('favorites-btn')?.setAttribute('aria-expanded', 'false');
+        document.getElementById('orders-btn')?.setAttribute('aria-expanded', 'false');
     }
 
     function setupDrawers() {
