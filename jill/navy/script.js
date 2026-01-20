@@ -13,8 +13,6 @@
 (function() {
     'use strict';
 
-    // Boot marker
-    window.__true_blue_boot = Date.now();
 
     // ═══════════════════════════════════════════════════════════════════════
     // HEARTS PERSISTENCE — Synced across galleries
@@ -254,6 +252,16 @@
         
         content.innerHTML = html;
         updateHeartButtons();
+
+        // Setup image load detection for skeleton removal
+        content.querySelectorAll('.product-image').forEach(img => {
+            const wrap = img.closest('.product-image-wrap');
+            if (img.complete) {
+                wrap?.classList.add('loaded');
+            } else {
+                img.addEventListener('load', () => wrap?.classList.add('loaded'));
+            }
+        });
     }
 
     function renderProductCard(product) {
@@ -417,7 +425,7 @@
             content.innerHTML = `
                 <div class="drawer-empty">
                     <p>No favorites yet</p>
-                    <p style="font-size: var(--text-sm); margin-top: var(--space-2);">Heart pieces you love</p>
+                    <p class="drawer-empty__hint">Heart pieces you love</p>
                 </div>
             `;
             return;
@@ -536,9 +544,12 @@
                 { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
                 { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0)`, opacity: 0 }
             ], {
-                duration: 500,
+                duration: 377, // Fibonacci timing
                 easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)'
             }).onfinish = () => particle.remove();
+
+            // Haptic feedback for mobile
+            if (navigator.vibrate) navigator.vibrate(50);
         }
     }
 
@@ -675,9 +686,6 @@
         renderBadges();
         setupDrawers();
         
-        console.log('🔵 True Blue loaded — Navy is her signature');
-        console.log('💕 Hearts:', Array.from(getHeartedItems()));
-        console.log('📦 Orders:', JILL_ORDERS.confirmed.length + JILL_ORDERS.pending_custom.length, 'items');
     }
 
     // Run on DOM ready
