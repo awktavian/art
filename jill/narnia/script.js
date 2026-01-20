@@ -60,6 +60,23 @@
         saveOrderState(state);
     }
 
+    const LAST_ACTION_KEY = 'jill_last_order_action_v1';
+
+    function setLastAction(action) {
+        try {
+            localStorage.setItem(LAST_ACTION_KEY, JSON.stringify({ ...action, at: Date.now() }));
+        } catch {}
+    }
+
+    function getLastAction() {
+        try {
+            return JSON.parse(localStorage.getItem(LAST_ACTION_KEY) || 'null');
+        } catch {
+            return null;
+        }
+    }
+
+
     // Badges: persist unseen counts; clear on drawer open
     const BADGE_KEY = 'jill_badges_v1';
 
@@ -310,7 +327,7 @@
                             <span class="status-label">${getItemStatus(product.id) || 'Just looking'}</span>
                           </button>
                           <div class="status-menu" role="menu" aria-hidden="true">
-                            ${['wishlisted','considering','ordered','purchased','owned','returned'].map(st => `
+                            ${['wishlisted','considering','ordered','purchased','owned','returned','cancelled'].map(st => `
                               <button class="status-option" type="button" role="menuitem" data-status="${st}" data-product-id="${product.id}">${st}</button>`).join('')}
                           </div>
                         </div>
@@ -591,6 +608,7 @@
             purchased: '#7fd3b7',
             owned: '#59d38a',
             returned: '#ff8a8a',
+            cancelled: '#c6a6ff',
         };
         return map[status] || 'rgba(255,255,255,0.22)';
     }
@@ -639,47 +657,93 @@
     function renderOrdersDrawer() {
         const root = document.querySelector('[data-drawer-content="orders"]');
         if (!root) return;
-        const state = loadOrderState();
-        const orderedIds = Object.keys(state).filter(id => ['ordered','purchased','owned','returned'].includes(state[id]?.status));
-        const productById = new Map((gallery?.products || []).map(p => [p.id, p]));
-        const ids = orderedIds.filter(id => productById.has(id));
 
-        if (!ids.length) {
-            root.innerHTML = `<div class="drawer-empty">No orders tracked yet. Use the status pill on any card to mark Ordered / Purchased / Owned — it syncs across Jill galleries.</div>`;
+        const state = loadOrderState();
+        const productById = new Map((gallery?.products || []).map(p => [p.id, p]));
+
+        const orderedLike = ['ordered','purchased'];
+        const activeIds = Object.keys(state).filter(id => orderedLike.includes(state[id]?.status) && productById.has(id));
+        const pastIds = Object.keys(state).filter(id => ['owned','returned','cancelled'].includes(state[id]?.status) && productById.has(id));
+
+        const last = getLastAction();
+        const banner = last ? `
+          <div class="drawer-empty" style="border-style:solid;border-color:rgba(212,165,116,0.25)">
+            <strong>Last update:</strong> ${last.verb} <em>${last.name}</em> → <strong>${last.status}</strong>
+          </div>
+        ` : '';
+
+        if (!activeIds.length && !pastIds.length) {
+            root.innerHTML = banner + `<div class="drawer-empty">No orders tracked yet. Use the status pill on any card to mark <strong>Ordered</strong> / <strong>Purchased</strong> / <strong>Owned</strong>.</div>`;
             return;
         }
 
-        const cats = categorizeProducts(ids);
-        const order = [ ['ordered','Ordered'], ['purchased','Purchased'], ['owned','Owned'], ['returned','Returned'] ];
-        // Build by status, inside categories
-        root.innerHTML = order.map(([status,label]) => {
-            const items = ids
-                .map(id => productById.get(id))
-                .filter(p => (state[p.id]?.status === status));
-            if (!items.length) return '';
+        function itemRow(p) {
+            const st = state[p.id]?.status || '';
+            const canCancel = st === 'ordered';
+            const canReturn = st === 'purchased' || st === 'owned';
+
             return `
-              <section class="drawer__section">
-                <div class="drawer__section-title">${label}</div>
-                ${items.map(p => {
-                    const st = state[p.id]?.status || '';
-                    return `
-                      <div class="drawer-item" data-product-id="${p.id}">
-                        <img class="drawer-item__img" src="./images/${p.local_image}" alt="${p.name}">
-                        <div>
-                          <div class="drawer-item__name">${p.name}</div>
-                          <div class="drawer-item__meta">${p.brand} · ${p.price_display || ''}</div>
-                        </div>
-                        <div class="drawer-item__right">
-                          <div class="drawer-pill"><span class="drawer-pill__dot" style="background:${statusDot(st)}"></span>${st}</div>
-                          <a class="product-card__cta" href="${p.product_url}" target="_blank" rel="noopener"><span>View</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg></a>
-                        </div>
-                      </div>
-                    `;
-                }).join('')}
-              </section>
+              <div class="drawer-item" data-product-id="${p.id}">
+                <img class="drawer-item__img" src="./images/${p.local_image}" alt="${p.name}">
+                <div>
+                  <div class="drawer-item__name">${p.name}</div>
+                  <div class="drawer-item__meta">${p.brand} · ${p.price_display || ''}</div>
+                  <div class="drawer-item__meta">Status: <strong>${st}</strong></div>
+                </div>
+                <div class="drawer-item__right">
+                  <div class="drawer-pill"><span class="drawer-pill__dot" style="background:${statusDot(st)}"></span>${st}</div>
+                  <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+                    ${canCancel ? `<button class="order-action order-action--cancel" type="button" data-action="cancel" data-product-id="${p.id}">Cancel</button>` : ''}
+                    ${canReturn ? `<button class="order-action order-action--return" type="button" data-action="return" data-product-id="${p.id}">Return</button>` : ''}
+                  </div>
+                  <a class="product-card__cta" href="${p.product_url}" target="_blank" rel="noopener"><span>View</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg></a>
+                </div>
+              </div>
             `;
-        }).join('');
+        }
+
+        const activeHtml = activeIds
+          .map(id => productById.get(id))
+          .filter(Boolean)
+          .map(itemRow)
+          .join('');
+
+        const pastHtml = pastIds
+          .map(id => productById.get(id))
+          .filter(Boolean)
+          .map(itemRow)
+          .join('');
+
+        root.innerHTML = banner + `
+          ${activeHtml ? `<section class="drawer__section"><div class="drawer__section-title">Active orders</div>${activeHtml}</section>` : ''}
+          ${pastHtml ? `<section class="drawer__section"><div class="drawer__section-title">Past</div>${pastHtml}</section>` : ''}
+        `;
+
+        // Wire actions
+        root.querySelectorAll('.order-action').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const productId = btn.dataset.productId;
+                const action = btn.dataset.action;
+                const p = productById.get(productId);
+                if (!p) return;
+
+                if (action === 'cancel') {
+                    setItemStatus(productId, 'cancelled');
+                    setLastAction({ verb: 'Cancelled', name: p.name, status: 'cancelled', productId });
+                }
+                if (action === 'return') {
+                    setItemStatus(productId, 'returned');
+                    setLastAction({ verb: 'Marked return', name: p.name, status: 'returned', productId });
+                }
+
+                // Rerender immediately so it’s screenshot-debuggable
+                renderOrdersDrawer();
+            });
+        });
     }
+
 
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -714,7 +778,22 @@
         initSmoothScroll();
         initNavHighlight();
         initStatusControls();
-        
+
+        // Drawers + badges
+        renderBadges();
+        document.querySelectorAll('.nav-action').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                openDrawer(btn.dataset.panel);
+            });
+        });
+        const overlay = document.querySelector('.drawer-overlay');
+        if (overlay) overlay.addEventListener('click', closeDrawers);
+        document.querySelectorAll('.drawer__close').forEach(b => b.addEventListener('click', closeDrawers));
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeDrawers();
+        });
+
         // Log for debugging
         console.log('✨ The Evening Edit initialized');
         console.log('💕 Hearts:', Array.from(getHeartedItems()));
