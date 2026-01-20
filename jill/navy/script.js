@@ -138,36 +138,45 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // REAL ORDER DATA — From Jill's Wardrobe (January 2026)
+    // REAL ORDER DATA — From Jill's Wardrobe Update (January 19, 2026)
+    // ═══════════════════════════════════════════════════════════════════════
+    // Confirmed: $1,950.32 | Pending Custom: ~$975 | Total Investment: ~$2,925
     // ═══════════════════════════════════════════════════════════════════════
 
     const JILL_ORDERS = {
         confirmed: [
-            { brand: 'Jenni Kayne', item: 'Brentwood Blazer + Cashmere Cocoon Cardigan', size: '2 / XS', img: '../wardrobe/images/jenni-kayne-blazer.jpg' },
-            { brand: 'La Ligne', item: 'Marin Stripe Sweater', size: 'XS', img: '../wardrobe/images/la-ligne-marin.jpg' },
-            { brand: 'Sézane', item: 'Eli Scarf Navy', size: '—', img: '../wardrobe/images/sezane-scarf.jpg' },
-            { brand: 'Barbour', item: 'Cropped Beadnell Waxed Jacket', size: 'US 6', img: '../wardrobe/images/barbour-beadnell.jpg' },
-            { brand: 'Saint James', item: 'Minquidame Breton Striped Shirt', size: '2', img: '../wardrobe/images/saint-james-breton.jpg' },
-            { brand: 'Catbird', item: 'Threadbare Ring 14K Gold', size: '7', img: '../wardrobe/images/catbird-threadbare.jpg' },
+            { brand: 'Jenni Kayne', item: 'Brentwood Blazer + Cashmere Cocoon Cardigan', size: '2 / XS', price: '$765.56', img: '../wardrobe/images/jenni-kayne-blazer.jpg' },
+            { brand: 'La Ligne', item: 'Marin Stripe Sweater', size: 'XS', price: '$397.83', img: '../wardrobe/images/la-ligne-marin.jpg' },
+            { brand: 'Sézane', item: 'Eli Scarf Navy + FREE Mon Amour Totebag 💙', size: '—', price: '$135.98', img: '../wardrobe/images/sezane-scarf.jpg' },
+            { brand: 'Barbour', item: 'Cropped Beadnell Waxed Jacket', size: 'US 6', price: '$469.84', img: '../wardrobe/images/barbour-beadnell.jpg' },
+            { brand: 'Saint James', item: 'Minquidame Breton Striped Shirt', size: '2', price: '$97.00', img: '../wardrobe/images/saint-james-breton.jpg' },
+            { brand: 'Catbird', item: 'Threadbare Ring 14K Gold', size: '7', price: '$84.01', img: '../wardrobe/images/catbird-threadbare.jpg' },
         ],
         pending_custom: [
-            { 
-                brand: 'Margaux', 
-                item: 'The Demi Ballet Flat', 
-                subtitle: 'Made to order',
+            {
+                brand: 'Margaux',
+                item: 'The Demi Ballet Flat',
+                subtitle: 'Personalized made-to-order',
                 img: '../wardrobe/images/margaux-demi.jpg',
-                specs: 'Navy Nappa · Size 8 · JSH',
-                status: 'In production'
+                specs: 'Ivory Nappa · Light Blue lining 💙 · JSH · Size 38 (US 8) · Medium',
+                price: '$325',
+                status: 'Contact submitted'
             },
-            { 
-                brand: 'Ahlem', 
-                item: 'One of One Bespoke Frames', 
-                subtitle: 'French handcrafted',
+            {
+                brand: 'Ahlem',
+                item: 'One of One Bespoke Frames',
+                subtitle: 'French handcrafted eyewear',
                 img: '../wardrobe/images/ahlem-custom.jpg',
-                specs: 'MOF-certified artisan',
+                specs: 'One of One Custom · MOF-certified artisan',
+                price: '~$650',
                 status: 'Consultation drafted'
             },
-        ]
+        ],
+        summary: {
+            confirmed_total: '$1,950.32',
+            pending_total: '~$975.00',
+            grand_total: '~$2,925'
+        }
     };
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -322,12 +331,15 @@
         function confirmedRow(order) {
             return `
               <div class="order-card">
-                <img class="order-card__img" src="${order.img}" alt="${order.item}" 
+                <img class="order-card__img" src="${order.img}" alt="${order.item}"
                      onerror="this.src='https://via.placeholder.com/70x70/E0E5EC/415A77?text=·'">
                 <div class="order-card__body">
                   <div class="order-card__brand">${order.brand}</div>
                   <div class="order-card__name">${order.item}</div>
-                  <div class="order-card__size">Size ${order.size}</div>
+                  <div class="order-card__meta">
+                    <span class="order-card__size">Size ${order.size}</span>
+                    ${order.price ? `<span class="order-card__price">${order.price}</span>` : ''}
+                  </div>
                 </div>
                 <div class="order-card__status order-card__status--confirmed">✓</div>
               </div>
@@ -344,21 +356,38 @@
                   <div class="order-card__name">${order.item}</div>
                   <div class="order-card__subtitle">${order.subtitle}</div>
                   <div class="order-card__specs">${order.specs}</div>
+                  ${order.price ? `<div class="order-card__price">${order.price}</div>` : ''}
                 </div>
               </div>
             `;
         }
 
         root.innerHTML = `
+          <!-- Order Summary -->
+          <div class="orders-summary">
+            <div class="orders-summary__row">
+              <span>Confirmed Orders</span>
+              <span class="orders-summary__value">${JILL_ORDERS.summary.confirmed_total}</span>
+            </div>
+            <div class="orders-summary__row">
+              <span>Pending Custom</span>
+              <span class="orders-summary__value orders-summary__value--pending">${JILL_ORDERS.summary.pending_total}</span>
+            </div>
+            <div class="orders-summary__row orders-summary__row--total">
+              <span>Total Investment</span>
+              <span class="orders-summary__value orders-summary__value--total">${JILL_ORDERS.summary.grand_total}</span>
+            </div>
+          </div>
+
           <section class="orders-group">
-            <h3 class="orders-group__title">Confirmed (${JILL_ORDERS.confirmed.length})</h3>
+            <h3 class="orders-group__title">✓ Confirmed (${JILL_ORDERS.confirmed.length})</h3>
             <div class="orders-group__list">
               ${JILL_ORDERS.confirmed.map(confirmedRow).join('')}
             </div>
           </section>
 
           <section class="orders-group orders-group--custom">
-            <h3 class="orders-group__title">Custom Orders (${JILL_ORDERS.pending_custom.length})</h3>
+            <h3 class="orders-group__title">⏳ Pending Custom (${JILL_ORDERS.pending_custom.length})</h3>
             <div class="orders-group__list">
               ${JILL_ORDERS.pending_custom.map(customRow).join('')}
             </div>
