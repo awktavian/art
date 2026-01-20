@@ -854,191 +854,129 @@
         }).join('');
     }
 
-    // Fallback image mapping for orders (in case seed doesn't have images)
-    const ORDER_IMAGES = {
-        'jk-bundle-2026-01-19': '../wardrobe/images/jenni-kayne-blazer.jpg',
-        'barbour-beadnell-2026-01-19': '../wardrobe/images/barbour-beadnell.jpg',
-        'margaux-demi-custom-2026-01-19': '../wardrobe/images/margaux-demi.jpg',
-        'ahlem-one-of-one-2026-01-19': '../wardrobe/images/ahlem-custom.jpg',
-        'la-ligne-marin-2026-01-19': '../wardrobe/images/la-ligne-marin.jpg',
-        'sezane-eli-scarf-2026-01-19': '../wardrobe/images/sezane-scarf.jpg',
-        'saint-james-minquidame-2026-01-19': '../wardrobe/images/saint-james-breton.jpg',
-        'catbird-threadbare-2026-01-19': '../wardrobe/images/catbird-threadbare.jpg',
+    // ═══════════════════════════════════════════════════════════════════════
+    // REAL ORDER DATA — From Jill's Wardrobe Update (January 19, 2026)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    const JILL_ORDERS = {
+        confirmed: [
+            { brand: 'Jenni Kayne', item: 'Brentwood Blazer + Cashmere Cocoon Cardigan', size: '2 / XS', total: '$765.56', img: '../wardrobe/images/jenni-kayne-blazer.jpg' },
+            { brand: 'La Ligne', item: 'Marin Stripe Sweater', size: 'XS', total: '$397.93', img: '../wardrobe/images/la-ligne-marin.jpg' },
+            { brand: 'Sézane', item: 'Eli Scarf Navy + FREE Mon Amour Totebag', size: '—', total: '$135.98', img: '../wardrobe/images/sezane-scarf.jpg' },
+            { brand: 'Barbour', item: 'Cropped Beadnell Waxed Jacket', size: 'US 6', total: '$469.84', img: '../wardrobe/images/barbour-beadnell.jpg' },
+            { brand: 'Saint James', item: 'Minquidame Breton Striped Shirt', size: '2', total: '$97.00', img: '../wardrobe/images/saint-james-breton.jpg' },
+            { brand: 'Catbird', item: 'Threadbare Ring 14K Gold', size: '7', total: '$84.01', img: '../wardrobe/images/catbird-threadbare.jpg' },
+        ],
+        pending_custom: [
+            { 
+                brand: 'Margaux', 
+                item: 'The Demi Ballet Flat', 
+                subtitle: 'Personalized made-to-order',
+                total: '$325', 
+                img: '../wardrobe/images/margaux-demi.jpg',
+                details: { Color: 'Ivory Nappa', Lining: 'Light Blue 💙', Monogram: 'JSH', Size: '38 (US 8)', Width: 'Medium' },
+                status: 'Contact submitted for custom order'
+            },
+            { 
+                brand: 'Ahlem', 
+                item: 'One of One Bespoke Frames', 
+                subtitle: 'French handcrafted eyewear',
+                total: '~$650', 
+                img: '../wardrobe/images/ahlem-custom.jpg',
+                details: { Program: 'One of One Custom', Craftsmanship: 'MOF-certified artisan' },
+                status: 'Consultation request drafted'
+            },
+        ],
+        summary: {
+            confirmed_total: '$1,950.32',
+            pending_total: '~$975.00',
+            grand_total: '~$2,925'
+        }
     };
 
     function renderOrdersDrawer() {
         const root = document.querySelector('[data-drawer-content="orders"]');
         if (!root) return;
 
-        const orders = loadOrdersList();
-
-        /*
-         * STATE MACHINE:
-         *   ORDERED ──→ DELIVERED ──→ RETURNING
-         *      │                         │
-         *      ↓                         ↓ (Keep)
-         *   CANCELLED              back to DELIVERED
-         *      │
-         *      ↓ (Restore)
-         *   back to ORDERED
-         */
-
-        // Categorize by status
-        const ordered = orders.filter(o => o.status === 'confirmed' || o.status === 'ordered');
-        const returning = orders.filter(o => o.status === 'returning');
-        const cancelled = orders.filter(o => o.status === 'cancelled');
-        const delivered = orders.filter(o => o.status === 'delivered');
-
-        if (!ordered.length && !delivered.length && !returning.length && !cancelled.length) {
-            root.innerHTML = `<div class="drawer-empty">No orders yet.</div>`;
-            return;
-        }
-
-        // Collapse state — auto-collapse sections with >3 items
-        const COLLAPSE_KEY = 'jill_orders_collapse_v2';
-        let collapsed = {};
-        try { collapsed = JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '{}'); } catch {}
-
-        function shouldBeOpen(key, count) {
-            if (collapsed[key] !== undefined) return !collapsed[key];
-            return count <= 3; // Auto-collapse large sections
-        }
-
-        function saveCollapse() {
-            try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(collapsed)); } catch {}
-        }
-
-        // Helper to find image
-        const productById = new Map((gallery?.products || []).map(p => [p.id, p]));
-
-        function orderRow(order) {
-            // Get image: try local_images first, then fallback map, then gallery
-            let img = '';
-            if (order.local_images && order.local_images.length) {
-                img = order.local_images[0];
-            } else if (ORDER_IMAGES[order.id]) {
-                img = ORDER_IMAGES[order.id];
-            } else if (order.product_ids && order.product_ids.length) {
-                const p = productById.get(order.product_ids[0]);
-                if (p) img = `./images/${p.local_image}`;
-            }
-
-            // Buttons based on status (state machine transitions)
-            let buttons = '';
-            if (order.status === 'confirmed' || order.status === 'ordered') {
-                buttons = `<button class="order-action order-action--cancel" type="button" data-action="cancel" data-order-id="${order.id}">Cancel</button>`;
-            } else if (order.status === 'delivered') {
-                buttons = `<button class="order-action order-action--return" type="button" data-action="return" data-order-id="${order.id}">Return</button>`;
-            } else if (order.status === 'returning') {
-                buttons = `<button class="order-action order-action--keep" type="button" data-action="keep" data-order-id="${order.id}">Keep</button>`;
-            } else if (order.status === 'cancelled') {
-                buttons = `<button class="order-action order-action--restore" type="button" data-action="restore" data-order-id="${order.id}">Restore</button>`;
-            }
-
+        // Render confirmed order row
+        function confirmedRow(order) {
             return `
-              <div class="drawer-item" data-order-id="${order.id}">
-                ${img ? `<img class="drawer-item__img" src="${img}" alt="${order.item}">` : `<div class="drawer-item__img drawer-item__img--placeholder">${order.kind === 'custom_pending' ? '✦' : '□'}</div>`}
+              <div class="drawer-item">
+                <img class="drawer-item__img" src="${order.img}" alt="${order.item}">
                 <div class="drawer-item__info">
                   <div class="drawer-item__name">${order.item}</div>
-                  <div class="drawer-item__meta">${order.brand} · ${order.size || '—'} · ${order.total || ''}</div>
+                  <div class="drawer-item__meta">${order.brand} · ${order.size} · ${order.total}</div>
                 </div>
                 <div class="drawer-item__right">
-                  ${buttons ? `<div class="drawer-item__actions">${buttons}</div>` : ''}
+                  <span class="order-status order-status--confirmed">✓ Confirmed</span>
                 </div>
               </div>
             `;
         }
 
-        function section(key, label, items, icon) {
-            if (!items.length) return '';
-            const isOpen = shouldBeOpen(key, items.length);
+        // Render custom order row with details table
+        function customRow(order) {
+            const detailsHtml = Object.entries(order.details)
+                .map(([k, v]) => `<div class="custom-detail"><span class="custom-detail__key">${k}</span><span class="custom-detail__val">${v}</span></div>`)
+                .join('');
+
             return `
-              <details class="orders-section" data-section="${key}" ${isOpen ? 'open' : ''}>
-                <summary class="orders-section__header">
-                  <span class="orders-section__icon">${icon}</span>
-                  <span class="orders-section__label">${label}</span>
-                  <span class="orders-section__count">${items.length}</span>
-                  <span class="orders-section__chevron">›</span>
-                </summary>
-                <div class="orders-section__content">
-                  ${items.map(orderRow).join('')}
+              <div class="drawer-item drawer-item--custom">
+                <img class="drawer-item__img" src="${order.img}" alt="${order.item}">
+                <div class="drawer-item__info">
+                  <div class="drawer-item__name">${order.item}</div>
+                  <div class="drawer-item__subtitle">${order.subtitle}</div>
+                  <div class="custom-details">${detailsHtml}</div>
+                  <div class="drawer-item__meta">${order.total}</div>
                 </div>
-              </details>
+                <div class="drawer-item__right">
+                  <span class="order-status order-status--pending">💬 ${order.status}</span>
+                </div>
+              </div>
             `;
         }
 
-        // Section order: Ordered, Returning, Cancelled, Delivered (delivered last per user request)
         root.innerHTML = `
-          ${section('ordered', 'Ordered', ordered, '📦')}
-          ${section('returning', 'Returning', returning, '↩')}
-          ${section('cancelled', 'Cancelled', cancelled, '✕')}
-          ${section('delivered', 'Delivered', delivered, '✓')}
+          <details class="orders-section" open>
+            <summary class="orders-section__header">
+              <span class="orders-section__icon">✅</span>
+              <span class="orders-section__label">All Orders Confirmed</span>
+              <span class="orders-section__count">${JILL_ORDERS.confirmed.length}</span>
+              <span class="orders-section__chevron">›</span>
+            </summary>
+            <div class="orders-section__content">
+              ${JILL_ORDERS.confirmed.map(confirmedRow).join('')}
+            </div>
+          </details>
+
+          <details class="orders-section" open>
+            <summary class="orders-section__header">
+              <span class="orders-section__icon">🎀</span>
+              <span class="orders-section__label">Pending Custom Orders</span>
+              <span class="orders-section__count">${JILL_ORDERS.pending_custom.length}</span>
+              <span class="orders-section__chevron">›</span>
+            </summary>
+            <div class="orders-section__content">
+              ${JILL_ORDERS.pending_custom.map(customRow).join('')}
+            </div>
+          </details>
+
+          <div class="orders-summary">
+            <div class="orders-summary__title">💰 Order Summary</div>
+            <div class="orders-summary__row">
+              <span>Confirmed Orders</span>
+              <span>${JILL_ORDERS.summary.confirmed_total}</span>
+            </div>
+            <div class="orders-summary__row">
+              <span>Pending Custom</span>
+              <span>${JILL_ORDERS.summary.pending_total}</span>
+            </div>
+            <div class="orders-summary__row orders-summary__row--total">
+              <span>Total Investment</span>
+              <span>${JILL_ORDERS.summary.grand_total}</span>
+            </div>
+          </div>
         `;
-
-        // Track collapse state
-        root.querySelectorAll('details.orders-section').forEach(details => {
-            details.addEventListener('toggle', () => {
-                collapsed[details.dataset.section] = !details.open;
-                saveCollapse();
-            });
-        });
-
-        // Wire action buttons (state transitions)
-        root.querySelectorAll('.order-action').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const orderId = btn.dataset.orderId;
-                const action = btn.dataset.action;
-                const list = loadOrdersList();
-                const idx = list.findIndex(o => o.id === orderId);
-                if (idx === -1) return;
-
-                const prevOrder = { ...list[idx] };
-                const o = { ...list[idx] };
-
-                let verb = '';
-                switch (action) {
-                    case 'cancel':
-                        o.status = 'cancelled';
-                        o.active = false;
-                        verb = 'Cancelled';
-                        break;
-                    case 'return':
-                        o.status = 'returning';
-                        o.active = false;
-                        verb = 'Return started';
-                        break;
-                    case 'keep':
-                        o.status = 'delivered';
-                        o.active = false;
-                        verb = 'Keeping';
-                        break;
-                    case 'restore':
-                        o.status = 'confirmed';
-                        o.active = true;
-                        verb = 'Restored';
-                        break;
-                }
-                o.updated_at = Date.now();
-
-                list[idx] = o;
-                saveOrdersList(list);
-                pushUndo({ orderId, prev: prevOrder, next: o });
-                renderOrdersDrawer();
-
-                showUndoToast(`${verb}: ${o.item}`, () => {
-                    const payload = popUndo();
-                    if (!payload) return;
-                    const currentList = loadOrdersList();
-                    const j = currentList.findIndex(x => x.id === payload.orderId);
-                    if (j === -1) return;
-                    currentList[j] = payload.prev;
-                    saveOrdersList(currentList);
-                    renderOrdersDrawer();
-                });
-            });
-        });
     }
 
 
