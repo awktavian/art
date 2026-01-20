@@ -750,7 +750,7 @@
     // INITIALIZATION
     // ═══════════════════════════════════════════════════════════════════════
 
-    document.addEventListener('DOMContentLoaded', async () => {
+    const boot = async () => {
         // Add particle animation keyframes
         const style = document.createElement('style');
         style.textContent = `
@@ -797,7 +797,16 @@
         // Log for debugging
         console.log('✨ The Evening Edit initialized');
         console.log('💕 Hearts:', Array.from(getHeartedItems()));
-    });
+    
+};
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+} else {
+    // DOM already ready (script loaded late). Boot immediately.
+    boot();
+}
+
 
     // ═══════════════════════════════════════════════════════════════════════
     // REDUCED MOTION
