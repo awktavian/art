@@ -198,7 +198,7 @@
 
     function renderProductCard(product) {
         const hearted = isHearted(product.id);
-        const badgeClass = product.badge === 'Her Ask' ? 'her-ask' : product.badge === 'Hearted' ? 'hearted' : '';
+        const badgeClass = product.badge === 'Her Ask' ? 'her-ask' : product.badge === 'Custom Order' ? 'custom-order' : '';
         return `
             <article class="product-card ${product.is_centerpiece ? 'centerpiece' : ''}"
                      data-product-id="${product.id}"
