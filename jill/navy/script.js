@@ -221,7 +221,7 @@
                         <span class="product-price">${product.price_display}</span>
                         <span class="product-occasion">${product.occasion || product.subcategory}</span>
                     </div>
-                    <a href="${product.product_url}" target="_blank" rel="noopener" class="product-link">View piece →</a>
+                    <a href="${product.product_url}" target="_blank" rel="noopener" class="product-link" aria-label="View ${product.brand} ${product.name} (opens in new window)">View piece <span aria-hidden="true">↗</span></a>
                 </div>
             </article>`;
     }
@@ -456,8 +456,28 @@
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawers(); });
     }
 
+    // LOADING STATE
+    function showLoadingState() {
+        const content = document.getElementById('gallery-content');
+        if (!content) return;
+        content.innerHTML = `
+            <div class="loading-state">
+                <div class="loading-state__icon">⚓</div>
+                <p class="loading-state__text">Curating your navy collection...</p>
+            </div>`;
+    }
+
+    // Initialize footer hearts from localStorage before gallery load
+    function initFooterHearts() {
+        const hearts = getHeartedItems();
+        const footerHearted = document.getElementById('footer-hearted');
+        if (footerHearted) footerHearted.textContent = hearts.size;
+    }
+
     // BOOT
     async function boot() {
+        initFooterHearts();
+        showLoadingState();
         gallery = await loadGallery();
         if (!gallery) { console.error('Failed to load gallery'); renderErrorState(); return; }
         renderPhilosophy();
