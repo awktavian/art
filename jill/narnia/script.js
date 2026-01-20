@@ -912,12 +912,11 @@
               <div class="order-card order-card--custom">
                 <img class="order-card__img" src="${order.img}" alt="${order.item}">
                 <div class="order-card__body">
-                  <div class="order-card__brand">${order.brand}</div>
+                  <div class="order-card__brand">${order.brand} <span class="order-card__status order-card__status--pending">${order.status}</span></div>
                   <div class="order-card__name">${order.item}</div>
                   <div class="order-card__subtitle">${order.subtitle}</div>
                   <div class="order-card__specs">${order.specs}</div>
                 </div>
-                <div class="order-card__status order-card__status--pending">${order.status}</div>
               </div>
             `;
         }
