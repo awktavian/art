@@ -130,11 +130,12 @@
                 <div class="error-state__icon">⚓</div>
                 <h2 class="error-state__title">Gallery couldn't load</h2>
                 <p class="error-state__message">There was a problem loading the collection. Please refresh the page to try again.</p>
-                <button class="error-state__button" onclick="location.reload()">Refresh Page</button>
+                <button class="error-state__button" id="error-refresh-btn">Refresh Page</button>
             </div>`;
         document.querySelector('.stats-bar')?.style.setProperty('display', 'none');
         document.querySelector('.philosophy-section')?.style.setProperty('display', 'none');
         document.querySelector('.outfits-section')?.style.setProperty('display', 'none');
+        document.getElementById('error-refresh-btn')?.addEventListener('click', () => location.reload());
     }
 
     // RENDER FUNCTIONS
@@ -205,7 +206,7 @@
                      tabindex="0" role="button"
                      aria-label="${product.brand} ${product.name}, ${product.price_display}">
                 <div class="product-image-wrap">
-                    <img class="product-image" src="images/${product.local_image}" alt="${product.name}"
+                    <img class="product-image" src="images/${product.local_image}" alt="${product.brand} ${product.name}"
                          loading="lazy" onerror="this.src='https://via.placeholder.com/400x500/E0E5EC/415A77?text=Navy'">
                     ${product.badge ? `<span class="product-badge ${badgeClass}">${product.badge}</span>` : ''}
                     <button class="heart-button ${hearted ? 'active' : ''}" data-product-id="${product.id}"
