@@ -860,122 +860,82 @@
 
     const JILL_ORDERS = {
         confirmed: [
-            { brand: 'Jenni Kayne', item: 'Brentwood Blazer + Cashmere Cocoon Cardigan', size: '2 / XS', total: '$765.56', img: '../wardrobe/images/jenni-kayne-blazer.jpg' },
-            { brand: 'La Ligne', item: 'Marin Stripe Sweater', size: 'XS', total: '$397.93', img: '../wardrobe/images/la-ligne-marin.jpg' },
-            { brand: 'Sézane', item: 'Eli Scarf Navy + FREE Mon Amour Totebag', size: '—', total: '$135.98', img: '../wardrobe/images/sezane-scarf.jpg' },
-            { brand: 'Barbour', item: 'Cropped Beadnell Waxed Jacket', size: 'US 6', total: '$469.84', img: '../wardrobe/images/barbour-beadnell.jpg' },
-            { brand: 'Saint James', item: 'Minquidame Breton Striped Shirt', size: '2', total: '$97.00', img: '../wardrobe/images/saint-james-breton.jpg' },
-            { brand: 'Catbird', item: 'Threadbare Ring 14K Gold', size: '7', total: '$84.01', img: '../wardrobe/images/catbird-threadbare.jpg' },
+            { brand: 'Jenni Kayne', item: 'Brentwood Blazer + Cashmere Cocoon Cardigan', size: '2 / XS', img: '../wardrobe/images/jenni-kayne-blazer.jpg' },
+            { brand: 'La Ligne', item: 'Marin Stripe Sweater', size: 'XS', img: '../wardrobe/images/la-ligne-marin.jpg' },
+            { brand: 'Sézane', item: 'Eli Scarf Navy', size: '—', img: '../wardrobe/images/sezane-scarf.jpg' },
+            { brand: 'Barbour', item: 'Cropped Beadnell Waxed Jacket', size: 'US 6', img: '../wardrobe/images/barbour-beadnell.jpg' },
+            { brand: 'Saint James', item: 'Minquidame Breton Striped Shirt', size: '2', img: '../wardrobe/images/saint-james-breton.jpg' },
+            { brand: 'Catbird', item: 'Threadbare Ring 14K Gold', size: '7', img: '../wardrobe/images/catbird-threadbare.jpg' },
         ],
         pending_custom: [
             { 
                 brand: 'Margaux', 
                 item: 'The Demi Ballet Flat', 
-                subtitle: 'Personalized made-to-order',
-                total: '$325', 
+                subtitle: 'Made to order',
                 img: '../wardrobe/images/margaux-demi.jpg',
-                details: { Color: 'Ivory Nappa', Lining: 'Light Blue 💙', Monogram: 'JSH', Size: '38 (US 8)', Width: 'Medium' },
-                status: 'Contact submitted for custom order'
+                specs: 'Ivory Nappa · Light Blue lining · JSH',
+                status: 'Contact submitted'
             },
             { 
                 brand: 'Ahlem', 
                 item: 'One of One Bespoke Frames', 
-                subtitle: 'French handcrafted eyewear',
-                total: '~$650', 
+                subtitle: 'French handcrafted',
                 img: '../wardrobe/images/ahlem-custom.jpg',
-                details: { Program: 'One of One Custom', Craftsmanship: 'MOF-certified artisan' },
-                status: 'Consultation request drafted'
+                specs: 'MOF-certified artisan',
+                status: 'Consultation drafted'
             },
-        ],
-        summary: {
-            confirmed_total: '$1,950.32',
-            pending_total: '~$975.00',
-            grand_total: '~$2,925'
-        }
+        ]
     };
 
     function renderOrdersDrawer() {
         const root = document.querySelector('[data-drawer-content="orders"]');
         if (!root) return;
 
-        // Render confirmed order row
+        // Confirmed order row - clean and elegant
         function confirmedRow(order) {
             return `
-              <div class="drawer-item">
-                <img class="drawer-item__img" src="${order.img}" alt="${order.item}">
-                <div class="drawer-item__info">
-                  <div class="drawer-item__name">${order.item}</div>
-                  <div class="drawer-item__meta">${order.brand} · ${order.size} · ${order.total}</div>
+              <div class="order-card">
+                <img class="order-card__img" src="${order.img}" alt="${order.item}">
+                <div class="order-card__body">
+                  <div class="order-card__brand">${order.brand}</div>
+                  <div class="order-card__name">${order.item}</div>
+                  <div class="order-card__size">Size ${order.size}</div>
                 </div>
-                <div class="drawer-item__right">
-                  <span class="order-status order-status--confirmed">✓ Confirmed</span>
-                </div>
+                <div class="order-card__status order-card__status--confirmed">✓</div>
               </div>
             `;
         }
 
-        // Render custom order row with details table
+        // Custom order row - with specs
         function customRow(order) {
-            const detailsHtml = Object.entries(order.details)
-                .map(([k, v]) => `<div class="custom-detail"><span class="custom-detail__key">${k}</span><span class="custom-detail__val">${v}</span></div>`)
-                .join('');
-
             return `
-              <div class="drawer-item drawer-item--custom">
-                <img class="drawer-item__img" src="${order.img}" alt="${order.item}">
-                <div class="drawer-item__info">
-                  <div class="drawer-item__name">${order.item}</div>
-                  <div class="drawer-item__subtitle">${order.subtitle}</div>
-                  <div class="custom-details">${detailsHtml}</div>
-                  <div class="drawer-item__meta">${order.total}</div>
+              <div class="order-card order-card--custom">
+                <img class="order-card__img" src="${order.img}" alt="${order.item}">
+                <div class="order-card__body">
+                  <div class="order-card__brand">${order.brand}</div>
+                  <div class="order-card__name">${order.item}</div>
+                  <div class="order-card__subtitle">${order.subtitle}</div>
+                  <div class="order-card__specs">${order.specs}</div>
                 </div>
-                <div class="drawer-item__right">
-                  <span class="order-status order-status--pending">💬 ${order.status}</span>
-                </div>
+                <div class="order-card__status order-card__status--pending">${order.status}</div>
               </div>
             `;
         }
 
         root.innerHTML = `
-          <details class="orders-section" open>
-            <summary class="orders-section__header">
-              <span class="orders-section__icon">✅</span>
-              <span class="orders-section__label">All Orders Confirmed</span>
-              <span class="orders-section__count">${JILL_ORDERS.confirmed.length}</span>
-              <span class="orders-section__chevron">›</span>
-            </summary>
-            <div class="orders-section__content">
+          <section class="orders-group">
+            <h3 class="orders-group__title">Confirmed</h3>
+            <div class="orders-group__list">
               ${JILL_ORDERS.confirmed.map(confirmedRow).join('')}
             </div>
-          </details>
+          </section>
 
-          <details class="orders-section" open>
-            <summary class="orders-section__header">
-              <span class="orders-section__icon">🎀</span>
-              <span class="orders-section__label">Pending Custom Orders</span>
-              <span class="orders-section__count">${JILL_ORDERS.pending_custom.length}</span>
-              <span class="orders-section__chevron">›</span>
-            </summary>
-            <div class="orders-section__content">
+          <section class="orders-group orders-group--custom">
+            <h3 class="orders-group__title">Custom Orders</h3>
+            <div class="orders-group__list">
               ${JILL_ORDERS.pending_custom.map(customRow).join('')}
             </div>
-          </details>
-
-          <div class="orders-summary">
-            <div class="orders-summary__title">💰 Order Summary</div>
-            <div class="orders-summary__row">
-              <span>Confirmed Orders</span>
-              <span>${JILL_ORDERS.summary.confirmed_total}</span>
-            </div>
-            <div class="orders-summary__row">
-              <span>Pending Custom</span>
-              <span>${JILL_ORDERS.summary.pending_total}</span>
-            </div>
-            <div class="orders-summary__row orders-summary__row--total">
-              <span>Total Investment</span>
-              <span>${JILL_ORDERS.summary.grand_total}</span>
-            </div>
-          </div>
+          </section>
         `;
     }
 
