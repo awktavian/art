@@ -47,6 +47,7 @@
       size: '2 / XS',
       total: '$765.56',
       status: 'confirmed',
+      local_images: ['../wardrobe/images/jenni-kayne-blazer.jpg'],
       product_urls: [
         'https://www.jennikayne.com/products/brentwood-blazer-dark-navy',
         'https://www.jennikayne.com/products/cropped-cashmere-cocoon-cardigan-ivory'
@@ -62,6 +63,7 @@
       size: 'US 6',
       total: '$469.84',
       status: 'confirmed',
+      local_images: ['../wardrobe/images/barbour-beadnell.jpg'],
       product_urls: ['https://www.barbour.com/us/cropped-beadnell-waxed-jacket-LWX1403NY92.html'],
       updated_at: now
     },
@@ -74,6 +76,7 @@
       size: '38 (US 8) · Medium',
       total: '$325',
       status: 'confirmed',
+      local_images: ['../wardrobe/images/margaux-demi.jpg'],
       details: {
         color: 'Ivory Nappa',
         lining: 'Light Blue',
@@ -91,6 +94,7 @@
       size: '—',
       total: '~$650',
       status: 'confirmed',
+      local_images: ['../wardrobe/images/ahlem-custom.jpg'],
       details: {
         program: 'One of One Custom',
         craftsmanship: 'MOF-certified artisan'
@@ -108,6 +112,7 @@
       size: 'XS',
       total: '$397.93',
       status: 'delivered',
+      local_images: ['../wardrobe/images/la-ligne-marin.jpg'],
       product_urls: ['https://lalignenyc.com/products/marin-sweater-cream-navy'],
       updated_at: now
     },
@@ -120,6 +125,7 @@
       size: '—',
       total: '$135.98',
       status: 'delivered',
+      local_images: ['../wardrobe/images/sezane-scarf.jpg'],
       product_urls: ['https://www.sezane.com/us-en/product/eli-scarf/navy'],
       updated_at: now
     },
@@ -132,6 +138,7 @@
       size: '2',
       total: '$97.00',
       status: 'delivered',
+      local_images: ['../wardrobe/images/saint-james-breton.jpg'],
       product_urls: ['https://us.saint-james.com/collections/women/products/minquidame-breton-striped-shirt-with-long-sleeve-soft-cotton-women-fit-navy-deep-teal'],
       updated_at: now
     },
@@ -144,6 +151,7 @@
       size: '7',
       total: '$84.01',
       status: 'delivered',
+      local_images: ['../wardrobe/images/catbird-threadbare.jpg'],
       product_urls: ['https://www.catbirdnyc.com/threadbare-gold-stacking-ring.html'],
       updated_at: now
     }
