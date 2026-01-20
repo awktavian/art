@@ -859,26 +859,47 @@
         if (!root) return;
 
         const orders = loadOrdersList();
-        const last = getLastAction();
-        const banner = last ? `
-          <div class="drawer-empty" style="border-style:solid;border-color:rgba(212,165,116,0.25)">
-            <strong>Last update:</strong> ${last.verb} <em>${last.name}</em> → <strong>${last.status}</strong>
-          </div>
-        ` : '';
 
-        const active = orders.filter(o => o.active);
-        const past = orders.filter(o => !o.active);
+        /*
+         * STATE MACHINE:
+         *   ORDERED ──→ DELIVERED ──→ RETURNING
+         *      │                         │
+         *      ↓                         ↓ (Keep)
+         *   CANCELLED              back to DELIVERED
+         *      │
+         *      ↓ (Restore)
+         *   back to ORDERED
+         */
 
-        if (!active.length && !past.length) {
-            root.innerHTML = banner + `<div class="drawer-empty">No Wardrobe orders found yet. (They’ll appear here once imported.)</div>`;
+        // Categorize by status
+        const ordered = orders.filter(o => o.status === 'confirmed' || o.status === 'ordered');
+        const returning = orders.filter(o => o.status === 'returning');
+        const cancelled = orders.filter(o => o.status === 'cancelled');
+        const delivered = orders.filter(o => o.status === 'delivered');
+
+        if (!ordered.length && !delivered.length && !returning.length && !cancelled.length) {
+            root.innerHTML = `<div class="drawer-empty">No orders yet.</div>`;
             return;
+        }
+
+        // Collapse state — auto-collapse sections with >3 items
+        const COLLAPSE_KEY = 'jill_orders_collapse_v1';
+        let collapsed = {};
+        try { collapsed = JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '{}'); } catch {}
+
+        function shouldBeOpen(key, count) {
+            if (collapsed[key] !== undefined) return !collapsed[key];
+            return count <= 3; // Auto-collapse large sections
+        }
+
+        function saveCollapse() {
+            try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(collapsed)); } catch {}
         }
 
         // Helper to find image
         const productById = new Map((gallery?.products || []).map(p => [p.id, p]));
 
-        function row(order) {
-            // Try to find image in this gallery first, then fallback to local_images from seed
+        function orderRow(order) {
             let img = '';
             if (order.local_images && order.local_images.length) {
                 img = order.local_images[0];
@@ -887,36 +908,67 @@
                 if (p) img = `./images/${p.local_image}`;
             }
 
-            const canCancel = order.active;
-            const canReturn = order.active && order.kind !== 'custom_pending';
-
-            const details = order.details ? Object.entries(order.details).map(([k,v]) => `${k}: ${v}`).join(' · ') : '';
+            // Buttons based on status (state machine transitions)
+            let buttons = '';
+            if (order.status === 'confirmed' || order.status === 'ordered') {
+                buttons = `<button class="order-action order-action--cancel" type="button" data-action="cancel" data-order-id="${order.id}">Cancel</button>`;
+            } else if (order.status === 'delivered') {
+                buttons = `<button class="order-action order-action--return" type="button" data-action="return" data-order-id="${order.id}">Return</button>`;
+            } else if (order.status === 'returning') {
+                buttons = `<button class="order-action order-action--keep" type="button" data-action="keep" data-order-id="${order.id}">Keep</button>`;
+            } else if (order.status === 'cancelled') {
+                buttons = `<button class="order-action order-action--restore" type="button" data-action="restore" data-order-id="${order.id}">Restore</button>`;
+            }
 
             return `
               <div class="drawer-item" data-order-id="${order.id}">
-                ${img ? `<img class="drawer-item__img" src="${img}" alt="${order.item}">` : `<div class="drawer-item__img" style="display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.35)">□</div>`}
-                <div>
+                ${img ? `<img class="drawer-item__img" src="${img}" alt="${order.item}">` : `<div class="drawer-item__img drawer-item__img--placeholder">${order.kind === 'custom_pending' ? '✦' : '□'}</div>`}
+                <div class="drawer-item__info">
                   <div class="drawer-item__name">${order.item}</div>
                   <div class="drawer-item__meta">${order.brand} · ${order.size || '—'} · ${order.total || ''}</div>
-                  <div class="drawer-item__meta">Status: <strong>${order.status}</strong>${details ? ` · ${details}` : ''}</div>
                 </div>
                 <div class="drawer-item__right">
-                  <div class="drawer-pill"><span class="drawer-pill__dot" style="background:${statusDot(order.kind === 'custom_pending' ? 'considering' : 'ordered')}"></span>${order.kind === 'custom_pending' ? 'custom' : 'confirmed'}</div>
-                  <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
-                    ${canCancel ? `<button class="order-action order-action--cancel" type="button" data-action="cancel" data-order-id="${order.id}">Cancel</button>` : ''}
-                    ${canReturn ? `<button class="order-action order-action--return" type="button" data-action="return" data-order-id="${order.id}">Return</button>` : ''}
-                  </div>
+                  ${buttons ? `<div class="drawer-item__actions">${buttons}</div>` : ''}
                 </div>
               </div>
             `;
         }
 
-        root.innerHTML = banner + `
-          ${active.length ? `<section class="drawer__section"><div class="drawer__section-title">Active</div>${active.map(row).join('')}</section>` : ''}
-          ${past.length ? `<section class="drawer__section"><div class="drawer__section-title">Past</div>${past.map(row).join('')}</section>` : ''}
+        function section(key, label, items, icon) {
+            if (!items.length) return '';
+            const isOpen = shouldBeOpen(key, items.length);
+            return `
+              <details class="orders-section" data-section="${key}" ${isOpen ? 'open' : ''}>
+                <summary class="orders-section__header">
+                  <span class="orders-section__icon">${icon}</span>
+                  <span class="orders-section__label">${label}</span>
+                  <span class="orders-section__count">${items.length}</span>
+                  <span class="orders-section__chevron">›</span>
+                </summary>
+                <div class="orders-section__content">
+                  ${items.map(orderRow).join('')}
+                </div>
+              </details>
+            `;
+        }
+
+        // Section order: Ordered, Returning, Cancelled, Delivered (delivered last per user request)
+        root.innerHTML = `
+          ${section('ordered', 'Ordered', ordered, '📦')}
+          ${section('returning', 'Returning', returning, '↩')}
+          ${section('cancelled', 'Cancelled', cancelled, '✕')}
+          ${section('delivered', 'Delivered', delivered, '✓')}
         `;
 
-        // Wire actions
+        // Track collapse state
+        root.querySelectorAll('details.orders-section').forEach(details => {
+            details.addEventListener('toggle', () => {
+                collapsed[details.dataset.section] = !details.open;
+                saveCollapse();
+            });
+        });
+
+        // Wire action buttons (state transitions)
         root.querySelectorAll('.order-action').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -926,34 +978,40 @@
                 const list = loadOrdersList();
                 const idx = list.findIndex(o => o.id === orderId);
                 if (idx === -1) return;
+
+                const prevOrder = { ...list[idx] };
                 const o = { ...list[idx] };
 
-                // Snapshot for undo
-                const prevOrder = { ...o };
-
-                if (action === 'cancel') {
-                    o.active = false;
-                    o.status = 'cancelled';
-                    o.updated_at = Date.now();
+                let verb = '';
+                switch (action) {
+                    case 'cancel':
+                        o.status = 'cancelled';
+                        o.active = false;
+                        verb = 'Cancelled';
+                        break;
+                    case 'return':
+                        o.status = 'returning';
+                        o.active = false;
+                        verb = 'Return started';
+                        break;
+                    case 'keep':
+                        o.status = 'delivered';
+                        o.active = false;
+                        verb = 'Keeping';
+                        break;
+                    case 'restore':
+                        o.status = 'confirmed';
+                        o.active = true;
+                        verb = 'Restored';
+                        break;
                 }
-
-                if (action === 'return') {
-                    o.active = false;
-                    o.status = 'returned';
-                    o.updated_at = Date.now();
-                }
+                o.updated_at = Date.now();
 
                 list[idx] = o;
                 saveOrdersList(list);
-                setLastAction({ verb: action === 'cancel' ? 'Cancelled' : 'Returned', name: o.item, status: o.status });
-
-                // Store undo payload
                 pushUndo({ orderId, prev: prevOrder, next: o });
-
                 renderOrdersDrawer();
 
-                // Show undo toast
-                const verb = action === 'cancel' ? 'Cancelled' : 'Returned';
                 showUndoToast(`${verb}: ${o.item}`, () => {
                     const payload = popUndo();
                     if (!payload) return;
@@ -962,7 +1020,6 @@
                     if (j === -1) return;
                     currentList[j] = payload.prev;
                     saveOrdersList(currentList);
-                    setLastAction({ verb: 'Undid', name: payload.prev.item, status: payload.prev.status });
                     renderOrdersDrawer();
                 });
             });

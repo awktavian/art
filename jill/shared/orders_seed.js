@@ -37,6 +37,7 @@
 
   const now = Date.now();
   const seeded = [
+    // ORDERED (in transit)
     {
       id: 'jk-bundle-2026-01-19',
       kind: 'confirmed',
@@ -53,30 +54,6 @@
       updated_at: now
     },
     {
-      id: 'la-ligne-marin-2026-01-19',
-      kind: 'confirmed',
-      active: true,
-      brand: 'La Ligne',
-      item: 'Marin Stripe Sweater',
-      size: 'XS',
-      total: '$397.93',
-      status: 'confirmed',
-      product_urls: ['https://lalignenyc.com/products/marin-sweater-cream-navy'],
-      updated_at: now
-    },
-    {
-      id: 'sezane-eli-scarf-2026-01-19',
-      kind: 'confirmed',
-      active: true,
-      brand: 'Sézane',
-      item: 'Eli Scarf (Navy) + FREE Mon Amour Totebag',
-      size: '—',
-      total: '$135.98',
-      status: 'confirmed',
-      product_urls: ['https://www.sezane.com/us-en/product/eli-scarf/navy'],
-      updated_at: now
-    },
-    {
       id: 'barbour-beadnell-2026-01-19',
       kind: 'confirmed',
       active: true,
@@ -89,30 +66,6 @@
       updated_at: now
     },
     {
-      id: 'saint-james-minquidame-2026-01-19',
-      kind: 'confirmed',
-      active: true,
-      brand: 'Saint James',
-      item: 'Minquidame Breton Striped Shirt',
-      size: '2',
-      total: '$97.00',
-      status: 'confirmed',
-      product_urls: ['https://us.saint-james.com/collections/women/products/minquidame-breton-striped-shirt-with-long-sleeve-soft-cotton-women-fit-navy-deep-teal'],
-      updated_at: now
-    },
-    {
-      id: 'catbird-threadbare-2026-01-19',
-      kind: 'confirmed',
-      active: true,
-      brand: 'Catbird',
-      item: 'Threadbare Ring 14K Gold',
-      size: '7',
-      total: '$84.01',
-      status: 'confirmed',
-      product_urls: ['https://www.catbirdnyc.com/threadbare-gold-stacking-ring.html'],
-      updated_at: now
-    },
-    {
       id: 'margaux-demi-custom-2026-01-19',
       kind: 'custom_pending',
       active: true,
@@ -120,7 +73,7 @@
       item: 'The Demi Ballet Flat (custom)',
       size: '38 (US 8) · Medium',
       total: '$325',
-      status: 'contact submitted',
+      status: 'confirmed',
       details: {
         color: 'Ivory Nappa',
         lining: 'Light Blue',
@@ -137,12 +90,61 @@
       item: 'One of One Bespoke Frames',
       size: '—',
       total: '~$650',
-      status: 'consultation request drafted',
+      status: 'confirmed',
       details: {
         program: 'One of One Custom',
         craftsmanship: 'MOF-certified artisan'
       },
       product_urls: ['https://www.ahlemeyewear.com/pages/bespoke-experience'],
+      updated_at: now
+    },
+    // DELIVERED (can return)
+    {
+      id: 'la-ligne-marin-2026-01-19',
+      kind: 'confirmed',
+      active: false,
+      brand: 'La Ligne',
+      item: 'Marin Stripe Sweater',
+      size: 'XS',
+      total: '$397.93',
+      status: 'delivered',
+      product_urls: ['https://lalignenyc.com/products/marin-sweater-cream-navy'],
+      updated_at: now
+    },
+    {
+      id: 'sezane-eli-scarf-2026-01-19',
+      kind: 'confirmed',
+      active: false,
+      brand: 'Sézane',
+      item: 'Eli Scarf (Navy) + FREE Mon Amour Totebag',
+      size: '—',
+      total: '$135.98',
+      status: 'delivered',
+      product_urls: ['https://www.sezane.com/us-en/product/eli-scarf/navy'],
+      updated_at: now
+    },
+    {
+      id: 'saint-james-minquidame-2026-01-19',
+      kind: 'confirmed',
+      active: false,
+      brand: 'Saint James',
+      item: 'Minquidame Breton Striped Shirt',
+      size: '2',
+      total: '$97.00',
+      status: 'delivered',
+      product_urls: ['https://us.saint-james.com/collections/women/products/minquidame-breton-striped-shirt-with-long-sleeve-soft-cotton-women-fit-navy-deep-teal'],
+      updated_at: now
+    },
+    {
+      id: 'catbird-threadbare-2026-01-19',
+      kind: 'confirmed',
+      active: false,
+      brand: 'Catbird',
+      item: 'Threadbare Ring 14K Gold',
+      size: '7',
+      total: '$84.01',
+      status: 'delivered',
+      product_urls: ['https://www.catbirdnyc.com/threadbare-gold-stacking-ring.html'],
       updated_at: now
     }
   ];
