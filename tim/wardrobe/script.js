@@ -551,7 +551,7 @@
             if (countEl) {
                 countEl.textContent = getHeartedItems().length;
             }
-            heartsNav.addEventListener('click', toggleHeartedPanel);
+            addTouchSafeClick(heartsNav, toggleHeartedPanel);
         } else {
             // Create hearts counter element and append to nav (not nav-links)
             const nav = document.querySelector('.nav');
@@ -566,9 +566,32 @@
                 </svg>
                 <span class="nav-hearts-count">${getHeartedItems().length}</span>
             `;
-            heartsNav.addEventListener('click', toggleHeartedPanel);
+            addTouchSafeClick(heartsNav, toggleHeartedPanel);
             nav.appendChild(heartsNav);
         }
+    }
+    
+    // iOS-safe click handler (handles both touch and click)
+    function addTouchSafeClick(element, handler) {
+        let touchMoved = false;
+        
+        element.addEventListener('touchstart', () => {
+            touchMoved = false;
+        }, { passive: true });
+        
+        element.addEventListener('touchmove', () => {
+            touchMoved = true;
+        }, { passive: true });
+        
+        element.addEventListener('touchend', (e) => {
+            if (!touchMoved) {
+                e.preventDefault();
+                handler(e);
+            }
+        });
+        
+        // Also add click for non-touch devices
+        element.addEventListener('click', handler);
     }
 
     function updateNavHeartsCount() {
@@ -592,7 +615,7 @@
         // Create overlay
         const overlay = document.createElement('div');
         overlay.className = 'panel-overlay';
-        overlay.addEventListener('click', closeHeartedPanel);
+        addTouchSafeClick(overlay, closeHeartedPanel);
 
         // Create panel
         const panel = document.createElement('aside');
@@ -617,7 +640,7 @@
             </footer>
         `;
 
-        panel.querySelector('.hearted-panel-close').addEventListener('click', closeHeartedPanel);
+        addTouchSafeClick(panel.querySelector('.hearted-panel-close'), closeHeartedPanel);
 
         document.body.appendChild(overlay);
         document.body.appendChild(panel);
@@ -1146,6 +1169,8 @@
                 border: none;
                 position: relative;
                 overflow: hidden;
+                -webkit-tap-highlight-color: transparent;
+                touch-action: manipulation;
             }
 
             .nav-hearts::after {
@@ -1155,9 +1180,11 @@
                 background: radial-gradient(circle at center, var(--burgundy) 0%, transparent 70%);
                 opacity: 0;
                 transition: opacity 233ms ease-out;
+                pointer-events: none; /* Allow touch through to button */
             }
 
-            .nav-hearts:hover::after {
+            .nav-hearts:hover::after,
+            .nav-hearts:active::after {
                 opacity: 0.3;
             }
 
