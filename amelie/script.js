@@ -15,6 +15,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     initializeModal();
     initializeScrollReveal();
     initializeParallax();
+    initializeDoubleTapToHeart();
+    initializeTouchFeedback();
 });
 
 // === Data Loading ===
@@ -205,21 +207,42 @@ function initializeModal() {
     const modal = document.getElementById('product-modal');
     const backdrop = modal.querySelector('.modal-backdrop');
     const closeBtn = modal.querySelector('.modal-close');
-    
+
     backdrop.addEventListener('click', closeModal);
     closeBtn.addEventListener('click', closeModal);
-    
+
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeModal();
+        // Arrow key navigation
+        if (modal.classList.contains('active')) {
+            if (e.key === 'ArrowRight') navigateModal(1);
+            if (e.key === 'ArrowLeft') navigateModal(-1);
+        }
     });
+
+    // Initialize swipe for modal on mobile
+    initializeModalSwipe();
+}
+
+function navigateModal(direction) {
+    const modal = document.getElementById('product-modal');
+    const currentId = modal.dataset.currentProductId;
+    if (!currentId) return;
+
+    const currentIndex = galleryData.products.findIndex(p => p.id === currentId);
+    const newIndex = (currentIndex + direction + galleryData.products.length) % galleryData.products.length;
+    openProductModal(galleryData.products[newIndex].id);
 }
 
 function openProductModal(productId) {
     const product = galleryData.products.find(p => p.id === productId);
     if (!product) return;
-    
+
     const modal = document.getElementById('product-modal');
-    
+
+    // Store current product ID for navigation
+    modal.dataset.currentProductId = productId;
+
     // Populate modal
     modal.querySelector('.modal-brand').textContent = product.brand;
     modal.querySelector('.modal-title').textContent = product.name;
@@ -421,6 +444,141 @@ function debounce(func, wait) {
     };
 }
 
+// === Double-Tap to Heart (Mobile) ===
+function initializeDoubleTapToHeart() {
+    const DOUBLE_TAP_DELAY = 300; // ms
+    let lastTapTime = 0;
+    let lastTapTarget = null;
+
+    // Use event delegation on the gallery container
+    document.addEventListener('touchend', (e) => {
+        const card = e.target.closest('.product-card');
+        if (!card) return;
+
+        const currentTime = Date.now();
+        const productId = card.dataset.productId;
+
+        // Check for double tap on the same card
+        if (lastTapTarget === productId && currentTime - lastTapTime < DOUBLE_TAP_DELAY) {
+            // Double tap detected!
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Trigger heart with visual feedback
+            toggleHeart(productId);
+
+            // Show big heart animation on the image
+            showDoubleTapHeart(card);
+
+            // Reset
+            lastTapTime = 0;
+            lastTapTarget = null;
+        } else {
+            lastTapTime = currentTime;
+            lastTapTarget = productId;
+        }
+    }, { passive: false });
+
+    // Prevent context menu on long press (mobile)
+    document.addEventListener('contextmenu', (e) => {
+        if (e.target.closest('.product-card')) {
+            e.preventDefault();
+        }
+    });
+}
+
+// Big heart animation on double-tap (Instagram-style)
+function showDoubleTapHeart(card) {
+    const imageContainer = card.querySelector('.product-image-container');
+    if (!imageContainer) return;
+
+    // Create the big heart overlay
+    const heartOverlay = document.createElement('div');
+    heartOverlay.className = 'double-tap-heart';
+    heartOverlay.innerHTML = '❤️';
+
+    imageContainer.appendChild(heartOverlay);
+
+    // Remove after animation
+    setTimeout(() => heartOverlay.remove(), 1000);
+}
+
+// === Touch Feedback for Mobile ===
+function initializeTouchFeedback() {
+    // Add active state on touch
+    document.addEventListener('touchstart', (e) => {
+        const card = e.target.closest('.product-card');
+        if (card) {
+            card.classList.add('touch-active');
+        }
+
+        const link = e.target.closest('.product-link, .nav-categories a');
+        if (link) {
+            link.classList.add('touch-active');
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchend', () => {
+        // Remove all touch-active classes
+        document.querySelectorAll('.touch-active').forEach(el => {
+            el.classList.remove('touch-active');
+        });
+    }, { passive: true });
+
+    document.addEventListener('touchcancel', () => {
+        document.querySelectorAll('.touch-active').forEach(el => {
+            el.classList.remove('touch-active');
+        });
+    }, { passive: true });
+
+    // Improve scroll performance
+    document.addEventListener('touchmove', () => {
+        document.querySelectorAll('.touch-active').forEach(el => {
+            el.classList.remove('touch-active');
+        });
+    }, { passive: true });
+}
+
+// === Swipe Navigation for Modal (Mobile) ===
+let touchStartX = 0;
+let touchEndX = 0;
+
+function initializeModalSwipe() {
+    const modal = document.getElementById('product-modal');
+    if (!modal) return;
+
+    modal.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    modal.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleModalSwipe();
+    }, { passive: true });
+}
+
+function handleModalSwipe() {
+    const swipeThreshold = 50;
+    const diff = touchStartX - touchEndX;
+
+    if (Math.abs(diff) < swipeThreshold) return;
+
+    // Get current product index
+    const modal = document.getElementById('product-modal');
+    const currentId = modal.dataset.currentProductId;
+    const currentIndex = galleryData.products.findIndex(p => p.id === currentId);
+
+    if (diff > 0) {
+        // Swipe left - next product
+        const nextIndex = (currentIndex + 1) % galleryData.products.length;
+        openProductModal(galleryData.products[nextIndex].id);
+    } else {
+        // Swipe right - previous product
+        const prevIndex = (currentIndex - 1 + galleryData.products.length) % galleryData.products.length;
+        openProductModal(galleryData.products[prevIndex].id);
+    }
+}
+
 // === Console Art ===
 console.log(`
   ╔═══════════════════════════════════════════════╗
@@ -432,6 +590,8 @@ console.log(`
   ║   Japanese artisan soul                       ║
   ║                                               ║
   ║   Pour Jill ❤️                                 ║
+  ║                                               ║
+  ║   📱 Double-tap to ❤️                          ║
   ║                                               ║
   ╚═══════════════════════════════════════════════╝
 `);
