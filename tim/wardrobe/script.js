@@ -17,40 +17,40 @@
             name: 'Green Lake Morning',
             vibe: 'Thoughtful weekend wandering',
             items: [
-                { name: 'Howlin\' Fair Isle', price: 116, category: 'Sweater', sale: true },
-                { name: 'orSlow French Work Pants', price: 225, category: 'Pants' },
-                { name: 'Moonstar Alweather', price: 240, category: 'Footwear' },
-                { name: 'Anonymous Ism Socks', price: 30, category: 'Socks' }
+                { name: 'Howlin\' Fair Isle', price: 116, category: 'Sweater', sale: true, image: 'images/howlin-fairisle.jpg' },
+                { name: 'orSlow French Work', price: 225, category: 'Pants', image: 'images/orslow-french.jpg' },
+                { name: 'Moonstar Alweather', price: 240, category: 'Footwear', image: 'images/moonstar-alweather.jpg' },
+                { name: 'Anonymous Ism', price: 30, category: 'Socks', image: 'images/anonymous-ism.jpg' }
             ]
         },
         creative: {
             name: 'Creative Professional',
             vibe: 'Serious but not stuffy',
             items: [
-                { name: 'Gitman Girard Shirt', price: 320, category: 'Shirt' },
-                { name: 'EG Fatigue Pant', price: 324, category: 'Pants' },
-                { name: 'Paraboot Michael', price: 475, category: 'Footwear' },
-                { name: 'Kapital Bandana', price: 43, category: 'Accessory' }
+                { name: 'Gitman Girard', price: 320, category: 'Shirt', image: 'images/gitman-girard.jpg' },
+                { name: 'EG Fatigue Pant', price: 324, category: 'Pants', image: 'images/eg-fatigue.jpg' },
+                { name: 'Paraboot Michael', price: 475, category: 'Footwear', image: 'images/paraboot-michael.jpg' },
+                { name: 'Kapital Bandana', price: 43, category: 'Accessory', image: 'images/kapital-bandana.jpg' }
             ]
         },
         hidden: {
             name: 'Hidden Personality',
             vibe: 'Respectable with a secret',
             items: [
-                { name: 'Brain Dead Wyrm Tee', price: 54, category: 'Base' },
-                { name: 'Arpenteur Travail', price: 195, category: 'Layer' },
-                { name: 'Gramicci G-Pant', price: 88, category: 'Pants' },
-                { name: 'Kapital GOGH Socks', price: 72, category: 'Secret' }
+                { name: 'Brain Dead Tee', price: 54, category: 'Base', image: 'images/brain-dead-gits.jpg' },
+                { name: 'Arpenteur Travail', price: 195, category: 'Layer', image: 'images/arpenteur-travail.jpg' },
+                { name: 'Gramicci G-Pant', price: 88, category: 'Pants', image: 'images/gramicci-gpant.jpg' },
+                { name: 'Kapital GOGH', price: 72, category: 'Secret', image: 'images/kapital-vangogh.jpg' }
             ]
         },
         pattern: {
             name: 'Pattern Maximalist',
             vibe: 'I know what I\'m doing',
             items: [
-                { name: 'Kardo Ikat Shirt', price: 130, category: 'Statement' },
-                { name: 'EG Loiter Jacket', price: 297, category: 'Layer', sale: true },
-                { name: 'orSlow French Work', price: 225, category: 'Pants' },
-                { name: 'Danner Mountain Light', price: 470, category: 'Footwear' }
+                { name: 'Kardo Ikat', price: 130, category: 'Statement', image: 'images/kardo-ikat.jpg' },
+                { name: 'EG Loiter Jacket', price: 297, category: 'Layer', sale: true, image: 'images/eg-loiter.jpg' },
+                { name: 'orSlow French Work', price: 225, category: 'Pants', image: 'images/orslow-french.jpg' },
+                { name: 'Danner Mountain', price: 470, category: 'Footwear', image: 'images/danner-mountain.jpg' }
             ]
         }
     };
@@ -125,41 +125,50 @@
             const itemEl = document.createElement('div');
             itemEl.className = 'outfit-item';
             itemEl.style.opacity = '0';
-            itemEl.style.transform = 'translateY(20px)';
+            itemEl.style.transform = 'translateY(20px) scale(0.95)';
             itemEl.style.transition = `all 377ms cubic-bezier(0.22, 1, 0.36, 1) ${index * 89}ms`;
 
-            // Color swatch based on category
-            const colors = {
-                'Sweater': 'linear-gradient(135deg, #2D5016, #4A7023)',
-                'Pants': 'linear-gradient(135deg, #1C2541, #3A506B)',
-                'Footwear': 'linear-gradient(135deg, #3C2415, #8B4513)',
-                'Socks': 'linear-gradient(135deg, #FF6B6B, #4ECDC4)',
-                'Shirt': 'linear-gradient(135deg, #4ECDC4, #45B7D1)',
-                'Accessory': 'linear-gradient(135deg, #722F37, #8B3A42)',
-                'Base': 'linear-gradient(135deg, #333, #555)',
-                'Layer': 'linear-gradient(135deg, #4A7023, #2D5016)',
-                'Secret': 'linear-gradient(135deg, #5B3A8C, #7B4FB8)',
-                'Statement': 'linear-gradient(135deg, #FFE66D, #E5C85E)'
+            // Category label for accessibility
+            const categoryLabels = {
+                'Sweater': '🧶', 'Pants': '👖', 'Footwear': '👟', 'Socks': '🧦',
+                'Shirt': '👔', 'Accessory': '🎀', 'Base': '👕', 'Layer': '🧥',
+                'Secret': '✨', 'Statement': '🎨'
             };
 
+            const saleTag = item.sale ? '<span class="outfit-item-sale">Sale</span>' : '';
+
             itemEl.innerHTML = `
-                <div class="outfit-item-image" style="background: ${colors[item.category] || 'linear-gradient(135deg, #5C677D, #7D8597)'}"></div>
-                <div class="outfit-item-name">${item.name}</div>
-                <div class="outfit-item-price">$${item.price}</div>
+                <div class="outfit-item-image-wrap">
+                    <img src="${item.image}" alt="${item.name}" class="outfit-item-image" loading="lazy">
+                    <span class="outfit-item-category">${categoryLabels[item.category] || '👕'}</span>
+                    ${saleTag}
+                </div>
+                <div class="outfit-item-details">
+                    <div class="outfit-item-name">${item.name}</div>
+                    <div class="outfit-item-price">${item.sale ? '<span class="sale-price">' : ''}$${item.price}${item.sale ? '</span>' : ''}</div>
+                </div>
             `;
+
+            // Add hover sound effect simulation (visual feedback)
+            itemEl.addEventListener('mouseenter', () => {
+                itemEl.style.transform = 'translateY(-8px) scale(1.02)';
+            });
+            itemEl.addEventListener('mouseleave', () => {
+                itemEl.style.transform = 'translateY(0) scale(1)';
+            });
 
             itemsContainer.appendChild(itemEl);
 
-            // Trigger animation
+            // Trigger animation with spring effect
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                     itemEl.style.opacity = '1';
-                    itemEl.style.transform = 'translateY(0)';
+                    itemEl.style.transform = 'translateY(0) scale(1)';
                 });
             });
         });
 
-        // Animate total price change
+        // Animate total price change with spring
         animateNumber(totalPrice, total);
     }
 
@@ -712,11 +721,549 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // MICRODELIGHTS — Scroll Progress Bar
+    // ═══════════════════════════════════════════════════════════════
+
+    function initScrollProgress() {
+        const progress = document.createElement('div');
+        progress.className = 'scroll-progress';
+        progress.innerHTML = '<div class="scroll-progress-bar"></div>';
+        document.body.appendChild(progress);
+
+        const bar = progress.querySelector('.scroll-progress-bar');
+
+        window.addEventListener('scroll', () => {
+            const scrollTop = window.scrollY;
+            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const scrollPercent = (scrollTop / docHeight) * 100;
+            bar.style.width = scrollPercent + '%';
+        }, { passive: true });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MICRODELIGHTS — Hero Parallax
+    // ═══════════════════════════════════════════════════════════════
+
+    function initHeroParallax() {
+        const hero = document.querySelector('.hero');
+        const heroContent = document.querySelector('.hero-content');
+        if (!hero || !heroContent) return;
+
+        window.addEventListener('scroll', () => {
+            const scrollY = window.scrollY;
+            const heroHeight = hero.offsetHeight;
+
+            if (scrollY < heroHeight) {
+                const parallaxY = scrollY * 0.3;
+                const opacity = 1 - (scrollY / heroHeight) * 0.6;
+                const scale = 1 - (scrollY / heroHeight) * 0.05;
+
+                heroContent.style.transform = `translateY(${parallaxY}px) scale(${scale})`;
+                heroContent.style.opacity = opacity;
+            }
+        }, { passive: true });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MICRODELIGHTS — Magnetic Buttons
+    // ═══════════════════════════════════════════════════════════════
+
+    function initMagneticButtons() {
+        const buttons = document.querySelectorAll('.product-cta, .outfit-preset');
+
+        buttons.forEach(btn => {
+            btn.addEventListener('mousemove', (e) => {
+                const rect = btn.getBoundingClientRect();
+                const x = e.clientX - rect.left - rect.width / 2;
+                const y = e.clientY - rect.top - rect.height / 2;
+
+                btn.style.transform = `translate(${x * 0.15}px, ${y * 0.15}px)`;
+            });
+
+            btn.addEventListener('mouseleave', () => {
+                btn.style.transform = '';
+            });
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MICRODELIGHTS — Staggered Philosophy Cards
+    // ═══════════════════════════════════════════════════════════════
+
+    function initPhilosophyReveal() {
+        const items = document.querySelectorAll('.philosophy-item');
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry, index) => {
+                if (entry.isIntersecting) {
+                    setTimeout(() => {
+                        entry.target.classList.add('revealed');
+                    }, index * 144);
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.2 });
+
+        items.forEach(item => {
+            item.classList.add('philosophy-reveal');
+            observer.observe(item);
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MICRODELIGHTS — Tilt Cards on Hover
+    // ═══════════════════════════════════════════════════════════════
+
+    function initCardTilt() {
+        const cards = document.querySelectorAll('.product-card');
+
+        cards.forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+
+                const rotateX = (y - centerY) / 20;
+                const rotateY = (centerX - x) / 20;
+
+                card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-12px) scale(1.02)`;
+            });
+
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = '';
+                card.style.transition = 'transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)';
+            });
+
+            card.addEventListener('mouseenter', () => {
+                card.style.transition = 'transform 0.1s ease-out';
+            });
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MICRODELIGHTS — Nav Section Indicator
+    // ═══════════════════════════════════════════════════════════════
+
+    function initNavSectionIndicator() {
+        const sections = document.querySelectorAll('section[id]');
+        const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.id;
+                    navLinks.forEach(link => {
+                        link.classList.remove('active');
+                        if (link.getAttribute('href') === '#' + id) {
+                            link.classList.add('active');
+                        }
+                    });
+                }
+            });
+        }, { rootMargin: '-50% 0px -50% 0px' });
+
+        sections.forEach(section => observer.observe(section));
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MICRODELIGHTS — Sparkle on Heart
+    // ═══════════════════════════════════════════════════════════════
+
+    function createSparkle(x, y) {
+        const sparkle = document.createElement('div');
+        sparkle.className = 'sparkle';
+        sparkle.style.cssText = `
+            position: fixed;
+            left: ${x}px;
+            top: ${y}px;
+            width: 8px;
+            height: 8px;
+            background: var(--burgundy);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            animation: sparkleAnim 600ms ease-out forwards;
+        `;
+        document.body.appendChild(sparkle);
+        setTimeout(() => sparkle.remove(), 600);
+    }
+
+    function initHeartSparkles() {
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.product-heart')) {
+                const rect = e.target.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+
+                for (let i = 0; i < 6; i++) {
+                    setTimeout(() => {
+                        const angle = (i / 6) * Math.PI * 2;
+                        const distance = 20 + Math.random() * 15;
+                        const x = cx + Math.cos(angle) * distance;
+                        const y = cy + Math.sin(angle) * distance;
+                        createSparkle(x, y);
+                    }, i * 50);
+                }
+            }
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MICRODELIGHTS — Number Counter Animation (Enhanced)
+    // ═══════════════════════════════════════════════════════════════
+
+    function initStatCounters() {
+        const stats = document.querySelectorAll('.stat-value');
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const el = entry.target;
+                    const text = el.textContent;
+                    const num = parseInt(text);
+
+                    if (!isNaN(num)) {
+                        animateCounter(el, 0, num, 1200);
+                    }
+                    observer.unobserve(el);
+                }
+            });
+        }, { threshold: 0.5 });
+
+        stats.forEach(stat => observer.observe(stat));
+    }
+
+    function animateCounter(el, start, end, duration) {
+        const startTime = performance.now();
+
+        function update(currentTime) {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            // Ease out cubic
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const current = Math.round(start + (end - start) * eased);
+
+            el.textContent = current;
+
+            if (progress < 1) {
+                requestAnimationFrame(update);
+            }
+        }
+
+        requestAnimationFrame(update);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MICRODELIGHTS — Inject All CSS
+    // ═══════════════════════════════════════════════════════════════
+
+    function injectMicrodelightCSS() {
+        const style = document.createElement('style');
+        style.textContent = `
+            /* Scroll Progress */
+            .scroll-progress {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 3px;
+                z-index: 1000;
+                background: rgba(28, 37, 65, 0.1);
+            }
+            .scroll-progress-bar {
+                height: 100%;
+                width: 0;
+                background: linear-gradient(90deg, var(--burgundy), var(--indigo), var(--olive));
+                transition: width 50ms ease-out;
+            }
+
+            /* Philosophy reveal */
+            .philosophy-reveal {
+                opacity: 0;
+                transform: translateY(40px);
+                transition: all 610ms cubic-bezier(0.22, 1, 0.36, 1);
+            }
+            .philosophy-reveal.revealed {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            /* Nav active link */
+            .nav-links a.active {
+                color: white;
+            }
+            .nav-links a.active::after {
+                transform: scaleX(1);
+            }
+
+            /* Sparkle animation */
+            @keyframes sparkleAnim {
+                0% { transform: scale(0); opacity: 1; }
+                50% { transform: scale(1.5); opacity: 0.8; }
+                100% { transform: scale(0); opacity: 0; }
+            }
+
+            /* Outfit item enhanced styles */
+            .outfit-item {
+                background: var(--porcelain);
+                border-radius: var(--radius-lg);
+                padding: 0;
+                text-align: center;
+                width: 140px;
+                transition: all 377ms cubic-bezier(0.34, 1.56, 0.64, 1);
+                border: 1px solid var(--ink-whisper);
+                cursor: pointer;
+                overflow: hidden;
+                box-shadow: var(--shadow-sm);
+            }
+
+            .outfit-item:hover {
+                box-shadow: var(--shadow-xl);
+                border-color: var(--burgundy);
+            }
+
+            .outfit-item-image-wrap {
+                position: relative;
+                aspect-ratio: 1;
+                overflow: hidden;
+                background: var(--linen-warm);
+            }
+
+            .outfit-item-image {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                transition: transform 377ms ease-out;
+            }
+
+            .outfit-item:hover .outfit-item-image {
+                transform: scale(1.08);
+            }
+
+            .outfit-item-category {
+                position: absolute;
+                top: 6px;
+                right: 6px;
+                font-size: 14px;
+                background: rgba(255,255,255,0.9);
+                border-radius: 50%;
+                width: 24px;
+                height: 24px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: var(--shadow-sm);
+            }
+
+            .outfit-item-sale {
+                position: absolute;
+                bottom: 6px;
+                left: 6px;
+                font-size: 9px;
+                font-weight: 700;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                background: linear-gradient(135deg, #FF6B6B, #FF8E8E);
+                color: white;
+                padding: 2px 6px;
+                border-radius: var(--radius-full);
+            }
+
+            .outfit-item-details {
+                padding: var(--space-3);
+            }
+
+            .outfit-item-name {
+                font-size: 11px;
+                font-weight: 600;
+                color: var(--ink);
+                margin-bottom: 2px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .outfit-item-price {
+                font-family: var(--font-mono);
+                font-size: var(--text-sm);
+                font-weight: 600;
+                color: var(--navy);
+            }
+
+            .outfit-item-price .sale-price {
+                color: #FF6B6B;
+            }
+
+            /* Outfit items container */
+            .outfit-items {
+                display: flex;
+                gap: var(--space-5);
+                justify-content: center;
+                flex-wrap: wrap;
+                margin-bottom: var(--space-6);
+                min-height: 200px;
+                align-items: flex-start;
+            }
+
+            /* Preset hover enhancement */
+            .outfit-preset {
+                position: relative;
+                overflow: hidden;
+            }
+
+            .outfit-preset::before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                background: linear-gradient(135deg, var(--burgundy), var(--indigo));
+                opacity: 0;
+                transition: opacity 233ms ease-out;
+            }
+
+            .outfit-preset:hover::before {
+                opacity: 0.03;
+            }
+
+            .outfit-preset.active::before {
+                opacity: 0.06;
+            }
+
+            /* Hearts button enhanced */
+            .nav-hearts {
+                border: none;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .nav-hearts::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+                background: radial-gradient(circle at center, var(--burgundy) 0%, transparent 70%);
+                opacity: 0;
+                transition: opacity 233ms ease-out;
+            }
+
+            .nav-hearts:hover::after {
+                opacity: 0.3;
+            }
+
+            /* Product card image shine effect */
+            .product-image-container::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: -100%;
+                width: 50%;
+                height: 100%;
+                background: linear-gradient(
+                    90deg,
+                    transparent,
+                    rgba(255,255,255,0.2),
+                    transparent
+                );
+                transition: left 600ms ease-out;
+                z-index: 2;
+                pointer-events: none;
+            }
+
+            .product-card:hover .product-image-container::before {
+                left: 100%;
+            }
+
+            /* Hearted panel header h2 style */
+            .hearted-panel-header h2 {
+                font-family: var(--font-display);
+                font-size: var(--text-xl);
+                font-weight: 400;
+                margin: 0;
+            }
+
+            /* Empty state */
+            .hearted-panel-empty {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                text-align: center;
+                color: var(--ink-faint);
+                padding: var(--space-8);
+            }
+
+            .hearted-panel-empty svg {
+                margin-bottom: var(--space-4);
+                opacity: 0.4;
+            }
+
+            .hearted-panel-empty p {
+                margin: 0;
+                font-size: var(--text-base);
+            }
+
+            .hearted-panel-empty-sub {
+                font-size: var(--text-sm) !important;
+                margin-top: var(--space-2) !important;
+                opacity: 0.7;
+            }
+
+            /* Hearted item brand */
+            .hearted-item-brand {
+                display: block;
+                font-size: 9px;
+                font-weight: 700;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+                color: var(--burgundy);
+                margin-bottom: 2px;
+            }
+
+            /* Total styling */
+            .hearted-panel-total {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .hearted-panel-total span:first-child {
+                font-size: var(--text-sm);
+                color: var(--ink-faint);
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+            }
+
+            .hearted-panel-total-price {
+                font-family: var(--font-display);
+                font-size: var(--text-2xl);
+                color: var(--navy);
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                .scroll-progress-bar {
+                    transition: none;
+                }
+                .philosophy-reveal {
+                    opacity: 1;
+                    transform: none;
+                }
+                .product-image-container::before {
+                    display: none;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // INIT
     // ═══════════════════════════════════════════════════════════════
 
     function init() {
         injectScrollRevealCSS();
+        injectMicrodelightCSS();
         initOutfitBuilder();
         initProductCards();
         initSmoothScroll();
@@ -726,6 +1273,14 @@
         initProductHearts();
         initNavHearts();
         initHeartedPanel();
+        initScrollProgress();
+        initHeroParallax();
+        initMagneticButtons();
+        initPhilosophyReveal();
+        initCardTilt();
+        initNavSectionIndicator();
+        initHeartSparkles();
+        initStatCounters();
 
         // Log a little curator's note
         console.log(
