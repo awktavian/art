@@ -177,6 +177,12 @@ function initializeNavigation() {
                 document.querySelectorAll('.category-section').forEach(s => {
                     s.style.display = 'block';
                 });
+            } else if (category === 'liked') {
+                // Scroll to liked section
+                const likedSection = document.getElementById('liked-section');
+                if (likedSection) {
+                    likedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
             } else {
                 const target = document.getElementById(category);
                 if (target) {
@@ -429,6 +435,29 @@ function updateFooterStats() {
     const likedCount = getLikedItems().length;
 
     footer.textContent = `${totalProducts} pieces • ${likedCount > 0 ? `${likedCount} ❤️ • ` : ''}Paris meets Tokyo • Sizing: Pants 6, Tops XS-S, Shoes US 8`;
+
+    // Update nav hearts count
+    updateNavHeartsCount();
+}
+
+// Update the hearts count in navigation
+function updateNavHeartsCount() {
+    const countEl = document.getElementById('nav-hearts-count');
+    const linkEl = document.getElementById('nav-hearts-link');
+    const likedCount = getLikedItems().length;
+
+    if (countEl) {
+        countEl.textContent = likedCount;
+    }
+
+    // Show/hide or highlight based on count
+    if (linkEl) {
+        if (likedCount > 0) {
+            linkEl.classList.add('has-items');
+        } else {
+            linkEl.classList.remove('has-items');
+        }
+    }
 }
 
 // === Utility Functions ===
