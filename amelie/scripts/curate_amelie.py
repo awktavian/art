@@ -2,8 +2,9 @@
 """
 Amélie Gallery Curation Script
 
-Uses the StockVerifier to ensure all products are in-stock at Jill's sizes
-before finalizing the gallery.
+Uses the core Kagami shopping services for:
+- StockVerifier: Ensure all products are in-stock at Jill's sizes
+- GalleryCurator: Download and verify product images
 
 Usage:
     python scripts/curate_amelie.py verify     # Verify stock at Jill's sizes
@@ -20,13 +21,13 @@ import sys
 from pathlib import Path
 
 # Add kagami to path if running standalone
-sys.path.insert(0, str(Path(__file__).parents[4] / "packages"))
+KAGAMI_PACKAGES = Path(__file__).parents[4] / "packages"
+if KAGAMI_PACKAGES.exists():
+    sys.path.insert(0, str(KAGAMI_PACKAGES))
 
-from kagami.core.services.shopping.stock_verifier import (
-    StockVerifier,
-    batch_verify_for_recipient,
-)
-from kagami.core.services.shopping.product_crawler import ProductCrawler, CrawlerConfig
+from kagami.core.services.shopping.stock_verifier import StockVerifier
+from kagami.core.services.shopping.gallery_curator import GalleryCurator
+from kagami.core.services.shopping.gallery_schema import Gallery
 
 logging.basicConfig(
     level=logging.INFO,
@@ -118,81 +119,47 @@ async def verify_stock() -> dict:
 
 
 async def download_images() -> int:
-    """Download product images using ProductCrawler."""
+    """Download product images using GalleryCurator."""
     logger.info("🖼️ Starting image download...")
-    
+
     IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-    
-    gallery = load_gallery()
-    products = gallery["products"]
-    downloaded = 0
-    
-    # Configure crawler for fashion items
-    config = CrawlerConfig(
-        expected_type="clothing",
-        min_width=400,
-        min_height=400,
+
+    # Load gallery using the schema
+    gallery = Gallery.load(GALLERY_JSON)
+
+    # Use GalleryCurator's download_images method
+    curator = GalleryCurator()
+    results = await curator.download_images(
+        gallery=gallery,
+        output_dir=IMAGES_DIR,
         use_vlm=True,  # Verify images are actually products
+        skip_existing=True,
     )
-    crawler = ProductCrawler(config)
-    
-    for product in products:
-        local_image = product.get("local_image", "")
-        image_path = IMAGES_DIR / local_image if local_image else None
-        
-        # Skip if already have image
-        if image_path and image_path.exists():
-            logger.info(f"   ⏭️ {product['name']}: already have image")
-            continue
-        
-        # Try to crawl from product URL
-        product_url = product.get("product_url", "")
-        if not product_url:
-            logger.warning(f"   ⚠️ {product['name']}: no product URL")
-            continue
-        
-        try:
-            result, verified_image = await crawler.crawl_and_verify(
-                product_url,
-                IMAGES_DIR,
-                filename=f"{product['id']}.jpg",
-            )
-            
-            if verified_image:
-                product["local_image"] = f"{product['id']}.jpg"
-                downloaded += 1
-                logger.info(f"   ✅ {product['name']}: downloaded image")
-            else:
-                logger.warning(f"   ⚠️ {product['name']}: could not verify image")
-                
-        except Exception as e:
-            logger.error(f"   ❌ {product['name']}: {e}")
-        
-        # Rate limiting
-        await asyncio.sleep(2)
-    
-    save_gallery(gallery)
-    logger.info(f"\n📊 Downloaded {downloaded} images")
+
+    # Save updated gallery with local_image paths
+    gallery.save(GALLERY_JSON)
+
+    downloaded = sum(1 for v in results.values() if v)
+    logger.info(f"\n📊 Downloaded {downloaded}/{len(results)} images")
     return downloaded
 
 
 async def full_curation() -> None:
     """Run full curation pipeline."""
     logger.info("🎬 Starting full Amélie curation pipeline...")
-    
+
     # Step 1: Verify stock
     await verify_stock()
-    
+
     # Step 2: Download images
     await download_images()
-    
+
     # Step 3: Summary
-    gallery = load_gallery()
+    gallery = Gallery.load(GALLERY_JSON)
     logger.info("\n" + "=" * 60)
-    logger.info(f"🎉 Curation Complete: {gallery['meta']['name']}")
-    logger.info(f"   Products: {len(gallery['products'])}")
-    logger.info(f"   Verified: {gallery['meta'].get('verified_count', 0)}")
-    logger.info(f"   Status: {gallery['meta'].get('validation_status', 'unknown')}")
+    logger.info(f"🎉 Curation Complete: {gallery.meta.name}")
+    logger.info(f"   Products: {len(gallery.products)}")
+    logger.info(f"   Verified: {gallery.meta.verified_count}")
     logger.info("=" * 60)
 
 
