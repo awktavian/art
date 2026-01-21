@@ -35,6 +35,7 @@ function initializeGallery() {
     renderProducts();
     renderOutfitFormulas();
     renderLikedItems();
+    updateFooterStats();
 }
 
 // === Product Rendering ===
@@ -52,25 +53,32 @@ function renderProducts() {
 
 function createProductCard(product) {
     const isCenterpiece = product.is_centerpiece;
-    const isLiked = product.liked;
-    const imagePath = product.local_image 
-        ? `./images/${product.local_image}` 
+    const isLiked = getLikedStatus(product.id) || product.liked;
+    const imagePath = product.local_image
+        ? `./images/${product.local_image}`
         : '';
-    
-    const badgeHTML = product.badge 
-        ? `<span class="product-badge ${isLiked ? 'liked' : ''} ${isCenterpiece ? 'centerpiece-badge' : ''}">${product.badge}</span>` 
+
+    const badgeHTML = product.badge
+        ? `<span class="product-badge ${isLiked ? 'liked' : ''} ${isCenterpiece ? 'centerpiece-badge' : ''}">${product.badge}</span>`
         : '';
-    
-    const heartHTML = isLiked 
-        ? '<span class="product-heart">❤️</span>' 
-        : '';
-    
+
+    const heartHTML = `<button class="heart-btn ${isLiked ? 'active' : ''}"
+        onclick="event.stopPropagation(); toggleHeart('${product.id}')"
+        aria-label="${isLiked ? 'Remove from favorites' : 'Add to favorites'}">
+        <span class="heart-icon">${isLiked ? '❤️' : '🤍'}</span>
+    </button>`;
+
     const imageHTML = imagePath
         ? `<img class="product-image" src="${imagePath}" alt="${product.name}" loading="lazy">`
         : `<div class="product-image placeholder-image">${getPlaceholderEmoji(product.category)}</div>`;
-    
+
+    // Direct link to product - clickable!
+    const productLink = product.product_url
+        ? `<a href="${product.product_url}" target="_blank" rel="noopener" class="product-link" onclick="event.stopPropagation()">Voir →</a>`
+        : '';
+
     return `
-        <article class="product-card ${isCenterpiece ? 'centerpiece' : ''} reveal" 
+        <article class="product-card ${isCenterpiece ? 'centerpiece' : ''} ${isLiked ? 'is-liked' : ''} reveal"
                  data-product-id="${product.id}"
                  onclick="openProductModal('${product.id}')">
             <div class="product-image-container">
@@ -84,7 +92,7 @@ function createProductCard(product) {
                 <p class="product-description">${product.description}</p>
                 <div class="product-footer">
                     <span class="product-price">${product.price_display}</span>
-                    <span class="product-origin">${product.origin}</span>
+                    ${productLink}
                 </div>
             </div>
         </article>
@@ -126,18 +134,27 @@ function renderOutfitFormulas() {
 // === Liked Items ===
 function renderLikedItems() {
     const grid = document.querySelector('.liked-grid');
-    if (!grid) return;
-    
-    const likedProducts = galleryData.products.filter(p => p.liked);
-    
+    const section = document.querySelector('.liked-section');
+    if (!grid || !section) return;
+
+    const likedIds = getLikedItems();
+    const likedProducts = galleryData.products.filter(p =>
+        likedIds.includes(p.id) || p.liked
+    );
+
     if (likedProducts.length === 0) {
         // Hide the section if no liked items
-        const section = document.querySelector('.liked-section');
-        if (section) section.style.display = 'none';
+        section.style.display = 'none';
         return;
     }
-    
+
+    // Show the section and render
+    section.style.display = 'block';
     grid.innerHTML = likedProducts.map(product => createProductCard(product)).join('');
+
+    // Re-run scroll reveal on new items
+    const revealElements = grid.querySelectorAll('.reveal:not(.visible)');
+    revealElements.forEach(el => el.classList.add('visible'));
 }
 
 // === Navigation ===
@@ -287,30 +304,108 @@ function initializeParallax() {
     });
 }
 
-// === Hearts Wishlist System ===
+// === Hearts Wishlist System with localStorage ===
+const LIKED_STORAGE_KEY = 'amelie-liked-products';
+
+function getLikedItems() {
+    try {
+        return JSON.parse(localStorage.getItem(LIKED_STORAGE_KEY)) || [];
+    } catch {
+        return [];
+    }
+}
+
+function saveLikedItems(likedIds) {
+    localStorage.setItem(LIKED_STORAGE_KEY, JSON.stringify(likedIds));
+}
+
+function getLikedStatus(productId) {
+    return getLikedItems().includes(productId);
+}
+
 function toggleHeart(productId) {
     const product = galleryData.products.find(p => p.id === productId);
     if (!product) return;
-    
-    product.liked = !product.liked;
-    
-    // Update UI
+
+    const likedIds = getLikedItems();
+    const isCurrentlyLiked = likedIds.includes(productId);
+
+    if (isCurrentlyLiked) {
+        // Remove from liked
+        const index = likedIds.indexOf(productId);
+        likedIds.splice(index, 1);
+    } else {
+        // Add to liked
+        likedIds.push(productId);
+    }
+
+    saveLikedItems(likedIds);
+
+    // Update UI with animation
     const card = document.querySelector(`[data-product-id="${productId}"]`);
     if (card) {
-        const heartEl = card.querySelector('.product-heart');
-        if (product.liked && !heartEl) {
-            const container = card.querySelector('.product-image-container');
-            container.insertAdjacentHTML('beforeend', '<span class="product-heart">❤️</span>');
-        } else if (!product.liked && heartEl) {
-            heartEl.remove();
+        const heartBtn = card.querySelector('.heart-btn');
+        const heartIcon = card.querySelector('.heart-icon');
+
+        if (isCurrentlyLiked) {
+            card.classList.remove('is-liked');
+            heartBtn.classList.remove('active');
+            heartIcon.textContent = '🤍';
+            heartBtn.setAttribute('aria-label', 'Add to favorites');
+        } else {
+            card.classList.add('is-liked');
+            heartBtn.classList.add('active');
+            heartIcon.textContent = '❤️';
+            heartBtn.setAttribute('aria-label', 'Remove from favorites');
+
+            // Microdelight: Confetti burst animation
+            createHeartBurst(heartBtn);
         }
     }
-    
+
     // Re-render liked section
     renderLikedItems();
-    
-    // Could save to localStorage here
-    console.log(`${product.liked ? '❤️' : '💔'} ${product.name}`);
+
+    // Update footer count
+    updateFooterStats();
+
+    console.log(`${!isCurrentlyLiked ? '❤️' : '💔'} ${product.name}`);
+}
+
+// Microdelight: Heart burst animation
+function createHeartBurst(element) {
+    const rect = element.getBoundingClientRect();
+    const hearts = ['❤️', '💕', '💗', '💖', '✨'];
+
+    for (let i = 0; i < 8; i++) {
+        const heart = document.createElement('span');
+        heart.className = 'heart-particle';
+        heart.textContent = hearts[Math.floor(Math.random() * hearts.length)];
+        heart.style.cssText = `
+            position: fixed;
+            left: ${rect.left + rect.width / 2}px;
+            top: ${rect.top + rect.height / 2}px;
+            font-size: 16px;
+            pointer-events: none;
+            z-index: 9999;
+            animation: heartBurst 0.8s ease-out forwards;
+            --angle: ${(i * 45) + (Math.random() * 20 - 10)}deg;
+            --distance: ${40 + Math.random() * 30}px;
+        `;
+        document.body.appendChild(heart);
+        setTimeout(() => heart.remove(), 800);
+    }
+}
+
+// Update footer with dynamic stats
+function updateFooterStats() {
+    const footer = document.getElementById('footer-details');
+    if (!footer || !galleryData) return;
+
+    const totalProducts = galleryData.products.length;
+    const likedCount = getLikedItems().length;
+
+    footer.textContent = `${totalProducts} pieces • ${likedCount > 0 ? `${likedCount} ❤️ • ` : ''}Paris meets Tokyo • Sizing: Pants 6, Tops XS-S, Shoes US 8`;
 }
 
 // === Utility Functions ===
