@@ -3,6 +3,12 @@
  * 
  * Creates and manages the hexagonal swarm of browser nodes.
  * Handles animations, connections, and state transitions.
+ * 
+ * FIXES APPLIED:
+ * - Proper animation cleanup
+ * - Collective breathing animation
+ * - Resize handler for SVG connections
+ * - Loading skeleton during boot
  */
 
 class SwarmVisualization {
@@ -10,15 +16,21 @@ class SwarmVisualization {
         this.container = document.getElementById(containerId);
         this.connectionsEl = document.getElementById(connectionsId);
         
-        if (!this.container || !this.connectionsEl) return;
+        if (!this.container || !this.connectionsEl) {
+            console.warn('SwarmVisualization: Required elements not found');
+            return;
+        }
         
         this.nodes = [];
         this.nodeCount = 25;
         this.centerNode = null;
         this.connections = [];
         this.isBooted = false;
+        this.isDestroyed = false;
         
-        // Node positions in hexagonal pattern
+        this._pulseAnimationId = null;
+        this._boundResize = this._onResize.bind(this);
+        
         this.positions = this.calculateHexPositions();
         
         this.init();
@@ -26,14 +38,12 @@ class SwarmVisualization {
     
     calculateHexPositions() {
         const positions = [];
-        const centerX = 50; // percentage
+        const centerX = 50;
         const centerY = 50;
-        const ringSpacing = 18; // percentage between rings
+        const ringSpacing = 18;
         
-        // Center node
         positions.push({ x: centerX, y: centerY, ring: 0 });
         
-        // Ring 1 (6 nodes)
         for (let i = 0; i < 6; i++) {
             const angle = (Math.PI / 3) * i - Math.PI / 2;
             positions.push({
@@ -43,7 +53,6 @@ class SwarmVisualization {
             });
         }
         
-        // Ring 2 (12 nodes)
         for (let i = 0; i < 12; i++) {
             const angle = (Math.PI / 6) * i - Math.PI / 2;
             const distance = ringSpacing * 2;
@@ -54,7 +63,6 @@ class SwarmVisualization {
             });
         }
         
-        // Ring 3 (6 nodes - just corners for aesthetics)
         for (let i = 0; i < 6; i++) {
             const angle = (Math.PI / 3) * i - Math.PI / 2;
             const distance = ringSpacing * 2.8;
@@ -69,12 +77,33 @@ class SwarmVisualization {
     }
     
     init() {
+        this.showLoadingSkeleton();
         this.createNodes();
         this.createConnectionsSVG();
         this.bindEvents();
-        
-        // Boot sequence after a delay
         setTimeout(() => this.bootSequence(), 1000);
+    }
+    
+    showLoadingSkeleton() {
+        const skeleton = document.createElement('div');
+        skeleton.className = 'swarm-loading-skeleton';
+        skeleton.innerHTML = '<div class="skeleton-pulse"></div><span class="skeleton-text">Initializing swarm...</span>';
+        skeleton.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;pointer-events:none;';
+        this.container.appendChild(skeleton);
+        this._loadingSkeleton = skeleton;
+    }
+    
+    hideLoadingSkeleton() {
+        if (this._loadingSkeleton) {
+            this._loadingSkeleton.style.opacity = '0';
+            this._loadingSkeleton.style.transition = 'opacity 0.3s ease-out';
+            setTimeout(() => {
+                if (this._loadingSkeleton) {
+                    this._loadingSkeleton.remove();
+                    this._loadingSkeleton = null;
+                }
+            }, 300);
+        }
     }
     
     createNodes() {
@@ -83,37 +112,25 @@ class SwarmVisualization {
         
         grid.innerHTML = '';
         
-        this.positions.forEach((pos, index) => {
+        this.positions.forEach((pos, idx) => {
             const node = document.createElement('div');
             node.className = 'browser-node';
-            node.dataset.index = index;
+            node.dataset.index = idx;
+            node.setAttribute('role', 'button');
+            node.setAttribute('tabindex', '0');
+            node.setAttribute('aria-label', idx === 0 ? 'Orchestrator node' : 'Browser node ' + (idx + 1));
             
-            if (index === 0) {
+            if (idx === 0) {
                 node.classList.add('central');
             }
             
-            // Random website icons
             const icons = ['🌐', '📱', '💻', '🖥️', '📊', '🛒', '📧', '💼', '🔍', '📰'];
-            const icon = index === 0 ? '🧠' : icons[index % icons.length];
+            const icon = idx === 0 ? '🧠' : icons[idx % icons.length];
             
-            node.innerHTML = `
-                <div class="node-icon">${icon}</div>
-                <div class="node-id">#${String(index + 1).padStart(2, '0')}</div>
-                <div class="node-viewport">
-                    <div class="node-viewport-header">
-                        <span class="viewport-dot"></span>
-                        <span class="viewport-dot"></span>
-                        <span class="viewport-dot"></span>
-                    </div>
-                    <div class="node-viewport-content">
-                        ${index === 0 ? 'Orchestrator<br>Coordinating swarm...' : `Browser ${index + 1}<br>Ready for tasks`}
-                    </div>
-                </div>
-            `;
+            node.innerHTML = '<div class="node-icon">' + icon + '</div><div class="node-id">#' + String(idx + 1).padStart(2, '0') + '</div><div class="node-viewport" role="tooltip" aria-hidden="true"><div class="node-viewport-header"><span class="viewport-dot"></span><span class="viewport-dot"></span><span class="viewport-dot"></span></div><div class="node-viewport-content">' + (idx === 0 ? 'Orchestrator<br>Coordinating swarm...' : 'Browser ' + (idx + 1) + '<br>Ready for tasks') + '</div></div>';
             
-            // Position the node
-            node.style.left = `${pos.x}%`;
-            node.style.top = `${pos.y}%`;
+            node.style.left = pos.x + '%';
+            node.style.top = pos.y + '%';
             node.style.transform = 'translate(-50%, -50%)';
             
             grid.appendChild(node);
@@ -124,25 +141,21 @@ class SwarmVisualization {
     }
     
     createConnectionsSVG() {
-        // Create SVG connections between nodes
         const svg = this.connectionsEl;
         svg.innerHTML = '';
         svg.setAttribute('viewBox', '0 0 100 100');
         svg.setAttribute('preserveAspectRatio', 'none');
         
-        // Connect center to ring 1
         for (let i = 1; i <= 6; i++) {
             this.addConnection(svg, 0, i);
         }
         
-        // Connect ring 1 to ring 2
         for (let i = 1; i <= 6; i++) {
             const ring2Start = 7;
             this.addConnection(svg, i, ring2Start + (i - 1) * 2);
             this.addConnection(svg, i, ring2Start + (i - 1) * 2 + 1);
         }
         
-        // Connect ring 1 neighbors
         for (let i = 1; i <= 6; i++) {
             const next = i === 6 ? 1 : i + 1;
             this.addConnection(svg, i, next);
@@ -168,141 +181,147 @@ class SwarmVisualization {
         this.connections.push(line);
     }
     
+    _onResize() {
+        this.connectionsEl.setAttribute('viewBox', '0 0 100 100');
+    }
+    
     bootSequence() {
-        // Boot nodes sequentially with staggered timing
+        this.hideLoadingSkeleton();
         const bootOrder = this.getBootOrder();
         
-        bootOrder.forEach((index, i) => {
+        bootOrder.forEach((nodeIdx, i) => {
             setTimeout(() => {
-                const node = this.nodes[index];
+                if (this.isDestroyed) return;
+                
+                const node = this.nodes[nodeIdx];
                 if (node) {
                     node.classList.add('booted');
                     
-                    // Emit particles
+                    if (window.soundEngine) {
+                        window.soundEngine.boot(nodeIdx === 0);
+                    }
+                    
                     if (window.particleSystem) {
                         const rect = node.getBoundingClientRect();
-                        window.particleSystem.emit(
-                            rect.left + rect.width / 2,
-                            rect.top + rect.height / 2,
-                            5,
-                            index === 0 ? 'magenta' : 'cyan'
-                        );
+                        window.particleSystem.emit(rect.left + rect.width / 2, rect.top + rect.height / 2, 5, nodeIdx === 0 ? 'magenta' : 'cyan');
                     }
                 }
             }, i * 80);
         });
         
-        // After all nodes boot, start synchronized pulse
         setTimeout(() => {
+            if (this.isDestroyed) return;
             this.isBooted = true;
             this.startSynchronizedPulse();
+            
+            if (window.soundEngine) {
+                window.soundEngine.ready();
+            }
         }, bootOrder.length * 80 + 500);
     }
     
     getBootOrder() {
-        // Boot from center outward
-        const order = [0]; // Center first
-        
-        // Ring 1
-        for (let i = 1; i <= 6; i++) {
-            order.push(i);
-        }
-        
-        // Ring 2
-        for (let i = 7; i <= 18; i++) {
-            if (i < this.nodeCount) order.push(i);
-        }
-        
-        // Ring 3
-        for (let i = 19; i < this.nodeCount; i++) {
-            order.push(i);
-        }
-        
+        const order = [0];
+        for (let i = 1; i <= 6; i++) order.push(i);
+        for (let i = 7; i <= 18; i++) if (i < this.nodeCount) order.push(i);
+        for (let i = 19; i < this.nodeCount; i++) order.push(i);
         return order;
     }
     
     startSynchronizedPulse() {
-        // All nodes pulse together in a breathing pattern
         let phase = 0;
+        let lastTime = performance.now();
+        const self = this;
         
-        const pulse = () => {
-            if (!this.isBooted) return;
+        const pulse = function(currentTime) {
+            if (!self.isBooted || self.isDestroyed) {
+                self._pulseAnimationId = null;
+                return;
+            }
             
-            phase += 0.02;
-            const intensity = 0.5 + Math.sin(phase) * 0.5;
+            const dt = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+            phase += dt * 1.5;
             
-            this.nodes.forEach((node, index) => {
+            self.nodes.forEach(function(node, nodeIdx) {
                 if (!node.classList.contains('active') && 
                     !node.classList.contains('processing') &&
                     !node.classList.contains('error')) {
-                    node.style.boxShadow = `0 0 ${10 + intensity * 20}px rgba(0, 245, 212, ${0.1 + intensity * 0.2})`;
+                    
+                    const pos = self.positions[nodeIdx];
+                    const distFromCenter = Math.sqrt(Math.pow(pos.x - 50, 2) + Math.pow(pos.y - 50, 2));
+                    const waveDelay = distFromCenter * 0.02;
+                    const localPhase = phase - waveDelay;
+                    const intensity = 0.5 + Math.sin(localPhase) * 0.5;
+                    
+                    node.style.boxShadow = '0 0 ' + (10 + intensity * 20) + 'px rgba(0, 245, 212, ' + (0.1 + intensity * 0.2) + ')';
                 }
             });
             
-            requestAnimationFrame(pulse);
+            self._pulseAnimationId = requestAnimationFrame(pulse);
         };
         
-        pulse();
+        this._pulseAnimationId = requestAnimationFrame(pulse);
     }
     
     bindEvents() {
-        // Node hover and click
+        window.addEventListener('resize', this._boundResize);
+        
         this.container.addEventListener('click', (e) => {
             const node = e.target.closest('.browser-node');
             if (node) {
                 this.activateNode(parseInt(node.dataset.index));
             }
         });
-    }
-    
-    activateNode(index) {
-        // Deactivate all
-        this.nodes.forEach(node => node.classList.remove('active'));
-        this.connections.forEach(conn => conn.classList.remove('active'));
         
-        // Activate selected
-        const node = this.nodes[index];
-        if (node) {
-            node.classList.add('active');
-            
-            // Activate connections to/from this node
-            this.connections.forEach(conn => {
-                if (parseInt(conn.dataset.from) === index || 
-                    parseInt(conn.dataset.to) === index) {
-                    conn.classList.add('active');
-                }
-            });
-            
-            // Emit particles
-            if (window.particleSystem) {
-                const rect = node.getBoundingClientRect();
-                window.particleSystem.emit(
-                    rect.left + rect.width / 2,
-                    rect.top + rect.height / 2,
-                    15,
-                    'cyan'
-                );
-            }
-        }
-    }
-    
-    // Simulate processing across nodes
-    simulateProcessing(nodeIndices, duration = 2000) {
-        nodeIndices.forEach(index => {
-            const node = this.nodes[index];
-            if (node) {
-                node.classList.add('processing');
-                
-                setTimeout(() => {
-                    node.classList.remove('processing');
-                }, duration);
+        this.container.addEventListener('keydown', (e) => {
+            const node = e.target.closest('.browser-node');
+            if (node && (e.key === 'Enter' || e.key === ' ')) {
+                e.preventDefault();
+                this.activateNode(parseInt(node.dataset.index));
             }
         });
     }
     
-    // Simulate error and healing
-    simulateError(index, healTime = 1500) {
-        const node = this.nodes[index];
+    activateNode(nodeIdx) {
+        this.nodes.forEach(node => node.classList.remove('active'));
+        this.connections.forEach(conn => conn.classList.remove('active'));
+        
+        const node = this.nodes[nodeIdx];
+        if (node) {
+            node.classList.add('active');
+            
+            if (window.soundEngine) {
+                window.soundEngine.click();
+            }
+            
+            this.connections.forEach(conn => {
+                if (parseInt(conn.dataset.from) === nodeIdx || parseInt(conn.dataset.to) === nodeIdx) {
+                    conn.classList.add('active');
+                }
+            });
+            
+            if (window.particleSystem) {
+                const rect = node.getBoundingClientRect();
+                window.particleSystem.emit(rect.left + rect.width / 2, rect.top + rect.height / 2, 15, 'cyan');
+            }
+        }
+    }
+    
+    simulateProcessing(nodeIndices, duration) {
+        duration = duration || 2000;
+        nodeIndices.forEach(nodeIdx => {
+            const node = this.nodes[nodeIdx];
+            if (node) {
+                node.classList.add('processing');
+                setTimeout(() => { node.classList.remove('processing'); }, duration);
+            }
+        });
+    }
+    
+    simulateError(nodeIdx, healTime) {
+        healTime = healTime || 1500;
+        const node = this.nodes[nodeIdx];
         if (!node) return;
         
         node.classList.add('error');
@@ -314,35 +333,70 @@ class SwarmVisualization {
             setTimeout(() => {
                 node.classList.remove('healing');
                 
-                // Emit success particles
                 if (window.particleSystem) {
                     const rect = node.getBoundingClientRect();
-                    window.particleSystem.emit(
-                        rect.left + rect.width / 2,
-                        rect.top + rect.height / 2,
-                        10,
-                        'amber'
-                    );
+                    window.particleSystem.emit(rect.left + rect.width / 2, rect.top + rect.height / 2, 10, 'amber');
                 }
             }, healTime);
         }, 500);
     }
     
-    // Distribute tasks across the swarm
+    flashAll(callback) {
+        const self = this;
+        const colors = ['cyan', 'magenta', 'violet', 'amber'];
+        
+        this.nodes.forEach(function(node, i) {
+            setTimeout(function() {
+                node.classList.add('active', 'rainbow');
+                
+                if (window.soundEngine) {
+                    window.soundEngine.click();
+                }
+                
+                if (window.particleSystem) {
+                    const rect = node.getBoundingClientRect();
+                    window.particleSystem.emit(rect.left + rect.width / 2, rect.top + rect.height / 2, 20, colors[i % 4]);
+                }
+                
+                setTimeout(function() { node.classList.remove('rainbow'); }, 2000);
+            }, i * 50);
+        });
+        
+        if (callback) {
+            setTimeout(callback, self.nodes.length * 50 + 500);
+        }
+    }
+    
     distributeTasks(taskCount) {
-        const availableNodes = this.nodes.slice(1); // Exclude central node
+        const availableNodes = this.nodes.slice(1);
         const tasksPerNode = Math.ceil(taskCount / availableNodes.length);
         
-        return availableNodes.map((node, index) => ({
-            nodeIndex: index + 1,
-            tasks: Math.min(tasksPerNode, taskCount - index * tasksPerNode)
-        })).filter(n => n.tasks > 0);
+        return availableNodes.map(function(node, nodeIdx) {
+            return {
+                nodeIndex: nodeIdx + 1,
+                tasks: Math.min(tasksPerNode, taskCount - nodeIdx * tasksPerNode)
+            };
+        }).filter(function(n) { return n.tasks > 0; });
+    }
+    
+    destroy() {
+        this.isDestroyed = true;
+        this.isBooted = false;
+        
+        if (this._pulseAnimationId) {
+            cancelAnimationFrame(this._pulseAnimationId);
+            this._pulseAnimationId = null;
+        }
+        
+        window.removeEventListener('resize', this._boundResize);
+        
+        this.nodes = [];
+        this.connections = [];
     }
 }
 
-// Initialize on load
 window.swarmViz = null;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
     window.swarmViz = new SwarmVisualization('swarm-grid', 'swarm-connections');
 });
