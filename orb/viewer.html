@@ -1,0 +1,1515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kagami Orb V3.1 — Premium Assembly Viewer</title>
+    <style>
+        :root {
+            --bg: #080810;
+            --surface: #12121a;
+            --border: rgba(255,255,255,0.06);
+            --accent: #a855f7;
+            --accent2: #6366f1;
+            --text: #f0f0f5;
+            --dim: #7a7a88;
+            --ok: #10b981;
+            --warn: #f59e0b;
+            --err: #ef4444;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+        }
+        #c { width:100vw; height:100vh; display:block; }
+
+        .ui { position:fixed; z-index:10; }
+
+        /* Header - more subtle */
+        #hdr {
+            top:0; left:0; right:0; height:52px;
+            background: linear-gradient(180deg, rgba(8,8,16,0.95), rgba(8,8,16,0.85));
+            backdrop-filter: blur(24px) saturate(180%);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 16px;
+        }
+        .logo {
+            display:flex; align-items:center; gap:12px;
+            font-weight:500; font-size:15px; letter-spacing: -0.02em;
+        }
+        .logo .orb {
+            width: 28px; height: 28px;
+            background: linear-gradient(135deg, #a855f7 0%, #6366f1 50%, #0ea5e9 100%);
+            border-radius: 50%;
+            display: grid; place-items: center;
+            font-size: 14px;
+            box-shadow: 0 0 20px rgba(168,85,247,0.4);
+        }
+        .logo span { color: var(--text); }
+        .badge {
+            font-size:9px; padding:4px 8px; border-radius:6px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color:#fff; font-weight:600;
+            text-transform: uppercase; letter-spacing: 0.8px;
+            box-shadow: 0 2px 8px rgba(16,185,129,0.3);
+        }
+
+        .toolbar { display:flex; gap:4px; margin-left:auto; }
+        .tbtn {
+            width:40px; height:40px;
+            display: grid; place-items: center;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            color: var(--dim);
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .tbtn:hover {
+            background: rgba(255,255,255,0.05);
+            border-color: var(--border);
+            color: var(--text);
+            transform: translateY(-1px);
+        }
+        .tbtn.on {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 4px 12px rgba(168,85,247,0.4);
+        }
+        .sep { width:1px; height:28px; background:var(--border); margin:0 8px; }
+
+        /* Panels - glassmorphism */
+        .panel {
+            background: rgba(18,18,26,0.85);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            font-size: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .panel-hdr {
+            padding: 14px 16px;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--dim);
+        }
+
+        #tree {
+            top: 64px; left: 12px; width: 240px; max-height: calc(100vh - 200px);
+        }
+        #tree-content {
+            max-height: calc(100vh - 260px);
+            overflow-y: auto;
+            padding: 8px 0;
+        }
+        #tree-content::-webkit-scrollbar { width: 6px; }
+        #tree-content::-webkit-scrollbar-track { background: transparent; }
+        #tree-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        .grp {
+            padding: 12px 16px 6px;
+            font-size: 10px;
+            color: var(--accent);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+        }
+        .part {
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: all 0.15s;
+            margin: 2px 0;
+        }
+        .part:hover {
+            background: rgba(255,255,255,0.03);
+            border-left-color: rgba(168,85,247,0.3);
+        }
+        .part.sel {
+            background: linear-gradient(90deg, rgba(168,85,247,0.15), transparent);
+            border-left-color: var(--accent);
+        }
+        .part .ico { font-size:14px; opacity:0.8; }
+        .part .n { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight: 400; }
+        .part .v { color:var(--ok); font-size:11px; }
+
+        #info {
+            top: 64px; right: 12px; width: 280px;
+        }
+        #props { padding: 16px; }
+        .row {
+            display:flex; justify-content:space-between; align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .row:last-child { border-bottom: none; }
+        .row .l { color:var(--dim); font-size: 11px; }
+        .row .v { font-family:'SF Mono', 'Fira Code', monospace; text-align:right; font-size: 12px; }
+        .row .v.ok { color:var(--ok); }
+        .row .v.warn { color:var(--warn); }
+        .row .v.err { color:var(--err); }
+
+        .src-link {
+            display: block;
+            margin-top: 12px;
+            padding: 10px 14px;
+            background: linear-gradient(135deg, rgba(168,85,247,0.15), rgba(99,102,241,0.15));
+            border: 1px solid rgba(168,85,247,0.3);
+            border-radius: 10px;
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 11px;
+            text-align: center;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .src-link:hover {
+            background: linear-gradient(135deg, rgba(168,85,247,0.25), rgba(99,102,241,0.25));
+            transform: translateY(-1px);
+        }
+
+        /* Stats Panel */
+        #stats {
+            bottom: 12px; right: 12px; width: 280px;
+        }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            padding: 16px;
+        }
+        .stat {
+            background: rgba(255,255,255,0.02);
+            border-radius: 12px;
+            padding: 14px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        .stat .val {
+            font-size: 20px;
+            font-weight: 600;
+            font-family:'SF Mono', monospace;
+            background: linear-gradient(135deg, var(--text), var(--dim));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stat .val.ok { background: linear-gradient(135deg, #10b981, #059669); -webkit-background-clip: text; }
+        .stat .val.warn { background: linear-gradient(135deg, #f59e0b, #d97706); -webkit-background-clip: text; }
+        .stat .lbl { font-size: 10px; color: var(--dim); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Section Controls */
+        #sect {
+            bottom: 12px; left: 50%; transform: translateX(-50%);
+            padding: 14px 20px;
+            display: none;
+            gap: 14px;
+            align-items: center;
+        }
+        #sect.show { display:flex; }
+        #sect select, #sect input {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+        }
+        #sect input[type=range] { width:160px; accent-color:var(--accent); }
+
+        /* Lighting Panel */
+        #lighting {
+            bottom: 12px; left: 12px; width: 200px;
+        }
+        #lighting .panel-content { padding: 12px 16px; }
+        #lighting select {
+            width: 100%;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        /* Help Modal */
+        #help {
+            position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:100;
+            display:none; place-items:center; backdrop-filter:blur(8px);
+        }
+        #help.show { display:grid; }
+        #help > div {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 32px;
+            max-width: 420px;
+            width: 90%;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+        }
+        #help h2 { font-size:18px; margin-bottom:20px; display:flex; align-items:center; gap:12px; font-weight: 600; }
+        #help .k { display:flex; justify-content:space-between; padding:8px 0; }
+        #help kbd {
+            background: rgba(255,255,255,0.05);
+            padding:5px 12px; border-radius:8px;
+            font-family:'SF Mono', monospace; font-size:12px;
+            border: 1px solid var(--border);
+        }
+        #help .close {
+            width:100%; margin-top:24px; padding:14px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color:#fff; border:none;
+            border-radius: 12px; cursor:pointer; font-weight:600;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        #help .close:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(168,85,247,0.4); }
+
+        /* Loading */
+        #load {
+            position:fixed; inset:0; background:var(--bg);
+            display:grid; place-items:center; z-index:200;
+            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #load.hide { opacity: 0; pointer-events: none; }
+        .loader {
+            display: flex; flex-direction: column; align-items: center; gap: 20px;
+        }
+        .spinner {
+            width:48px; height:48px; border-radius:50%;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+        .loader-text { color: var(--dim); font-size: 13px; letter-spacing: 0.5px; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+    </style>
+</head>
+<body>
+<div id="load">
+    <div class="loader">
+        <div class="spinner"></div>
+        <div class="loader-text">Loading Premium Renderer...</div>
+    </div>
+</div>
+<canvas id="c"></canvas>
+
+<div id="hdr" class="ui">
+    <div class="logo">
+        <div class="orb">&#128302;</div>
+        <span>Kagami Orb V3.1</span>
+        <div class="badge">Premium</div>
+    </div>
+    <div class="toolbar">
+        <button class="tbtn" id="bHome" title="Reset View (H)">&#127968;</button>
+        <button class="tbtn" id="bExpl" title="Explode (E)">&#128165;</button>
+        <button class="tbtn" id="bSect" title="Section (S)">&#9986;</button>
+        <div class="sep"></div>
+        <button class="tbtn" id="bXray" title="X-Ray (X)">&#128065;</button>
+        <button class="tbtn" id="bHeat" title="Thermal (T)">&#127777;</button>
+        <button class="tbtn" id="bMass" title="Mass (M)">&#9878;</button>
+        <div class="sep"></div>
+        <button class="tbtn on" id="bBloom" title="Bloom (B)">&#10024;</button>
+        <button class="tbtn" id="bMirror" title="Infinity Mirror (I)">&#127760;</button>
+        <button class="tbtn" id="bHelp" title="Help (?)">&#10067;</button>
+    </div>
+</div>
+
+<div id="tree" class="ui panel">
+    <div class="panel-hdr">Assembly Tree</div>
+    <div id="tree-content"></div>
+</div>
+
+<div id="info" class="ui panel">
+    <div class="panel-hdr">Properties</div>
+    <div id="props"><div style="color:var(--dim);padding:32px;text-align:center;font-size:13px">Select a component</div></div>
+</div>
+
+<div id="stats" class="ui panel">
+    <div class="panel-hdr">System Stats</div>
+    <div class="stat-grid">
+        <div class="stat"><div class="val" id="sParts">0</div><div class="lbl">Parts</div></div>
+        <div class="stat"><div class="val" id="sMass">0g</div><div class="lbl">Mass</div></div>
+        <div class="stat"><div class="val" id="sMax">0mm</div><div class="lbl">Max Diam</div></div>
+        <div class="stat"><div class="val" id="sHeat">0W</div><div class="lbl">Active</div></div>
+    </div>
+</div>
+
+<div id="lighting" class="ui panel">
+    <div class="panel-hdr">Environment</div>
+    <div class="panel-content">
+        <select id="lightPreset">
+            <option value="studio">Studio</option>
+            <option value="showroom">Showroom</option>
+            <option value="jewelry">Jewelry</option>
+            <option value="sunset">Sunset</option>
+            <option value="night">Night</option>
+        </select>
+    </div>
+</div>
+
+<div id="sect" class="ui panel">
+    <span style="color:var(--dim)">Vertical Slice:</span>
+    <select id="sAxis"><option value="x" selected>X (Left/Right)</option><option value="z">Z (Front/Back)</option><option value="y">Y (Top/Bottom)</option></select>
+    <input type="range" id="sPos" min="-45" max="45" value="0" step="1">
+    <span id="sVal" style="font-family:monospace;min-width:50px;text-align:right">0mm</span>
+</div>
+
+<div id="help">
+    <div>
+        <h2>&#128302; Kagami Orb Viewer</h2>
+        <p style="color:var(--dim);margin-bottom:20px;font-size:13px;line-height:1.6">
+            85mm sealed sphere with verified manufacturer dimensions.
+            Geometry-corrected to fit sphere curvature.
+        </p>
+        <div class="k"><span>Orbit</span><kbd>Left Drag</kbd></div>
+        <div class="k"><span>Pan</span><kbd>Right Drag</kbd></div>
+        <div class="k"><span>Zoom</span><kbd>Scroll</kbd></div>
+        <div class="k"><span>Reset View</span><kbd>H</kbd></div>
+        <div class="k"><span>Explode</span><kbd>E</kbd></div>
+        <div class="k"><span>Section</span><kbd>S</kbd></div>
+        <div class="k"><span>X-Ray</span><kbd>X</kbd></div>
+        <div class="k"><span>Thermal</span><kbd>T</kbd></div>
+        <div class="k"><span>Mass View</span><kbd>M</kbd></div>
+        <div class="k"><span>Bloom</span><kbd>B</kbd></div>
+        <div class="k"><span>Infinity Mirror</span><kbd>I</kbd></div>
+        <button class="close" onclick="document.getElementById('help').classList.remove('show')">Close</button>
+    </div>
+</div>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+// Import modular components (for future refactoring - currently using inline versions)
+// These modules are the single source of truth for component data
+// import { COMPONENTS as MODULE_COMPONENTS, getAvailableDiameter } from './js/components.js';
+// import { getMaterialForComponent } from './js/materials.js';
+// import { createGeometryForComponent } from './js/geometry.js';
+// import { createLighting, LIGHTING_PRESETS } from './js/lighting.js';
+// import { createPostProcessing } from './js/postprocessing.js';
+
+// Event listener references for cleanup
+const eventListeners = [];
+
+// ================================================================
+// VERIFIED COMPONENT DATABASE V3.1 - GEOMETRY CORRECTED
+// RX Coil moved to Y=-20 with R=27.5 (diameter 55mm) - FITS!
+// At Y=-20: available diameter = 57.4mm
+// ================================================================
+
+const DESIGN = {
+    outerDiameter: 85,
+    shellThickness: 7.5,
+    internalDiameter: 70,
+};
+
+function getAvailableDiameter(y) {
+    const r = DESIGN.internalDiameter / 2;
+    const d = r * r - y * y;
+    return d > 0 ? 2 * Math.sqrt(d) : 0;
+}
+
+const COMPONENTS = [
+    // SHELL - Premium optical glass-like acrylic with infinity mirror capability
+    { id:'shell_top', name:'Shell (Top)', grp:'Shell', ico:'&#128309;', geo:'hemi_top', r:42.5, y:0,
+      clr:0xffffff, op:0.12, mass:45, W:0, verified:true, src:'Zeiss optical acrylic + AR coating', dims:'85mm hemisphere' },
+    { id:'shell_bot', name:'Shell (Bottom)', grp:'Shell', ico:'&#128309;', geo:'hemi_bot', r:42.5, y:0,
+      clr:0xffffff, op:0.12, mass:45, W:0, verified:true, src:'Zeiss optical acrylic + AR coating', dims:'85mm hemisphere' },
+
+    // DISPLAY STACK - Positions verified against sphere curvature
+    { id:'display', name:'1.39" AMOLED', grp:'Display', ico:'&#128250;', geo:'box', w:38.21, d:38.83, h:0.68, y:28,
+      clr:0x0a0a12, mass:8, W:0.8, verified:true,
+      src:'King Tech Display', dims:'38.8x38.2x0.7mm',
+      note:'Y adjusted for sphere fit (avail: 40.5mm)' },
+    { id:'camera', name:'IMX989 Module', grp:'Display', ico:'&#128247;', geo:'box', w:26, d:26, h:9.4, y:22,
+      clr:0x15151f, mass:15, W:0.5, verified:true,
+      src:'SincereFirst', dims:'26x26x9.4mm',
+      note:'Sensor UP for Digital PTZ' },
+    { id:'disp_mnt', name:'Display Mount', grp:'Display', ico:'&#128295;', geo:'cyl', r:22, h:8, y:15,
+      clr:0x3a3a42, mass:10, W:0, verified:true, src:'Grey Pro SLA', dims:'44x8mm' },
+
+    // COMPUTE
+    { id:'main_pcb', name:'Main PCB', grp:'Compute', ico:'&#128223;', geo:'disc', r:30, h:1.6, y:8,
+      clr:0x1a5c35, mass:15, W:0, verified:true, src:'4-layer FR4', dims:'60x1.6mm' },
+    { id:'som', name:'QCS6490 SoM', grp:'Compute', ico:'&#129504;', geo:'box', w:42.5, d:35.5, h:2.7, y:11,
+      clr:0x1a6b2a, mass:25, W:8, verified:true,
+      src:'Thundercomm', dims:'42.5x35.5x2.7mm' },
+    { id:'heatsink', name:'Heatsink', grp:'Compute', ico:'&#10052;', geo:'box', w:20, d:20, h:6, y:15,
+      clr:0x888890, mass:8, W:0, verified:true, src:'Brushed aluminum', dims:'20x20x6mm' },
+    { id:'hailo', name:'Hailo-10H', grp:'Compute', ico:'&#129302;', geo:'box', w:42, d:22, h:2.63, y:5,
+      clr:0x145220, mass:8, W:2.5, verified:true,
+      src:'Hailo', dims:'42x22x2.63mm (M.2 2242)' },
+
+    // AUDIO
+    { id:'xmos', name:'XMOS XVF3800', grp:'Audio', ico:'&#127899;', geo:'box', w:7, d:7, h:0.9, y:6,
+      clr:0x1a1a28, mass:1, W:0.4, verified:true,
+      src:'XMOS', dims:'7x7x0.9mm (QFN-60)',
+      note:'Voice DSP' },
+    { id:'mics', name:'sensiBel x4', grp:'Audio', ico:'&#127908;', geo:'mics', r:28, y:3,
+      clr:0x2a2a32, mass:0.5, W:0.006, verified:true,
+      src:'sensiBel', dims:'6x3.8x2.47mm each' },
+    { id:'speaker', name:'Speaker 28mm', grp:'Audio', ico:'&#128266;', geo:'cyl', r:14, h:5.4, y:-6,
+      clr:0x1e1e24, mass:5, W:0, verified:true, src:'Yueda/Tectonic', dims:'28x5.4mm' },
+
+    // LEDs
+    { id:'led_ring', name:'LED Ring PCB', grp:'LEDs', ico:'&#128161;', geo:'ring', ro:27, ri:22, h:1.6, y:0,
+      clr:0x1a5c35, mass:3, W:0, verified:true, src:'Flex PCB', dims:'54x1.6mm' },
+    { id:'leds', name:'HD108 x16', grp:'LEDs', ico:'&#10024;', geo:'leds', n:16, r:25, y:0,
+      clr:0xff00ff, mass:1, W:0.8, verified:true,
+      src:'Rose Lighting', dims:'5.1x5.0x1.6mm',
+      note:'16-bit RGBW' },
+    { id:'diffuser', name:'Diffuser Ring', grp:'LEDs', ico:'&#9711;', geo:'ring', ro:29, ri:21, h:3, y:1,
+      clr:0xffffff, op:0.7, mass:4, W:0, verified:true, src:'Frosted acrylic', dims:'58x3mm' },
+
+    // POWER - CORRECTED RX COIL POSITION
+    { id:'battery', name:'Battery 2200mAh', grp:'Power', ico:'&#128267;', geo:'box', w:50, d:30, h:22, y:-16,
+      clr:0x1055aa, mass:150, W:0.3, verified:true,
+      src:'Custom LiPo 3S', dims:'50x30x22mm',
+      note:'Custom sized for sphere (retail: 55x35x20mm)' },
+    { id:'bms', name:'BMS + Charger', grp:'Power', ico:'&#9889;', geo:'box', w:30, d:20, h:4, y:-3,
+      clr:0x1a5c35, mass:8, W:0.5, verified:true, src:'BQ25895+BQ40Z50', dims:'30x20x4mm' },
+    { id:'coil_mnt', name:'Coil Mount', grp:'Power', ico:'&#128295;', geo:'disc', r:26, h:4, y:-22,
+      clr:0x2e2e34, mass:8, W:0, verified:true, src:'Tough 2000 SLA', dims:'52x4mm' },
+    // CORRECTED: RX Coil at Y=-20 with R=27.5 (55mm diameter) - FITS within 57.4mm available
+    { id:'rx_coil', name:'RX Coil', grp:'Power', ico:'&#12336;', geo:'torus', R:27.5, r:2.5, y:-20,
+      clr:0xb87333, mass:18, W:3, verified:true, src:'Litz wire 18 turns', dims:'55mm',
+      note:'CORRECTED: Y=-20, fits 57.4mm avail' },
+    { id:'ferrite', name:'Ferrite Disc', grp:'Power', ico:'&#11035;', geo:'disc', r:25, h:0.5, y:-24,
+      clr:0x121216, mass:12, W:0, verified:true, src:'Mn-Zn Fair-Rite 78', dims:'50x0.5mm' },
+
+    // BASE - SCULPTURAL WALNUT
+    { id:'base_leds', name:'Base LEDs x8', grp:'Base', ico:'&#128171;', geo:'leds', n:8, r:35, y:-50,
+      clr:0x00ff88, mass:0.5, W:0.1, verified:true, src:'SK6812', dims:'70mm ring', base:1 },
+    { id:'base_pcb', name:'Base PCB', grp:'Base', ico:'&#128223;', geo:'disc', r:40, h:1.6, y:-52,
+      clr:0x1a5c35, mass:15, W:0.5, verified:true, src:'ESP32-S3-WROOM-1', dims:'80x1.6mm', base:1 },
+    { id:'tx_coil', name:'TX Coil', grp:'Base', ico:'&#12336;', geo:'torus', R:32, r:3, y:-58,
+      clr:0xb87333, mass:15, W:4, verified:true, src:'Litz wire 14 turns', dims:'70mm', base:1 },
+    { id:'maglev', name:'Maglev Module', grp:'Base', ico:'&#129522;', geo:'box', w:100, d:100, h:20, y:-72,
+      clr:0x22252a, mass:350, W:2, verified:true,
+      src:'Stirlingkit', dims:'100x100x20mm', base:1 },
+    { id:'base_enc', name:'Walnut Pedestal', grp:'Base', ico:'&#129717;', geo:'lathe', y:-90,
+      clr:0x5d4037, mass:350, W:0, verified:true, src:'CNC walnut, tung oil', dims:'140x35mm sculptural', base:1 },
+];
+
+// ================================================================
+// 7-LIGHT PREMIUM LIGHTING - Apple/Jewelry/Automotive inspired
+// ================================================================
+const LIGHTING = {
+    studio: {
+        bg: 0x0c0c14,
+        ambient: { color: 0xffffff, intensity: 0.12 },
+        key: { color: 0xfff8f0, intensity: 2.8, pos: [8, 12, 8] },
+        fill: { color: 0x8899cc, intensity: 0.9, pos: [-7, 5, -5] },
+        rim: { color: 0xffeedd, intensity: 1.4, pos: [-3, -4, -9] },
+        accent: { color: 0xffffff, intensity: 0.6, pos: [0, 20, 0] },
+        internal: { color: 0xa855f7, intensity: 0.8, pos: [0, 0, 0] },
+        sparkle: { color: 0xffffff, intensity: 0.3, pos: [5, 8, -5] },
+        ground: 0x1a1a22
+    },
+    showroom: {
+        bg: 0x101018,
+        ambient: { color: 0xffffff, intensity: 0.15 },
+        key: { color: 0xffffff, intensity: 2.2, pos: [6, 10, 6] },
+        fill: { color: 0xaaccff, intensity: 1.1, pos: [-8, 6, -2] },
+        rim: { color: 0xffddcc, intensity: 0.9, pos: [0, -2, -10] },
+        accent: { color: 0xccddff, intensity: 0.5, pos: [0, 15, 0] },
+        internal: { color: 0x6366f1, intensity: 0.6, pos: [0, 0, 0] },
+        sparkle: { color: 0xffffff, intensity: 0.4, pos: [-4, 6, 4] },
+        ground: 0x1e2028
+    },
+    jewelry: {
+        bg: 0x08080c,
+        ambient: { color: 0xffffff, intensity: 0.08 },
+        key: { color: 0xfff4e8, intensity: 3.5, pos: [5, 15, 5] },
+        fill: { color: 0x99aadd, intensity: 0.7, pos: [-6, 4, -4] },
+        rim: { color: 0xffeedd, intensity: 1.8, pos: [-2, -3, -8] },
+        accent: { color: 0xffffff, intensity: 1.2, pos: [0, 25, 0] },
+        internal: { color: 0xff6699, intensity: 1.0, pos: [0, 0, 0] },
+        sparkle: { color: 0xffffff, intensity: 0.6, pos: [3, 10, -3] },
+        ground: 0x12121a
+    },
+    sunset: {
+        bg: 0x1a1215,
+        ambient: { color: 0xffaa77, intensity: 0.08 },
+        key: { color: 0xff8844, intensity: 3.2, pos: [10, 6, 2] },
+        fill: { color: 0x4466aa, intensity: 0.5, pos: [-6, 4, -6] },
+        rim: { color: 0xff6633, intensity: 1.6, pos: [0, 0, -8] },
+        accent: { color: 0xffaa66, intensity: 0.4, pos: [0, 12, 0] },
+        internal: { color: 0xff9933, intensity: 0.9, pos: [0, 0, 0] },
+        sparkle: { color: 0xffcc88, intensity: 0.3, pos: [-5, 8, 5] },
+        ground: 0x201818
+    },
+    night: {
+        bg: 0x050508,
+        ambient: { color: 0x3344aa, intensity: 0.06 },
+        key: { color: 0x6688ff, intensity: 1.8, pos: [4, 8, 4] },
+        fill: { color: 0x2244aa, intensity: 0.35, pos: [-4, 2, -4] },
+        rim: { color: 0x4466ff, intensity: 0.7, pos: [0, -2, -6] },
+        accent: { color: 0x4488ff, intensity: 0.3, pos: [0, 10, 0] },
+        internal: { color: 0x00ff88, intensity: 1.2, pos: [0, 0, 0] },
+        sparkle: { color: 0x88aaff, intensity: 0.2, pos: [3, 6, -3] },
+        ground: 0x08080c
+    }
+};
+
+// ================================================================
+// PREMIUM MATERIALS - Optical Glass IOR 1.68, Anisotropic Copper
+// ================================================================
+function createOpticalGlassMaterial() {
+    return new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        metalness: 0.0,
+        roughness: 0.008,          // Ultra-smooth Zeiss quality
+        transmission: 0.995,       // 99.5% with AR coating
+        thickness: 4.0,
+        ior: 1.68,                 // ZEISS Crown Glass N-BK7
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.001,
+        envMapIntensity: 2.0,
+        transparent: true,
+        side: THREE.DoubleSide,
+        attenuationColor: new THREE.Color(0xf0f8ff),
+        attenuationDistance: 10,
+        specularIntensity: 1.0,
+        specularColor: new THREE.Color(0xffffff),
+        sheen: 0.1,
+        sheenColor: new THREE.Color(0xffffff),
+    });
+}
+
+function createPolishedCopperMaterial() {
+    return new THREE.MeshPhysicalMaterial({
+        color: 0xd4875a,
+        metalness: 1.0,
+        roughness: 0.12,
+        envMapIntensity: 2.5,
+        clearcoat: 0.4,
+        clearcoatRoughness: 0.08,
+        // Anisotropic effect simulated via normal perturbation
+        flatShading: false,
+    });
+}
+
+function createOiledWalnutMaterial() {
+    return new THREE.MeshPhysicalMaterial({
+        color: 0x5d4037,
+        metalness: 0.0,
+        roughness: 0.4,
+        envMapIntensity: 0.8,
+        clearcoat: 0.5,            // Tung oil sheen
+        clearcoatRoughness: 0.25,
+        sheen: 0.5,                // Wood grain highlights
+        sheenColor: new THREE.Color(0x4a3528),
+        sheenRoughness: 0.5,
+    });
+}
+
+function createBrushedAluminumMaterial() {
+    return new THREE.MeshPhysicalMaterial({
+        color: 0x9a9aa0,
+        metalness: 0.98,
+        roughness: 0.22,
+        envMapIntensity: 1.8,
+        clearcoat: 0.15,
+    });
+}
+
+function createMattePCBMaterial() {
+    return new THREE.MeshPhysicalMaterial({
+        color: 0x1a5c35,
+        metalness: 0.0,
+        roughness: 0.45,
+        clearcoat: 0.35,
+        clearcoatRoughness: 0.2,
+        envMapIntensity: 0.6,
+    });
+}
+
+function createLEDMaterial(color, intensity = 3.0) {
+    return new THREE.MeshStandardMaterial({
+        color: 0x222222,
+        emissive: new THREE.Color(color),
+        emissiveIntensity: intensity,
+        toneMapped: false,
+        metalness: 0.2,
+        roughness: 0.3,
+    });
+}
+
+function createDiffuserMaterial() {
+    return new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        metalness: 0.0,
+        roughness: 0.85,
+        transmission: 0.65,
+        thickness: 2,
+        ior: 1.42,
+        transparent: true,
+        side: THREE.DoubleSide,
+        envMapIntensity: 0.4,
+    });
+}
+
+function createDisplayMaterial() {
+    return new THREE.MeshPhysicalMaterial({
+        color: 0x050508,
+        metalness: 0.0,
+        roughness: 0.03,
+        emissive: new THREE.Color(0x000511),
+        emissiveIntensity: 0.6,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.01,
+        envMapIntensity: 1.0,
+    });
+}
+
+function createBatteryMaterial() {
+    return new THREE.MeshPhysicalMaterial({
+        color: 0x1055aa,
+        metalness: 0.35,
+        roughness: 0.55,
+        clearcoat: 0.2,
+        envMapIntensity: 0.5,
+    });
+}
+
+function createFerriteMaterial() {
+    return new THREE.MeshStandardMaterial({
+        color: 0x0a0a0a,
+        metalness: 0.0,
+        roughness: 0.95,
+    });
+}
+
+function getMaterialForComponent(c) {
+    if (c.id.includes('shell')) return createOpticalGlassMaterial();
+    if (c.id.includes('coil')) return createPolishedCopperMaterial();
+    if (c.id === 'base_enc') return createOiledWalnutMaterial();
+    if (c.id.includes('pcb') || c.id === 'led_ring' || c.id === 'bms') return createMattePCBMaterial();
+    if (c.id === 'leds' || c.id === 'base_leds') return createLEDMaterial(c.clr);
+    if (c.id === 'heatsink') return createBrushedAluminumMaterial();
+    if (c.id === 'diffuser') return createDiffuserMaterial();
+    if (c.id === 'display') return createDisplayMaterial();
+    if (c.id === 'battery') return createBatteryMaterial();
+    if (c.id === 'ferrite') return createFerriteMaterial();
+
+    return new THREE.MeshPhysicalMaterial({
+        color: c.clr,
+        metalness: 0.1,
+        roughness: 0.6,
+        transparent: c.op !== undefined,
+        opacity: c.op ?? 1,
+        side: c.op ? THREE.DoubleSide : THREE.FrontSide,
+        envMapIntensity: 0.7,
+    });
+}
+
+// ================================================================
+// SCULPTURAL WALNUT BASE - LatheGeometry organic pedestal
+// ================================================================
+function createSculpturalBase() {
+    // Organic pedestal profile - inspired by museum plinths and Danish design
+    const points = [
+        new THREE.Vector2(0.0, 0.0),      // Center bottom
+        new THREE.Vector2(55, 2),          // Soft foot start
+        new THREE.Vector2(65, 5),          // Foot flare
+        new THREE.Vector2(70, 8),          // Maximum foot width
+        new THREE.Vector2(68, 12),         // Slight taper
+        new THREE.Vector2(62, 18),         // Waist
+        new THREE.Vector2(58, 24),         // Continued taper
+        new THREE.Vector2(55, 28),         // Upper waist
+        new THREE.Vector2(54, 32),         // Near top
+        new THREE.Vector2(56, 35),         // Subtle flare at top
+    ];
+
+    const geometry = new THREE.LatheGeometry(points, 128);
+
+    // Center the geometry
+    geometry.computeBoundingBox();
+    const center = new THREE.Vector3();
+    geometry.boundingBox.getCenter(center);
+    geometry.translate(-center.x, -center.y, -center.z);
+
+    return geometry;
+}
+
+// ================================================================
+// INFINITY MIRROR EFFECT - Concentric spheres with decreasing opacity
+// ================================================================
+function createInfinityMirrorLayers(scene) {
+    const layers = [];
+    const numLayers = 8;
+
+    for (let i = 0; i < numLayers; i++) {
+        const scale = 0.96 - (i * 0.015);
+        const opacity = Math.pow(1.0 - (i / numLayers), 1.8);
+
+        const geometry = new THREE.SphereGeometry(42.5 * scale, 64, 32);
+        const material = new THREE.MeshPhysicalMaterial({
+            color: 0x2244aa,
+            metalness: 0.95,
+            roughness: 0.05,
+            transmission: 0.85,
+            emissive: new THREE.Color(0x1133aa),
+            emissiveIntensity: opacity * 0.2,
+            transparent: true,
+            opacity: opacity * 0.4,
+            side: THREE.BackSide,
+            depthWrite: false,
+        });
+
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.visible = false; // Start hidden
+        scene.add(mesh);
+        layers.push(mesh);
+    }
+
+    return layers;
+}
+
+// ================================================================
+// STUDIO ENVIRONMENT - Premium gradient with light spots
+// ================================================================
+async function createPremiumEnvironment(renderer) {
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    pmremGenerator.compileEquirectangularShader();
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 2048;
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+
+    // Studio gradient background
+    const gradient = ctx.createLinearGradient(0, 0, 0, 1024);
+    gradient.addColorStop(0, '#1e2130');
+    gradient.addColorStop(0.25, '#181c28');
+    gradient.addColorStop(0.5, '#14161e');
+    gradient.addColorStop(0.75, '#0e1016');
+    gradient.addColorStop(1, '#0a0c10');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 2048, 1024);
+
+    // Add studio light spots for realistic reflections
+    ctx.globalCompositeOperation = 'screen';
+    const spots = [
+        // Key light reflection
+        { x: 400, y: 200, r: 300, c: 'rgba(255,252,245,0.25)' },
+        // Fill light reflection
+        { x: 1400, y: 350, r: 250, c: 'rgba(180,200,255,0.15)' },
+        // Rim light reflection
+        { x: 1024, y: 150, r: 200, c: 'rgba(255,245,230,0.12)' },
+        // Top accent
+        { x: 1024, y: 100, r: 150, c: 'rgba(255,255,255,0.1)' },
+        // Sparkle spots
+        { x: 600, y: 180, r: 80, c: 'rgba(255,255,255,0.08)' },
+        { x: 1500, y: 250, r: 60, c: 'rgba(255,255,255,0.06)' },
+    ];
+
+    spots.forEach(s => {
+        const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
+        g.addColorStop(0, s.c);
+        g.addColorStop(0.5, s.c.replace(/[\d.]+\)$/, '0.05)'));
+        g.addColorStop(1, 'transparent');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 2048, 1024);
+    });
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.mapping = THREE.EquirectangularReflectionMapping;
+
+    const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+    pmremGenerator.dispose();
+
+    return envMap;
+}
+
+// ================================================================
+// RENDERER
+// ================================================================
+let scene, camera, renderer, controls, clipPlane, composer, bloomPass;
+const meshes = new Map();
+const lights = {};
+let exploded = false, sectioning = false, xray = false, thermal = false, massView = false;
+let bloomEnabled = true, infinityMirrorEnabled = false;
+let selected = null;
+let groundMesh, infinityLayers = [];
+
+async function init() {
+    scene = new THREE.Scene();
+
+    camera = new THREE.PerspectiveCamera(28, innerWidth/innerHeight, 1, 800);
+    camera.position.set(140, 80, 140);
+
+    renderer = new THREE.WebGLRenderer({
+        canvas: document.getElementById('c'),
+        antialias: true,
+        powerPreference: 'high-performance'
+    });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.localClippingEnabled = true;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    clipPlane = new THREE.Plane(new THREE.Vector3(1,0,0), 0);
+
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.target.set(0, -15, 0);
+    controls.minDistance = 80;
+    controls.maxDistance = 350;
+    controls.maxPolarAngle = Math.PI * 0.85;
+
+    // Create premium environment
+    const envMap = await createPremiumEnvironment(renderer);
+    scene.environment = envMap;
+    scene.background = new THREE.Color(0x0c0c14);
+
+    // Setup 7-light system
+    setupLighting('studio');
+
+    // Create premium ground
+    createPremiumGround();
+
+    // Levitation gap indicator (subtle)
+    const gapGeo = new THREE.CylinderGeometry(43, 43, 22, 64, 1, true);
+    const gapMat = new THREE.MeshBasicMaterial({
+        color: 0xa855f7,
+        transparent: true,
+        opacity: 0.02,
+        side: THREE.DoubleSide,
+        depthWrite: false
+    });
+    const gap = new THREE.Mesh(gapGeo, gapMat);
+    gap.position.y = -52;
+    scene.add(gap);
+
+    // Create infinity mirror layers
+    infinityLayers = createInfinityMirrorLayers(scene);
+
+    buildComponents();
+    buildTree();
+    updateStats();
+
+    // Post-processing
+    setupPostProcessing();
+
+    // Events - store references for cleanup
+    const resizeHandler = onResize;
+    const keyHandler = onKey;
+    const clickHandler = onClick;
+    
+    addEventListener('resize', resizeHandler);
+    addEventListener('keydown', keyHandler);
+    renderer.domElement.addEventListener('click', clickHandler);
+    
+    // Store for cleanup
+    eventListeners.push(
+        { target: window, event: 'resize', handler: resizeHandler },
+        { target: window, event: 'keydown', handler: keyHandler },
+        { target: renderer.domElement, event: 'click', handler: clickHandler }
+    );
+
+    document.getElementById('bHome').onclick = resetView;
+    document.getElementById('bExpl').onclick = toggleExplode;
+    document.getElementById('bSect').onclick = toggleSection;
+    document.getElementById('bXray').onclick = toggleXray;
+    document.getElementById('bHeat').onclick = toggleThermal;
+    document.getElementById('bMass').onclick = toggleMass;
+    document.getElementById('bBloom').onclick = toggleBloom;
+    document.getElementById('bMirror').onclick = toggleInfinityMirror;
+    document.getElementById('bHelp').onclick = () => document.getElementById('help').classList.toggle('show');
+    document.getElementById('sAxis').onchange = updateClip;
+    document.getElementById('sPos').oninput = updateClip;
+    document.getElementById('lightPreset').onchange = (e) => {
+        setupLighting(e.target.value);
+        updateGroundColor(LIGHTING[e.target.value].ground);
+    };
+
+    document.getElementById('bBloom').classList.toggle('on', bloomEnabled);
+
+    setTimeout(() => document.getElementById('load').classList.add('hide'), 800);
+    renderer.setAnimationLoop(render);
+}
+
+function createPremiumGround() {
+    // Reflective studio floor
+    const groundGeo = new THREE.CircleGeometry(250, 128);
+    const groundMat = new THREE.MeshPhysicalMaterial({
+        color: 0x1a1a22,
+        metalness: 0.25,
+        roughness: 0.6,
+        envMapIntensity: 0.4,
+        clearcoat: 0.1,
+    });
+    groundMesh = new THREE.Mesh(groundGeo, groundMat);
+    groundMesh.rotation.x = -Math.PI / 2;
+    groundMesh.position.y = -108;
+    groundMesh.receiveShadow = true;
+    scene.add(groundMesh);
+
+    // Subtle concentric rings for studio feel
+    const ringsMat = new THREE.MeshBasicMaterial({
+        color: 0x222230,
+        transparent: true,
+        opacity: 0.15,
+        side: THREE.DoubleSide,
+    });
+    for (let i = 1; i <= 4; i++) {
+        const ringGeo = new THREE.RingGeometry(i * 50 - 1, i * 50 + 1, 128);
+        const ring = new THREE.Mesh(ringGeo, ringsMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.y = -107.9;
+        scene.add(ring);
+    }
+}
+
+function updateGroundColor(color) {
+    if (groundMesh) {
+        groundMesh.material.color.setHex(color);
+    }
+}
+
+function setupLighting(preset) {
+    Object.values(lights).forEach(light => {
+        if (light?.parent) light.parent.remove(light);
+    });
+
+    const cfg = LIGHTING[preset];
+    scene.background = new THREE.Color(cfg.bg);
+
+    // 1. Ambient - global fill
+    lights.ambient = new THREE.AmbientLight(cfg.ambient.color, cfg.ambient.intensity);
+    scene.add(lights.ambient);
+
+    // 2. Key light - main dramatic light with shadows
+    lights.key = new THREE.DirectionalLight(cfg.key.color, cfg.key.intensity);
+    lights.key.position.set(...cfg.key.pos).multiplyScalar(10);
+    lights.key.castShadow = true;
+    lights.key.shadow.mapSize.width = 2048;
+    lights.key.shadow.mapSize.height = 2048;
+    lights.key.shadow.camera.near = 10;
+    lights.key.shadow.camera.far = 250;
+    lights.key.shadow.camera.left = -80;
+    lights.key.shadow.camera.right = 80;
+    lights.key.shadow.camera.top = 80;
+    lights.key.shadow.camera.bottom = -80;
+    lights.key.shadow.bias = -0.0003;
+    lights.key.shadow.radius = 3;
+    scene.add(lights.key);
+
+    // 3. Fill light - soften shadows
+    lights.fill = new THREE.DirectionalLight(cfg.fill.color, cfg.fill.intensity);
+    lights.fill.position.set(...cfg.fill.pos).multiplyScalar(10);
+    scene.add(lights.fill);
+
+    // 4. Rim light - edge separation
+    lights.rim = new THREE.DirectionalLight(cfg.rim.color, cfg.rim.intensity);
+    lights.rim.position.set(...cfg.rim.pos).multiplyScalar(10);
+    scene.add(lights.rim);
+
+    // 5. Accent light - top highlight
+    lights.accent = new THREE.PointLight(cfg.accent.color, cfg.accent.intensity, 200);
+    lights.accent.position.set(...cfg.accent.pos).multiplyScalar(5);
+    scene.add(lights.accent);
+
+    // 6. Internal light - glow inside orb
+    lights.internal = new THREE.PointLight(cfg.internal.color, cfg.internal.intensity, 60);
+    lights.internal.position.set(0, 0, 0);
+    scene.add(lights.internal);
+
+    // 7. Sparkle light - small accent for highlights
+    lights.sparkle = new THREE.PointLight(cfg.sparkle.color, cfg.sparkle.intensity, 100);
+    lights.sparkle.position.set(...cfg.sparkle.pos).multiplyScalar(8);
+    scene.add(lights.sparkle);
+}
+
+function setupPostProcessing() {
+    composer = new EffectComposer(renderer);
+
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+
+    // Refined bloom - subtle, only for emissives
+    bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(innerWidth, innerHeight),
+        0.4,   // strength
+        0.5,   // radius
+        0.88   // threshold - only bright things bloom
+    );
+    composer.addPass(bloomPass);
+
+    // SMAA anti-aliasing
+    const smaaPass = new SMAAPass(innerWidth, innerHeight);
+    composer.addPass(smaaPass);
+
+    const outputPass = new OutputPass();
+    composer.addPass(outputPass);
+}
+
+function createGeometry(c) {
+    switch(c.geo) {
+        case 'hemi_top': return new THREE.SphereGeometry(c.r, 128, 64, 0, Math.PI*2, 0, Math.PI/2);
+        case 'hemi_bot': return new THREE.SphereGeometry(c.r, 128, 64, 0, Math.PI*2, Math.PI/2, Math.PI/2);
+        case 'box': return new THREE.BoxGeometry(c.w, c.h, c.d, 2, 2, 2);
+        case 'cyl': return new THREE.CylinderGeometry(c.r, c.r, c.h, 64);
+        case 'disc': return new THREE.CylinderGeometry(c.r, c.r, c.h, 64);
+        case 'ring': {
+            const shape = new THREE.Shape();
+            shape.absarc(0,0,c.ro,0,Math.PI*2);
+            const hole = new THREE.Path();
+            hole.absarc(0,0,c.ri,0,Math.PI*2);
+            shape.holes.push(hole);
+            return new THREE.ExtrudeGeometry(shape, { depth:c.h, bevelEnabled:false });
+        }
+        case 'torus': return new THREE.TorusGeometry(c.R, c.r, 32, 128);
+        case 'lathe': return createSculpturalBase();
+        default: return null;
+    }
+}
+
+function buildComponents() {
+    COMPONENTS.forEach(c => {
+        let mesh;
+        const material = getMaterialForComponent(c);
+
+        if (c.geo === 'leds') {
+            mesh = new THREE.Group();
+            const ledMat = createLEDMaterial(c.clr, c.base ? 2.0 : 3.0);
+            for (let i = 0; i < c.n; i++) {
+                const a = (i / c.n) * Math.PI * 2;
+                const led = new THREE.Mesh(
+                    new THREE.BoxGeometry(3.5, 1.6, 3.5, 1, 1, 1),
+                    ledMat.clone()
+                );
+                led.position.set(Math.cos(a) * c.r, 0, Math.sin(a) * c.r);
+                led.castShadow = true;
+                mesh.add(led);
+            }
+        } else if (c.geo === 'mics') {
+            mesh = new THREE.Group();
+            const positions = [[1,0],[-1,0],[0,1],[0,-1]];
+            positions.forEach(([x,z]) => {
+                const mic = new THREE.Mesh(
+                    new THREE.CylinderGeometry(1.5, 1.5, 2.47, 24),
+                    new THREE.MeshPhysicalMaterial({
+                        color: c.clr,
+                        metalness: 0.25,
+                        roughness: 0.5,
+                        envMapIntensity: 0.5
+                    })
+                );
+                mic.position.set(x * c.r, 0, z * c.r);
+                mic.castShadow = true;
+                mesh.add(mic);
+            });
+        } else {
+            const geo = createGeometry(c);
+            if (!geo) return;
+            mesh = new THREE.Mesh(geo, material);
+        }
+
+        if (mesh) {
+            mesh.position.y = c.y;
+            if (c.geo === 'ring') mesh.rotation.x = -Math.PI/2;
+            if (c.geo === 'torus') mesh.rotation.x = Math.PI/2;
+            mesh.userData = { c, origY: c.y, origClr: c.clr };
+            mesh.castShadow = !c.id.includes('shell');
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+            meshes.set(c.id, mesh);
+        }
+    });
+}
+
+function buildTree() {
+    const container = document.getElementById('tree-content');
+    const groups = {};
+    COMPONENTS.forEach(c => {
+        if (!groups[c.grp]) groups[c.grp] = [];
+        groups[c.grp].push(c);
+    });
+
+    let html = '';
+    Object.entries(groups).forEach(([grp, parts]) => {
+        html += `<div class="grp">${grp}</div>`;
+        parts.forEach(c => {
+            const noteStyle = c.note ? ' style="color:#f59e0b"' : '';
+            html += `<div class="part" data-id="${c.id}">
+                <span class="ico">${c.ico}</span>
+                <span class="n"${noteStyle}>${c.name}</span>
+                ${c.verified ? '<span class="v">&#10003;</span>' : ''}
+            </div>`;
+        });
+    });
+    container.innerHTML = html;
+    container.querySelectorAll('.part').forEach(el => el.onclick = () => selectPart(el.dataset.id));
+}
+
+function updateStats() {
+    const orb = COMPONENTS.filter(c => !c.base);
+    document.getElementById('sParts').textContent = orb.length;
+
+    const mass = orb.reduce((s,c) => s + c.mass, 0);
+    const massEl = document.getElementById('sMass');
+    massEl.textContent = mass + 'g';
+    massEl.className = 'val ' + (mass <= 350 ? 'ok' : 'warn');
+
+    let maxW = 0;
+    orb.forEach(c => {
+        const w = c.w || (c.r ? c.r*2 : 0) || (c.ro ? c.ro*2 : 0) || (c.R ? c.R*2 : 0);
+        if (w > maxW) maxW = w;
+    });
+    const maxEl = document.getElementById('sMax');
+    maxEl.textContent = maxW.toFixed(0) + 'mm';
+    maxEl.className = 'val ' + (maxW < 65 ? 'ok' : '');
+
+    const heat = orb.reduce((s,c) => s + (c.W || 0), 0);
+    document.getElementById('sHeat').textContent = heat.toFixed(1) + 'W';
+}
+
+function selectPart(id) {
+    document.querySelectorAll('.part').forEach(el => el.classList.remove('sel'));
+    meshes.forEach(m => {
+        if (m.material?.emissive && !m.userData?.c?.id?.includes('led')) {
+            m.material.emissive.setHex(0);
+            m.material.emissiveIntensity = 0;
+        }
+    });
+
+    selected = id;
+    const c = COMPONENTS.find(x => x.id === id);
+    if (!c) return;
+
+    document.querySelector(`.part[data-id="${id}"]`)?.classList.add('sel');
+
+    const mesh = meshes.get(id);
+    if (mesh?.material?.emissive && !id.includes('led')) {
+        mesh.material.emissive.setHex(0x442266);
+        mesh.material.emissiveIntensity = 0.3;
+    }
+
+    const available = getAvailableDiameter(c.y);
+    const compSize = c.w || (c.r ? c.r*2 : 0) || (c.ro ? c.ro*2 : 0) || (c.R ? c.R*2 : 0);
+    const fits = compSize <= available || c.base;
+
+    let html = `
+        <div class="row"><span class="l">Name</span><span class="v">${c.name}</span></div>
+        <div class="row"><span class="l">Dimensions</span><span class="v">${c.dims || '-'}</span></div>
+        <div class="row"><span class="l">Y Position</span><span class="v">${c.y}mm</span></div>
+    `;
+    if (!c.base) {
+        html += `
+        <div class="row"><span class="l">Available Diam</span><span class="v ${fits?'ok':'err'}">${available.toFixed(1)}mm</span></div>
+        <div class="row"><span class="l">Component Diam</span><span class="v ${fits?'ok':'err'}">${compSize.toFixed(1)}mm</span></div>
+        `;
+    }
+    html += `
+        <div class="row"><span class="l">Mass</span><span class="v">${c.mass}g</span></div>
+        <div class="row"><span class="l">Power</span><span class="v">${c.W}W</span></div>
+        <div class="row"><span class="l">Verified</span><span class="v ${c.verified?'ok':'warn'}">${c.verified?'&#10003;':'?'}</span></div>
+        <div class="row"><span class="l">Source</span><span class="v" style="font-size:10px;max-width:140px;overflow:hidden;text-overflow:ellipsis">${c.src}</span></div>
+    `;
+    if (c.note) {
+        html += `<div class="row"><span class="l">Note</span><span class="v warn" style="font-size:10px">${c.note}</span></div>`;
+    }
+    document.getElementById('props').innerHTML = html;
+}
+
+function toggleExplode() {
+    exploded = !exploded;
+    document.getElementById('bExpl').classList.toggle('on', exploded);
+    meshes.forEach(m => {
+        const target = exploded ? m.userData.origY * 1.5 : m.userData.origY;
+        animateProp(m.position, 'y', target, 500);
+    });
+}
+
+function toggleSection() {
+    sectioning = !sectioning;
+    document.getElementById('bSect').classList.toggle('on', sectioning);
+    document.getElementById('sect').classList.toggle('show', sectioning);
+    meshes.forEach(m => {
+        const applyClip = (mat) => {
+            if (mat) {
+                mat.clippingPlanes = sectioning ? [clipPlane] : [];
+                mat.needsUpdate = true;
+            }
+        };
+        applyClip(m.material);
+        m.children?.forEach(child => applyClip(child.material));
+    });
+    // Also clip infinity mirror layers
+    infinityLayers.forEach(layer => {
+        layer.material.clippingPlanes = sectioning ? [clipPlane] : [];
+        layer.material.needsUpdate = true;
+    });
+}
+
+function updateClip() {
+    const axis = document.getElementById('sAxis').value;
+    const pos = +document.getElementById('sPos').value;
+    document.getElementById('sVal').textContent = pos + 'mm';
+    clipPlane.normal.set(axis==='x'?1:0, axis==='y'?1:0, axis==='z'?1:0);
+    clipPlane.constant = -pos;
+}
+
+function toggleXray() {
+    xray = !xray;
+    document.getElementById('bXray').classList.toggle('on', xray);
+    meshes.forEach((m, id) => {
+        const c = COMPONENTS.find(x => x.id === id);
+        if (m.material && !c?.base) {
+            m.material.transparent = true;
+            m.material.opacity = xray ? 0.1 : (c?.op ?? 1);
+            m.material.needsUpdate = true;
+        }
+    });
+}
+
+function toggleThermal() {
+    thermal = !thermal;
+    if (thermal) massView = false;
+    document.getElementById('bHeat').classList.toggle('on', thermal);
+    document.getElementById('bMass').classList.remove('on');
+    updateColors();
+}
+
+function toggleMass() {
+    massView = !massView;
+    if (massView) thermal = false;
+    document.getElementById('bMass').classList.toggle('on', massView);
+    document.getElementById('bHeat').classList.remove('on');
+    updateColors();
+}
+
+function toggleBloom() {
+    bloomEnabled = !bloomEnabled;
+    document.getElementById('bBloom').classList.toggle('on', bloomEnabled);
+    bloomPass.enabled = bloomEnabled;
+}
+
+function toggleInfinityMirror() {
+    infinityMirrorEnabled = !infinityMirrorEnabled;
+    document.getElementById('bMirror').classList.toggle('on', infinityMirrorEnabled);
+    infinityLayers.forEach(layer => {
+        layer.visible = infinityMirrorEnabled;
+    });
+}
+
+function updateColors() {
+    meshes.forEach((m, id) => {
+        const c = COMPONENTS.find(x => x.id === id);
+        if (!m.material || !c || id.includes('led')) return;
+
+        if (thermal) {
+            const t = Math.min(c.W / 8, 1);
+            m.material.color.setHSL(0.35 - t * 0.35, 0.8, 0.4);
+        } else if (massView) {
+            const t = Math.min(c.mass / 350, 1);
+            m.material.color.setHSL(0.6 - t * 0.5, 0.6, 0.45);
+        } else {
+            m.material.color.setHex(c.clr);
+        }
+    });
+}
+
+function resetView() {
+    animateProp(camera.position, 'x', 140, 600);
+    animateProp(camera.position, 'y', 80, 600);
+    animateProp(camera.position, 'z', 140, 600);
+    animateProp(controls.target, 'x', 0, 600);
+    animateProp(controls.target, 'y', -15, 600);
+    animateProp(controls.target, 'z', 0, 600);
+}
+
+function animateProp(obj, prop, target, duration) {
+    const start = obj[prop];
+    const t0 = performance.now();
+    function tick(t) {
+        const p = Math.min((t - t0) / duration, 1);
+        const ease = 1 - Math.pow(1 - p, 4);
+        obj[prop] = start + (target - start) * ease;
+        if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+}
+
+function onClick(e) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    const mouse = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1
+    );
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(mouse, camera);
+    const hits = ray.intersectObjects(Array.from(meshes.values()).filter(m => m.visible), true);
+    if (hits.length) {
+        let m = hits[0].object;
+        while (m.parent && !m.userData.c) m = m.parent;
+        if (m.userData.c) selectPart(m.userData.c.id);
+    }
+}
+
+function onKey(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    switch(e.key.toLowerCase()) {
+        case 'h': resetView(); break;
+        case 'e': toggleExplode(); break;
+        case 's': toggleSection(); break;
+        case 'x': toggleXray(); break;
+        case 't': toggleThermal(); break;
+        case 'm': toggleMass(); break;
+        case 'b': toggleBloom(); break;
+        case 'i': toggleInfinityMirror(); break;
+        case '?': document.getElementById('help').classList.toggle('show'); break;
+        case 'escape': document.getElementById('help').classList.remove('show'); break;
+    }
+}
+
+function onResize() {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+    composer.setSize(innerWidth, innerHeight);
+}
+
+function render() {
+    controls.update();
+
+    // LED animation - subtle breathing
+    const time = performance.now() * 0.001;
+    meshes.forEach((mesh, id) => {
+        if (id === 'leds' || id === 'base_leds') {
+            mesh.children.forEach((led, i) => {
+                const phase = time * 0.4 + i * 0.12;
+                const pulse = 0.5 + 0.5 * Math.sin(phase * Math.PI * 2);
+                const baseIntensity = id === 'leds' ? 3 : 2;
+                led.material.emissiveIntensity = baseIntensity * (0.75 + 0.25 * pulse);
+            });
+        }
+    });
+
+    // Internal light subtle animation
+    if (lights.internal) {
+        const pulse = 0.5 + 0.5 * Math.sin(time * 0.8);
+        lights.internal.intensity = LIGHTING.studio.internal.intensity * (0.85 + 0.15 * pulse);
+    }
+
+    // Infinity mirror layer rotation
+    if (infinityMirrorEnabled) {
+        infinityLayers.forEach((layer, i) => {
+            layer.rotation.y = time * 0.02 * (i % 2 === 0 ? 1 : -1);
+        });
+    }
+
+    composer.render();
+}
+
+/**
+ * Cleanup function to prevent memory leaks
+ * Call this when unmounting or navigating away
+ */
+function cleanup() {
+    // Stop animation loop
+    if (renderer) {
+        renderer.setAnimationLoop(null);
+    }
+    
+    // Remove event listeners
+    eventListeners.forEach(({ target, event, handler }) => {
+        target.removeEventListener(event, handler);
+    });
+    eventListeners.length = 0;
+    
+    // Dispose geometries and materials
+    meshes.forEach((mesh) => {
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) {
+            if (Array.isArray(mesh.material)) {
+                mesh.material.forEach(m => m.dispose());
+            } else {
+                mesh.material.dispose();
+            }
+        }
+        // Handle children (LEDs, mics)
+        mesh.children?.forEach(child => {
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) child.material.dispose();
+        });
+    });
+    meshes.clear();
+    
+    // Dispose infinity mirror layers
+    infinityLayers.forEach(layer => {
+        if (layer.geometry) layer.geometry.dispose();
+        if (layer.material) layer.material.dispose();
+    });
+    infinityLayers.length = 0;
+    
+    // Dispose ground mesh
+    if (groundMesh) {
+        groundMesh.geometry.dispose();
+        groundMesh.material.dispose();
+    }
+    
+    // Dispose composer
+    if (composer) {
+        composer.dispose();
+    }
+    
+    // Dispose renderer
+    if (renderer) {
+        renderer.dispose();
+    }
+    
+    // Clear scene
+    if (scene) {
+        scene.clear();
+    }
+    
+    // Dispose controls
+    if (controls) {
+        controls.dispose();
+    }
+    
+    console.log('Kagami Orb Viewer: Cleanup complete');
+}
+
+// Expose cleanup for external use (e.g., SPA navigation)
+window.kagamiOrbCleanup = cleanup;
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', cleanup);
+
+init();
+</script>
+</body>
+</html>
