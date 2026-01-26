@@ -1386,8 +1386,21 @@
                 line-height: 1.65;
             }
             
+            /* Contain negative margins and prevent horizontal overflow */
+            main {
+                overflow-x: hidden;
+            }
+            
             .container {
                 padding: 0 var(--space-4);
+                overflow-x: hidden;
+            }
+            
+            /* CSS fallback: ensure sections are visible on mobile 
+               even if JS IntersectionObserver fails */
+            .section {
+                opacity: 1 !important;
+                transform: none !important;
             }
             
             /* Hero mobile */
@@ -1465,8 +1478,16 @@
                 overflow-x: auto;
                 overflow-y: visible;
                 -webkit-overflow-scrolling: touch;
-                margin: 0 calc(-1 * var(--space-4));
+                /* Remove negative margins - use padding instead */
+                margin: 0;
                 padding: 0 var(--space-4);
+                /* Ensure scrollbar doesn't affect layout */
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+            
+            .timeline-container::-webkit-scrollbar {
+                display: none;
             }
             
             .timeline-track {
@@ -1474,6 +1495,9 @@
                 gap: 1px;
                 min-width: max-content;
                 overflow: visible;
+                /* Add padding for first/last items */
+                padding-left: var(--space-2);
+                padding-right: var(--space-2);
             }
             
             .timeline-day {
@@ -1661,16 +1685,17 @@
                 overflow-x: auto;
                 flex-wrap: nowrap;
                 padding-bottom: var(--space-3);
-                margin: 0 calc(-1 * var(--space-4));
-                padding-left: var(--space-4);
+                /* Remove negative margins to prevent overflow issues */
+                margin: 0;
+                margin-bottom: var(--space-4);
+                padding-left: 0;
                 padding-right: var(--space-4);
                 -webkit-overflow-scrolling: touch;
                 scrollbar-width: none;
                 -ms-overflow-style: none;
                 gap: var(--space-2);
-                /* Add fade hint that content scrolls */
-                mask-image: linear-gradient(to right, black 90%, transparent 100%);
-                -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
+                /* Ensure visible content */
+                width: 100%;
             }
             
             .filters::-webkit-scrollbar {
@@ -1858,8 +1883,10 @@
             }
             
             .filters {
-                margin: 0 calc(-1 * var(--space-3));
-                padding-left: var(--space-3);
+                /* Remove negative margins for small mobile */
+                margin: 0;
+                margin-bottom: var(--space-3);
+                padding-left: 0;
                 padding-right: var(--space-3);
             }
             
@@ -1935,6 +1962,51 @@
                 opacity: 1;
                 transform: none;
             }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           LOADING PLACEHOLDERS
+           ═══════════════════════════════════════════════════════════════════ */
+        .loading-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-3);
+            padding: var(--space-8);
+            color: var(--text-500);
+        }
+        
+        .loading-bar {
+            width: 100%;
+            max-width: 200px;
+            height: 4px;
+            background: var(--void-600);
+            border-radius: 2px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .loading-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 30%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--code-blue), var(--growth));
+            border-radius: 2px;
+            animation: loadingSlide 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes loadingSlide {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(400%); }
+        }
+        
+        .loading-text {
+            font-size: var(--text-sm);
+            color: var(--text-500);
         }
         
         /* ═══════════════════════════════════════════════════════════════════
@@ -2036,7 +2108,10 @@
                 
                 <div class="timeline-container">
                     <div class="timeline-track" id="timeline-track" role="list" aria-label="Commits by time">
-                        <!-- Populated by JS -->
+                        <!-- Loading state - replaced by JS -->
+                        <div class="loading-placeholder" aria-label="Loading timeline">
+                            <div class="loading-bar"></div>
+                        </div>
                     </div>
                 </div>
                 
@@ -2268,7 +2343,10 @@
                 </div>
                 
                 <div class="category-list" id="category-list">
-                    <!-- Populated by JS -->
+                    <!-- Loading state - replaced by JS -->
+                    <div class="loading-placeholder" aria-label="Loading categories">
+                        <div class="loading-bar"></div>
+                    </div>
                 </div>
             </section>
             
@@ -2325,7 +2403,11 @@
                 </div>
                 
                 <div class="commits-list" id="commits-list" role="list">
-                    <!-- Populated by JS -->
+                    <!-- Loading state - replaced by JS -->
+                    <div class="loading-placeholder" aria-label="Loading commits">
+                        <div class="loading-bar"></div>
+                        <span class="loading-text">Loading 81 commits...</span>
+                    </div>
                 </div>
             </section>
         </div>
@@ -2391,12 +2473,32 @@
                         fetch('data/metrics.json')
                     ]);
                     
+                    if (!commitsRes.ok || !metricsRes.ok) {
+                        throw new Error('Failed to fetch data');
+                    }
+                    
                     const commitsData = await commitsRes.json();
                     commits = commitsData.commits || [];
                     metrics = await metricsRes.json();
                 } catch (e) {
                     console.error('Failed to load data:', e);
+                    // Show error states in containers
+                    showLoadingError();
                 }
+            }
+            
+            function showLoadingError() {
+                const errorHtml = `
+                    <div class="loading-error" style="text-align: center; padding: var(--space-6); color: var(--text-400);">
+                        <p>Unable to load data. Please refresh the page.</p>
+                    </div>
+                `;
+                
+                const containers = ['timeline-track', 'category-list', 'commits-list'];
+                containers.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.innerHTML = errorHtml;
+                });
             }
             
             // ═══════════════════════════════════════════════════════════════
@@ -2509,6 +2611,13 @@
             function initScrollReveal() {
                 const sections = document.querySelectorAll('.section');
                 
+                // Check if IntersectionObserver is supported
+                if (!('IntersectionObserver' in window)) {
+                    // Fallback: reveal all sections immediately
+                    sections.forEach(section => section.classList.add('revealed'));
+                    return;
+                }
+                
                 const observer = new IntersectionObserver((entries) => {
                     entries.forEach(entry => {
                         if (entry.isIntersecting) {
@@ -2517,11 +2626,32 @@
                         }
                     });
                 }, { 
-                    rootMargin: '0px 0px -10% 0px',
-                    threshold: 0.1 
+                    rootMargin: '0px 0px -5% 0px',
+                    threshold: 0.05 
                 });
                 
-                sections.forEach(section => observer.observe(section));
+                // Check if sections are already visible (important for mobile)
+                sections.forEach(section => {
+                    const rect = section.getBoundingClientRect();
+                    const windowHeight = window.innerHeight;
+                    
+                    // If section is already in viewport, reveal immediately
+                    if (rect.top < windowHeight && rect.bottom > 0) {
+                        section.classList.add('revealed');
+                    } else {
+                        observer.observe(section);
+                    }
+                });
+                
+                // Mobile fallback: reveal remaining sections after a short delay
+                // This ensures content is visible even if observer has issues
+                setTimeout(() => {
+                    sections.forEach(section => {
+                        if (!section.classList.contains('revealed')) {
+                            section.classList.add('revealed');
+                        }
+                    });
+                }, 1500);
             }
             
             // ═══════════════════════════════════════════════════════════════
