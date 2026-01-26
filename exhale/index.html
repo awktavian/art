@@ -28,10 +28,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
-    <!-- Fonts -->
+    <!-- Fonts - IBM Plex (NOT Inter per design system) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
     <style>
         /* ═══════════════════════════════════════════════════════════════════
@@ -126,9 +126,9 @@
             --space-16: 4rem;
             --space-20: 5rem;
             
-            /* Font Stacks */
-            --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-            --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+            /* Font Stacks - IBM Plex per design system */
+            --font-sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+            --font-mono: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
             
             /* Fibonacci Timing */
             --dur-instant: 89ms;
@@ -891,6 +891,54 @@
         .change-card[data-category="security"] .change-card__number { background: rgba(236, 72, 153, 0.15); color: var(--cat-security); }
         .change-card[data-category="quality"] .change-card__number { background: rgba(16, 185, 129, 0.15); color: var(--cat-quality); }
         .change-card[data-category="verification"] .change-card__number { background: rgba(249, 115, 22, 0.15); color: var(--cat-verification); }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           TILT EFFECT (Microdelight)
+           ═══════════════════════════════════════════════════════════════════ */
+        .tilt-card {
+            transform-style: preserve-3d;
+            perspective: 1000px;
+        }
+        
+        .tilt-card:hover {
+            transform: perspective(1000px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) scale(1.02);
+        }
+        
+        .tilt-card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                105deg,
+                transparent 40%,
+                rgba(255, 255, 255, 0.03) 45%,
+                rgba(255, 255, 255, 0.06) 50%,
+                rgba(255, 255, 255, 0.03) 55%,
+                transparent 60%
+            );
+            border-radius: inherit;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity var(--dur-normal) var(--ease-out);
+            transform: translateX(var(--shine-x, -100%));
+        }
+        
+        .tilt-card:hover::after {
+            opacity: 1;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           HERO PARALLAX
+           ═══════════════════════════════════════════════════════════════════ */
+        .hero__content {
+            position: relative;
+            z-index: 1;
+            will-change: transform;
+        }
+        
+        .parallax-layer {
+            transition: transform 0.1s linear;
+        }
         
         /* ═══════════════════════════════════════════════════════════════════
            CATEGORY BREAKDOWN
@@ -1722,6 +1770,7 @@
                 initScrollProgress();
                 initSectionNav();
                 initHeroCounters();
+                initHeroParallax();
                 initScrollReveal();
                 initTimeline();
                 initCategoryList();
@@ -1732,6 +1781,7 @@
                 initSort();
                 initEasterEgg();
                 initMagneticButtons();
+                initTiltCards();
                 
                 console.log('%c Exhale ', 'background: linear-gradient(135deg, #3b82f6, #22c55e); color: white; padding: 8px 16px; border-radius: 4px; font-weight: bold;');
                 console.log('%c −7,287 lines lighter ', 'color: #ef4444; font-style: italic;');
@@ -2219,6 +2269,76 @@
             }
             
             // ═══════════════════════════════════════════════════════════════
+            // TILT EFFECT
+            // ═══════════════════════════════════════════════════════════════
+            function initTiltCards() {
+                const cards = document.querySelectorAll('.change-card, .commit-item');
+                
+                cards.forEach(card => {
+                    card.classList.add('tilt-card');
+                    
+                    card.addEventListener('mousemove', (e) => {
+                        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                        
+                        const rect = card.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const y = e.clientY - rect.top;
+                        const centerX = rect.width / 2;
+                        const centerY = rect.height / 2;
+                        
+                        // Subtle tilt (max 3 degrees)
+                        const tiltX = ((y - centerY) / centerY) * -3;
+                        const tiltY = ((x - centerX) / centerX) * 3;
+                        
+                        // Shine position
+                        const shineX = ((x / rect.width) * 200) - 100;
+                        
+                        card.style.setProperty('--tilt-x', `${tiltX}deg`);
+                        card.style.setProperty('--tilt-y', `${tiltY}deg`);
+                        card.style.setProperty('--shine-x', `${shineX}%`);
+                    });
+                    
+                    card.addEventListener('mouseleave', () => {
+                        card.style.setProperty('--tilt-x', '0deg');
+                        card.style.setProperty('--tilt-y', '0deg');
+                        card.style.setProperty('--shine-x', '-100%');
+                    });
+                });
+            }
+            
+            // ═══════════════════════════════════════════════════════════════
+            // HERO PARALLAX
+            // ═══════════════════════════════════════════════════════════════
+            function initHeroParallax() {
+                const hero = document.querySelector('.hero');
+                const eyebrow = document.querySelector('.hero__eyebrow');
+                const title = document.querySelector('.hero__title');
+                const subtitle = document.querySelector('.hero__subtitle');
+                const stats = document.querySelector('.hero__stats');
+                const scrollIndicator = document.querySelector('.hero__scroll');
+                
+                if (!hero || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                
+                window.addEventListener('scroll', () => {
+                    const scrollY = window.scrollY;
+                    const heroHeight = hero.offsetHeight;
+                    
+                    if (scrollY > heroHeight) return;
+                    
+                    const progress = scrollY / heroHeight;
+                    
+                    // Different speeds for parallax layers
+                    if (eyebrow) eyebrow.style.transform = `translateY(${scrollY * 0.3}px)`;
+                    if (title) title.style.transform = `translateY(${scrollY * 0.2}px)`;
+                    if (subtitle) subtitle.style.transform = `translateY(${scrollY * 0.15}px)`;
+                    if (stats) stats.style.transform = `translateY(${scrollY * 0.1}px)`;
+                    if (scrollIndicator) {
+                        scrollIndicator.style.opacity = Math.max(0, 1 - progress * 2);
+                    }
+                }, { passive: true });
+            }
+            
+            // ═══════════════════════════════════════════════════════════════
             // UTILITIES
             // ═══════════════════════════════════════════════════════════════
             function escapeHtml(str) {
@@ -2234,6 +2354,21 @@
                 document.addEventListener('DOMContentLoaded', init);
             } else {
                 init();
+            }
+            
+            // ═══════════════════════════════════════════════════════════════
+            // SERVICE WORKER REGISTRATION
+            // ═══════════════════════════════════════════════════════════════
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/sw.js')
+                        .then((registration) => {
+                            console.log('[App] Service Worker registered:', registration.scope);
+                        })
+                        .catch((error) => {
+                            console.log('[App] Service Worker registration failed:', error);
+                        });
+                });
             }
         })();
     </script>
