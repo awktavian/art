@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#020204">
+    <title>癒 — Heal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Crimson+Pro:ital,wght@0,300;0,400;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&family=Zen+Kaku+Gothic+New:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Text */
+            --text: #f4f1ea;
+            --text-dim: rgba(244, 241, 234, 0.6);
+            --text-whisper: rgba(244, 241, 234, 0.3);
+
+            /* Flow spectrum */
+            --flow-deep: #008B8B;
+            --flow: #00cec9;
+            --flow-bright: #00FFFF;
+            --flow-dim: rgba(0, 206, 201, 0.5);
+            --flow-glow: rgba(0, 206, 201, 0.3);
+            --flow-whisper: rgba(0, 206, 201, 0.1);
+
+            /* Gold spectrum */
+            --gold: #c4a35a;
+            --gold-bright: #d4af37;
+            --gold-glow: rgba(196, 163, 90, 0.25);
+
+            /* Void */
+            --void: #020204;
+            --void-soft: #0a0a0f;
+
+            /* Semantic */
+            --danger: #e74c3c;
+            --success: #2ecc71;
+            --warning: #f39c12;
+
+            /* Fonts */
+            --font-display: 'Cormorant Garamond', Georgia, serif;
+            --font-body: 'Crimson Pro', Georgia, serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-jp: 'Zen Kaku Gothic New', sans-serif;
+
+            /* Easing */
+            --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+            --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html {
+            scroll-behavior: smooth;
+            background: var(--void);
+        }
+
+        body {
+            font-family: var(--font-body);
+            color: var(--text);
+            font-size: 18px;
+            line-height: 1.9;
+            background: var(--void);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--void); }
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, var(--flow) 0%, var(--flow-deep) 100%);
+            border-radius: 4px;
+        }
+
+        /* Selection */
+        ::selection {
+            background: rgba(0, 206, 201, 0.3);
+            color: var(--text);
+        }
+
+        /* Grain overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* === NAVIGATION === */
+        .nav-dots {
+            position: fixed;
+            right: 2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            z-index: 100;
+        }
+
+        .nav-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-whisper);
+            cursor: pointer;
+            transition: all 0.3s var(--ease-out-expo);
+            position: relative;
+        }
+
+        .nav-dot::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 1px solid transparent;
+            transition: border-color 0.3s var(--ease-out-expo), transform 0.3s var(--ease-out-expo);
+        }
+
+        .nav-dot:hover::before,
+        .nav-dot.active::before {
+            border-color: var(--flow);
+            transform: scale(1.5);
+        }
+
+        .nav-dot:hover, .nav-dot.active {
+            background: var(--flow);
+            box-shadow: 0 0 12px var(--flow-glow), 0 0 24px var(--flow-whisper);
+        }
+
+        .nav-dot::after {
+            content: attr(data-label);
+            position: absolute;
+            right: 1.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.3s var(--ease-out-expo);
+        }
+
+        .nav-dot:hover::after {
+            opacity: 1;
+        }
+
+        /* === HEADER / HERO === */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-canvas {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .kanji-main {
+            font-family: var(--font-jp);
+            font-size: clamp(8rem, 25vw, 14rem);
+            color: var(--flow);
+            opacity: 0.9;
+            font-weight: 300;
+            text-shadow: 0 0 60px var(--flow-glow), 0 0 120px var(--flow-glow);
+            line-height: 1;
+            animation: kanji-breathe 6s ease-in-out infinite;
+        }
+
+        @keyframes kanji-breathe {
+            0%, 100% { opacity: 0.9; text-shadow: 0 0 60px var(--flow-glow), 0 0 120px var(--flow-glow); }
+            50% { opacity: 1; text-shadow: 0 0 80px rgba(0, 206, 201, 0.4), 0 0 160px var(--flow-glow); }
+        }
+
+        .english-main {
+            font-family: var(--font-display);
+            font-size: 1.4rem;
+            letter-spacing: 0.6em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        /* Haiku */
+        .haiku-container {
+            position: relative;
+            height: 140px;
+            width: 320px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        .haiku-english, .haiku-japanese {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.8s var(--ease-out-expo), transform 0.8s var(--ease-out-expo);
+        }
+
+        .haiku-english { opacity: 1; transform: translateY(0); }
+        .haiku-japanese {
+            opacity: 0;
+            transform: translateY(10px);
+            writing-mode: vertical-rl;
+            flex-direction: row;
+            gap: 1.5rem;
+        }
+
+        .haiku-container:hover .haiku-english {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        .haiku-container:hover .haiku-japanese {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .haiku-line {
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            font-style: italic;
+            color: var(--text-dim);
+            margin: 0.15rem 0;
+        }
+
+        .haiku-jp {
+            font-family: var(--font-jp);
+            font-size: 1.1rem;
+            letter-spacing: 0.4em;
+            color: var(--gold);
+            text-shadow: 0 0 20px var(--gold-glow);
+        }
+
+        .scroll-hint {
+            font-family: var(--font-display);
+            font-size: 0.9rem;
+            color: var(--text-whisper);
+            font-style: italic;
+            animation: fade-hint 3s ease-in-out infinite;
+            margin-top: 4rem;
+        }
+
+        @keyframes fade-hint {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 0.5; }
+        }
+
+        /* === SECTIONS === */
+        section {
+            min-height: 100vh;
+            padding: 5rem 3rem;
+            position: relative;
+        }
+
+        /* Section background gradients */
+        #signal {
+            background: radial-gradient(ellipse at 30% 20%, rgba(0, 206, 201, 0.04) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 70%, rgba(196, 163, 90, 0.02) 0%, transparent 40%),
+                        var(--void);
+        }
+
+        #response {
+            background: radial-gradient(ellipse at 70% 30%, rgba(0, 206, 201, 0.03) 0%, transparent 45%),
+                        radial-gradient(ellipse at 20% 80%, rgba(0, 206, 201, 0.02) 0%, transparent 35%),
+                        var(--void);
+        }
+
+        #repair {
+            background: radial-gradient(ellipse at 50% 20%, rgba(196, 163, 90, 0.03) 0%, transparent 50%),
+                        var(--void);
+        }
+
+        #merge {
+            background: radial-gradient(ellipse at 40% 60%, rgba(46, 204, 113, 0.03) 0%, transparent 45%),
+                        var(--void);
+        }
+
+        #failure {
+            background: radial-gradient(ellipse at 60% 40%, rgba(231, 76, 60, 0.03) 0%, transparent 45%),
+                        var(--void);
+        }
+
+        #escalation {
+            background: radial-gradient(ellipse at 30% 70%, rgba(243, 156, 18, 0.02) 0%, transparent 40%),
+                        radial-gradient(ellipse at 70% 30%, rgba(231, 76, 60, 0.02) 0%, transparent 35%),
+                        var(--void);
+        }
+
+        .section-container {
+            max-width: 860px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .section-number {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--flow);
+            letter-spacing: 0.3em;
+            margin-bottom: 1rem;
+        }
+
+        .section-title {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 300;
+            color: var(--text);
+            margin-bottom: 1rem;
+        }
+
+        .section-subtitle {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            font-style: italic;
+            color: var(--text-dim);
+        }
+
+        /* Section divider */
+        .section-divider {
+            width: 1px;
+            height: 60px;
+            margin: 3rem auto;
+            background: linear-gradient(to bottom, transparent, var(--gold), transparent);
+        }
+
+        /* Code blocks */
+        .code-block {
+            background: rgba(10, 10, 15, 0.8);
+            border: 1px solid rgba(0, 206, 201, 0.2);
+            border-radius: 8px;
+            padding: 1.75rem;
+            margin: 2rem 0;
+            overflow-x: auto;
+            position: relative;
+        }
+
+        .code-block::before {
+            content: attr(data-lang);
+            position: absolute;
+            top: 0.5rem;
+            right: 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            color: var(--text-whisper);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+        }
+
+        .code-block code {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.7;
+            color: var(--text-dim);
+        }
+
+        .code-block .keyword { color: var(--flow); }
+        .code-block .string { color: var(--gold); }
+        .code-block .comment { color: var(--text-whisper); font-style: italic; }
+        .code-block .important { color: var(--danger); }
+        .code-block .function { color: #a78bfa; }
+        .code-block .variable { color: var(--flow-bright); }
+
+        /* Flow diagram */
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1.25rem;
+            margin: 3rem 0;
+        }
+
+        .flow-node {
+            background: rgba(0, 206, 201, 0.1);
+            border: 1px solid rgba(0, 206, 201, 0.3);
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--flow);
+            cursor: pointer;
+            transition: all 0.3s var(--ease-spring);
+            position: relative;
+        }
+
+        .flow-node:hover {
+            background: rgba(0, 206, 201, 0.2);
+            border-color: var(--flow);
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 10px 30px var(--flow-glow);
+        }
+
+        .flow-node:focus-visible {
+            outline: 2px solid var(--flow);
+            outline-offset: 4px;
+        }
+
+        .flow-node.success {
+            border-color: var(--success);
+            color: var(--success);
+            background: rgba(46, 204, 113, 0.1);
+        }
+
+        .flow-node.danger {
+            border-color: var(--danger);
+            color: var(--danger);
+            background: rgba(231, 76, 60, 0.1);
+        }
+
+        .flow-arrow {
+            font-size: 1.5rem;
+            color: var(--text-whisper);
+        }
+
+        /* Branch diagram */
+        .branch-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+
+        .branch-card {
+            background: linear-gradient(135deg, rgba(10, 10, 15, 0.9), rgba(0, 206, 201, 0.05));
+            border: 1px solid rgba(0, 206, 201, 0.15);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s var(--ease-spring);
+            cursor: default;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .branch-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--flow), transparent);
+            opacity: 0;
+            transition: opacity 0.3s var(--ease-out-expo);
+        }
+
+        .branch-card:hover::before {
+            opacity: 1;
+        }
+
+        .branch-card:hover {
+            border-color: rgba(0, 206, 201, 0.4);
+            transform: translateY(-6px);
+            box-shadow: 0 15px 40px var(--flow-glow);
+        }
+
+        .branch-card:focus-visible {
+            outline: 2px solid var(--flow);
+            outline-offset: 4px;
+        }
+
+        .branch-card h4 {
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            color: var(--flow);
+            margin-bottom: 0.5rem;
+        }
+
+        .branch-card p {
+            font-family: var(--font-body);
+            font-size: 0.95rem;
+            color: var(--text-dim);
+            line-height: 1.6;
+        }
+
+        /* State machine visualization */
+        .state-machine {
+            position: relative;
+            padding: 3rem;
+            margin: 3rem 0;
+        }
+
+        .state-machine-canvas {
+            width: 100%;
+            height: 400px;
+            border-radius: 12px;
+        }
+
+        /* Escalation ladder */
+        .escalation-ladder {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin: 2rem 0;
+        }
+
+        .escalation-level {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 1.5rem;
+            background: rgba(10, 10, 15, 0.8);
+            border-left: 3px solid var(--text-whisper);
+            border-radius: 0 8px 8px 0;
+            transition: all 0.3s var(--ease-spring);
+        }
+
+        .escalation-level:hover {
+            transform: translateX(8px);
+        }
+
+        .escalation-level.low { border-color: var(--text-dim); }
+        .escalation-level.medium { border-color: var(--flow); }
+        .escalation-level.high { border-color: var(--warning); }
+        .escalation-level.critical { border-color: var(--danger); }
+
+        .escalation-badge {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: transform 0.3s var(--ease-spring);
+        }
+
+        .escalation-level:hover .escalation-badge {
+            transform: scale(1.05);
+        }
+
+        .escalation-level.low .escalation-badge {
+            background: rgba(244, 241, 234, 0.1);
+            color: var(--text-dim);
+        }
+
+        .escalation-level.medium .escalation-badge {
+            background: rgba(0, 206, 201, 0.2);
+            color: var(--flow);
+        }
+
+        .escalation-level.high .escalation-badge {
+            background: rgba(243, 156, 18, 0.2);
+            color: var(--warning);
+        }
+
+        .escalation-level.critical .escalation-badge {
+            background: rgba(231, 76, 60, 0.2);
+            color: var(--danger);
+        }
+
+        .escalation-text {
+            font-family: var(--font-body);
+            font-size: 1rem;
+            color: var(--text-dim);
+        }
+
+        /* Quote block */
+        .quote-block {
+            text-align: center;
+            padding: 3.5rem;
+            margin: 3rem 0;
+            border-top: 1px solid rgba(196, 163, 90, 0.2);
+            border-bottom: 1px solid rgba(196, 163, 90, 0.2);
+        }
+
+        .quote-block .quote-text {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            font-style: italic;
+            color: var(--gold);
+            letter-spacing: 0.05em;
+        }
+
+        .quote-block cite {
+            display: block;
+            margin-top: 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--text-whisper);
+            letter-spacing: 0.15em;
+            font-style: normal;
+        }
+
+        /* Closing section */
+        .closing {
+            text-align: center;
+            padding: 6rem 2rem;
+            background: radial-gradient(ellipse at 50% 50%, rgba(0, 206, 201, 0.03) 0%, transparent 60%),
+                        var(--void);
+        }
+
+        .split-circle {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 2rem;
+            position: relative;
+        }
+
+        .split-circle svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .closing-text {
+            font-family: var(--font-body);
+            font-size: 1.2rem;
+            color: var(--text-dim);
+            max-width: 500px;
+            margin: 0 auto;
+            line-height: 1.8;
+        }
+
+        .closing-constraint {
+            font-family: var(--font-mono);
+            font-size: 1.2rem;
+            font-weight: 400;
+            color: var(--flow);
+            margin-top: 2rem;
+            letter-spacing: 0.1em;
+            text-shadow: 0 0 20px var(--flow-glow);
+        }
+
+        /* Highlight prose */
+        .prose {
+            font-family: var(--font-body);
+            font-size: 1.1rem;
+            line-height: 1.9;
+            color: var(--text-dim);
+            max-width: 680px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .prose em {
+            color: var(--gold);
+            font-style: normal;
+        }
+
+        .prose strong {
+            color: var(--flow);
+            font-weight: 500;
+        }
+
+        .prose code {
+            font-family: var(--font-mono);
+            font-size: 0.9em;
+            color: var(--flow-bright);
+            background: rgba(0, 206, 201, 0.1);
+            padding: 0.1em 0.4em;
+            border-radius: 4px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-dots { display: none; }
+            section { padding: 4rem 1.5rem; }
+            .code-block { padding: 1rem; }
+            .code-block code { font-size: 0.7rem; }
+            .branch-grid { gap: 1rem; }
+        }
+
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation dots -->
+    <nav class="nav-dots">
+        <div class="nav-dot active" data-target="hero" data-label="癒"></div>
+        <div class="nav-dot" data-target="signal" data-label="Signal"></div>
+        <div class="nav-dot" data-target="response" data-label="Response"></div>
+        <div class="nav-dot" data-target="repair" data-label="Repair"></div>
+        <div class="nav-dot" data-target="merge" data-label="Merge"></div>
+        <div class="nav-dot" data-target="failure" data-label="Failure"></div>
+        <div class="nav-dot" data-target="escalation" data-label="Escalation"></div>
+        <div class="nav-dot" data-target="closing" data-label="h(x) ≥ 0"></div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero" id="hero">
+        <canvas class="hero-canvas" id="hero-canvas"></canvas>
+        <div class="hero-content">
+            <div class="kanji-main">癒</div>
+            <div class="english-main">Heal</div>
+            <div class="haiku-container">
+                <div class="haiku-english">
+                    <div class="haiku-line">Failure speaks softly</div>
+                    <div class="haiku-line">The mirror perceives, responds</div>
+                    <div class="haiku-line">Mended before dawn</div>
+                </div>
+                <div class="haiku-japanese">
+                    <div class="haiku-jp">失敗は囁く</div>
+                    <div class="haiku-jp">鏡は知り応える</div>
+                    <div class="haiku-jp">夜明け前に癒す</div>
+                </div>
+            </div>
+            <div class="scroll-hint">scroll to enter</div>
+        </div>
+    </section>
+
+    <!-- Section 1: The Signal -->
+    <section id="signal">
+        <div class="section-container">
+            <div class="section-header">
+                <div class="section-number">01 / THE SIGNAL</div>
+                <h2 class="section-title">Detection</h2>
+                <p class="section-subtitle">When CI fails, the healing begins</p>
+            </div>
+
+            <p class="prose">
+                The continuous integration pipeline is the <em>heartbeat</em> of the codebase.
+                Every push, every pull request triggers a cascade of tests, lints, and validations.
+                When something breaks, <strong>the system notices instantly</strong>.
+            </p>
+
+            <div class="flow-diagram">
+                <div class="flow-node" tabindex="0">ci.yml completes</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node danger" tabindex="0">failure detected</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node" tabindex="0">workflow_run triggers</div>
+            </div>
+
+            <div class="code-block" data-lang="yaml">
+<code><span class="keyword">on</span>:
+  <span class="keyword">workflow_run</span>:
+    <span class="keyword">workflows</span>: [<span class="string">"ci"</span>]
+    <span class="keyword">types</span>: [completed]
+
+<span class="comment"># The signal propagates to four parallel responders</span>
+<span class="comment"># Each with a specialized role in the healing process</span></code>
+            </div>
+
+            <p class="prose">
+                The <code>workflow_run</code> event is the <em>nervous signal</em> that initiates healing.
+                It fires when CI completes—success or failure—allowing downstream workflows to respond
+                with full context about what happened.
+            </p>
+        </div>
+    </section>
+
+    <!-- Section 2: The Response -->
+    <section id="response">
+        <div class="section-container">
+            <div class="section-header">
+                <div class="section-number">02 / THE RESPONSE</div>
+                <h2 class="section-title">Parallel Processing</h2>
+                <p class="section-subtitle">Four workflows respond to a single signal</p>
+            </div>
+
+            <p class="prose">
+                Like the body's immune response, multiple systems activate simultaneously.
+                Each workflow has a <em>singular responsibility</em>, and together they
+                orchestrate the repair.
+            </p>
+
+            <div class="branch-grid">
+                <div class="branch-card" tabindex="0">
+                    <h4>cursor-fix-trigger.yml</h4>
+                    <p>The <em>single source of truth</em> for issue creation. Creates GitHub issues and fix branches for Cursor to heal.</p>
+                </div>
+                <div class="branch-card" tabindex="0">
+                    <h4>self-healing-ci.yml</h4>
+                    <p>Analyzes failure logs with AI, generates fix suggestions, creates draft PRs.</p>
+                </div>
+                <div class="branch-card" tabindex="0">
+                    <h4>auto-solver.yml</h4>
+                    <p>Handles notifications—Slack alerts, Notion logging. The messenger.</p>
+                </div>
+                <div class="branch-card" tabindex="0">
+                    <h4>ci-failure-escalation.yml</h4>
+                    <p>Routes failures by severity. Adds labels, escalates to humans when needed.</p>
+                </div>
+            </div>
+
+            <div class="code-block" data-lang="yaml">
+<code><span class="comment"># SINGLE SOURCE OF TRUTH for CI failure → Issue creation</span>
+<span class="comment"># Other workflows delegate to cursor-fix-trigger.yml</span>
+<span class="comment"># This prevents duplicate issues from racing workflows</span>
+
+<span class="keyword">concurrency</span>:
+  <span class="keyword">group</span>: <span class="variable">cursor-fix-${{ github.event.workflow_run.id }}</span>
+  <span class="keyword">cancel-in-progress</span>: <span class="important">false</span>  <span class="comment"># Never cancel—ensure single issue</span></code>
+            </div>
+
+            <p class="prose">
+                <strong>Deduplication</strong> is critical. Without it, four workflows racing to create
+                issues would spawn duplicates. The solution: <em>one workflow owns issue creation</em>,
+                others delegate or enhance.
+            </p>
+        </div>
+    </section>
+
+    <!-- Section 3: The Repair -->
+    <section id="repair">
+        <div class="section-container">
+            <div class="section-header">
+                <div class="section-number">03 / THE REPAIR</div>
+                <h2 class="section-title">Fix Generation</h2>
+                <p class="section-subtitle">From issue to pull request</p>
+            </div>
+
+            <div class="flow-diagram">
+                <div class="flow-node" tabindex="0">Issue Created</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node" tabindex="0">Fix Branch</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node" tabindex="0">Cursor Fixes</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node success" tabindex="0">PR Ready</div>
+            </div>
+
+            <p class="prose">
+                When an issue is created with the <code>cursor-agent</code> label, Cursor's
+                Background Agent activates. It reads the failure context, analyzes the logs,
+                and commits a fix to the branch named <code>cursor/ci-fix-{runId}</code>.
+            </p>
+
+            <div class="code-block" data-lang="bash">
+<code><span class="comment"># Branch naming convention links fix to original failure</span>
+<span class="variable">cursor/ci-fix-</span><span class="string">12345678901</span>  <span class="comment"># workflow run ID</span>
+
+<span class="comment"># This naming is critical for:</span>
+<span class="comment"># 1. Tracing fixes back to their source failure</span>
+<span class="comment"># 2. Detecting when a fix branch itself fails (loop prevention)</span>
+<span class="comment"># 3. Automatic PR association and issue closing</span></code>
+            </div>
+
+            <div class="quote-block">
+                <div class="quote-text">"The branch name is the thread connecting failure to healing"</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 4: The Merge -->
+    <section id="merge">
+        <div class="section-container">
+            <div class="section-header">
+                <div class="section-number">04 / THE MERGE</div>
+                <h2 class="section-title">Automatic Integration</h2>
+                <p class="section-subtitle">When healing succeeds, the fix flows home</p>
+            </div>
+
+            <div class="flow-diagram">
+                <div class="flow-node success" tabindex="0">CI Passes</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node" tabindex="0">Auto-Approve</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node" tabindex="0">Auto-Merge</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node success" tabindex="0">Issue Closed</div>
+            </div>
+
+            <p class="prose">
+                The <code>auto-merge-fixes.yml</code> workflow watches for CI completion on
+                fix branches. When <em>all checks pass</em>, it approves the PR, merges it,
+                and closes the original issue. The loop completes.
+            </p>
+
+            <div class="code-block" data-lang="yaml">
+<code><span class="comment"># Only proceed if CI passed</span>
+<span class="keyword">if</span>: |
+  <span class="variable">github.event_name</span> != <span class="string">'workflow_run'</span> ||
+  <span class="variable">github.event.workflow_run.conclusion</span> == <span class="string">'success'</span>
+
+<span class="comment"># The eligibility check ensures:</span>
+<span class="comment"># 1. PR is from an auto-fix branch</span>
+<span class="comment"># 2. All required checks passed</span>
+<span class="comment"># 3. PR is mergeable (no conflicts)</span></code>
+            </div>
+
+            <p class="prose">
+                The merge is a <strong>squash merge</strong>—collapsing the fix into a single commit
+                with a clear message. The fix branch is deleted. Clean. Traceable. <em>Healed</em>.
+            </p>
+        </div>
+    </section>
+
+    <!-- Section 5: When Healing Fails -->
+    <section id="failure">
+        <div class="section-container">
+            <div class="section-header">
+                <div class="section-number">05 / THE FAILURE PATH</div>
+                <h2 class="section-title">When Healing Fails</h2>
+                <p class="section-subtitle">Breaking the infinite loop</p>
+            </div>
+
+            <p class="prose">
+                What happens when a fix branch <em>itself</em> fails CI? Without careful design,
+                this creates an infinite loop: failure → issue → fix branch → failure → issue → ...
+            </p>
+
+            <div class="code-block" data-lang="bash">
+<code><span class="comment"># CRITICAL: Detect and handle fix branch failures</span>
+<span class="variable">HEAD_BRANCH</span>=<span class="string">"$&#123;&#123; github.event.workflow_run.head_branch &#125;&#125;"</span>
+
+<span class="keyword">if</span> [[ <span class="string">"$HEAD_BRANCH"</span> =~ ^(cursor/ci-fix-|autofix/) ]]; <span class="keyword">then</span>
+  <span class="comment"># NO new issue - prevents infinite loops</span>
+  <span class="comment"># Instead: route to handle_fix_branch_failure job</span>
+<span class="keyword">fi</span></code>
+            </div>
+
+            <div class="flow-diagram">
+                <div class="flow-node danger" tabindex="0">Fix Branch Fails</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node" tabindex="0">Find Original Issue</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node" tabindex="0">Add fix-failed Label</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node" tabindex="0">Reopen Issue</div>
+            </div>
+
+            <p class="prose">
+                When a fix fails, the system doesn't create a new issue. Instead, it finds the
+                <em>original</em> issue, adds a <code>fix-failed</code> label, reopens it if closed,
+                and comments with details. <strong>Manual intervention requested.</strong>
+            </p>
+
+            <div class="quote-block">
+                <div class="quote-text">"Some wounds require a human touch"</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 6: Escalation -->
+    <section id="escalation">
+        <div class="section-container">
+            <div class="section-header">
+                <div class="section-number">06 / THE ESCALATION</div>
+                <h2 class="section-title">Severity Ladder</h2>
+                <p class="section-subtitle">From whisper to alarm</p>
+            </div>
+
+            <p class="prose">
+                Not all failures are equal. A flaky test differs from a security vulnerability.
+                The escalation system routes failures based on <em>severity</em> and
+                <em>consecutive failure count</em>.
+            </p>
+
+            <div class="escalation-ladder">
+                <div class="escalation-level low">
+                    <span class="escalation-badge">Low</span>
+                    <span class="escalation-text">Log only. First-time, non-critical failures.</span>
+                </div>
+                <div class="escalation-level medium">
+                    <span class="escalation-badge">Medium</span>
+                    <span class="escalation-text">Slack notification. Repeated failures, moderate impact.</span>
+                </div>
+                <div class="escalation-level high">
+                    <span class="escalation-badge">High</span>
+                    <span class="escalation-text">Slack + labels. Security, data integrity concerns.</span>
+                </div>
+                <div class="escalation-level critical">
+                    <span class="escalation-badge">Critical</span>
+                    <span class="escalation-text">PagerDuty + all channels. Production impact, immediate response.</span>
+                </div>
+            </div>
+
+            <p class="prose">
+                The escalation workflow <em>never creates duplicate issues</em>. It finds the
+                existing issue (created by <code>cursor-fix-trigger.yml</code>) and enhances it
+                with labels and comments appropriate to the severity level.
+            </p>
+        </div>
+    </section>
+
+    <!-- Section 7: Closing -->
+    <section class="closing" id="closing">
+        <div class="split-circle">
+            <svg viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="45" fill="none" stroke="var(--flow)" stroke-width="1" opacity="0.3"/>
+                <path d="M50 5 A45 45 0 0 1 50 95" fill="none" stroke="var(--flow)" stroke-width="2"/>
+                <path d="M50 5 A45 45 0 0 0 50 95" fill="none" stroke="var(--gold)" stroke-width="2"/>
+                <circle cx="50" cy="50" r="5" fill="var(--flow)" opacity="0.8"/>
+            </svg>
+        </div>
+
+        <h2 class="section-title" style="margin-bottom: 2rem;">The Complete Cycle</h2>
+
+        <p class="closing-text">
+            Failure is not the opposite of success—it is the signal that guides improvement.
+            The self-healing system watches, responds, repairs, and learns.
+            When it cannot heal alone, it asks for help.
+        </p>
+
+        <div class="closing-constraint">h(x) ≥ 0. Always.</div>
+
+        <canvas id="closing-canvas" width="800" height="200" style="margin-top: 3rem; max-width: 100%;"></canvas>
+    </section>
+
+    <script>
+        // ========================================================================
+        // Navigation
+        // ========================================================================
+        const navDots = document.querySelectorAll('.nav-dot');
+        const sections = document.querySelectorAll('section');
+
+        navDots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                const target = document.getElementById(dot.dataset.target);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+
+        // Update active dot on scroll
+        const observerOptions = {
+            root: null,
+            rootMargin: '-50% 0px',
+            threshold: 0
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    navDots.forEach(dot => {
+                        dot.classList.toggle('active', dot.dataset.target === entry.target.id);
+                    });
+                }
+            });
+        }, observerOptions);
+
+        sections.forEach(section => observer.observe(section));
+
+        // ========================================================================
+        // Hero Canvas - Healing particles (refined)
+        // ========================================================================
+        const heroCanvas = document.getElementById('hero-canvas');
+        const heroCtx = heroCanvas.getContext('2d');
+        let heroTime = 0;
+
+        function resizeHeroCanvas() {
+            heroCanvas.width = window.innerWidth;
+            heroCanvas.height = window.innerHeight;
+        }
+        resizeHeroCanvas();
+        window.addEventListener('resize', resizeHeroCanvas);
+
+        // Particles that break and reconnect
+        class HealingParticle {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = Math.random() * heroCanvas.width;
+                this.y = Math.random() * heroCanvas.height;
+                this.size = Math.random() * 1.5 + 1; // Refined: 1-2.5px
+                this.speedX = (Math.random() - 0.5) * 0.3; // Refined: slower
+                this.speedY = (Math.random() - 0.5) * 0.3;
+                this.opacity = Math.random() * 0.5 + 0.2;
+                this.hue = Math.random() > 0.75 ? 48 : 176; // 25% gold, 75% cyan
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+
+                if (this.x < 0 || this.x > heroCanvas.width) this.speedX *= -1;
+                if (this.y < 0 || this.y > heroCanvas.height) this.speedY *= -1;
+            }
+
+            draw(time) {
+                // Pulse effect based on distance from center
+                const centerX = heroCanvas.width / 2;
+                const centerY = heroCanvas.height / 2;
+                const centerDist = Math.hypot(this.x - centerX, this.y - centerY);
+                const maxDist = Math.hypot(centerX, centerY);
+                const pulse = 1 + 0.15 * Math.sin(time * 0.002 + centerDist * 0.005);
+
+                heroCtx.beginPath();
+                heroCtx.arc(this.x, this.y, this.size * pulse, 0, Math.PI * 2);
+                heroCtx.fillStyle = `hsla(${this.hue}, 70%, 60%, ${this.opacity})`;
+                heroCtx.fill();
+            }
+        }
+
+        const particles = Array.from({ length: 100 }, () => new HealingParticle()); // Refined: 100 particles
+
+        function drawConnections() {
+            const connectionDistance = 120; // Refined: tighter clusters
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < connectionDistance) {
+                        const opacity = (1 - distance / connectionDistance) * 0.12; // Refined: more subtle
+                        heroCtx.beginPath();
+                        heroCtx.moveTo(particles[i].x, particles[i].y);
+                        heroCtx.lineTo(particles[j].x, particles[j].y);
+                        heroCtx.strokeStyle = `rgba(0, 206, 201, ${opacity})`;
+                        heroCtx.lineWidth = 1;
+                        heroCtx.stroke();
+                    }
+                }
+            }
+        }
+
+        function animateHero(timestamp) {
+            heroTime = timestamp;
+            heroCtx.fillStyle = 'rgba(2, 2, 4, 0.1)';
+            heroCtx.fillRect(0, 0, heroCanvas.width, heroCanvas.height);
+
+            drawConnections();
+
+            particles.forEach(p => {
+                p.update();
+                p.draw(heroTime);
+            });
+
+            requestAnimationFrame(animateHero);
+        }
+
+        requestAnimationFrame(animateHero);
+
+        // ========================================================================
+        // Closing Canvas - State machine animation (refined)
+        // ========================================================================
+        const closingCanvas = document.getElementById('closing-canvas');
+        const closingCtx = closingCanvas.getContext('2d');
+
+        const states = [
+            { name: 'CI', x: 80, color: '#00cec9' },
+            { name: 'Fail', x: 200, color: '#e74c3c' },
+            { name: 'Issue', x: 320, color: '#c4a35a' },
+            { name: 'Fix', x: 440, color: '#00cec9' },
+            { name: 'PR', x: 560, color: '#2ecc71' },
+            { name: 'Merge', x: 680, color: '#2ecc71' }
+        ];
+
+        let activeState = 0;
+        let pulsePhase = 0;
+
+        function drawStateMachine() {
+            closingCtx.clearRect(0, 0, closingCanvas.width, closingCanvas.height);
+
+            // Draw connections
+            closingCtx.strokeStyle = 'rgba(244, 241, 234, 0.2)';
+            closingCtx.lineWidth = 2;
+            for (let i = 0; i < states.length - 1; i++) {
+                closingCtx.beginPath();
+                closingCtx.moveTo(states[i].x + 32, 100);
+                closingCtx.lineTo(states[i + 1].x - 32, 100);
+                closingCtx.stroke();
+
+                // Arrow
+                closingCtx.beginPath();
+                closingCtx.moveTo(states[i + 1].x - 38, 95);
+                closingCtx.lineTo(states[i + 1].x - 32, 100);
+                closingCtx.lineTo(states[i + 1].x - 38, 105);
+                closingCtx.stroke();
+            }
+
+            // Loop back arrow (merge to CI) - flatter curve
+            closingCtx.beginPath();
+            closingCtx.moveTo(states[5].x, 72);
+            closingCtx.quadraticCurveTo(400, 10, states[0].x, 72); // Refined: flatter
+            closingCtx.stroke();
+
+            // Draw states
+            states.forEach((state, i) => {
+                const isActive = i === activeState;
+                const pulse = isActive ? Math.sin(pulsePhase) * 8 : 0; // Refined: larger pulse
+                const radius = 28 + pulse; // Refined: larger radius
+
+                // Glow
+                if (isActive) {
+                    closingCtx.beginPath();
+                    closingCtx.arc(state.x, 100, radius + 12, 0, Math.PI * 2);
+                    closingCtx.fillStyle = `${state.color}40`; // Refined: more visible glow
+                    closingCtx.fill();
+                }
+
+                // Circle
+                closingCtx.beginPath();
+                closingCtx.arc(state.x, 100, radius, 0, Math.PI * 2);
+                closingCtx.fillStyle = isActive ? state.color : '#0a0a0f';
+                closingCtx.strokeStyle = state.color;
+                closingCtx.lineWidth = 2;
+                closingCtx.fill();
+                closingCtx.stroke();
+
+                // Label
+                closingCtx.fillStyle = isActive ? '#020204' : state.color;
+                closingCtx.font = '11px "JetBrains Mono", monospace';
+                closingCtx.textAlign = 'center';
+                closingCtx.textBaseline = 'middle';
+                closingCtx.fillText(state.name, state.x, 100);
+            });
+
+            pulsePhase += 0.06; // Refined: slower pulse
+            requestAnimationFrame(drawStateMachine);
+        }
+
+        // Cycle through states
+        setInterval(() => {
+            activeState = (activeState + 1) % states.length;
+        }, 2000); // Refined: 2s transitions
+
+        drawStateMachine();
+
+        // ========================================================================
+        // Scroll reveal animations (refined with stagger)
+        // ========================================================================
+        const revealContainers = document.querySelectorAll('.section-container');
+
+        const revealObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    // Stagger children
+                    const children = entry.target.children;
+                    Array.from(children).forEach((child, i) => {
+                        child.style.transitionDelay = `${i * 0.1}s`;
+                        child.style.opacity = '1';
+                        child.style.transform = 'translateY(0)';
+                    });
+                }
+            });
+        }, { threshold: 0.1 });
+
+        revealContainers.forEach(container => {
+            const children = container.children;
+            Array.from(children).forEach(child => {
+                child.style.opacity = '0';
+                child.style.transform = 'translateY(30px)';
+                child.style.transition = 'opacity 1s cubic-bezier(0.19, 1, 0.22, 1), transform 1s cubic-bezier(0.19, 1, 0.22, 1)';
+            });
+            revealObserver.observe(container);
+        });
+    </script>
+</body>
+</html>
