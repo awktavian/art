@@ -453,21 +453,27 @@
         const syncButton = document.getElementById('sync-button');
         if (!syncButton) return;
         
+        const svg = syncButton.querySelector('svg');
+        const originalHTML = syncButton.innerHTML;
+        
         syncButton.addEventListener('click', () => {
-            // Animate sync
+            // Animate sync - keep button structure stable
             syncButton.disabled = true;
-            syncButton.textContent = '⟳ Syncing...';
-            syncButton.style.animation = 'rotate 1s linear infinite';
+            if (svg) svg.style.animation = 'spin 1s linear infinite';
+            
+            // Update text but keep icon
+            const textNode = [...syncButton.childNodes].find(n => n.nodeType === Node.TEXT_NODE);
+            if (textNode) textNode.textContent = ' Syncing...';
             
             // Simulate sync
             setTimeout(() => {
-                syncButton.style.animation = '';
-                syncButton.textContent = '✓ Synced!';
+                if (svg) svg.style.animation = '';
+                if (textNode) textNode.textContent = ' Synced!';
                 showToast('🔄 Design tokens synchronized successfully', 'success');
                 
                 // Reset after a moment
                 setTimeout(() => {
-                    syncButton.textContent = '⟳ Sync Now';
+                    syncButton.innerHTML = originalHTML;
                     syncButton.disabled = false;
                 }, 2000);
             }, 1500);
