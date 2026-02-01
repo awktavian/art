@@ -45,7 +45,7 @@
     const state = {
         loaded: false,
         nightMode: false,
-        grainMode: false,
+        grainMode: true, // On by default for that analog feel
         particles: [],
         mouseX: 0,
         mouseY: 0,
@@ -753,6 +753,11 @@
         // Check preferences
         checkReducedMotion();
         loadEasterEggs();
+        
+        // Enable analog grain mode by default
+        if (state.grainMode) {
+            document.body.classList.add('grain-mode');
+        }
         
         // Start loading screen
         initLoadingScreen();
