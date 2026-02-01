@@ -45,7 +45,7 @@
     const state = {
         loaded: false,
         nightMode: false,
-        designMode: false,
+        grainMode: false,
         particles: [],
         mouseX: 0,
         mouseY: 0,
@@ -484,7 +484,7 @@
             state.konamiIndex++;
             
             if (state.konamiIndex === KONAMI_CODE.length) {
-                activateDesignMode();
+                activateGrainMode();
                 state.konamiIndex = 0;
                 recordEasterEgg('konami');
             }
@@ -493,15 +493,19 @@
         }
     }
     
-    function activateDesignMode() {
-        const overlay = document.getElementById('design-mode-overlay');
-        state.designMode = !state.designMode;
+    function activateGrainMode() {
+        state.grainMode = !state.grainMode;
+        document.body.classList.toggle('grain-mode', state.grainMode);
         
-        if (overlay) {
-            overlay.classList.toggle('active', state.designMode);
+        if (state.grainMode) {
+            showToast('✨ Analog film grain activated', 'info');
+            if (!state.easterEggsFound.has('grain')) {
+                state.easterEggsFound.add('grain');
+                localStorage.setItem('kagami-eggs', JSON.stringify([...state.easterEggsFound]));
+            }
+        } else {
+            showToast('Film grain deactivated', 'info');
         }
-        
-        showToast(state.designMode ? '🎨 Design Mode Activated!' : '🎨 Design Mode Deactivated', 'info');
     }
     
     // Triple-click title for night mode
