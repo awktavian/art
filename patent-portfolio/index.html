@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="鏡 Kagami Patent Museum - 54 Patentable Innovations in an immersive 3D gallery">
+    <meta name="theme-color" content="#07060B">
+    
+    <!-- XR Meta Tags -->
+    <meta name="xr-spatial-tracking" content="true">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    
+    <title>鏡 Patent Museum | Kagami</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Orbitron:wght@500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Import Map -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    
+    <style>
+        /* Reset & Base */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        :root {
+            /* Kagami Tokens */
+            --void: #07060B;
+            --void-warm: #0D0A0F;
+            --obsidian: #12101A;
+            
+            --text-primary: #F5F0E8;
+            --text-secondary: #C4BFBA;
+            --text-tertiary: #9E9994;
+            
+            --colony-spark: #FF6B35;
+            --colony-forge: #D4AF37;
+            --colony-flow: #4ECDC4;
+            --colony-nexus: #9B7EBD;
+            --colony-beacon: #F59E0B;
+            --colony-grove: #7EB77F;
+            --colony-crystal: #67D4E4;
+            
+            --font-sans: 'IBM Plex Sans', -apple-system, sans-serif;
+            --font-mono: 'IBM Plex Mono', monospace;
+            --font-display: 'Orbitron', sans-serif;
+            
+            /* Fibonacci timing */
+            --duration-fast: 144ms;
+            --duration-normal: 233ms;
+            --duration-slow: 377ms;
+            
+            /* Spacing scale (8px grid) */
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 12px;
+            --spacing-lg: 16px;
+            --spacing-xl: 24px;
+            --spacing-2xl: 32px;
+            --spacing-3xl: 40px;
+            --spacing-4xl: 64px;
+            
+            /* Typography scale */
+            --font-size-xs: 11px;
+            --font-size-sm: 12px;
+            --font-size-base: 14px;
+            --font-size-md: 16px;
+            --font-size-lg: 20px;
+            --font-size-xl: 24px;
+            --font-size-2xl: 28px;
+            --font-size-3xl: 48px;
+            --font-size-4xl: 80px;
+            
+            /* Line heights */
+            --line-height-tight: 1.2;
+            --line-height-normal: 1.4;
+            --line-height-relaxed: 1.6;
+            
+            /* Z-index layers */
+            --z-base: 100;
+            --z-controls: 1000;
+            --z-panel: 3000;
+            --z-modal: 4000;
+            --z-loading: 5000;
+            
+            /* Easing functions */
+            --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
+            --ease-in: cubic-bezier(0.32, 0, 0.67, 0);
+            --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+            
+            /* Opacity levels */
+            --opacity-subtle: 0.15;
+            --opacity-light: 0.3;
+            --opacity-medium: 0.5;
+            --opacity-strong: 0.8;
+            --opacity-overlay: 0.95;
+            
+            /* Border radius */
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --radius-xl: 16px;
+            --radius-full: 9999px;
+            
+            /* Shadows */
+            --shadow-glow: 0 0 20px rgba(103, 212, 228, 0.3);
+            --shadow-glow-strong: 0 0 40px rgba(103, 212, 228, 0.5);
+            --shadow-panel: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: var(--void);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+        }
+        
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        canvas {
+            display: block;
+        }
+        
+        /* Loading Screen */
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--void);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 5000;
+            transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+        }
+
+        #loading-particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        #loading-screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loading-logo {
+            font-family: var(--font-display);
+            font-size: 96px;
+            color: var(--colony-crystal);
+            margin-bottom: 8px;
+            animation: logo-breathe 3s ease-in-out infinite;
+            text-shadow: 0 0 60px rgba(103, 212, 228, 0.4),
+                         0 0 120px rgba(103, 212, 228, 0.15);
+            filter: drop-shadow(0 0 20px rgba(103, 212, 228, 0.3));
+        }
+
+        @keyframes logo-breathe {
+            0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 20px rgba(103, 212, 228, 0.3)); }
+            50% { opacity: 0.85; transform: scale(0.97); filter: drop-shadow(0 0 40px rgba(103, 212, 228, 0.5)); }
+        }
+
+        .loading-subtitle {
+            font-family: var(--font-display);
+            font-size: 14px;
+            letter-spacing: 0.4em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            margin-bottom: 32px;
+            opacity: 0;
+            animation: fade-up 0.8s 0.3s var(--ease-out) forwards;
+        }
+
+        .loading-poem {
+            font-family: var(--font-sans);
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            min-height: 24px;
+            text-align: center;
+            max-width: 400px;
+            line-height: var(--line-height-relaxed);
+            opacity: 0;
+            animation: fade-up 0.6s 0.6s var(--ease-out) forwards;
+            font-style: italic;
+            transition: opacity 0.9s var(--ease-out), transform 0.9s var(--ease-out);
+        }
+
+        @keyframes fade-up {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .loading-bar {
+            width: 240px;
+            height: 2px;
+            background: rgba(245, 240, 232, 0.06);
+            border-radius: 1px;
+            overflow: hidden;
+            margin-bottom: 24px;
+            opacity: 0;
+            animation: fade-up 0.6s 0.8s var(--ease-out) forwards;
+        }
+
+        .loading-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg,
+                var(--colony-spark),
+                var(--colony-forge),
+                var(--colony-flow),
+                var(--colony-nexus),
+                var(--colony-beacon),
+                var(--colony-grove),
+                var(--colony-crystal)
+            );
+            background-size: 200% 100%;
+            animation: shimmer 2s linear infinite;
+            transition: width 0.4s var(--ease-out);
+            box-shadow: 0 0 12px rgba(103, 212, 228, 0.4);
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .loading-colony-reveal {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            opacity: 0;
+            animation: fade-up 0.6s 1.0s var(--ease-out) forwards;
+        }
+
+        .colony-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--c);
+            opacity: 0.2;
+            transition: all 0.4s var(--ease-out);
+            position: relative;
+        }
+
+        .colony-dot.lit {
+            opacity: 1;
+            box-shadow: 0 0 12px var(--c), 0 0 24px var(--c);
+            transform: scale(1.3);
+            animation: colony-bloom 0.61s var(--ease-bounce) forwards;
+        }
+
+        @keyframes colony-bloom {
+            0% { transform: scale(1); opacity: 0.2; }
+            50% { transform: scale(1.8); opacity: 1; box-shadow: 0 0 20px var(--c), 0 0 40px var(--c); }
+            100% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 12px var(--c), 0 0 24px var(--c); }
+        }
+
+        .colony-dot.lit::after {
+            content: attr(data-name);
+            position: absolute;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: var(--font-mono);
+            font-size: 9px;
+            color: var(--c);
+            white-space: nowrap;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            opacity: 0;
+            animation: fade-up 0.3s var(--ease-out) forwards;
+        }
+        
+        /* HUD */
+        #hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: var(--z-base);
+        }
+        
+        #location-indicator {
+            position: absolute;
+            top: var(--spacing-xl);
+            left: var(--spacing-xl);
+            font-family: var(--font-mono);
+            font-size: var(--font-size-sm);
+            color: var(--text-tertiary);
+            background: rgba(7, 6, 11, 0.88);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: var(--spacing-sm) var(--spacing-lg);
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(103, 212, 228, 0.15);
+            border-left: 3px solid var(--colony-crystal);
+            transition: all 0.4s var(--ease-out);
+            letter-spacing: 0.15em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #location-indicator .colony-glyph {
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        #location-indicator::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(90deg, var(--colony-crystal), transparent);
+            opacity: 0.3;
+        }
+        
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 24px;
+            height: 24px;
+            opacity: 0.4;
+            transition: opacity 0.2s ease, transform 0.3s var(--ease-out);
+            animation: crosshair-breathe 3s ease-in-out infinite;
+        }
+
+        #crosshair.near-artwork {
+            opacity: 0.8;
+            transform: translate(-50%, -50%) scale(1.4);
+        }
+
+        #crosshair.near-artwork::before,
+        #crosshair.near-artwork::after {
+            background: var(--colony-crystal);
+            box-shadow: 0 0 8px rgba(103, 212, 228, 0.5);
+        }
+
+        @keyframes crosshair-breathe {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.25; }
+        }
+
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(245, 240, 232, 0.6);
+            border-radius: 1px;
+            transition: all 0.2s ease;
+        }
+
+        #crosshair::before {
+            width: 1.5px;
+            height: 24px;
+            left: 11.25px;
+            top: 0;
+        }
+
+        #crosshair::after {
+            width: 24px;
+            height: 1.5px;
+            left: 0;
+            top: 11.25px;
+        }
+
+        /* Center gap for elegance */
+        #crosshair .dot {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 3px;
+            height: 3px;
+            border-radius: 50%;
+            background: var(--colony-crystal);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        #crosshair.near-artwork .dot {
+            opacity: 1;
+            box-shadow: 0 0 6px rgba(103, 212, 228, 0.8);
+            animation: dot-ping 1s var(--ease-out) infinite;
+        }
+
+        @keyframes dot-ping {
+            0% { box-shadow: 0 0 6px rgba(103, 212, 228, 0.8), 0 0 0 0 rgba(103, 212, 228, 0.4); }
+            70% { box-shadow: 0 0 6px rgba(103, 212, 228, 0.8), 0 0 0 8px rgba(103, 212, 228, 0); }
+            100% { box-shadow: 0 0 6px rgba(103, 212, 228, 0.8), 0 0 0 0 rgba(103, 212, 228, 0); }
+        }
+        
+        #minimap {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 150px;
+            height: 150px;
+            background: rgba(7, 6, 11, 0.92);
+            border: 1px solid rgba(103, 212, 228, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        #minimap canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        #minimap::before {
+            content: 'MAP';
+            position: absolute;
+            top: 6px;
+            left: 8px;
+            font-family: var(--font-mono);
+            font-size: 8px;
+            color: rgba(103, 212, 228, 0.4);
+            letter-spacing: 0.15em;
+            z-index: 1;
+            pointer-events: none;
+        }
+        
+        /* Interaction Prompts */
+        #interaction-prompt {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%) translateY(8px);
+            background: rgba(7, 6, 11, 0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(103, 212, 228, 0.2);
+            padding: 10px 20px;
+            border-radius: var(--radius-md);
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--text-secondary);
+            opacity: 0;
+            transition: opacity 0.2s ease, transform 0.3s var(--ease-out);
+            pointer-events: none;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            letter-spacing: 0.05em;
+        }
+
+        #interaction-prompt.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        #interaction-prompt kbd {
+            background: rgba(103, 212, 228, 0.15);
+            border: 1px solid rgba(103, 212, 228, 0.4);
+            border-radius: 3px;
+            padding: 2px 8px;
+            margin-right: 8px;
+            color: var(--colony-crystal);
+            font-weight: 500;
+            font-size: 12px;
+        }
+        
+        /* XR Button */
+        #xr-buttons {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            z-index: 1000;
+            pointer-events: auto;
+        }
+        
+        .xr-button {
+            background: rgba(7, 6, 11, 0.9);
+            border: 1px solid var(--colony-crystal);
+            color: var(--colony-crystal);
+            padding: var(--spacing-md) var(--spacing-xl);
+            border-radius: var(--radius-md);
+            transition: all var(--duration-fast) var(--ease-out);
+            font-family: var(--font-mono);
+            font-size: 14px;
+            cursor: pointer;
+            /* Minimum 44px touch target */
+            min-height: 44px;
+            min-width: 44px;
+        }
+        
+        .xr-button:hover {
+            background: rgba(103, 212, 228, 0.2);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-glow);
+        }
+        
+        .xr-button:active {
+            transform: scale(0.98) translateY(0);
+            background: rgba(103, 212, 228, 0.3);
+        }
+        
+        .xr-button:focus-visible {
+            outline: 2px solid var(--colony-crystal);
+            outline-offset: 2px;
+            box-shadow: var(--shadow-glow-strong);
+        }
+        
+        .xr-button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        /* Gallery Menu */
+        #gallery-menu {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.95);
+            background: rgba(7, 6, 11, 0.92);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(103, 212, 228, 0.3);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-2xl);
+            z-index: var(--z-modal);
+            opacity: 0;
+            visibility: hidden;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: var(--shadow-panel);
+            transition: all var(--duration-normal) var(--ease-out);
+        }
+        
+        #gallery-menu.visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        
+        #gallery-menu h2 {
+            font-family: var(--font-display);
+            font-size: 22px;
+            color: var(--colony-crystal);
+            margin-bottom: 8px;
+            text-align: center;
+            letter-spacing: 0.05em;
+        }
+
+        .menu-subtitle {
+            text-align: center;
+            font-family: var(--font-sans);
+            font-size: 13px;
+            color: var(--text-tertiary);
+            margin-bottom: 24px;
+            font-style: italic;
+        }
+
+        .wing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .wing-button {
+            background: var(--obsidian);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-lg) var(--spacing-md);
+            cursor: pointer;
+            transition: all var(--duration-normal) var(--ease-out);
+            text-align: center;
+            min-height: 44px;
+            min-width: 44px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .wing-button::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 120%, var(--wing-color, var(--colony-crystal)), transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .wing-button:hover::before {
+            opacity: 0.12;
+        }
+
+        .wing-button:hover {
+            border-color: var(--wing-color, var(--colony-crystal));
+            transform: translateY(-3px);
+            box-shadow: 0 0 20px rgba(103, 212, 228, 0.3);
+        }
+
+        @supports (box-shadow: 0 0 20px color-mix(in srgb, red 30%, transparent)) {
+            .wing-button:hover {
+                box-shadow: 0 0 20px color-mix(in srgb, var(--wing-color, var(--colony-crystal)) 30%, transparent);
+            }
+        }
+
+        .wing-button:active {
+            transform: scale(0.97) translateY(0);
+        }
+
+        .wing-button:focus-visible {
+            outline: 2px solid var(--wing-color, var(--colony-crystal));
+            outline-offset: 2px;
+        }
+
+        .wing-glyph {
+            font-size: 20px;
+            margin-bottom: 6px;
+            filter: grayscale(0.3);
+            transition: filter 0.2s ease;
+        }
+
+        .wing-button:hover .wing-glyph {
+            filter: grayscale(0);
+        }
+
+        .wing-button .wing-name {
+            font-family: var(--font-sans);
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+            position: relative;
+        }
+
+        .wing-desc {
+            font-family: var(--font-sans);
+            font-size: 11px;
+            color: #B5B0AB;
+            font-style: italic;
+            margin-bottom: 6px;
+        }
+
+        .wing-button .wing-categories {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: #B5B0AB;
+            letter-spacing: 0.03em;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           RESPONSIVE BREAKPOINTS
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        /* Mobile Small (< 480px) */
+        @media (max-width: 480px) {
+            #minimap {
+                width: 80px;
+                height: 80px;
+                bottom: 80px;
+            }
+            
+            .loading-logo {
+                font-size: 48px;
+            }
+            
+            #location-indicator {
+                font-size: var(--font-size-xs);
+                padding: var(--spacing-xs) var(--spacing-sm);
+            }
+            
+            #gallery-menu {
+                padding: var(--spacing-lg);
+            }
+            
+            #gallery-menu h2 {
+                font-size: var(--font-size-lg);
+            }
+            
+            .wing-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: var(--spacing-sm);
+            }
+            
+            .wing-button {
+                padding: var(--spacing-md);
+            }
+            
+            .wing-button .wing-name {
+                font-size: var(--font-size-sm);
+            }
+            
+            #audio-controls {
+                top: var(--spacing-sm);
+                right: var(--spacing-sm);
+                padding: var(--spacing-xs);
+            }
+            
+            .xr-button {
+                padding: var(--spacing-sm) var(--spacing-md);
+                font-size: var(--font-size-xs);
+            }
+        }
+        
+        /* Mobile Large / Tablet Portrait (< 768px) */
+        @media (max-width: 768px) {
+            #minimap {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .loading-logo {
+                font-size: 60px;
+            }
+            
+            #gallery-menu {
+                width: 95%;
+                max-height: 90vh;
+                overflow-y: auto;
+            }
+            
+            .wing-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            #navigation-instructions .controls-grid {
+                grid-template-columns: 1fr;
+                gap: var(--spacing-md);
+            }
+        }
+        
+        /* Tablet Landscape (< 1024px) */
+        @media (max-width: 1024px) {
+            #gallery-menu {
+                max-width: 700px;
+            }
+            
+            .wing-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        
+        /* Large Desktop (> 1440px) */
+        @media (min-width: 1440px) {
+            #minimap {
+                width: 180px;
+                height: 180px;
+            }
+            
+            #location-indicator {
+                font-size: var(--font-size-base);
+            }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           SAFE AREA INSETS (Notched Devices)
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        @supports (padding: env(safe-area-inset-top)) {
+            #hud {
+                padding-top: env(safe-area-inset-top);
+                padding-left: env(safe-area-inset-left);
+                padding-right: env(safe-area-inset-right);
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+            
+            #location-indicator {
+                top: calc(var(--spacing-xl) + env(safe-area-inset-top));
+                left: calc(var(--spacing-xl) + env(safe-area-inset-left));
+            }
+            
+            #audio-controls {
+                top: calc(var(--spacing-lg) + env(safe-area-inset-top));
+                right: calc(var(--spacing-lg) + env(safe-area-inset-right));
+            }
+            
+            #minimap {
+                bottom: calc(20px + env(safe-area-inset-bottom));
+                right: calc(20px + env(safe-area-inset-right));
+            }
+            
+            #help-button {
+                bottom: calc(20px + env(safe-area-inset-bottom));
+                left: calc(20px + env(safe-area-inset-left));
+            }
+            
+            #xr-buttons {
+                bottom: calc(20px + env(safe-area-inset-bottom));
+            }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           REDUCED MOTION
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           HIGH CONTRAST MODE
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        @media (prefers-contrast: high) {
+            :root {
+                --text-primary: #FFFFFF;
+                --text-secondary: #E0E0E0;
+                --text-tertiary: #C0C0C0;
+            }
+            
+            .xr-button, .wing-button, #help-button {
+                border-width: 2px;
+            }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           LANDSCAPE MOBILE
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        @media (max-height: 500px) and (orientation: landscape) {
+            #navigation-instructions .instructions-content {
+                padding: var(--spacing-lg);
+            }
+            
+            #navigation-instructions h2 {
+                font-size: var(--font-size-xl);
+                margin-bottom: var(--spacing-md);
+            }
+            
+            #navigation-instructions .controls-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: var(--spacing-sm);
+            }
+            
+            .loading-logo {
+                font-size: 40px;
+                margin-bottom: var(--spacing-lg);
+            }
+        }
+        
+        /* Arrival transition overlay */
+        #arrival-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--void);
+            z-index: 4800;
+            pointer-events: none;
+            opacity: 1;
+            transition: opacity 1.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        #arrival-overlay.revealed {
+            opacity: 0;
+        }
+
+        #arrival-overlay .arrival-poem {
+            position: absolute;
+            bottom: 15%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: var(--font-sans);
+            font-size: 15px;
+            color: var(--text-secondary);
+            font-style: italic;
+            text-align: center;
+            max-width: 400px;
+            opacity: 1;
+            transition: opacity 1.2s var(--ease-in);
+        }
+
+        #arrival-overlay.revealed .arrival-poem {
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" role="status" aria-label="Loading Patent Museum">
+        <canvas id="loading-particles" aria-hidden="true"></canvas>
+        <div class="loading-content">
+            <div class="loading-logo" aria-hidden="true">鏡</div>
+            <div class="loading-subtitle">Patent Museum</div>
+            <div class="loading-poem" id="loading-poem" aria-live="polite" aria-atomic="true"></div>
+            <div class="loading-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Loading progress">
+                <div class="loading-bar-fill" id="loading-fill"></div>
+            </div>
+            <div class="loading-colony-reveal" id="colony-reveal" aria-hidden="true">
+                <span class="colony-dot" style="--c: var(--colony-spark);" data-name="Spark"></span>
+                <span class="colony-dot" style="--c: var(--colony-forge);" data-name="Forge"></span>
+                <span class="colony-dot" style="--c: var(--colony-flow);" data-name="Flow"></span>
+                <span class="colony-dot" style="--c: var(--colony-nexus);" data-name="Nexus"></span>
+                <span class="colony-dot" style="--c: var(--colony-beacon);" data-name="Beacon"></span>
+                <span class="colony-dot" style="--c: var(--colony-grove);" data-name="Grove"></span>
+                <span class="colony-dot" style="--c: var(--colony-crystal);" data-name="Crystal"></span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Arrival Transition (bridges loading → museum) -->
+    <div id="arrival-overlay" aria-hidden="true">
+        <p class="arrival-poem">Welcome to the mirror.</p>
+    </div>
+
+    <!-- Canvas Container -->
+    <div id="canvas-container" aria-label="3D Patent Museum — navigate with mouse and keyboard to explore 54 patent innovations across 7 wings"></div>
+    
+    <!-- HUD -->
+    <div id="hud">
+        <div id="location-indicator" aria-live="polite" aria-atomic="true">VESTIBULE</div>
+        <div id="crosshair" aria-hidden="true"><span class="dot"></span></div>
+        <div id="minimap" aria-hidden="true"></div>
+        <div id="interaction-prompt" aria-live="polite">
+            <kbd>E</kbd> Examine artwork
+        </div>
+    </div>
+    
+    <!-- XR Buttons -->
+    <div id="xr-buttons"></div>
+    
+    <!-- Gallery Quick-Travel Menu -->
+    <div id="gallery-menu" role="dialog" aria-modal="true" aria-label="Quick Travel Menu" tabindex="-1">
+        <h2>Navigate the Museum</h2>
+        <p class="menu-subtitle">Seven wings. Fifty-four innovations. One constellation of thought.</p>
+        <div class="wing-grid">
+            <button class="wing-button" data-wing="rotunda" style="--wing-color: var(--colony-crystal);">
+                <div class="wing-glyph">&#x2B21;</div>
+                <div class="wing-name">Rotunda</div>
+                <div class="wing-desc">The still center where seven paths remember they are one</div>
+                <div class="wing-categories">Central Hall</div>
+            </button>
+            <button class="wing-button" data-wing="spark" style="--wing-color: var(--colony-spark);">
+                <div class="wing-glyph">&#x1F525;</div>
+                <div class="wing-name" style="color: var(--colony-spark);">Spark</div>
+                <div class="wing-desc">Where voice becomes presence</div>
+                <div class="wing-categories">Voice + Visual &middot; 5 patents</div>
+            </button>
+            <button class="wing-button" data-wing="forge" style="--wing-color: var(--colony-forge);">
+                <div class="wing-glyph">&#x2692;</div>
+                <div class="wing-name" style="color: var(--colony-forge);">Forge</div>
+                <div class="wing-desc">Where trust is built</div>
+                <div class="wing-categories">Crypto + Platform &middot; 10 patents</div>
+            </button>
+            <button class="wing-button" data-wing="flow" style="--wing-color: var(--colony-flow);">
+                <div class="wing-glyph">&#x1F30A;</div>
+                <div class="wing-name" style="color: var(--colony-flow);">Flow</div>
+                <div class="wing-desc">The house learns your mornings, your music, your quiet</div>
+                <div class="wing-categories">Smart Home &middot; 7 patents</div>
+            </button>
+            <button class="wing-button" data-wing="nexus" style="--wing-color: var(--colony-nexus);">
+                <div class="wing-glyph">&#x1F517;</div>
+                <div class="wing-name" style="color: var(--colony-nexus);">Nexus</div>
+                <div class="wing-desc">Where disagreement converges into discovered truth</div>
+                <div class="wing-categories">Consensus + Reasoning &middot; 7 patents</div>
+            </button>
+            <button class="wing-button" data-wing="beacon" style="--wing-color: var(--colony-beacon);">
+                <div class="wing-glyph">&#x1F5FC;</div>
+                <div class="wing-name" style="color: var(--colony-beacon);">Beacon</div>
+                <div class="wing-desc">Autonomy, earned and measured</div>
+                <div class="wing-categories">Economic &middot; 4 patents</div>
+            </button>
+            <button class="wing-button" data-wing="grove" style="--wing-color: var(--colony-grove);">
+                <div class="wing-glyph">&#x1F33F;</div>
+                <div class="wing-name" style="color: var(--colony-grove);">Grove</div>
+                <div class="wing-desc">Worlds imagined, worlds learned</div>
+                <div class="wing-categories">World Models &middot; 7 patents</div>
+            </button>
+            <button class="wing-button" data-wing="crystal" style="--wing-color: var(--colony-crystal);">
+                <div class="wing-glyph">&#x1F48E;</div>
+                <div class="wing-name" style="color: var(--colony-crystal);">Crystal</div>
+                <div class="wing-desc">Where truth is proven</div>
+                <div class="wing-categories">Math + Safety &middot; 14 patents</div>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Help Button -->
+    <button id="help-button" aria-label="Show controls help">?</button>
+    
+    <!-- Accessibility Skip Link -->
+    <a href="#canvas-container" class="skip-link">Skip to 3D experience</a>
+    
+    <style>
+        #help-button {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            /* Minimum 44px touch target */
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(7, 6, 11, 0.9);
+            border: 1px solid var(--colony-crystal);
+            color: var(--colony-crystal);
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all var(--duration-fast) var(--ease-out);
+        }
+
+        #help-button:hover {
+            background: rgba(103, 212, 228, 0.2);
+            transform: scale(1.1);
+            box-shadow: var(--shadow-glow);
+        }
+        
+        #help-button:active {
+            transform: scale(0.95);
+            background: rgba(103, 212, 228, 0.3);
+        }
+        
+        #help-button:focus-visible {
+            outline: 2px solid var(--colony-crystal);
+            outline-offset: 2px;
+            box-shadow: var(--shadow-glow-strong);
+        }
+        
+        .skip-link {
+            position: absolute;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--colony-crystal);
+            color: var(--void);
+            padding: 12px 24px;
+            border-radius: 8px;
+            z-index: 10000;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .skip-link:focus {
+            top: 20px;
+        }
+    </style>
+    
+    <!-- Main Application -->
+    <script type="module" src="./main.js"></script>
+</body>
+</html>
