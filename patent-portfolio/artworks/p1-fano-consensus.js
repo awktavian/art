@@ -83,6 +83,12 @@ export class FanoConsensusArtwork extends THREE.Group {
         this.hoveredStation = null;
         this.playerVotes = new Set();
         
+        // Attack Mode - let visitors try to break consensus
+        this.attackMode = false;
+        this.attackerNodes = new Set(); // Nodes controlled by attacker
+        this.attackAttempts = 0;
+        this.attacksBlocked = 0;
+        
         // Audio context (will be created on interaction)
         this.audioContext = null;
         
@@ -101,6 +107,9 @@ export class FanoConsensusArtwork extends THREE.Group {
         this.createConsensusPillar();
         this.createMessageSystem();
         this.createCelebrationSystem();
+        
+        // === ATTACK MODE CONTROLS ===
+        this.createAttackModePanel();
         
         // === ATMOSPHERIC ===
         this.createAmbientParticles();
@@ -172,17 +181,19 @@ export class FanoConsensusArtwork extends THREE.Group {
     }
     
     getNodePosition(index) {
-        // Arrange 7 nodes in Fano plane pattern
-        // Nexus (3) at center as ORCHESTRATOR
+        // True Fano plane PG(2,2): 7 points, 7 lines. Standard layout:
+        // Triangle vertices 0, 1, 2; edge midpoints 3=(0,1), 4=(1,2), 5=(0,2); centroid 6.
+        // FANO_LINES: [0,1,3], [0,2,5], [0,4,6], [1,2,4], [1,5,6], [2,3,6], [3,4,5]
         const scale = 4.5;
+        const h = scale * Math.sqrt(3) / 2;
         const positions = [
-            { x: 0,     z: scale },           // 0 - Spark (top)
-            { x: -scale * 0.85, z: scale * 0.5 }, // 1 - Forge
-            { x: scale * 0.85,  z: scale * 0.5 }, // 2 - Flow
-            { x: 0,     z: 0 },               // 3 - Nexus (center - ORCHESTRATOR)
-            { x: -scale * 0.85, z: -scale * 0.5 }, // 4 - Beacon
-            { x: scale * 0.85,  z: -scale * 0.5 }, // 5 - Grove
-            { x: 0,     z: -scale }           // 6 - Crystal (bottom)
+            { x: 0,           z: scale },           // 0 - Spark (top vertex)
+            { x: -scale,      z: -scale * 0.5 },   // 1 - Forge (left vertex)
+            { x: scale,       z: -scale * 0.5 },   // 2 - Flow (right vertex)
+            { x: -scale / 2,  z: scale * 0.25 },   // 3 - Nexus (mid 0-1)
+            { x: 0,          z: -scale * 0.5 },   // 4 - Beacon (mid 1-2)
+            { x: scale / 2,   z: scale * 0.25 },   // 5 - Grove (mid 0-2)
+            { x: 0,          z: 0 }               // 6 - Crystal (centroid)
         ];
         return positions[index];
     }
@@ -509,9 +520,9 @@ export class FanoConsensusArtwork extends THREE.Group {
         ctx.textAlign = 'center';
         ctx.fillText('CONSENSUS STATUS', 256, 50);
         
-        // Vote count
+        // Vote count - using colony-based status colors
         const consensusThreshold = Math.ceil(7 * 2 / 3); // 5 of 7
-        ctx.fillStyle = approves >= consensusThreshold ? '#00FF88' : '#F5F0E8';
+        ctx.fillStyle = approves >= consensusThreshold ? '#6FA370' : '#F5F0E8';  // Grove green
         ctx.font = 'bold 48px "IBM Plex Mono", monospace';
         ctx.fillText(`${approves}/7 AGREE`, 256, 120);
         
@@ -520,17 +531,17 @@ export class FanoConsensusArtwork extends THREE.Group {
         ctx.font = '24px "IBM Plex Sans", sans-serif';
         ctx.fillText(`(Need ${consensusThreshold} for consensus)`, 256, 160);
         
-        // Status
+        // Status - film-quality colony colors
         if (this.consensusAchieved) {
-            ctx.fillStyle = '#00FF88';
+            ctx.fillStyle = '#6FA370';  // Grove green
             ctx.font = 'bold 28px "IBM Plex Sans", sans-serif';
             ctx.fillText('✓ CONSENSUS ACHIEVED', 256, 210);
         } else if (byzantine > 0) {
-            ctx.fillStyle = '#FF4444';
+            ctx.fillStyle = '#E85A2F';  // Spark red
             ctx.font = 'bold 28px "IBM Plex Sans", sans-serif';
             ctx.fillText(`⚠ ${byzantine} BYZANTINE DETECTED`, 256, 210);
         } else if (pending > 0) {
-            ctx.fillStyle = '#FFAA00';
+            ctx.fillStyle = '#E8940A';  // Beacon amber
             ctx.font = '24px "IBM Plex Sans", sans-serif';
             ctx.fillText(`${pending} votes pending...`, 256, 210);
         }
@@ -552,7 +563,7 @@ export class FanoConsensusArtwork extends THREE.Group {
         
         for (let i = 0; i < 100; i++) {
             const particleMat = new THREE.MeshBasicMaterial({
-                color: 0xFFFFFF,
+                color: 0xF5F0E8,
                 transparent: true,
                 opacity: 0
             });
@@ -597,7 +608,7 @@ export class FanoConsensusArtwork extends THREE.Group {
         };
         
         // Set color based on vote
-        particle.material.color.setHex(voteValue === VOTE_STATES.APPROVE ? 0x00FF88 : 0xFF4444);
+        particle.material.color.setHex(voteValue === VOTE_STATES.APPROVE ? 0x6FA370 : 0xE85A2F);
         particle.material.opacity = 1;
         particle.visible = true;
         
@@ -751,6 +762,236 @@ export class FanoConsensusArtwork extends THREE.Group {
     }
     
     // ═══════════════════════════════════════════════════════════════════════
+    // ATTACK MODE - "Try to Break It" Feature
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    createAttackModePanel() {
+        // Control panel for attack mode
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 384;
+        this.attackCanvas = canvas;
+        this.attackCtx = canvas.getContext('2d');
+        
+        this.updateAttackPanel();
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        this.attackTexture = texture;
+        
+        const geo = new THREE.PlaneGeometry(2.2, 1.65);
+        const mat = new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+        
+        const panel = new THREE.Mesh(geo, mat);
+        panel.position.set(-6.5, 2.5, 0);
+        panel.rotation.y = Math.PI / 5;
+        panel.name = 'attack-panel';
+        panel.userData = { type: 'attack-toggle' };
+        this.attackPanel = panel;
+        this.add(panel);
+        
+        // Attack mode toggle button
+        const btnGeo = new THREE.BoxGeometry(0.8, 0.3, 0.1);
+        const btnMat = new THREE.MeshPhysicalMaterial({
+            color: 0xE85A2F,
+            emissive: 0xE85A2F,
+            emissiveIntensity: 0.3,
+            metalness: 0.6,
+            roughness: 0.3
+        });
+        
+        const btn = new THREE.Mesh(btnGeo, btnMat);
+        btn.position.set(-6.5, 1.5, 0.3);
+        btn.rotation.y = Math.PI / 5;
+        btn.name = 'attack-button';
+        btn.userData = { type: 'attack-toggle', interactive: true };
+        this.attackButton = btn;
+        this.add(btn);
+    }
+    
+    updateAttackPanel() {
+        if (!this.attackCtx) return;
+        const ctx = this.attackCtx;
+        
+        ctx.clearRect(0, 0, 512, 384);
+        
+        // Background
+        ctx.fillStyle = this.attackMode ? 'rgba(100, 20, 20, 0.9)' : 'rgba(20, 20, 30, 0.9)';
+        if (ctx.roundRect) {
+            ctx.beginPath();
+            ctx.roundRect(10, 10, 492, 364, 10);
+            ctx.fill();
+        } else {
+            ctx.fillRect(10, 10, 492, 364);
+        }
+        
+        // Title
+        ctx.fillStyle = this.attackMode ? '#FF4444' : '#67D4E4';
+        ctx.font = 'bold 28px "IBM Plex Sans", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(this.attackMode ? '⚔️ ATTACK MODE' : 'Try to Break It', 256, 55);
+        
+        // Explanation
+        ctx.fillStyle = '#AAAAAA';
+        ctx.font = '16px "IBM Plex Sans", sans-serif';
+        ctx.textAlign = 'center';
+        
+        if (this.attackMode) {
+            ctx.fillText('Control 2 Byzantine nodes to try', 256, 100);
+            ctx.fillText('fooling the network!', 256, 125);
+            
+            // Attack stats
+            ctx.fillStyle = '#FF6666';
+            ctx.font = 'bold 20px "IBM Plex Mono", monospace';
+            ctx.fillText(`Attacks: ${this.attackAttempts}`, 256, 175);
+            
+            ctx.fillStyle = '#66FF66';
+            ctx.fillText(`Blocked: ${this.attacksBlocked}`, 256, 210);
+            
+            // Success rate
+            const blockRate = this.attackAttempts > 0 
+                ? Math.round((this.attacksBlocked / this.attackAttempts) * 100) 
+                : 0;
+            ctx.fillStyle = '#FFCC00';
+            ctx.font = 'bold 24px "IBM Plex Mono", monospace';
+            ctx.fillText(`Block Rate: ${blockRate}%`, 256, 260);
+            
+            // Explanation
+            ctx.fillStyle = '#888888';
+            ctx.font = '14px "IBM Plex Sans", sans-serif';
+            ctx.fillText('Byzantine Fault Tolerance: Need 5/7', 256, 310);
+            ctx.fillText('agreement for consensus', 256, 330);
+            ctx.fillText('2 liars cannot fool 7 honest nodes!', 256, 355);
+        } else {
+            ctx.fillText('Click button below to become a', 256, 100);
+            ctx.fillText('Byzantine attacker!', 256, 125);
+            
+            ctx.fillStyle = '#666666';
+            ctx.font = '14px "IBM Plex Sans", sans-serif';
+            ctx.fillText('In BFT, malicious actors try to disrupt', 256, 180);
+            ctx.fillText('consensus by sending conflicting messages.', 256, 205);
+            
+            ctx.fillStyle = '#67D4E4';
+            ctx.fillText('The Fano plane structure (3 per line)', 256, 260);
+            ctx.fillText('guarantees detection of up to 2 liars!', 256, 285);
+            
+            ctx.fillStyle = '#888888';
+            ctx.font = '12px "IBM Plex Mono", monospace';
+            ctx.fillText('f < n/3 → safe consensus', 256, 330);
+            ctx.fillText('(f=faults, n=nodes)', 256, 350);
+        }
+        
+        if (this.attackTexture) {
+            this.attackTexture.needsUpdate = true;
+        }
+    }
+    
+    toggleAttackMode() {
+        this.attackMode = !this.attackMode;
+        
+        if (this.attackMode) {
+            // Randomly select 2 nodes for attacker to control
+            this.attackerNodes.clear();
+            const available = [0, 1, 2, 3, 4, 5, 6];
+            for (let i = 0; i < 2; i++) {
+                const idx = Math.floor(Math.random() * available.length);
+                this.attackerNodes.add(available[idx]);
+                available.splice(idx, 1);
+            }
+            
+            // Mark attacker nodes visually
+            this.attackerNodes.forEach(nodeIdx => {
+                const station = this.stations[nodeIdx];
+                const node = station?.getObjectByName('colony-node');
+                if (node) {
+                    node.material.color.setHex(0xFF0000);
+                    node.material.emissive.setHex(0xFF0000);
+                }
+            });
+            
+            // Update button color
+            if (this.attackButton) {
+                this.attackButton.material.color.setHex(0x66FF66);
+                this.attackButton.material.emissive.setHex(0x66FF66);
+            }
+        } else {
+            // Reset attacker nodes
+            this.attackerNodes.forEach(nodeIdx => {
+                const colony = COLONY_ORDER[nodeIdx];
+                const data = COLONY_DATA[colony];
+                const station = this.stations[nodeIdx];
+                const node = station?.getObjectByName('colony-node');
+                if (node && data) {
+                    node.material.color.setHex(data.hex);
+                    node.material.emissive.setHex(data.hex);
+                }
+            });
+            this.attackerNodes.clear();
+            
+            // Update button color
+            if (this.attackButton) {
+                this.attackButton.material.color.setHex(0xE85A2F);
+                this.attackButton.material.emissive.setHex(0xE85A2F);
+            }
+            
+            // Reset consensus
+            this.resetConsensus();
+        }
+        
+        this.updateAttackPanel();
+    }
+    
+    executeAttack() {
+        if (!this.attackMode || this.attackerNodes.size !== 2) return;
+        
+        this.attackAttempts++;
+        
+        // Attacker tries to send conflicting votes
+        // In a real Byzantine attack, they would send APPROVE to some and REJECT to others
+        const attackerArray = Array.from(this.attackerNodes);
+        
+        // First attacker node: vote APPROVE
+        this.votes[attackerArray[0]] = VOTE_STATES.APPROVE;
+        this.broadcastVote(attackerArray[0], VOTE_STATES.APPROVE);
+        
+        // Second attacker node: vote REJECT (conflicting!)
+        this.votes[attackerArray[1]] = VOTE_STATES.REJECT;
+        this.broadcastVote(attackerArray[1], VOTE_STATES.REJECT);
+        
+        // Update visuals
+        this.updateNodeVisual(attackerArray[0], VOTE_STATES.APPROVE);
+        this.updateNodeVisual(attackerArray[1], VOTE_STATES.REJECT);
+        
+        // The other 5 nodes detect the conflict via Fano lines
+        // (each line has 3 points, so conflicting votes are detected)
+        setTimeout(() => {
+            // Mark Byzantine nodes as detected
+            attackerArray.forEach(idx => this.markByzantine(idx));
+            this.attacksBlocked++;
+            this.updateAttackPanel();
+            this.updateStatusDisplay();
+        }, 1500);
+    }
+    
+    updateNodeVisual(nodeIndex, voteState) {
+        const station = this.stations[nodeIndex];
+        if (!station) return;
+        
+        const ring = this.consensusRings?.[nodeIndex];
+        if (ring) {
+            if (voteState === VOTE_STATES.APPROVE) {
+                ring.material.color.setHex(0x6FA370);
+            } else if (voteState === VOTE_STATES.REJECT) {
+                ring.material.color.setHex(0xE85A2F);
+            }
+            ring.material.opacity = 1;
+        }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
     // PLAQUE
     // ═══════════════════════════════════════════════════════════════════════
     
@@ -767,12 +1008,28 @@ export class FanoConsensusArtwork extends THREE.Group {
     // INTERACTION
     // ═══════════════════════════════════════════════════════════════════════
     
-    handleClick(point, object) {
-        if (object && object.userData && object.userData.type === 'vote-node') {
+    onClick(intersection) {
+        const object = intersection?.object;
+        if (!object || !object.userData) return;
+        
+        // Handle attack mode toggle
+        if (object.userData.type === 'attack-toggle') {
+            this.toggleAttackMode();
+            return;
+        }
+        
+        // Handle voting nodes
+        if (object.userData.type === 'vote-node') {
             const index = object.userData.index;
             const colony = object.userData.colony;
             
-            // Toggle vote
+            // In attack mode, clicking attacker nodes executes attack
+            if (this.attackMode && this.attackerNodes.has(index)) {
+                this.executeAttack();
+                return;
+            }
+            
+            // Normal voting
             if (this.votes[index] === VOTE_STATES.PENDING || this.votes[index] === VOTE_STATES.REJECT) {
                 this.castVote(index, VOTE_STATES.APPROVE);
             } else if (this.votes[index] === VOTE_STATES.APPROVE) {
@@ -784,6 +1041,11 @@ export class FanoConsensusArtwork extends THREE.Group {
         }
     }
     
+    // Alias for backward compatibility
+    handleClick(point, object) {
+        this.onClick({ point, object });
+    }
+    
     castVote(nodeIndex, voteValue) {
         this.votes[nodeIndex] = voteValue;
         this.playerVotes.add(nodeIndex);
@@ -793,7 +1055,7 @@ export class FanoConsensusArtwork extends THREE.Group {
         const voteIndicator = station.getObjectByName('vote-indicator');
         if (voteIndicator) {
             voteIndicator.material.color.setHex(
-                voteValue === VOTE_STATES.APPROVE ? 0x00FF88 : 0xFF4444
+                voteValue === VOTE_STATES.APPROVE ? 0x6FA370 : 0xE85A2F
             );
             voteIndicator.material.opacity = 1;
         }
@@ -801,7 +1063,7 @@ export class FanoConsensusArtwork extends THREE.Group {
         // Update consensus ring
         if (this.consensusRings[nodeIndex]) {
             this.consensusRings[nodeIndex].material.color.setHex(
-                voteValue === VOTE_STATES.APPROVE ? 0x00FF88 : 0xFF4444
+                voteValue === VOTE_STATES.APPROVE ? 0x6FA370 : 0xE85A2F
             );
             this.consensusRings[nodeIndex].material.opacity = 1;
         }
@@ -975,7 +1237,7 @@ export class FanoConsensusArtwork extends THREE.Group {
             const approves = this.votes.filter(v => v === VOTE_STATES.APPROVE).length;
             const t = approves / 7;
             this.consensusIndicator.material.color.setHex(
-                this.consensusAchieved ? 0x00FF88 : 
+                this.consensusAchieved ? 0x6FA370 : 
                 (approves >= 3 ? 0xFFAA00 : 0x67D4E4)
             );
         }

@@ -33,7 +33,7 @@ const AR_CONFIG = {
 // XR AR ANCHORS CLASS
 // ═══════════════════════════════════════════════════════════════════════════
 
-export class XRARAnchos {
+export class XRARAnchors {
     constructor(scene, xrManager) {
         this.scene = scene;
         this.xrManager = xrManager;
@@ -496,4 +496,4 @@ export class XRARAnchos {
     }
 }
 
-export default XRARAnchos;
+export default XRARAnchors;

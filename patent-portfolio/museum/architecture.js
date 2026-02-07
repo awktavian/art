@@ -1,17 +1,22 @@
 /**
- * Patent Museum Architecture
- * ==========================
+ * Patent Museum Architecture (Redesigned)
+ * =======================================
  * 
- * The Fano Rotunda - a central hall with 7 radiating wings,
- * each representing a colony and containing category galleries.
+ * Inspired by:
+ * - I.M. Pei: Geometric clarity, triangular forms, clean materials
+ * - Frank Lloyd Wright: Compression/release, organic flow
+ * - Frank Gehry: Sculptural drama, asymmetric forms
+ * 
+ * The architecture speaks through geometry, not decoration.
  * 
  * h(x) ≥ 0 always
  */
 
 import * as THREE from 'three';
+import { createProceduralNormalMap, createConcreteMaterial, createConcretePolishedMaterial, createBrushedSteelMaterial, createCrystalMaterial, createFlowPoolMaterial } from '../lib/materials.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// COLONY COLORS & WING DATA
+// COLONY DATA
 // ═══════════════════════════════════════════════════════════════════════════
 
 export const COLONY_DATA = {
@@ -27,672 +32,825 @@ export const COLONY_DATA = {
 export const COLONY_ORDER = ['spark', 'forge', 'flow', 'nexus', 'beacon', 'grove', 'crystal'];
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MUSEUM DIMENSIONS
+// DIMENSIONS (Wright-inspired compression/release)
 // ═══════════════════════════════════════════════════════════════════════════
 
 export const DIMENSIONS = {
-    // Central Rotunda
     rotunda: {
         radius: 20,
-        height: 25,
+        height: 28,
         floorY: 0,
-        domeStart: 15
+        domeStart: 18,
+        wallSegments: 48,
+        apertureRadius: 4,      // Gehry: off-center aperture
+        apertureOffset: 3       // Offset from center
     },
     
-    // Wing corridors
+    // Wright: 3:1 compression — 4m corridor exploding into 16m gallery
     wing: {
-        width: 12,
-        length: 40,
-        height: 8,
-        entranceWidth: 8
+        width: 4,               // Narrow corridor (was 12)
+        length: 45,
+        entranceHeight: 4,     // LOW - compressed entrance
+        corridorHeight: 8,     // Start ceiling height
+        corridorCeilingMin: 4,  // Taper to 4m mid-corridor
+        vestibuleDepth: 6,     // Transition at compression/release boundary
+        openingAngle: Math.PI / 8
     },
-    
-    // Gallery rooms (at end of each wing)
+
     gallery: {
-        width: 25,
+        width: 24,
         depth: 30,
-        height: 10
+        height: 16              // HIGH - release/expansion
     },
-    
-    // Entry vestibule
+
     vestibule: {
         width: 10,
         depth: 15,
         height: 6
+    },
+    
+    landmarks: {
+        spacing: [8, 13, 21, 34],
+        signageInterval: 8
     }
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MATERIALS
+// BUILDING (floor plan: entrance, spine, circulation)
+// Data-driven so layout and wayfinding share one source of truth.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const BUILDING = {
+    /** World angle (radians) of main entrance; guest faces this direction on arrival. South = Math.PI. */
+    entranceWorldDirection: Math.PI,
+    /** World angle (radians) of primary circulation axis through the rotunda (e.g. entrance–center–back). */
+    spineDirection: Math.PI,
+    /** Optional: world angle for exit / return path (default same as entrance). */
+    exitWorldDirection: Math.PI,
+    /** Wing layout: use COLONY_DATA[].wingAngle and DIMENSIONS.wing for lengths/widths. */
+    wingCount: COLONY_ORDER.length
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MATERIALS (Pei-inspired: 4 core materials)
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function createMuseumMaterials() {
+    const normalMap = createProceduralNormalMap(256, 6);
     return {
-        // Floor materials
-        floor: new THREE.MeshStandardMaterial({
-            color: 0x0A0A0F,
-            metalness: 0.8,
-            roughness: 0.2,
-            envMapIntensity: 0.5
-        }),
-        
-        floorReflective: new THREE.MeshPhysicalMaterial({
-            color: 0x050510,
-            metalness: 0.95,
-            roughness: 0.05,
-            clearcoat: 1.0,
-            clearcoatRoughness: 0.1,
-            reflectivity: 1.0
-        }),
-        
-        // Wall materials - enhanced with depth
-        wall: new THREE.MeshPhysicalMaterial({
-            color: 0x12101A,
-            metalness: 0.15,
-            roughness: 0.75,
-            clearcoat: 0.1,
-            clearcoatRoughness: 0.8
-        }),
-        
-        wallAccent: new THREE.MeshPhysicalMaterial({
-            color: 0x1A1820,
+        // 1. WARM CONCRETE - Walls, dome (procedural normal map, roughness 0.8)
+        concrete: createConcreteMaterial({ normalMap, roughness: 0.8 }),
+        floor: new THREE.MeshPhysicalMaterial({
+            color: 0x0A0A0A,
+            roughness: 0.1,
             metalness: 0.3,
-            roughness: 0.6,
-            clearcoat: 0.3
+            clearcoat: 0.8,
+            clearcoatRoughness: 0.1,
+            envMapIntensity: 1.0,
+            side: THREE.DoubleSide
         }),
-        
-        // Baseboard/trim material
-        baseboard: new THREE.MeshPhysicalMaterial({
-            color: 0x0A080D,
-            metalness: 0.4,
-            roughness: 0.3,
-            clearcoat: 0.5
-        }),
-        
-        // Vertical rib material
-        rib: new THREE.MeshStandardMaterial({
-            color: 0x0E0C14,
-            metalness: 0.2,
-            roughness: 0.6
-        }),
-        
-        // Ceiling
-        ceiling: new THREE.MeshStandardMaterial({
-            color: 0x0D0A0F,
-            metalness: 0.2,
-            roughness: 0.9,
-            side: THREE.BackSide
-        }),
-        
-        // Glass/crystal
+        // 3. BRUSHED STEEL - Fano sculpture, accents (anisotropy)
+        steel: createBrushedSteelMaterial({ roughness: 0.3 }),
         glass: new THREE.MeshPhysicalMaterial({
             color: 0xFFFFFF,
-            metalness: 0,
-            roughness: 0,
-            transmission: 0.95,
+            transmission: 0.7,
             thickness: 0.5,
-            transparent: true,
-            opacity: 0.3
+            roughness: 0.1,
+            metalness: 0,
+            ior: 1.5,
+            envMapIntensity: 0.5
         }),
-        
-        // Trim/accent lighting
-        trim: new THREE.MeshBasicMaterial({
-            color: 0x67D4E4,
-            transparent: true,
-            opacity: 0.8
-        })
+        ceiling: new THREE.MeshStandardMaterial({
+            color: 0x2D2A28,
+            roughness: 0.9,
+            metalness: 0.02,
+            side: THREE.BackSide
+        }),
+        concretePolished: createConcretePolishedMaterial(),
+
+        // Legacy compatibility
+        wall: null,  // Will point to concrete
+        wallAccent: null,
+        baseboard: null,
+        rib: null,
+        floorReflective: null
     };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CENTRAL ROTUNDA
+// ROTUNDA (Gehry-inspired asymmetric dome)
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function createRotunda(materials) {
     const group = new THREE.Group();
     group.name = 'rotunda';
     
-    const { radius, height, domeStart } = DIMENSIONS.rotunda;
+    const { radius, height, wallSegments, apertureRadius, apertureOffset } = DIMENSIONS.rotunda;
     
-    // Floor - reflective black marble
-    const floorGeo = new THREE.CircleGeometry(radius, 64);
-    const floor = new THREE.Mesh(floorGeo, materials.floorReflective);
+    // === FLOOR (polished black) ===
+    const floorGeo = new THREE.CircleGeometry(radius, wallSegments);
+    const floor = new THREE.Mesh(floorGeo, materials.floor);
     floor.rotation.x = -Math.PI / 2;
+    floor.position.y = 0;
     floor.receiveShadow = true;
     floor.name = 'rotunda-floor';
     group.add(floor);
     
-    // Floor pattern - E8 lattice hint (concentric rings + radials)
-    const patternGroup = createFloorPattern(radius);
-    group.add(patternGroup);
-    
-    // Cylindrical walls (with openings for wings)
-    const wallGroup = createRotundaWalls(radius, height, materials);
-    group.add(wallGroup);
-    
-    // Dome ceiling
-    const dome = createDome(radius, height, domeStart, materials);
-    group.add(dome);
-    
-    // Central Fano Plane sculpture
-    const fanoSculpture = createFanoSculpture();
-    fanoSculpture.position.y = 3;
-    group.add(fanoSculpture);
-    
-    // Ambient lighting
-    const ambientRing = createAmbientLightRing(radius * 0.8, 12);
-    ambientRing.position.y = height - 2;
-    group.add(ambientRing);
-    
-    return group;
-}
-
-function createFloorPattern(radius) {
-    const group = new THREE.Group();
-    group.name = 'floor-pattern';
-    
-    // Primary lines - more visible (opacity 0.25)
-    const lineMaterial = new THREE.LineBasicMaterial({
-        color: 0x67D4E4,
-        transparent: true,
-        opacity: 0.25
-    });
-    
-    // Emissive glow layer (wider, more subtle)
-    const glowMaterial = new THREE.LineBasicMaterial({
-        color: 0x67D4E4,
-        transparent: true,
-        opacity: 0.08,
-        linewidth: 2
-    });
-    
-    // Concentric circles (8 for E8 reference)
-    for (let i = 1; i <= 8; i++) {
-        const r = (radius * i) / 9;
-        const points = [];
-        for (let j = 0; j <= 64; j++) {
-            const angle = (j / 64) * Math.PI * 2;
-            points.push(new THREE.Vector3(Math.cos(angle) * r, 0.01, Math.sin(angle) * r));
-        }
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const circle = new THREE.Line(geometry, lineMaterial);
-        group.add(circle);
-        
-        // Add glow layer
-        const glowGeometry = new THREE.BufferGeometry().setFromPoints(points.map(p => 
-            new THREE.Vector3(p.x, 0.005, p.z)
-        ));
-        const glowCircle = new THREE.Line(glowGeometry, glowMaterial);
-        group.add(glowCircle);
-    }
-    
-    // Radial lines (7 for Fano + 7 more)
-    for (let i = 0; i < 14; i++) {
-        const angle = (i / 14) * Math.PI * 2;
-        const points = [
-            new THREE.Vector3(0, 0.01, 0),
-            new THREE.Vector3(Math.cos(angle) * radius, 0.01, Math.sin(angle) * radius)
-        ];
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const line = new THREE.Line(geometry, lineMaterial);
-        group.add(line);
-        
-        // Add glow layer for radial lines
-        const glowPoints = [
-            new THREE.Vector3(0, 0.005, 0),
-            new THREE.Vector3(Math.cos(angle) * radius, 0.005, Math.sin(angle) * radius)
-        ];
-        const glowGeometry = new THREE.BufferGeometry().setFromPoints(glowPoints);
-        const glowLine = new THREE.Line(glowGeometry, glowMaterial);
-        group.add(glowLine);
-    }
-    
-    // Add center glow point
-    const centerGeo = new THREE.CircleGeometry(0.5, 32);
-    const centerMat = new THREE.MeshBasicMaterial({
-        color: 0x67D4E4,
-        transparent: true,
-        opacity: 0.2
-    });
-    const centerGlow = new THREE.Mesh(centerGeo, centerMat);
-    centerGlow.rotation.x = -Math.PI / 2;
-    centerGlow.position.y = 0.02;
-    group.add(centerGlow);
-    
-    return group;
-}
-
-function createRotundaWalls(radius, height, materials) {
-    const group = new THREE.Group();
-    group.name = 'rotunda-walls';
-    
-    // Create wall segments between wing openings
-    const wingOpeningAngle = Math.PI / 12; // Opening width in radians
-    
+    // Radial lines pointing to wings (use thin planes for better visibility)
     COLONY_ORDER.forEach((colony, i) => {
         const data = COLONY_DATA[colony];
-        const startAngle = data.wingAngle + wingOpeningAngle;
-        const endAngle = data.wingAngle + (Math.PI * 2 / 7) - wingOpeningAngle;
         
-        // Wall segment
-        const segmentAngle = endAngle - startAngle;
-        const wallGeo = new THREE.CylinderGeometry(
-            radius, radius, height,
-            16, 1, true,
-            startAngle, segmentAngle
-        );
-        const wall = new THREE.Mesh(wallGeo, materials.wall);
-        wall.position.y = height / 2;
-        group.add(wall);
-        
-        // Colony accent strip at top of wall - ENLARGED (0.8m height)
-        const accentGeo = new THREE.CylinderGeometry(
-            radius + 0.08, radius + 0.08, 0.8,
-            16, 1, true,
-            startAngle, segmentAngle
-        );
-        const accentMat = new THREE.MeshBasicMaterial({
-            color: data.hex,
+        // Create a thin plane instead of a line for better visibility
+        const lineLength = radius - 2;  // Don't go all the way to center
+        const lineGeo = new THREE.PlaneGeometry(0.08, lineLength);
+        const lineMat = new THREE.MeshBasicMaterial({ 
+            color: data.hex, 
+            opacity: 0.6,
             transparent: true,
-            opacity: 0.7
-        });
-        const accent = new THREE.Mesh(accentGeo, accentMat);
-        accent.position.y = height - 0.6;
-        group.add(accent);
-        
-        // Subtle glow behind accent strip
-        const glowGeo = new THREE.CylinderGeometry(
-            radius + 0.02, radius + 0.02, 1.2,
-            16, 1, true,
-            startAngle, segmentAngle
-        );
-        const glowMat = new THREE.MeshBasicMaterial({
-            color: data.hex,
-            transparent: true,
-            opacity: 0.15,
-            side: THREE.BackSide
-        });
-        const glow = new THREE.Mesh(glowGeo, glowMat);
-        glow.position.y = height - 0.6;
-        group.add(glow);
-        
-        // Baseboard at bottom
-        const baseboardGeo = new THREE.CylinderGeometry(
-            radius + 0.1, radius + 0.1, 0.3,
-            16, 1, true,
-            startAngle, segmentAngle
-        );
-        const baseboard = new THREE.Mesh(baseboardGeo, materials.baseboard);
-        baseboard.position.y = 0.15;
-        group.add(baseboard);
-        
-        // Vertical ribs/panels (3 per segment)
-        const numRibs = 3;
-        for (let r = 0; r < numRibs; r++) {
-            const ribAngle = startAngle + segmentAngle * ((r + 0.5) / numRibs);
-            const ribX = Math.cos(ribAngle) * (radius + 0.05);
-            const ribZ = Math.sin(ribAngle) * (radius + 0.05);
-            
-            const ribGeo = new THREE.BoxGeometry(0.08, height - 1.5, 0.4);
-            const rib = new THREE.Mesh(ribGeo, materials.rib);
-            rib.position.set(ribX, height / 2 - 0.3, ribZ);
-            rib.rotation.y = -ribAngle + Math.PI / 2;
-            group.add(rib);
-        }
-    });
-    
-    return group;
-}
-
-function createDome(radius, height, domeStart, materials) {
-    const group = new THREE.Group();
-    group.name = 'dome';
-    
-    // Hemisphere dome
-    const domeRadius = radius;
-    const domeGeo = new THREE.SphereGeometry(
-        domeRadius, 64, 32,
-        0, Math.PI * 2,
-        0, Math.PI / 2
-    );
-    const dome = new THREE.Mesh(domeGeo, materials.ceiling);
-    dome.position.y = domeStart;
-    dome.scale.y = (height - domeStart) / domeRadius;
-    group.add(dome);
-    
-    // Hopf fibration projection on dome (simplified as glowing rings)
-    const hopfGroup = createHopfProjection(domeRadius * 0.9, 7);
-    hopfGroup.position.y = domeStart + 2;
-    group.add(hopfGroup);
-    
-    return group;
-}
-
-function createHopfProjection(radius, numRings) {
-    const group = new THREE.Group();
-    group.name = 'hopf-projection';
-    
-    COLONY_ORDER.forEach((colony, i) => {
-        const color = COLONY_DATA[colony].hex;
-        const material = new THREE.MeshBasicMaterial({
-            color: color,
-            transparent: true,
-            opacity: 0.4,
             side: THREE.DoubleSide
         });
+        const line = new THREE.Mesh(lineGeo, lineMat);
         
-        // Tilted torus ring
-        const torusGeo = new THREE.TorusGeometry(radius * 0.3, 0.1, 16, 32);
-        const torus = new THREE.Mesh(torusGeo, material);
-        
-        // Position around dome
-        const angle = (i / 7) * Math.PI * 2;
-        const tilt = Math.PI / 4 + (i * 0.2);
-        
-        torus.position.set(
-            Math.cos(angle) * radius * 0.4,
-            radius * 0.2 + Math.sin(i) * 2,
-            Math.sin(angle) * radius * 0.4
+        // Position at half the radius, rotated to point outward
+        line.rotation.x = -Math.PI / 2;  // Lay flat
+        line.rotation.z = -data.wingAngle + Math.PI / 2;  // Point toward wing
+        line.position.set(
+            Math.cos(data.wingAngle) * (radius / 2 + 1),
+            0.01,  // Slightly above floor
+            Math.sin(data.wingAngle) * (radius / 2 + 1)
         );
-        torus.rotation.set(tilt, angle, 0);
-        
-        group.add(torus);
+        group.add(line);
+    });
+    
+    // === WALLS (warm concrete, cylindrical) ===
+    const wallGeo = new THREE.CylinderGeometry(
+        radius, radius * 1.02,  // Slight outward cant (Gehry)
+        height * 0.7,
+        wallSegments, 1, true
+    );
+    const walls = new THREE.Mesh(wallGeo, materials.concrete);
+    walls.name = 'wall-rotunda';
+    walls.userData.occludes = true;
+    walls.position.y = height * 0.35;
+    walls.receiveShadow = true;
+    walls.castShadow = true;
+    group.add(walls);
+    
+    // === DOME (Gehry asymmetric curve) ===
+    createGehryDome(group, materials, radius, height, apertureRadius, apertureOffset);
+    
+    // === FANO SCULPTURE (simplified - just the 7 lines) ===
+    const fano = createSimplifiedFano(materials.steel);
+    fano.position.y = height * 0.5;
+    fano.userData = { interactive: true, type: 'fano-sculpture' };
+    group.add(fano);
+    
+    // === TRIANGULAR PORTALS (Pei-inspired) ===
+    COLONY_ORDER.forEach(colony => {
+        const data = COLONY_DATA[colony];
+        const portal = createTriangularPortal(
+            data.wingAngle, 
+            radius, 
+            DIMENSIONS.wing.entranceHeight,
+            data.hex
+        );
+        group.add(portal);
     });
     
     return group;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// FANO PLANE SCULPTURE
+// GEHRY DOME (asymmetric with off-center aperture)
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function createFanoSculpture(scale = 3) {
+function createGehryDome(group, materials, radius, height, apertureRadius, apertureOffset) {
+    // Custom dome geometry - asymmetric curve
+    const segments = 48;
+    const rings = 24;
+    const positions = [];
+    const indices = [];
+    const uvs = [];
+    
+    const domeStart = DIMENSIONS.rotunda.domeStart;
+    
+    for (let ring = 0; ring <= rings; ring++) {
+        const v = ring / rings;
+        
+        for (let seg = 0; seg <= segments; seg++) {
+            const u = seg / segments;
+            const theta = u * Math.PI * 2;
+            
+            // Asymmetric radius (Gehry effect)
+            const asymmetry = 1 + 0.08 * Math.sin(theta * 2);
+            const ringRadius = radius * (1 - v * 0.7) * asymmetry;
+            
+            // Height curve (steeper on one side)
+            const heightCurve = Math.pow(v, 1.5 + 0.3 * Math.cos(theta));
+            const y = domeStart + (height - domeStart) * heightCurve;
+            
+            // Check if inside aperture (off-center)
+            const distFromAperture = Math.sqrt(
+                Math.pow(ringRadius * Math.cos(theta) - apertureOffset, 2) +
+                Math.pow(ringRadius * Math.sin(theta), 2)
+            );
+            
+            if (v > 0.85 && distFromAperture < apertureRadius) {
+                continue; // Skip aperture area
+            }
+            
+            positions.push(
+                ringRadius * Math.cos(theta),
+                y,
+                ringRadius * Math.sin(theta)
+            );
+            uvs.push(u, v);
+        }
+    }
+    
+    // Create indices (simplified for now - use sphere as base)
+    const domeGeo = new THREE.SphereGeometry(radius, segments, rings, 0, Math.PI * 2, 0, Math.PI * 0.5);
+    
+    // Apply asymmetric deformation to sphere
+    const pos = domeGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const y = pos.getY(i);
+        const z = pos.getZ(i);
+        
+        const theta = Math.atan2(z, x);
+        const asymmetry = 1 + 0.1 * Math.sin(theta * 2);
+        
+        pos.setX(i, x * asymmetry);
+        pos.setZ(i, z * asymmetry);
+        pos.setY(i, y * 0.6 + domeStart);  // Flatten and raise
+    }
+    pos.needsUpdate = true;
+    domeGeo.computeVertexNormals();
+    
+    const dome = new THREE.Mesh(domeGeo, materials.ceiling);
+    dome.name = 'dome';
+    dome.userData.occludes = true;
+    group.add(dome);
+    
+    // Aperture ring (off-center)
+    const ringGeo = new THREE.TorusGeometry(apertureRadius, 0.3, 8, 32);
+    const ring = new THREE.Mesh(ringGeo, materials.steel);
+    ring.position.set(apertureOffset, height - 1, 0);
+    ring.rotation.x = Math.PI / 2;
+    group.add(ring);
+    
+    // Sky disc visible through aperture
+    const skyGeo = new THREE.CircleGeometry(apertureRadius - 0.1, 32);
+    const skyMat = new THREE.MeshBasicMaterial({ 
+        color: 0x4488AA, 
+        side: THREE.DoubleSide 
+    });
+    const sky = new THREE.Mesh(skyGeo, skyMat);
+    sky.position.set(apertureOffset, height - 0.5, 0);
+    sky.rotation.x = Math.PI / 2;
+    group.add(sky);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SIMPLIFIED FANO SCULPTURE (just 7 lines, no particles)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function createSimplifiedFano(steelMaterial) {
     const group = new THREE.Group();
     group.name = 'fano-sculpture';
     
-    // Fano plane points (7 points)
-    const points = [
-        [0, 2, 0],        // 0 - Spark (top)
-        [-1.5, 0.5, 0.5], // 1 - Forge
-        [1.5, 0.5, 0.5],  // 2 - Flow
-        [-2, -1.5, 0],    // 3 - Nexus
-        [0, -0.5, 1],     // 4 - Beacon (center front)
-        [2, -1.5, 0],     // 5 - Grove
-        [0, -2.5, -0.5]   // 6 - Crystal (bottom)
-    ].map(p => new THREE.Vector3(p[0] * scale, p[1] * scale, p[2] * scale));
+    const scale = 2.5;
     
-    // Fano lines (7 lines, each connecting 3 collinear points)
-    const lines = [
-        [0, 1, 3], [0, 2, 5], [0, 4, 6],
-        [1, 2, 4], [1, 5, 6], [2, 3, 6], [3, 4, 5]
+    // 7 points on a heptagon
+    const points = [];
+    for (let i = 0; i < 7; i++) {
+        const angle = (i / 7) * Math.PI * 2 - Math.PI / 2;
+        points.push(new THREE.Vector3(
+            Math.cos(angle) * scale,
+            0,
+            Math.sin(angle) * scale
+        ));
+    }
+    
+    // Fano plane connections (each point connects to 3 others)
+    const connections = [
+        [0, 1], [0, 2], [0, 4],
+        [1, 2], [1, 3], [1, 5],
+        [2, 3], [2, 6],
+        [3, 4], [3, 5],
+        [4, 5], [4, 6],
+        [5, 6], [6, 0]
     ];
     
-    // Create nodes (icosahedrons)
-    COLONY_ORDER.forEach((colony, i) => {
-        const color = COLONY_DATA[colony].hex;
-        
-        // Core
-        const coreGeo = new THREE.IcosahedronGeometry(0.5, 2);
-        const coreMat = new THREE.MeshPhysicalMaterial({
-            color: color,
-            emissive: color,
-            emissiveIntensity: 0.5,
-            metalness: 0.2,
-            roughness: 0.3,
-            clearcoat: 0.8
-        });
-        const core = new THREE.Mesh(coreGeo, coreMat);
-        core.position.copy(points[i]);
-        core.userData = { colony, index: i, type: 'fano-node' };
-        group.add(core);
-        
-        // Glow
-        const glowGeo = new THREE.IcosahedronGeometry(0.7, 1);
-        const glowMat = new THREE.MeshBasicMaterial({
-            color: color,
-            transparent: true,
-            opacity: 0.2,
-            side: THREE.BackSide
-        });
-        const glow = new THREE.Mesh(glowGeo, glowMat);
-        glow.position.copy(points[i]);
-        group.add(glow);
-    });
-    
-    // Create connecting lines
-    lines.forEach((lineIndices, lineIdx) => {
-        // Get colors from endpoints
-        const color1 = COLONY_DATA[COLONY_ORDER[lineIndices[0]]].hex;
-        const color2 = COLONY_DATA[COLONY_ORDER[lineIndices[2]]].hex;
-        
-        // Create curved line through 3 points
-        const curve = new THREE.CatmullRomCurve3([
-            points[lineIndices[0]],
-            points[lineIndices[1]],
-            points[lineIndices[2]]
-        ]);
-        
-        const tubeGeo = new THREE.TubeGeometry(curve, 32, 0.08, 8, false);
-        const tubeMat = new THREE.MeshBasicMaterial({
-            color: new THREE.Color(color1).lerp(new THREE.Color(color2), 0.5),
-            transparent: true,
-            opacity: 0.6
-        });
-        const tube = new THREE.Mesh(tubeGeo, tubeMat);
-        tube.userData = { type: 'fano-line', indices: lineIndices };
+    connections.forEach(([a, b]) => {
+        const tubeGeo = new THREE.TubeGeometry(
+            new THREE.CatmullRomCurve3([points[a], points[b]]),
+            8, 0.03, 6, false
+        );
+        const tube = new THREE.Mesh(tubeGeo, steelMaterial);
+        tube.castShadow = true;
         group.add(tube);
     });
     
-    // Slow rotation animation data
-    group.userData.rotationSpeed = 0.1;
+    // Small spheres at vertices
+    points.forEach((point, i) => {
+        const sphereGeo = new THREE.SphereGeometry(0.08, 16, 16);
+        const sphere = new THREE.Mesh(sphereGeo, steelMaterial);
+        sphere.position.copy(point);
+        sphere.castShadow = true;
+        group.add(sphere);
+    });
     
     return group;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// WING CORRIDORS
+// TRIANGULAR PORTAL (Pei-inspired wing entrance)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function createTriangularPortal(angle, rotundaRadius, height, color) {
+    const group = new THREE.Group();
+    
+    const width = DIMENSIONS.wing.width;
+    
+    // Triangle shape for portal frame
+    const shape = new THREE.Shape();
+    shape.moveTo(-width / 2, 0);
+    shape.lineTo(0, height * 1.5);  // Peak above entrance
+    shape.lineTo(width / 2, 0);
+    shape.lineTo(-width / 2, 0);
+    
+    // Inner cutout (the actual opening)
+    const hole = new THREE.Path();
+    const inset = 0.8;
+    hole.moveTo(-width / 2 * inset, 0.1);
+    hole.lineTo(0, height * 1.3);
+    hole.lineTo(width / 2 * inset, 0.1);
+    hole.lineTo(-width / 2 * inset, 0.1);
+    shape.holes.push(hole);
+    
+    const extrudeSettings = {
+        depth: 1,
+        bevelEnabled: false
+    };
+    
+    const frameGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+    const frameMat = new THREE.MeshStandardMaterial({
+        color: color,
+        metalness: 0.6,
+        roughness: 0.3
+    });
+    
+    const frame = new THREE.Mesh(frameGeo, frameMat);
+    
+    // Position at rotunda edge
+    frame.position.set(
+        Math.cos(angle) * rotundaRadius,
+        0,
+        Math.sin(angle) * rotundaRadius
+    );
+    frame.rotation.y = -angle + Math.PI / 2;
+    frame.castShadow = true;
+    
+    group.add(frame);
+    
+    return group;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WING CORRIDORS (extreme compression: 4m wide, ceiling taper 8m→4m)
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function createWing(colony, materials) {
     const group = new THREE.Group();
     group.name = `wing-${colony}`;
-    
     const data = COLONY_DATA[colony];
-    const { width, length, height } = DIMENSIONS.wing;
-    const { radius: rotundaRadius } = DIMENSIONS.rotunda;
-    
-    // Position wing radiating from rotunda
     const angle = data.wingAngle;
-    
-    // Floor
+    const { width, length, corridorHeight, corridorCeilingMin, vestibuleDepth } = DIMENSIONS.wing;
+    const rotundaRadius = DIMENSIONS.rotunda.radius;
+    const cos = Math.cos(angle), sin = Math.sin(angle);
+
+    // Corridor in 3 segments: ceiling 8m -> 6m -> 4m
+    const segLen = length / 3;
+    const heights = [corridorHeight, (corridorHeight + (corridorCeilingMin ?? 4)) / 2, corridorCeilingMin ?? 4];
+
+    // === FLOOR (corridor only; vestibule has its own floor) ===
     const floorGeo = new THREE.PlaneGeometry(width, length);
     const floor = new THREE.Mesh(floorGeo, materials.floor);
     floor.rotation.x = -Math.PI / 2;
-    floor.position.set(0, 0, length / 2);
-    floor.receiveShadow = true;
-    group.add(floor);
-    
-    // Floor accent line (colony color)
-    const accentLineGeo = new THREE.PlaneGeometry(0.2, length);
-    const accentLineMat = new THREE.MeshBasicMaterial({
-        color: data.hex,
-        transparent: true,
-        opacity: 0.4
-    });
-    const accentLine = new THREE.Mesh(accentLineGeo, accentLineMat);
-    accentLine.rotation.x = -Math.PI / 2;
-    accentLine.position.set(0, 0.01, length / 2);
-    group.add(accentLine);
-    
-    // Left wall
-    const leftWallGeo = new THREE.BoxGeometry(0.3, height, length);
-    const leftWall = new THREE.Mesh(leftWallGeo, materials.wall);
-    leftWall.position.set(-width / 2, height / 2, length / 2);
-    group.add(leftWall);
-    
-    // Right wall
-    const rightWall = leftWall.clone();
-    rightWall.position.set(width / 2, height / 2, length / 2);
-    group.add(rightWall);
-    
-    // Ceiling
-    const ceilingGeo = new THREE.PlaneGeometry(width, length);
-    const ceiling = new THREE.Mesh(ceilingGeo, materials.ceiling);
-    ceiling.rotation.x = Math.PI / 2;
-    ceiling.position.set(0, height, length / 2);
-    group.add(ceiling);
-    
-    // Accent lighting strips along ceiling edges
-    const lightStripGeo = new THREE.BoxGeometry(0.1, 0.1, length);
-    const lightStripMat = new THREE.MeshBasicMaterial({
-        color: data.hex,
-        transparent: true,
-        opacity: 0.7
-    });
-    
-    const leftStrip = new THREE.Mesh(lightStripGeo, lightStripMat);
-    leftStrip.position.set(-width / 2 + 0.5, height - 0.1, length / 2);
-    group.add(leftStrip);
-    
-    const rightStrip = leftStrip.clone();
-    rightStrip.position.set(width / 2 - 0.5, height - 0.1, length / 2);
-    group.add(rightStrip);
-    
-    // Wing label at entrance
-    const labelGroup = createWingLabel(data.name, data.hex, width);
-    labelGroup.position.set(0, height - 1, 2);
-    group.add(labelGroup);
-    
-    // Position and rotate entire wing
-    group.position.set(
-        Math.cos(angle) * rotundaRadius,
-        0,
-        Math.sin(angle) * rotundaRadius
+    floor.rotation.z = angle;
+    floor.position.set(
+        cos * (rotundaRadius + length / 2),
+        0.01,
+        sin * (rotundaRadius + length / 2)
     );
-    group.rotation.y = -angle + Math.PI / 2;
-    
-    // Store colony reference
-    group.userData = { colony, categories: data.categories };
-    
-    return group;
-}
+    floor.receiveShadow = true;
+    floor.name = `wing-floor-${colony}`;
+    group.add(floor);
 
-function createWingLabel(name, color, width) {
-    const group = new THREE.Group();
-    
-    // Create text using canvas texture
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    
-    // Background
-    ctx.fillStyle = 'rgba(18, 16, 26, 0.9)';
-    ctx.fillRect(0, 0, 512, 128);
-    
-    // Border
-    ctx.strokeStyle = `#${color.toString(16).padStart(6, '0')}`;
-    ctx.lineWidth = 4;
-    ctx.strokeRect(4, 4, 504, 120);
-    
-    // Text
-    ctx.fillStyle = '#F5F0E8';
-    ctx.font = '600 48px "IBM Plex Sans", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${name.toUpperCase()} WING`, 256, 64);
-    
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    
-    const planeGeo = new THREE.PlaneGeometry(width * 0.8, width * 0.2);
-    const planeMat = new THREE.MeshBasicMaterial({
-        map: texture,
-        transparent: true
+    const centerLineLen = length;
+    const lineGeo = new THREE.PlaneGeometry(0.08, centerLineLen);
+    const lineMat = new THREE.MeshBasicMaterial({
+        color: data.hex,
+        opacity: 0.6,
+        transparent: true,
+        side: THREE.DoubleSide
     });
-    const plane = new THREE.Mesh(planeGeo, planeMat);
-    group.add(plane);
-    
+    const centerLine = new THREE.Mesh(lineGeo, lineMat);
+    centerLine.rotation.x = -Math.PI / 2;
+    centerLine.rotation.z = angle;
+    centerLine.position.set(cos * (rotundaRadius + length / 2), 0.02, sin * (rotundaRadius + length / 2));
+    group.add(centerLine);
+
+    // === WALLS + CEILING per segment (taper: rough concrete, last segment polished at threshold) ===
+    for (let i = 0; i < 3; i++) {
+        const h = heights[i];
+        const segStart = i * segLen;
+        const mid = segStart + segLen / 2;
+        const wallMat = i >= 2 ? materials.concretePolished : materials.concrete;
+        const ceilMat = materials.ceiling;
+
+        const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.4, h, segLen), wallMat);
+        leftWall.name = `wall-${colony}-left-${i}`;
+        leftWall.userData.occludes = true;
+        leftWall.position.set(
+            cos * (rotundaRadius + mid) - sin * width / 2,
+            h / 2,
+            sin * (rotundaRadius + mid) + cos * width / 2
+        );
+        leftWall.rotation.y = angle;
+        leftWall.castShadow = true;
+        leftWall.receiveShadow = true;
+        group.add(leftWall);
+
+        const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.4, h, segLen), wallMat);
+        rightWall.name = `wall-${colony}-right-${i}`;
+        rightWall.userData.occludes = true;
+        rightWall.position.set(
+            cos * (rotundaRadius + mid) + sin * width / 2,
+            h / 2,
+            sin * (rotundaRadius + mid) - cos * width / 2
+        );
+        rightWall.rotation.y = angle;
+        rightWall.castShadow = true;
+        rightWall.receiveShadow = true;
+        group.add(rightWall);
+
+        const ceilingGeo = new THREE.PlaneGeometry(width + 0.1, segLen);
+        const ceiling = new THREE.Mesh(ceilingGeo, ceilMat);
+        ceiling.userData.occludes = true;
+        ceiling.rotation.x = Math.PI / 2;
+        ceiling.rotation.z = angle;
+        ceiling.position.set(cos * (rotundaRadius + mid), h, sin * (rotundaRadius + mid));
+        group.add(ceiling);
+    }
+
     return group;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// GALLERY ROOMS
+// WING VESTIBULE (transition at compression/release: 4m→12m width, 4m→10m height)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export function createWingVestibule(colony, materials) {
+    const group = new THREE.Group();
+    group.name = `wing-vestibule-${colony}`;
+    const data = COLONY_DATA[colony];
+    const angle = data.wingAngle;
+    const rotundaRadius = DIMENSIONS.rotunda.radius;
+    const wingLength = DIMENSIONS.wing.length;
+    const vestibuleDepth = DIMENSIONS.wing.vestibuleDepth ?? 6;
+    const cos = Math.cos(angle), sin = Math.sin(angle);
+    const centerDist = rotundaRadius + wingLength + vestibuleDepth / 2;
+    const centerX = cos * centerDist;
+    const centerZ = sin * centerDist;
+    const widthStart = DIMENSIONS.wing.width;
+    const widthEnd = 12;
+    const heightStart = DIMENSIONS.wing.corridorCeilingMin ?? 4;
+    const heightEnd = 10;
+    const widthMid = (widthStart + widthEnd) / 2;
+    const heightMid = (heightStart + heightEnd) / 2;
+
+    const floorGeo = new THREE.PlaneGeometry(widthEnd, vestibuleDepth);
+    const floor = new THREE.Mesh(floorGeo, materials.floor);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(centerX, 0.01, centerZ);
+    floor.rotation.z = angle;
+    floor.receiveShadow = true;
+    group.add(floor);
+
+    const wallMat = materials.concretePolished;
+    const leftWall = new THREE.Mesh(
+        new THREE.BoxGeometry(0.4, heightMid, vestibuleDepth),
+        wallMat
+    );
+    leftWall.position.set(centerX - sin * widthMid / 2, heightMid / 2, centerZ + cos * widthMid / 2);
+    leftWall.rotation.y = angle;
+    group.add(leftWall);
+    const rightWall = new THREE.Mesh(
+        new THREE.BoxGeometry(0.4, heightMid, vestibuleDepth),
+        wallMat
+    );
+    rightWall.position.set(centerX + sin * widthMid / 2, heightMid / 2, centerZ - cos * widthMid / 2);
+    rightWall.rotation.y = angle;
+    group.add(rightWall);
+
+    const ceilingGeo = new THREE.PlaneGeometry(widthMid, vestibuleDepth);
+    const ceiling = new THREE.Mesh(ceilingGeo, materials.ceiling);
+    ceiling.userData.occludes = true;
+    ceiling.rotation.x = Math.PI / 2;
+    ceiling.rotation.z = angle;
+    ceiling.position.set(centerX, heightMid, centerZ);
+    group.add(ceiling);
+
+    return group;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GALLERY ROOM (high ceiling - the "release")
+// Each wing has ONE distinct architectural feature
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function createGalleryRoom(colony, categoryId, materials) {
     const group = new THREE.Group();
     group.name = `gallery-${colony}-${categoryId}`;
     
-    const { width, depth, height } = DIMENSIONS.gallery;
     const data = COLONY_DATA[colony];
+    const angle = data.wingAngle;
+    const { width, depth, height } = DIMENSIONS.gallery;
+    const rotundaRadius = DIMENSIONS.rotunda.radius;
+    const wingLength = DIMENSIONS.wing.length;
+    const vestibuleDepth = DIMENSIONS.wing.vestibuleDepth ?? 6;
+    // Gallery position after corridor + vestibule
+    const centerDist = rotundaRadius + wingLength + vestibuleDepth + depth / 2;
+    const centerX = Math.cos(angle) * centerDist;
+    const centerZ = Math.sin(angle) * centerDist;
     
-    // Floor
+    // === FLOOR ===
     const floorGeo = new THREE.PlaneGeometry(width, depth);
-    const floor = new THREE.Mesh(floorGeo, materials.floorReflective);
+    const floor = new THREE.Mesh(floorGeo, materials.floor);
     floor.rotation.x = -Math.PI / 2;
+    floor.position.set(centerX, 0.01, centerZ);
+    floor.rotation.z = angle;
     floor.receiveShadow = true;
     group.add(floor);
     
-    // Walls
-    const wallGeo = new THREE.BoxGeometry(0.3, height, depth);
+    // === SIDE WALLS (concrete) ===
+    const wallThickness = 0.5;
+    const sideWallGeo = new THREE.BoxGeometry(wallThickness, height, depth);
     
-    // Left wall
-    const leftWall = new THREE.Mesh(wallGeo, materials.wall);
-    leftWall.position.set(-width / 2, height / 2, 0);
+    const leftWall = new THREE.Mesh(sideWallGeo, materials.concrete);
+    leftWall.name = `wall-gallery-${colony}-left`;
+    leftWall.userData.occludes = true;
+    leftWall.position.set(
+        centerX - Math.sin(angle) * width / 2,
+        height / 2,
+        centerZ + Math.cos(angle) * width / 2
+    );
+    leftWall.rotation.y = angle;
     group.add(leftWall);
     
-    // Right wall
-    const rightWall = new THREE.Mesh(wallGeo, materials.wall);
-    rightWall.position.set(width / 2, height / 2, 0);
+    const rightWall = new THREE.Mesh(sideWallGeo, materials.concrete);
+    rightWall.name = `wall-gallery-${colony}-right`;
+    rightWall.userData.occludes = true;
+    rightWall.position.set(
+        centerX + Math.sin(angle) * width / 2,
+        height / 2,
+        centerZ - Math.cos(angle) * width / 2
+    );
+    rightWall.rotation.y = angle;
     group.add(rightWall);
     
-    // Back wall
-    const backWallGeo = new THREE.BoxGeometry(width, height, 0.3);
-    const backWall = new THREE.Mesh(backWallGeo, materials.wall);
-    backWall.position.set(0, height / 2, depth / 2);
-    group.add(backWall);
-    
-    // Ceiling
+    // === CEILING ===
     const ceilingGeo = new THREE.PlaneGeometry(width, depth);
     const ceiling = new THREE.Mesh(ceilingGeo, materials.ceiling);
+    ceiling.userData.occludes = true;
     ceiling.rotation.x = Math.PI / 2;
-    ceiling.position.y = height;
+    ceiling.rotation.z = angle;
+    ceiling.position.set(centerX, height, centerZ);
     group.add(ceiling);
     
-    // Accent lighting
-    const accentHeight = height - 0.5;
-    const accentMat = new THREE.MeshBasicMaterial({
-        color: data.hex,
+    // === WING-SPECIFIC ACCENT (the differentiator) ===
+    const backWallPos = {
+        x: centerX + Math.cos(angle) * depth / 2,
+        z: centerZ + Math.sin(angle) * depth / 2
+    };
+    
+    switch (colony) {
+        case 'spark': {
+            // COPPER-CLAD ACCENT WALL (warm reflections)
+            const copperMat = new THREE.MeshStandardMaterial({
+                color: 0xB87333,
+                metalness: 0.9,
+                roughness: 0.25
+            });
+            const copperWall = new THREE.Mesh(
+                new THREE.BoxGeometry(width, height, wallThickness),
+                copperMat
+            );
+            copperWall.position.set(backWallPos.x, height / 2, backWallPos.z);
+            copperWall.rotation.y = angle;
+            group.add(copperWall);
+            break;
+        }
+        
+        case 'forge': {
+            // BRASS INLAY FLOOR + warm metal wall
+            const brassMat = new THREE.MeshStandardMaterial({
+                color: 0xD4AF37,
+                metalness: 0.85,
+                roughness: 0.2
+            });
+            
+            // Brass threshold inlay
+            const inlayGeo = new THREE.RingGeometry(2, 4, 6);
+            const inlay = new THREE.Mesh(inlayGeo, brassMat);
+            inlay.rotation.x = -Math.PI / 2;
+            inlay.position.set(centerX, 0.02, centerZ);
+            group.add(inlay);
+            
+            // Brass accent wall
+            const brassWall = new THREE.Mesh(
+                new THREE.BoxGeometry(width, height, wallThickness),
+                brassMat
+            );
+            brassWall.position.set(backWallPos.x, height / 2, backWallPos.z);
+            brassWall.rotation.y = angle;
+            group.add(brassWall);
+            break;
+        }
+        
+        case 'flow': {
+            // REFLECTION POOL (dynamic env map reflection)
+            const waterMat = createFlowPoolMaterial({ color: 0x4ECDC4 });
+            const poolGeo = new THREE.CircleGeometry(6, 32);
+            const pool = new THREE.Mesh(poolGeo, waterMat);
+            pool.rotation.x = -Math.PI / 2;
+            pool.position.set(centerX, 0.02, centerZ);
+            group.add(pool);
+            
+            // Glass back wall
+            const glassWall = materials.glass.clone();
+            glassWall.color = new THREE.Color(0x4ECDC4);
+            const backWall = new THREE.Mesh(
+                new THREE.BoxGeometry(width, height, wallThickness),
+                glassWall
+            );
+            backWall.position.set(backWallPos.x, height / 2, backWallPos.z);
+            backWall.rotation.y = angle;
+            group.add(backWall);
+            break;
+        }
+        
+        case 'nexus': {
+            // PERFORATED WALL (network pattern, light passes through)
+            const perfMat = new THREE.MeshStandardMaterial({
+                color: 0x9B7EBD,
+                metalness: 0.5,
+                roughness: 0.4
+            });
+            
+            // Create perforated effect with multiple boxes
+            const gridSize = 8;
+            const cellSize = width / gridSize;
+            for (let x = 0; x < gridSize; x++) {
+                for (let y = 0; y < gridSize; y++) {
+                    // Skip some cells to create perforation pattern
+                    if ((x + y) % 3 === 0) continue;
+                    
+                    const cell = new THREE.Mesh(
+                        new THREE.BoxGeometry(cellSize * 0.8, (height / gridSize) * 0.8, wallThickness),
+                        perfMat
+                    );
+                    const offsetX = (x - gridSize / 2 + 0.5) * cellSize;
+                    const offsetY = (y + 0.5) * (height / gridSize);
+                    
+                    cell.position.set(
+                        backWallPos.x - Math.sin(angle) * offsetX,
+                        offsetY,
+                        backWallPos.z + Math.cos(angle) * offsetX
+                    );
+                    cell.rotation.y = angle;
+                    group.add(cell);
+                }
+            }
+            break;
+        }
+        
+        case 'beacon': {
+            // VERTICAL WINDOW SLOT (lighthouse reference)
+            const backWallMat = materials.concrete.clone();
+            const backWall = new THREE.Mesh(
+                new THREE.BoxGeometry(width, height, wallThickness),
+                backWallMat
+            );
+            backWall.position.set(backWallPos.x, height / 2, backWallPos.z);
+            backWall.rotation.y = angle;
+            group.add(backWall);
+            
+            // Vertical light slot
+            const slotMat = new THREE.MeshBasicMaterial({
+                color: 0xF59E0B,
+                transparent: true,
+                opacity: 0.8
+            });
+            const slot = new THREE.Mesh(
+                new THREE.BoxGeometry(1, height * 0.9, 0.1),
+                slotMat
+            );
+            slot.position.set(backWallPos.x, height / 2, backWallPos.z);
+            slot.rotation.y = angle;
+            group.add(slot);
+            break;
+        }
+        
+        case 'grove': {
+            // GREEN TEXTURED WALL (living wall reference)
+            const greenMat = new THREE.MeshStandardMaterial({
+                color: 0x4A7A4C,
+                roughness: 0.9,
+                metalness: 0.0
+            });
+            const greenWall = new THREE.Mesh(
+                new THREE.BoxGeometry(width, height, wallThickness),
+                greenMat
+            );
+            greenWall.position.set(backWallPos.x, height / 2, backWallPos.z);
+            greenWall.rotation.y = angle;
+            group.add(greenWall);
+            
+            // Subtle vine pattern (vertical lines)
+            const vineMat = new THREE.MeshBasicMaterial({
+                color: 0x7EB77F,
+                transparent: true,
+                opacity: 0.3
+            });
+            for (let i = 0; i < 5; i++) {
+                const vine = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.2, height, 0.1),
+                    vineMat
+                );
+                const offset = (i - 2) * (width / 5);
+                vine.position.set(
+                    backWallPos.x - Math.sin(angle) * offset,
+                    height / 2,
+                    backWallPos.z + Math.cos(angle) * offset
+                );
+                vine.rotation.y = angle;
+                group.add(vine);
+            }
+            break;
+        }
+        
+        case 'crystal': {
+            const crystalMat = createCrystalMaterial({
+                color: 0x67D4E4,
+                transmission: 0.7,
+                thickness: 1,
+                roughness: 0.05,
+                dispersion: 0.12,
+                iridescenceIntensity: 0.5
+            });
+            for (let i = 0; i < 7; i++) {
+                const facet = new THREE.Mesh(
+                    new THREE.BoxGeometry(width / 7, height, wallThickness),
+                    crystalMat.clone()
+                );
+                const offset = (i - 3) * (width / 7);
+                const angleOffset = (i - 3) * 0.1;  // Slight angle variation
+                
+                facet.position.set(
+                    backWallPos.x - Math.sin(angle) * offset,
+                    height / 2,
+                    backWallPos.z + Math.cos(angle) * offset
+                );
+                facet.rotation.y = angle + angleOffset;
+                group.add(facet);
+            }
+            break;
+        }
+    }
+    
+    // === TRIANGULAR SKYLIGHT (Pei touch - all galleries) ===
+    const skylightSize = Math.min(width, depth) * 0.3;
+    const skylightGeo = new THREE.ConeGeometry(skylightSize, 2, 3, 1, true);
+    const skylightMat = new THREE.MeshBasicMaterial({
+        color: 0x88AACC,
+        side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.5
+        opacity: 0.3
     });
-    
-    // Perimeter accent line
-    const accentPoints = [
-        new THREE.Vector3(-width/2 + 0.5, accentHeight, -depth/2 + 0.5),
-        new THREE.Vector3(-width/2 + 0.5, accentHeight, depth/2 - 0.5),
-        new THREE.Vector3(width/2 - 0.5, accentHeight, depth/2 - 0.5),
-        new THREE.Vector3(width/2 - 0.5, accentHeight, -depth/2 + 0.5),
-        new THREE.Vector3(-width/2 + 0.5, accentHeight, -depth/2 + 0.5)
-    ];
-    
-    const accentLineGeo = new THREE.BufferGeometry().setFromPoints(accentPoints);
-    const accentLine = new THREE.Line(accentLineGeo, new THREE.LineBasicMaterial({
-        color: data.hex,
-        transparent: true,
-        opacity: 0.6
-    }));
-    group.add(accentLine);
-    
-    // Store data
-    group.userData = { colony, categoryId, artworkSlots: [] };
+    const skylight = new THREE.Mesh(skylightGeo, skylightMat);
+    skylight.position.set(centerX, height + 1, centerZ);
+    skylight.rotation.x = Math.PI;
+    group.add(skylight);
     
     return group;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ENTRY VESTIBULE
+// VESTIBULE
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function createVestibule(materials) {
@@ -700,336 +858,116 @@ export function createVestibule(materials) {
     group.name = 'vestibule';
     
     const { width, depth, height } = DIMENSIONS.vestibule;
-    const { radius: rotundaRadius } = DIMENSIONS.rotunda;
+    const rotundaRadius = DIMENSIONS.rotunda.radius;
+    
+    // Position outside rotunda at main entrance (BUILDING.entranceWorldDirection)
+    const angle = BUILDING.entranceWorldDirection;
+    const centerX = Math.cos(angle) * (rotundaRadius + depth / 2 + 2);
+    const centerZ = Math.sin(angle) * (rotundaRadius + depth / 2 + 2);
     
     // Floor
     const floorGeo = new THREE.PlaneGeometry(width, depth);
     const floor = new THREE.Mesh(floorGeo, materials.floor);
     floor.rotation.x = -Math.PI / 2;
+    floor.position.set(centerX, 0.01, centerZ);
     floor.receiveShadow = true;
     group.add(floor);
     
-    // Walls (left and right)
-    const wallGeo = new THREE.BoxGeometry(0.3, height, depth);
+    // Walls
+    const wallGeo = new THREE.BoxGeometry(width, height, 0.5);
+    const backWall = new THREE.Mesh(wallGeo, materials.concrete);
+    backWall.name = 'wall-vestibule-back';
+    backWall.userData.occludes = true;
+    backWall.position.set(centerX, height / 2, centerZ - depth / 2);
+    group.add(backWall);
     
-    const leftWall = new THREE.Mesh(wallGeo, materials.wall);
-    leftWall.position.set(-width / 2, height / 2, 0);
+    // Side walls
+    const sideGeo = new THREE.BoxGeometry(0.5, height, depth);
+    const leftWall = new THREE.Mesh(sideGeo, materials.concrete);
+    leftWall.name = 'wall-vestibule-left';
+    leftWall.userData.occludes = true;
+    leftWall.position.set(centerX - width / 2, height / 2, centerZ);
     group.add(leftWall);
     
-    const rightWall = new THREE.Mesh(wallGeo, materials.wall);
-    rightWall.position.set(width / 2, height / 2, 0);
+    const rightWall = new THREE.Mesh(sideGeo, materials.concrete);
+    rightWall.name = 'wall-vestibule-right';
+    rightWall.userData.occludes = true;
+    rightWall.position.set(centerX + width / 2, height / 2, centerZ);
     group.add(rightWall);
-    
-    // Entry archway (back of vestibule)
-    const archGroup = createArchway(width, height, 0x67D4E4);
-    archGroup.position.set(0, 0, -depth / 2);
-    group.add(archGroup);
     
     // Ceiling
     const ceilingGeo = new THREE.PlaneGeometry(width, depth);
     const ceiling = new THREE.Mesh(ceilingGeo, materials.ceiling);
+    ceiling.userData.occludes = true;
     ceiling.rotation.x = Math.PI / 2;
-    ceiling.position.y = height;
+    ceiling.position.set(centerX, height, centerZ);
     group.add(ceiling);
     
-    // Title plaque
-    const titlePlaque = createTitlePlaque();
-    titlePlaque.position.set(0, height * 0.6, -depth / 2 + 1);
-    group.add(titlePlaque);
-    
-    // Position vestibule outside rotunda
-    group.position.set(0, 0, -rotundaRadius - depth / 2);
-    
-    return group;
-}
-
-function createArchway(width, height, color) {
-    const group = new THREE.Group();
-    
-    // Arch shape using CatmullRomCurve
-    const archPoints = [];
-    for (let i = 0; i <= 20; i++) {
-        const t = i / 20;
-        const angle = Math.PI * t;
-        archPoints.push(new THREE.Vector3(
-            Math.cos(angle) * (width / 2 - 0.5),
-            Math.sin(angle) * (height - 1) + 1,
-            0
-        ));
-    }
-    
-    const archCurve = new THREE.CatmullRomCurve3(archPoints);
-    const tubeGeo = new THREE.TubeGeometry(archCurve, 32, 0.15, 8, false);
-    const tubeMat = new THREE.MeshBasicMaterial({
-        color: color,
-        transparent: true,
-        opacity: 0.8
-    });
-    const arch = new THREE.Mesh(tubeGeo, tubeMat);
-    group.add(arch);
-    
-    return group;
-}
-
-function createTitlePlaque() {
-    const group = new THREE.Group();
-    
-    // Create canvas texture
-    const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 512;
-    const ctx = canvas.getContext('2d');
-    
-    // Background
-    ctx.fillStyle = 'rgba(7, 6, 11, 0.95)';
-    ctx.fillRect(0, 0, 1024, 512);
-    
-    // Border
-    ctx.strokeStyle = '#67D4E4';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(20, 20, 984, 472);
-    
-    // Title
-    ctx.fillStyle = '#F5F0E8';
-    ctx.font = '700 72px "Orbitron", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('鏡', 512, 120);
-    
-    ctx.font = '500 48px "IBM Plex Sans", sans-serif';
-    ctx.fillText('PATENT PORTFOLIO', 512, 200);
-    
-    // Subtitle
-    ctx.fillStyle = '#9E9994';
-    ctx.font = '400 28px "IBM Plex Sans", sans-serif';
-    ctx.fillText('54 Patentable Innovations', 512, 280);
-    
-    // h(x) >= 0
-    ctx.fillStyle = '#67D4E4';
-    ctx.font = '500 36px "IBM Plex Mono", monospace';
-    ctx.fillText('h(x) ≥ 0 always', 512, 380);
-    
-    const texture = new THREE.CanvasTexture(canvas);
-    
-    const planeGeo = new THREE.PlaneGeometry(6, 3);
-    const planeMat = new THREE.MeshBasicMaterial({
-        map: texture,
-        transparent: true
-    });
-    const plane = new THREE.Mesh(planeGeo, planeMat);
-    group.add(plane);
-    
     return group;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// AMBIENT LIGHTING
-// ═══════════════════════════════════════════════════════════════════════════
-
-function createAmbientLightRing(radius, numLights) {
-    const group = new THREE.Group();
-    group.name = 'ambient-light-ring';
-    
-    for (let i = 0; i < numLights; i++) {
-        const angle = (i / numLights) * Math.PI * 2;
-        const x = Math.cos(angle) * radius;
-        const z = Math.sin(angle) * radius;
-        
-        // Point light
-        const light = new THREE.PointLight(0xF5F0E8, 0.5, 30, 2);
-        light.position.set(x, 0, z);
-        group.add(light);
-        
-        // Visual indicator (small glowing sphere)
-        const sphereGeo = new THREE.SphereGeometry(0.2, 16, 16);
-        const sphereMat = new THREE.MeshBasicMaterial({
-            color: 0xF5F0E8,
-            transparent: true,
-            opacity: 0.6
-        });
-        const sphere = new THREE.Mesh(sphereGeo, sphereMat);
-        sphere.position.set(x, 0, z);
-        group.add(sphere);
-    }
-    
-    return group;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// COMPLETE MUSEUM ASSEMBLY
+// MUSEUM ASSEMBLY
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function createMuseum() {
-    const museum = new THREE.Group();
-    museum.name = 'patent-museum';
+    const group = new THREE.Group();
+    group.name = 'museum';
     
     // Create materials
     const materials = createMuseumMaterials();
     
+    // Aliases for compatibility
+    materials.wall = materials.concrete;
+    materials.wallAccent = materials.concrete;
+    materials.baseboard = materials.steel;
+    materials.rib = materials.concrete;
+    materials.floorReflective = materials.floor;
+    
     // Central rotunda
     const rotunda = createRotunda(materials);
-    museum.add(rotunda);
+    group.add(rotunda);
     
-    // Entry vestibule
-    const vestibule = createVestibule(materials);
-    museum.add(vestibule);
+    // Store references for animation
+    group.userData.rotunda = rotunda;
+    group.userData.materials = materials;
     
-    // Wing corridors
-    const wings = {};
+    // 7 wings (corridor + vestibule + gallery each)
     COLONY_ORDER.forEach(colony => {
         const wing = createWing(colony, materials);
-        wings[colony] = wing;
-        museum.add(wing);
-    });
-    
-    // Gallery rooms at the end of each wing
-    const galleries = {};
-    COLONY_ORDER.forEach(colony => {
+        group.add(wing);
+        const vestibule = createWingVestibule(colony, materials);
+        group.add(vestibule);
         const data = COLONY_DATA[colony];
-        const galleryGroup = new THREE.Group();
-        galleryGroup.name = `galleries-${colony}`;
-        
-        // Create gallery for each category in this wing
-        data.categories.forEach((categoryId, idx) => {
-            const gallery = createGalleryRoom(colony, categoryId, materials);
-            
-            // Position gallery at end of wing
-            const { radius } = DIMENSIONS.rotunda;
-            const { length } = DIMENSIONS.wing;
-            const { depth } = DIMENSIONS.gallery;
-            
-            // Gallery position: at end of wing corridor
-            const distance = radius + length + depth / 2 + 2; // Extra 2m for archway
-            const angle = data.wingAngle;
-            
-            gallery.position.set(
-                Math.cos(angle) * distance,
-                0,
-                Math.sin(angle) * distance
-            );
-            
-            // Rotate gallery to face wing
-            gallery.rotation.y = -angle + Math.PI / 2;
-            
-            // Offset multiple galleries laterally
-            if (data.categories.length > 1) {
-                const lateralOffset = (idx - (data.categories.length - 1) / 2) * (DIMENSIONS.gallery.width + 4);
-                const perpAngle = angle + Math.PI / 2;
-                gallery.position.x += Math.cos(perpAngle) * lateralOffset;
-                gallery.position.z += Math.sin(perpAngle) * lateralOffset;
-            }
-            
-            galleryGroup.add(gallery);
+        data.categories.forEach(cat => {
+            const gallery = createGalleryRoom(colony, cat, materials);
+            group.add(gallery);
         });
-        
-        // Create archway transition from wing to gallery
-        const archway = createGalleryArchway(colony, materials);
-        galleryGroup.add(archway);
-        
-        galleries[colony] = galleryGroup;
-        museum.add(galleryGroup);
     });
     
-    // Store references
-    museum.userData = {
-        materials,
-        rotunda,
-        vestibule,
-        wings,
-        galleries
-    };
+    // Vestibule
+    const vestibule = createVestibule(materials);
+    group.add(vestibule);
     
-    return museum;
-}
-
-// Create archway transition between wing and gallery
-function createGalleryArchway(colony, materials) {
-    const group = new THREE.Group();
-    group.name = `archway-${colony}`;
-    
-    const data = COLONY_DATA[colony];
-    const { radius } = DIMENSIONS.rotunda;
-    const { length, width, height } = DIMENSIONS.wing;
-    
-    // Position at end of wing
-    const distance = radius + length;
-    const angle = data.wingAngle;
-    
-    group.position.set(
-        Math.cos(angle) * distance,
-        0,
-        Math.sin(angle) * distance
-    );
-    group.rotation.y = -angle + Math.PI / 2;
-    
-    // Archway frame
-    const archWidth = width * 0.8;
-    const archHeight = height * 0.9;
-    const archDepth = 2;
-    
-    // Left pillar
-    const pillarGeo = new THREE.BoxGeometry(0.5, archHeight, archDepth);
-    const pillarMat = materials.wallAccent;
-    
-    const leftPillar = new THREE.Mesh(pillarGeo, pillarMat);
-    leftPillar.position.set(-archWidth / 2, archHeight / 2, 0);
-    group.add(leftPillar);
-    
-    // Right pillar
-    const rightPillar = new THREE.Mesh(pillarGeo, pillarMat);
-    rightPillar.position.set(archWidth / 2, archHeight / 2, 0);
-    group.add(rightPillar);
-    
-    // Top arch
-    const archGeo = new THREE.BoxGeometry(archWidth + 1, 0.5, archDepth);
-    const arch = new THREE.Mesh(archGeo, pillarMat);
-    arch.position.set(0, archHeight, 0);
-    group.add(arch);
-    
-    // Colony-colored accent
-    const accentGeo = new THREE.BoxGeometry(archWidth + 1.2, 0.15, archDepth + 0.2);
-    const accentMat = new THREE.MeshBasicMaterial({
-        color: data.hex,
-        transparent: true,
-        opacity: 0.6
-    });
-    const accent = new THREE.Mesh(accentGeo, accentMat);
-    accent.position.set(0, archHeight + 0.3, 0);
-    group.add(accent);
-    
-    // Floor connection
-    const floorGeo = new THREE.PlaneGeometry(archWidth, archDepth);
-    const floor = new THREE.Mesh(floorGeo, materials.floorReflective);
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = 0.01;
-    group.add(floor);
+    console.log('Museum created: Pei/Wright/Gehry architecture');
     
     return group;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ANIMATION HELPERS
+// ANIMATION (minimal - just Fano rotation)
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function animateFanoSculpture(sculpture, time) {
     if (!sculpture) return;
-    
-    // Slow rotation
-    sculpture.rotation.y = time * 0.1;
-    
-    // Pulse the nodes
-    sculpture.children.forEach((child, i) => {
-        if (child.userData?.type === 'fano-node') {
-            const pulse = 1 + Math.sin(time * 2 + i * 0.9) * 0.1;
-            child.scale.setScalar(pulse);
-        }
-    });
+    // Slow rotation: 1 revolution per 7 minutes (420 seconds)
+    sculpture.rotation.y = (time / 420) * Math.PI * 2;
 }
 
-export function animateHopfProjection(projection, time) {
-    if (!projection) return;
-    
-    projection.children.forEach((ring, i) => {
-        ring.rotation.z = time * 0.3 + i * 0.5;
-        ring.rotation.x = Math.sin(time * 0.2 + i) * 0.3 + Math.PI / 4;
-    });
+// Legacy compatibility stubs
+export function createFanoSculpture(scale) {
+    const materials = createMuseumMaterials();
+    return createSimplifiedFano(materials.steel);
 }
+
+export function animateHopfProjection() {}

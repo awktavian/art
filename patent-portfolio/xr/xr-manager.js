@@ -49,6 +49,8 @@ export class XRManager {
         // AR-specific
         this.hitTestSource = null;
         this.hitTestResults = [];
+        this.arAnchors = null; // XRARAnchors instance
+        this.domOverlayElement = null;
         
         // Callbacks
         this.onSessionStart = null;
@@ -143,6 +145,12 @@ export class XRManager {
             // Request hit test source for surface detection
             await this.setupHitTesting();
             
+            // Connect touch events for AR interactions if domOverlay is available
+            this.domOverlayElement = document.getElementById('ar-overlay');
+            if (this.domOverlayElement && this.arAnchors) {
+                this.arAnchors.connectTouchEvents(this.domOverlayElement);
+            }
+            
             console.log(`AR session started with ${this.referenceSpaceType} reference space`);
             
             if (this.onSessionStart) {
@@ -231,6 +239,11 @@ export class XRManager {
             this.hitTestSource = null;
         }
         
+        // Disconnect touch events for AR
+        if (this.domOverlayElement && this.arAnchors) {
+            this.arAnchors.disconnectTouchEvents(this.domOverlayElement);
+        }
+        
         // Reset state
         this.session = null;
         this.sessionType = null;
@@ -238,6 +251,7 @@ export class XRManager {
         this.referenceSpaceType = null;
         this.isPresenting = false;
         this.hitTestResults = [];
+        this.domOverlayElement = null;
         
         // Notify listeners
         if (this.onSessionEnd) {
@@ -314,6 +328,11 @@ export class XRManager {
         return this.session.enabledFeatures?.includes(feature) ?? false;
     }
     
+    // Set AR anchors instance for touch event handling
+    setARAnchors(arAnchors) {
+        this.arAnchors = arAnchors;
+    }
+    
     // ═══════════════════════════════════════════════════════════════════════
     // BUTTON CREATION
     // ═══════════════════════════════════════════════════════════════════════
@@ -337,10 +356,192 @@ export class XRManager {
             button.textContent = this.isPresenting ? 'Exit VR' : 'Enter VR';
         };
         
+        // Preserve existing callbacks
+        const originalOnStart = this.onSessionStart;
+        const originalOnEnd = this.onSessionEnd;
+        
         this.onSessionStart = (type) => {
             if (type === 'vr') updateButton();
+            if (originalOnStart) originalOnStart(type);
         };
-        this.onSessionEnd = () => updateButton();
+        this.onSessionEnd = () => {
+            updateButton();
+            if (originalOnEnd) originalOnEnd();
+        };
+        
+        return button;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // VISION PRO SPECIFIC FEATURES
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Detect if running on Apple Vision Pro
+     * Vision Pro uses WebXR with specific capabilities
+     */
+    isVisionPro() {
+        // Vision Pro detection heuristics:
+        // 1. Check for visionOS user agent
+        // 2. Check for Safari with WebXR support
+        // 3. Check for hand tracking without controllers
+        const ua = navigator.userAgent.toLowerCase();
+        const isVisionOS = ua.includes('visionos') || ua.includes('xros');
+        const isSafariWebXR = ua.includes('safari') && 'xr' in navigator;
+        
+        return isVisionOS || (isSafariWebXR && window.XRHand !== undefined);
+    }
+    
+    /**
+     * Request Vision Pro-optimized VR session
+     * Uses natural input (eye tracking + hand pinch) instead of controllers
+     */
+    async startVisionProSession() {
+        if (this.session) {
+            console.warn('XR session already active');
+            return false;
+        }
+        
+        try {
+            // Vision Pro features: hand tracking is the primary input
+            // No traditional controllers, uses eye tracking for gaze
+            const sessionInit = {
+                optionalFeatures: [
+                    'local-floor',
+                    'hand-tracking',       // Primary input method
+                    'layers',              // For high-quality rendering
+                    'depth-sensing',       // For occlusion
+                    'mesh-detection'       // For room understanding
+                ]
+            };
+            
+            // Vision Pro may support either immersive-vr or immersive-ar
+            // Try VR first (fully immersive) then fall back to AR (passthrough)
+            try {
+                this.session = await navigator.xr.requestSession('immersive-vr', sessionInit);
+                this.sessionType = 'vr';
+            } catch (vrError) {
+                console.log('Full VR not available, trying AR passthrough');
+                sessionInit.requiredFeatures = ['hand-tracking'];
+                this.session = await navigator.xr.requestSession('immersive-ar', sessionInit);
+                this.sessionType = 'ar';
+            }
+            
+            await this.setupSession();
+            await this.setupReferenceSpace(['local-floor', 'local']);
+            
+            // Configure for high-quality rendering on Vision Pro
+            this.configureVisionProRenderer();
+            
+            console.log(`Vision Pro session started (${this.sessionType})`);
+            
+            if (this.onSessionStart) {
+                this.onSessionStart(this.sessionType);
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('Failed to start Vision Pro session:', error);
+            if (this.onError) {
+                this.onError(error, 'visionpro');
+            }
+            return false;
+        }
+    }
+    
+    /**
+     * Configure renderer for Vision Pro's display characteristics
+     */
+    configureVisionProRenderer() {
+        if (!this.renderer) return;
+        
+        // Vision Pro has high pixel density display
+        // Use high-quality settings but be mindful of performance
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2.0));
+        
+        // Enable tone mapping for better HDR
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.0;
+        
+        // Vision Pro benefits from higher quality shadows
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
+        // Output encoding for sRGB display
+        this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    }
+    
+    /**
+     * Create Vision Pro-appropriate UI button
+     * Detects device and shows appropriate label
+     */
+    createVisionProButton() {
+        const button = document.createElement('button');
+        button.className = 'xr-button vision-pro-button';
+        button.id = 'visionpro-button';
+        
+        // Set label based on detection
+        const isVP = this.isVisionPro();
+        button.textContent = isVP ? 'Open in Vision Pro' : 'Enter VR';
+        button.innerHTML = isVP 
+            ? '🥽 Open in Vision Pro' 
+            : '🎮 Enter VR';
+        
+        button.style.cssText = `
+            background: linear-gradient(135deg, #2C3E50, #1A1A1A);
+            border: 1px solid rgba(103, 212, 228, 0.5);
+            color: #E0E0E0;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, 'IBM Plex Sans', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        `;
+        
+        button.addEventListener('mouseover', () => {
+            button.style.borderColor = '#67D4E4';
+            button.style.boxShadow = '0 0 20px rgba(103, 212, 228, 0.3)';
+        });
+        
+        button.addEventListener('mouseout', () => {
+            button.style.borderColor = 'rgba(103, 212, 228, 0.5)';
+            button.style.boxShadow = 'none';
+        });
+        
+        button.addEventListener('click', async () => {
+            if (this.isPresenting) {
+                await this.endSession();
+            } else if (isVP) {
+                await this.startVisionProSession();
+            } else {
+                await this.startVR();
+            }
+        });
+        
+        // Update button on session changes
+        const updateButton = () => {
+            if (this.isPresenting) {
+                button.innerHTML = '✕ Exit Immersive';
+            } else {
+                button.innerHTML = isVP 
+                    ? '🥽 Open in Vision Pro' 
+                    : '🎮 Enter VR';
+            }
+        };
+        
+        // Preserve existing callbacks
+        const originalOnStart = this.onSessionStart;
+        const originalOnEnd = this.onSessionEnd;
+        
+        this.onSessionStart = (type) => {
+            updateButton();
+            if (originalOnStart) originalOnStart(type);
+        };
+        this.onSessionEnd = () => {
+            updateButton();
+            if (originalOnEnd) originalOnEnd();
+        };
         
         return button;
     }

@@ -1,7 +1,7 @@
 # Kagami Codebase Architectural Analysis
 
-**Generated:** 2026-01-18
-**Codebase:** ~12,253 source files (py/rs/ts/swift/kt), ~814,655 lines Python in packages/, 18 semantic clusters
+**Generated:** 2026-01-27
+**Codebase:** 4,402 source files, 1,664,665 lines total (1,085,622 code / 285,846 blank / 293,197 comment), 7 colonies
 
 > Note: File/line counts are approximate. Run `cloc` for precise metrics.
 
@@ -401,9 +401,9 @@ The Kagami codebase is a feature-rich system at an **architectural inflection po
 
 | Metric | Value | Target |
 |--------|-------|--------|
-| Files | 4,513 | - |
-| Lines | 1,811,810 | - |
-| Clusters | 18 | - |
+| Files | 4,402 | - |
+| Lines | 1,664,665 | - |
+| Clusters | 7 | - |
 | God modules (>1000 LOC) | 10 | 0 |
 | Duplicate patterns | 20+ | <5 |
 | Test coverage | ~15% | >80% |

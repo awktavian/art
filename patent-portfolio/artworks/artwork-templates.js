@@ -10,6 +10,7 @@
 
 import * as THREE from 'three';
 import { createPlaque } from '../components/plaque.js';
+import { getCanvasFont, setupHiDPICanvas } from '../lib/typography.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // COLONY COLORS
@@ -132,6 +133,7 @@ export class TemplateArtwork extends THREE.Group {
         });
         const pedestal = new THREE.Mesh(geo, mat);
         pedestal.position.y = 0.1;
+        pedestal.userData.isPedestal = true;
         this.add(pedestal);
         
         // Glowing rim
@@ -512,37 +514,57 @@ export class TemplateArtwork extends THREE.Group {
     }
     
     createFloatingText(text, color) {
+        // Higher resolution canvas for crisp text (512x128 @ 2x DPI)
         const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 64;
-        const ctx = canvas.getContext('2d');
+        const ctx = setupHiDPICanvas(canvas, 256, 64, 2);
         
-        ctx.fillStyle = 'transparent';
-        ctx.fillRect(0, 0, 256, 64);
+        // Clear with transparency
+        ctx.clearRect(0, 0, 256, 64);
         
-        ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
-        ctx.font = 'bold 32px "IBM Plex Mono", monospace';
+        // Text with glow effect
+        const colorHex = '#' + color.toString(16).padStart(6, '0');
+        ctx.shadowColor = colorHex;
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = colorHex;
+        ctx.font = getCanvasFont(32, 'mono');
         ctx.textAlign = 'center';
-        ctx.fillText(text, 128, 40);
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 128, 32);
         
         const texture = new THREE.CanvasTexture(canvas);
-        const geo = new THREE.PlaneGeometry(1, 0.25);
+        texture.anisotropy = 8;
+        
+        const geo = new THREE.PlaneGeometry(1.2, 0.3);
         const mat = new THREE.MeshBasicMaterial({
             map: texture,
             transparent: true,
-            side: THREE.DoubleSide
+            side: THREE.DoubleSide,
+            depthWrite: false
         });
         const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.y = 1.5;
+        mesh.position.y = 1.8;
+        mesh.userData.isBillboard = true;  // Flag for billboard behavior
+        mesh.userData.floatingLabel = true;
         this.add(mesh);
+        
+        // Store reference for billboard update
+        if (!this.billboards) this.billboards = [];
+        this.billboards.push(mesh);
     }
     
     // ═══════════════════════════════════════════════════════════════════════
     // ANIMATION
     // ═══════════════════════════════════════════════════════════════════════
     
-    update(deltaTime) {
+    update(deltaTime, camera = null) {
         this.time += deltaTime;
+        
+        // Billboard behavior - make floating text face camera
+        if (camera && this.billboards) {
+            this.billboards.forEach(billboard => {
+                billboard.lookAt(camera.position);
+            });
+        }
         
         // Animate shapes
         if (this.shapes) {

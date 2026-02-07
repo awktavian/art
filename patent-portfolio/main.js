@@ -24,12 +24,34 @@ import {
 import { MuseumNavigation } from './museum/navigation.js';
 import { GalleryLoader } from './museum/gallery-loader.js';
 import { TurrellLighting } from './museum/lighting.js';
+import { WingEnhancementManager } from './museum/wing-enhancements.js';
+import { WayfindingManager } from './museum/wayfinding.js';
+import { AccessibilityManager, injectAccessibilityStyles } from './lib/accessibility.js';
 import { PostProcessingManager } from './lib/post-processing.js';
-import { CompleteSoundManager } from './lib/sound-design.js';
+import { SoundDesignManager } from './lib/sound-design.js';
 import { XRManager } from './xr/xr-manager.js';
 import { XRControllers } from './xr/xr-controllers.js';
 import { XRTeleport } from './xr/xr-teleport.js';
 import { PerformanceManager } from './lib/performance.js';
+import { 
+    getStateMachine, 
+    AppState, 
+    ErrorType 
+} from './lib/state-machine.js';
+import { getDebugManager } from './lib/debug-system.js';
+import { getCullingManager, SimpleOctree } from './lib/culling-system.js';
+import { getSettingsManager } from './lib/settings-menu.js';
+import { getJourneyTracker } from './lib/journey-tracker.js';
+import { VitalsDisplay } from './lib/vitals-display.js';
+import { 
+    createGradientEnvironmentMap, 
+    applyEnvironmentMapToScene,
+    setMaterialQuality 
+} from './lib/materials.js';
+import { ProximityTriggerManager } from './lib/proximity-triggers.js';
+import { AtmosphereManager } from './lib/atmosphere.js';
+import { createFloatingCard } from './components/floating-card.js';
+import { CONTEXT_PROMPTS } from './lib/interactions.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN APPLICATION
@@ -40,6 +62,22 @@ class PatentMuseum {
         this.container = document.getElementById('canvas-container');
         this.clock = new THREE.Clock();
         this.time = 0;
+        
+        // SIMPLE FPS COUNTER - Always visible, always working
+        this._fpsFrames = 0;
+        this._fpsLastTime = performance.now();
+        this._currentFps = 60;
+        // Vitals display created after renderer init
+        
+        // Debug Manager - Professional debug system
+        this.debug = getDebugManager();
+        
+        // Settings Manager - User settings and adaptive quality
+        this.settings = getSettingsManager();
+        
+        // State machine for formal state management
+        this.stateMachine = getStateMachine();
+        this.setupStateMachineListeners();
         
         // Core components
         this.scene = null;
@@ -54,6 +92,11 @@ class PatentMuseum {
         this.hopfProjection = null;
         this.galleryLoader = null;
         this.turrellLighting = null;
+        this.wingEnhancements = null;
+        this.wayfinding = null;
+        this.accessibility = null;
+        this.proximityTriggers = null;
+        this.atmosphere = null;
         
         // Enhanced systems
         this.postProcessing = null;
@@ -74,7 +117,16 @@ class PatentMuseum {
         this._interactionPromptEl = null;
         this._locationIndicatorEl = null;
         this._interactables = [];
+        this._interactablesOctree = null;
         this._warpActive = false;
+        this._pointerClientX = 0;
+        this._pointerClientY = 0;
+        this.floatingCard = createFloatingCard();
+        
+        // Cached vectors for render loop (avoid allocations per frame)
+        this._soundForward = new THREE.Vector3(0, 0, -1);
+        this._soundUp = new THREE.Vector3(0, 1, 0);
+        this._frameCount = 0;
         
         // XR System
         this.xrManager = null;
@@ -82,10 +134,280 @@ class PatentMuseum {
         this.xrTeleport = null;
         this.xrSession = null; // Keep for backward compatibility
         
+        // Error recovery state
+        this._isRecovering = false;
+        this._webglContextLost = false;
+        
         this.init();
     }
     
+    // ═══════════════════════════════════════════════════════════════════════
+    // VITALS DISPLAY (Sparkline FPS + GPU)
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    _initVitalsDisplay() {
+        this.vitalsDisplay = new VitalsDisplay(this.renderer);
+        
+        // Activate on mouse movement
+        document.addEventListener('mousemove', () => {
+            this.vitalsDisplay?.activate();
+        }, { passive: true });
+    }
+    
+    _updateVitals() {
+        this.vitalsDisplay?.update();
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // STATE MACHINE INTEGRATION
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    setupStateMachineListeners() {
+        // State change handler
+        this.stateMachine.on('stateChange', ({ from, to, data }) => {
+            console.log(`State: ${from} → ${to}`);
+            
+            // Handle specific transitions
+            if (to === AppState.PAUSED) {
+                this.onPause();
+            } else if (from === AppState.PAUSED) {
+                this.onResume();
+            }
+        });
+        
+        // Error handlers
+        this.stateMachine.on('retryOperation', ({ type, attempt }) => {
+            this.retryOperation(type, attempt);
+        });
+        
+        this.stateMachine.on('reinitialize', ({ type }) => {
+            if (type === ErrorType.WEBGL_CONTEXT_LOST) {
+                this.reinitializeRenderer();
+            }
+        });
+        
+        this.stateMachine.on('gracefulExit', ({ type }) => {
+            if (type === ErrorType.XR_SESSION_ERROR) {
+                this.exitXRGracefully();
+            }
+        });
+        
+        this.stateMachine.on('reduceQuality', () => {
+            this.reduceQualityForMemory();
+        });
+        
+        this.stateMachine.on('reinitAudio', () => {
+            this.reinitializeAudio();
+        });
+        
+        this.stateMachine.on('showErrorScreen', ({ type, error }) => {
+            this.showErrorScreen(type, error);
+        });
+        
+        this.stateMachine.on('emergencyCleanup', ({ disposed }) => {
+            console.log(`Emergency cleanup: disposed ${disposed} resources`);
+        });
+        
+        // Memory check handler
+        this.stateMachine.on('memoryCheck', ({ usage, used, total }) => {
+            if (usage > 0.8 && usage < 0.9) {
+                console.log(`Memory warning: ${(usage * 100).toFixed(1)}%`);
+            }
+        });
+        
+        // Navigation events
+        this.stateMachine.on('navigate', ({ location, data }) => {
+            this.teleportToLocation(location, data);
+        });
+        
+        // Artwork focus
+        this.stateMachine.on('artworkFocus', ({ artwork }) => {
+            this.focusOnArtwork(artwork);
+        });
+    }
+    
+    onPause() {
+        // Pause rendering
+        if (this.renderer) {
+            this.renderer.setAnimationLoop(null);
+        }
+        // Pause audio
+        if (this.soundDesign) {
+            this.soundDesign.pause?.();
+        }
+    }
+    
+    onResume() {
+        // Resume rendering
+        if (this.renderer) {
+            this.renderer.setAnimationLoop(() => this.render());
+        }
+        // Resume audio
+        if (this.soundDesign) {
+            this.soundDesign.resume?.();
+        }
+    }
+    
+    retryOperation(type, attempt) {
+        console.log(`Retrying ${type} operation (attempt ${attempt})`);
+        // Specific retry logic based on type
+    }
+    
+    reinitializeRenderer() {
+        if (this._isRecovering) return;
+        this._isRecovering = true;
+        
+        console.log('Reinitializing WebGL renderer...');
+        
+        try {
+            // Dispose old renderer
+            if (this.renderer) {
+                this.renderer.dispose();
+            }
+            
+            // Recreate renderer
+            this.initRenderer();
+            
+            // Recreate post-processing
+            if (this.postProcessing) {
+                this.initPostProcessing();
+            }
+            
+            // Restart animation loop
+            this.animate();
+            
+            this._webglContextLost = false;
+            this.stateMachine.resetErrorCount(ErrorType.WEBGL_CONTEXT_LOST);
+            this.stateMachine.transition(AppState.EXPLORING);
+            
+        } catch (e) {
+            console.error('Failed to reinitialize renderer:', e);
+            this.showErrorScreen(ErrorType.WEBGL_CONTEXT_LOST, e);
+        } finally {
+            this._isRecovering = false;
+        }
+    }
+    
+    exitXRGracefully() {
+        if (this.xrManager?.session) {
+            this.xrManager.session.end().catch(() => {});
+        }
+        this.onXRSessionEnd();
+    }
+    
+    reduceQualityForMemory() {
+        console.log('Reducing quality for memory pressure...');
+        
+        if (this.performanceManager) {
+            this.performanceManager.setPreset('low');
+        }
+        
+        // Disable expensive effects
+        if (this.postProcessing) {
+            this.postProcessing.setQuality('low');
+        }
+        
+        // Reduce particle count
+        this.reduceParticles();
+    }
+    
+    reduceParticles() {
+        // Find and thin particle systems
+        this.scene?.traverse((object) => {
+            if (object.type === 'Points' && object.geometry) {
+                const positions = object.geometry.attributes.position;
+                if (positions && positions.count > 200) {
+                    // Keep every other particle
+                    const newCount = Math.floor(positions.count / 2);
+                    const newPositions = new Float32Array(newCount * 3);
+                    for (let i = 0; i < newCount; i++) {
+                        newPositions[i * 3] = positions.array[i * 6];
+                        newPositions[i * 3 + 1] = positions.array[i * 6 + 1];
+                        newPositions[i * 3 + 2] = positions.array[i * 6 + 2];
+                    }
+                    object.geometry.setAttribute('position', 
+                        new THREE.BufferAttribute(newPositions, 3)
+                    );
+                }
+            }
+        });
+    }
+    
+    reinitializeAudio() {
+        if (this.soundDesign) {
+            this.soundDesign.dispose?.();
+        }
+        this.initAudio();
+    }
+    
+    showErrorScreen(type, error) {
+        // Create error overlay
+        let errorOverlay = document.getElementById('error-overlay');
+        if (!errorOverlay) {
+            errorOverlay = document.createElement('div');
+            errorOverlay.id = 'error-overlay';
+            errorOverlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.9);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                color: #67D4E4;
+                font-family: 'IBM Plex Sans', sans-serif;
+            `;
+            document.body.appendChild(errorOverlay);
+        }
+        
+        errorOverlay.innerHTML = `
+            <div style="text-align: center; max-width: 600px; padding: 40px;">
+                <h1 style="font-size: 72px; margin: 0 0 20px;">鏡</h1>
+                <h2 style="margin: 0 0 30px; color: #FF6B6B;">Something went wrong</h2>
+                <p style="color: #999; margin: 0 0 30px;">
+                    ${type === ErrorType.WEBGL_CONTEXT_LOST 
+                        ? 'The graphics context was lost. This can happen due to GPU overload or driver issues.'
+                        : 'An unexpected error occurred.'}
+                </p>
+                <button onclick="location.reload()" style="
+                    background: #67D4E4;
+                    color: #0A0A0F;
+                    border: none;
+                    padding: 15px 40px;
+                    font-size: 18px;
+                    cursor: pointer;
+                    border-radius: 4px;
+                ">Reload Museum</button>
+            </div>
+        `;
+    }
+    
+    teleportToLocation(location, data) {
+        if (this.navigation) {
+            this.navigation.teleportTo(location);
+        }
+    }
+    
+    focusOnArtwork(artwork) {
+        if (!artwork || !this.navigation) return;
+        const worldPos = new THREE.Vector3();
+        artwork.getWorldPosition(worldPos);
+        // Teleport to 4m in front of artwork (along -Z of artwork, or default -Z world)
+        const offset = new THREE.Vector3(0, 0, 4).applyQuaternion(artwork.quaternion);
+        const target = worldPos.clone().add(offset);
+        target.y = this.navigation.playerHeight || 1.7;
+        this.navigation.teleportTo(target);
+        if (this.soundDesign) this.soundDesign.playInteraction('teleport');
+    }
+    
     async init() {
+        // Transition to loading state
+        this.stateMachine.transition(AppState.LOADING);
+        
         try {
             // Start loading screen animation
             this.initLoadingScreen();
@@ -95,62 +417,141 @@ class PatentMuseum {
             this.initScene();
             this.updateLoadingProgress(20);
 
-            // Create renderer
-            this.initRenderer();
+            // Create renderer with context loss handling
+            // This may throw if WebGL is not available
+            try {
+                this.initRenderer();
+                this.setupWebGLContextHandlers();
+                this._initVitalsDisplay();  // Initialize vitals after renderer
+            } catch (rendererError) {
+                console.error('Failed to initialize renderer:', rendererError.message);
+                this.stateMachine.transition(AppState.ERROR);
+                return;  // Stop initialization - WebGL not available
+            }
             this.updateLoadingProgress(30);
 
             // Create camera
             this.initCamera();
             this.updateLoadingProgress(40);
 
-            // Create lighting
-            this.initLighting();
-            this.lightColonyDot(0); // Spark
+            // Create lighting (use debug flags)
+            if (!this.debug.isMinimalMode) {
+                this.initLighting();
+            } else {
+                // Minimal lighting for debug
+                const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+                this.scene.add(ambient);
+                const directional = new THREE.DirectionalLight(0xffffff, 0.5);
+                directional.position.set(0, 20, 0);
+                this.scene.add(directional);
+                console.log('Debug: Using minimal lighting');
+            }
+            this.lightColonyDot(0);
             this.updateLoadingProgress(50);
+            
+            // Initialize IBL (Image-Based Lighting) for film-quality reflections
+            // This creates a museum-appropriate environment map for all PBR materials
+            if (!this.debug.isMinimalMode) {
+                this.initEnvironmentMap();
+            }
 
-            // Create post-processing
-            this.initPostProcessing();
-            this.lightColonyDot(1); // Forge
+            // Create post-processing (check debug flags)
+            if (!this.debug.shouldDisablePost && !this.debug.isMinimalMode) {
+                this.initPostProcessing();
+            } else {
+                console.log('Debug: Post-processing disabled');
+            }
+            this.lightColonyDot(1);
             this.updateLoadingProgress(60);
 
             // Build museum
-            this.buildMuseum();
-            this.lightColonyDot(2); // Flow
-            this.lightColonyDot(3); // Nexus
+            if (!this.debug.isMinimalMode) {
+                this.buildMuseum();
+            } else {
+                this.buildDebugMuseum();
+            }
+            this.lightColonyDot(2);
+            this.lightColonyDot(3);
             this.updateLoadingProgress(70);
 
             // Load gallery artworks
-            this.loadGalleries();
-            this.lightColonyDot(4); // Beacon
+            if (!this.debug.isMinimalMode) {
+                this.loadGalleries();
+                this.initProximityTriggers();
+            } else {
+                console.log('Debug: Skipping gallery artworks');
+            }
+            this.lightColonyDot(4);
             this.updateLoadingProgress(85);
+            
+            // Apply environment map to all materials after scene is populated
+            if (!this.debug.isMinimalMode && this.environmentMap) {
+                this.applyEnvironmentMap();
+            }
 
             // Initialize navigation
             this.initNavigation();
-            this.lightColonyDot(5); // Grove
+            
+            // Initialize collision (unless noclip mode)
+            if (this.navigation && !this.debug.noclipEnabled) {
+                const collisionCount = this.navigation.forceRebuildCollision();
+                console.log(`Collision system initialized with ${collisionCount} objects`);
+            }
+            
+            this.lightColonyDot(5);
             this.updateLoadingProgress(90);
 
-            // Initialize audio (will activate on first click)
-            this.initAudio();
-
-            // Initialize minimap
-            this.initMinimap();
+            // Initialize audio (unless disabled)
+            if (!this.debug.shouldDisableAudio) {
+                this.initAudio();
+            }
+            // Minimap is handled by wayfinding.js - no duplicate needed
 
             // Setup event listeners
             this.initEventListeners();
 
-            // Check for XR support (with timeout protection)
+            // Initialize XR
             await this.initXR();
-            this.lightColonyDot(6); // Crystal
+            
+            this.lightColonyDot(6);
             this.updateLoadingProgress(100);
+            
+            // Initialize debug system with references to all systems
+            this.debug.init(this.renderer, this.scene, this.camera);
+            this.debug.navigation = this.navigation;
+            this.debug.postProcessing = this.postProcessing;
+            this.debug.lighting = this.turrellLighting;
+            this.debug.wingEnhancements = this.wingEnhancements;
+            this.debug.soundDesign = this.soundDesign;
+            
+            // Initialize culling system
+            this.initCullingSystem();
+            
+            // Initialize settings UI and sync with performance manager
+            this.settings.syncWithPerformanceManager(this.performanceManager);
+            this.settings.createSettingsMenu();
+            
+            // Listen for settings changes
+            this.setupSettingsListeners();
 
+            // Transition to ready state
+            this.stateMachine.transition(AppState.READY);
+            
             // Start render loop
             this.animate();
 
             console.log('🏛️ Patent Museum initialized');
             console.log('   54 innovations · h(x) ≥ 0 always');
+            if (this.debug.enabled) {
+                console.log('   Debug: F3 for HUD, ` for console');
+            }
 
         } catch (error) {
             console.error('Museum initialization error:', error);
+            this.stateMachine.transition(AppState.ERROR, { 
+                error, 
+                type: ErrorType.INITIALIZATION 
+            });
         } finally {
             // Cache DOM elements for render loop (avoid per-frame queries)
             this._crosshairEl = document.getElementById('crosshair');
@@ -160,42 +561,56 @@ class PatentMuseum {
             // Cache interactable objects list
             this._rebuildInteractables();
 
-            // Dramatic fade out — loading screen CSS handles the 1.2s transition
-            const loadingScreen = document.getElementById('loading-screen');
-            if (loadingScreen) {
-                loadingScreen.classList.add('hidden');
-                loadingScreen.setAttribute('aria-hidden', 'true');
-
-                const cleanup = () => {
-                    loadingScreen.removeEventListener('transitionend', cleanup);
-                    // Clean up loading animations
-                    if (this._loadingAnimFrame) {
-                        cancelAnimationFrame(this._loadingAnimFrame);
-                        this._loadingAnimFrame = null;
-                    }
-                    if (this._poemInterval) {
-                        clearInterval(this._poemInterval);
-                        this._poemInterval = null;
-                    }
-
-                    // Arrival transition: hold, then reveal museum
-                    const arrival = document.getElementById('arrival-overlay');
-                    if (arrival) {
-                        setTimeout(() => {
-                            arrival.classList.add('revealed');
-                            // Remove from DOM after transition
-                            arrival.addEventListener('transitionend', () => {
-                                if (arrival.parentNode) arrival.parentNode.removeChild(arrival);
-                            }, { once: true });
-                        }, 400);
-                    }
-                };
-                loadingScreen.addEventListener('transitionend', cleanup, { once: true });
-
-                // Fallback if transitionend doesn't fire
-                setTimeout(() => cleanup(), 1500);
-            }
+            // Hide loading screen and show museum
+            this.hideLoadingScreen();
         }
+    }
+    
+    hideLoadingScreen() {
+        const loadingScreen = document.getElementById('loading-screen');
+        const constellation = document.getElementById('colony-reveal');
+        const minimapEl = document.getElementById('minimap');
+        
+        if (!loadingScreen) return;
+        
+        // Clean up loading animations immediately
+        if (this._loadingAnimFrame) {
+            cancelAnimationFrame(this._loadingAnimFrame);
+            this._loadingAnimFrame = null;
+        }
+        if (this._poemInterval) {
+            clearInterval(this._poemInterval);
+            this._poemInterval = null;
+        }
+        
+        // Morph constellation to minimap
+        if (constellation) {
+            constellation.classList.add('morphing');
+        }
+        
+        // Start loading screen fade
+        loadingScreen.classList.add('hidden');
+        loadingScreen.setAttribute('aria-hidden', 'true');
+        
+        // After fade completes, clean up
+        setTimeout(() => {
+            // Show minimap
+            if (minimapEl) {
+                minimapEl.style.opacity = '1';
+            }
+            
+            // Remove constellation
+            if (constellation && constellation.parentNode) {
+                constellation.remove();
+            }
+            
+            // Remove loading screen from DOM
+            if (loadingScreen.parentNode) {
+                loadingScreen.remove();
+            }
+            
+            console.log('✅ Loading screen removed');
+        }, 700);  // Slightly longer than the 0.6s CSS transition
     }
     
     // ═══════════════════════════════════════════════════════════════════════
@@ -204,8 +619,8 @@ class PatentMuseum {
     
     initScene() {
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x07060B);
-        this.scene.fog = new THREE.FogExp2(0x07060B, 0.015);
+        this.scene.background = new THREE.Color(0x0A0A12);  // Slightly lighter
+        this.scene.fog = new THREE.FogExp2(0x0A0A12, 0.008);  // Reduced density (was 0.015)
     }
     
     initRenderer() {
@@ -217,10 +632,26 @@ class PatentMuseum {
         console.log(`  Device: ${this.performanceManager.isMobile() ? 'Mobile' : 'Desktop'}`);
         console.log(`  GPU Tier: ${this.performanceManager.getGPUTier()}`);
         
-        this.renderer = new THREE.WebGLRenderer({
-            antialias: preset.antialiasing,
-            powerPreference: 'high-performance'
-        });
+        // Try to create WebGL renderer with error handling
+        try {
+            this.renderer = new THREE.WebGLRenderer({
+                antialias: preset.antialiasing,
+                powerPreference: 'high-performance',
+                failIfMajorPerformanceCaveat: false  // Allow software rendering
+            });
+        } catch (webglError) {
+            console.error('WebGL initialization failed:', webglError.message);
+            this.showWebGLError();
+            throw webglError;  // Re-throw to stop initialization
+        }
+        
+        // Check if context was actually created
+        if (!this.renderer.getContext()) {
+            console.error('WebGL context not available');
+            this.showWebGLError();
+            throw new Error('WebGL context not available');
+        }
+        
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         
         // Use performance-appropriate pixel ratio
@@ -240,6 +671,65 @@ class PatentMuseum {
         
         // Register renderer with performance manager
         this.performanceManager.setRenderer(this.renderer);
+        
+        // Register renderer for memory management
+        this.stateMachine.registerDisposable(this.renderer, { type: 'renderer' });
+        
+        console.log(`Renderer: pixelRatio=${pixelRatio}, shadows=${preset.shadowsEnabled}`);
+    }
+    
+    showWebGLError() {
+        // Show a user-friendly error message when WebGL fails
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = `
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: #07060B; color: #E8E6F0; font-family: 'IBM Plex Sans', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 10000; padding: 2rem; text-align: center;
+        `;
+        errorDiv.innerHTML = `
+            <h1 style="font-size: 2rem; margin-bottom: 1rem;">🎨 WebGL Not Available</h1>
+            <p style="max-width: 500px; line-height: 1.6; opacity: 0.8;">
+                The Patent Museum requires WebGL for its 3D experience.
+            </p>
+            <p style="margin-top: 1rem; opacity: 0.6; font-size: 0.9rem;">
+                Please try a different browser or enable hardware acceleration.
+            </p>
+        `;
+        document.body.appendChild(errorDiv);
+        
+        // Hide loading screen
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+            loadingScreen.classList.add('hidden');
+        }
+    }
+    
+    setupWebGLContextHandlers() {
+        const canvas = this.renderer.domElement;
+        
+        canvas.addEventListener('webglcontextlost', (event) => {
+            event.preventDefault();
+            console.warn('WebGL context lost');
+            this._webglContextLost = true;
+            
+            // Stop render loop
+            this.renderer.setAnimationLoop(null);
+            
+            // Notify state machine
+            this.stateMachine.transition(AppState.ERROR, {
+                error: new Error('WebGL context lost'),
+                type: ErrorType.WEBGL_CONTEXT_LOST
+            });
+        }, false);
+        
+        canvas.addEventListener('webglcontextrestored', () => {
+            console.log('WebGL context restored');
+            this._webglContextLost = false;
+            
+            // Reinitialize
+            this.reinitializeRenderer();
+        }, false);
     }
     
     initCamera() {
@@ -249,7 +739,9 @@ class PatentMuseum {
             0.1,
             500
         );
-        this.camera.position.set(0, 1.7, -35);
+        // Start in center of rotunda, facing a wing
+        this.camera.position.set(0, 1.7, 0);
+        this.camera.lookAt(20, 1.7, 0);  // Face Spark wing
     }
     
     initLighting() {
@@ -257,6 +749,7 @@ class PatentMuseum {
         // Each wing bathes visitors in its colony's characteristic light
         // Inspired by James Turrell's Skyspaces and Olafur Eliasson's mono-frequency rooms
         this.turrellLighting = new TurrellLighting(this.scene, this.camera);
+        this.atmosphere = new AtmosphereManager(this.scene);
         
         // Main directional for shadows (kept minimal to let zone lights dominate)
         const mainLight = new THREE.DirectionalLight(0xF5F0E8, 0.3);
@@ -271,6 +764,42 @@ class PatentMuseum {
         mainLight.shadow.camera.top = 50;
         mainLight.shadow.camera.bottom = -50;
         this.scene.add(mainLight);
+    }
+    
+    /**
+     * Initialize Image-Based Lighting (IBL) for film-quality reflections
+     * Creates a museum-appropriate environment map and applies it to all PBR materials
+     */
+    initEnvironmentMap() {
+        try {
+            // Set material quality based on performance preset
+            const preset = this.performanceManager?.getPresetName() || 'high';
+            setMaterialQuality(preset);
+            
+            // Create procedural museum environment map
+            // This gives us HDR-like reflections without loading external files
+            const envMap = createGradientEnvironmentMap(this.renderer);
+            
+            // Store for later use
+            this.environmentMap = envMap;
+            
+            // Set scene environment for global IBL
+            this.scene.environment = envMap;
+            
+            console.log('🌍 Environment map initialized');
+        } catch (error) {
+            console.warn('Failed to initialize environment map:', error);
+        }
+    }
+    
+    /**
+     * Apply environment map to all materials after scene is built
+     */
+    applyEnvironmentMap() {
+        if (this.environmentMap) {
+            const count = applyEnvironmentMapToScene(this.scene, this.environmentMap, 1.0);
+            console.log(`🌍 Applied environment map to ${count} materials`);
+        }
     }
     
     initPostProcessing() {
@@ -320,8 +849,81 @@ class PatentMuseum {
             }
         }
         
+        // Initialize wing visual enhancements (colony-specific atmospheres)
+        this.wingEnhancements = new WingEnhancementManager(this.scene);
+        this.wingEnhancements.init();
+        
+        // Initialize wayfinding system (minimap, signage, kiosk)
+        this.wayfinding = new WayfindingManager(this.scene);
+        this.wayfinding.init();
+        
+        // Initialize journey tracker for personalized experience
+        this.journeyTracker = getJourneyTracker();
+        
+        // Connect journey tracker to minimap and guest-experience
+        this.wayfinding.setJourneyTracker(this.journeyTracker);
+        if (this.wayfinding.minimap) {
+            this.wayfinding.minimap.setVisitedWings(this.journeyTracker.state.visitedWings);
+            
+            // Listen for zone changes
+            this.journeyTracker.on('zoneChange', ({ to }) => {
+                this.wayfinding.minimap.setVisitedWings(this.journeyTracker.state.visitedWings);
+            });
+        }
+        
+        // Initialize accessibility system
+        injectAccessibilityStyles();
+        this.accessibility = new AccessibilityManager();
+        this.accessibility.init();
+        
         // Add atmospheric particles
         this.addAtmosphericParticles();
+    }
+    
+    buildDebugMuseum() {
+        console.log('🔧 DEBUG: Building minimal museum');
+        
+        // Just a simple floor and some reference markers
+        const floorGeo = new THREE.PlaneGeometry(100, 100);
+        const floorMat = new THREE.MeshStandardMaterial({ 
+            color: 0x333344,
+            roughness: 0.8 
+        });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = 0;
+        this.scene.add(floor);
+        
+        // Add a simple grid for orientation
+        const grid = new THREE.GridHelper(100, 50, 0x444455, 0x222233);
+        grid.position.y = 0.01;
+        this.scene.add(grid);
+        
+        // Add some reference cubes to test navigation
+        const cubeGeo = new THREE.BoxGeometry(2, 2, 2);
+        const colors = [0xff6b35, 0xd4af37, 0x4fccc3, 0x9c7dba, 0xf59e0b, 0x7db87e, 0x67d4e4];
+        
+        for (let i = 0; i < 7; i++) {
+            const angle = (i / 7) * Math.PI * 2;
+            const radius = 15;
+            const cubeMat = new THREE.MeshStandardMaterial({ color: colors[i] });
+            const cube = new THREE.Mesh(cubeGeo, cubeMat);
+            cube.position.set(
+                Math.cos(angle) * radius,
+                1,
+                Math.sin(angle) * radius
+            );
+            this.scene.add(cube);
+        }
+        
+        // Center marker
+        const centerGeo = new THREE.SphereGeometry(1, 16, 16);
+        const centerMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x444444 });
+        const center = new THREE.Mesh(centerGeo, centerMat);
+        center.position.set(0, 1, 0);
+        this.scene.add(center);
+        
+        console.log('🔧 DEBUG: Minimal museum built - floor, grid, 7 cubes, center sphere');
     }
     
     loadGalleries() {
@@ -330,81 +932,33 @@ class PatentMuseum {
         // Gallery loading is synchronous — _rebuildInteractables() in finally block
         // will capture all gallery objects since it runs after this returns.
     }
+
+    initProximityTriggers() {
+        if (!this.galleryLoader?.loadedArtworks?.size) return;
+        this.proximityTriggers = new ProximityTriggerManager(
+            this.scene,
+            this.camera,
+            this.galleryLoader.loadedArtworks
+        );
+        this.proximityTriggers.onSpark = (patentId, artwork) => {
+            if (this.soundDesign) this.soundDesign.playInteraction('hover');
+            if (this._interactionPromptEl) {
+                const actionEl = document.getElementById('prompt-action');
+                const hintEl = document.getElementById('prompt-hint');
+                if (actionEl) actionEl.textContent = 'Near exhibit';
+                if (hintEl) hintEl.textContent = `Approaching ${patentId} — Click to view details`;
+                this._interactionPromptEl.classList.add('visible');
+            }
+        };
+        this.proximityTriggers.onSustain = (patentId) => {
+            if (this.soundDesign) this.soundDesign.playInteraction('discovery');
+            window.dispatchEvent(new CustomEvent('patent-select', { detail: { patentId, highlight: true } }));
+        };
+    }
     
     addAtmosphericParticles() {
-        // Dust particles floating in museum — colony-colored near wings
-        const particleCount = 700;
-        const positions = new Float32Array(particleCount * 3);
-        const colors = new Float32Array(particleCount * 3);
-        const sizes = new Float32Array(particleCount);
-
-        const colonyRGB = {
-            spark:   [1.0, 0.42, 0.21],
-            forge:   [0.83, 0.69, 0.22],
-            flow:    [0.31, 0.80, 0.77],
-            nexus:   [0.61, 0.49, 0.74],
-            beacon:  [0.96, 0.62, 0.04],
-            grove:   [0.49, 0.72, 0.50],
-            crystal: [0.40, 0.83, 0.89]
-        };
-
-        for (let i = 0; i < particleCount; i++) {
-            const radius = Math.random() * 80;
-            const theta = Math.random() * Math.PI * 2;
-            const y = Math.random() * 22;
-            const x = Math.cos(theta) * radius;
-            const z = Math.sin(theta) * radius;
-
-            positions[i * 3] = x;
-            positions[i * 3 + 1] = y;
-            positions[i * 3 + 2] = z;
-
-            // Check proximity to colony wings and tint accordingly
-            let tinted = false;
-            COLONY_ORDER.forEach(colony => {
-                const data = COLONY_DATA[colony];
-                const wingX = Math.cos(data.wingAngle) * (DIMENSIONS.rotunda.radius + DIMENSIONS.wing.length / 2);
-                const wingZ = Math.sin(data.wingAngle) * (DIMENSIONS.rotunda.radius + DIMENSIONS.wing.length / 2);
-                const dx = x - wingX;
-                const dz = z - wingZ;
-                const dist = Math.sqrt(dx * dx + dz * dz);
-
-                if (dist < 20 && !tinted) {
-                    const rgb = colonyRGB[colony];
-                    const blend = 0.3 + Math.random() * 0.4;
-                    colors[i * 3]     = rgb[0] * blend + 0.96 * (1 - blend);
-                    colors[i * 3 + 1] = rgb[1] * blend + 0.94 * (1 - blend);
-                    colors[i * 3 + 2] = rgb[2] * blend + 0.91 * (1 - blend);
-                    tinted = true;
-                }
-            });
-
-            if (!tinted) {
-                colors[i * 3]     = 0.96;
-                colors[i * 3 + 1] = 0.94;
-                colors[i * 3 + 2] = 0.91;
-            }
-
-            sizes[i] = 0.03 + Math.random() * 0.06;
-        }
-
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-        geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-
-        const material = new THREE.PointsMaterial({
-            size: 0.05,
-            vertexColors: true,
-            transparent: true,
-            opacity: 0.35,
-            blending: THREE.AdditiveBlending,
-            sizeAttenuation: true
-        });
-
-        this.dustParticles = new THREE.Points(geometry, material);
-        this.scene.add(this.dustParticles);
+        // REMOVED: No particles - architecture speaks through geometry
+        // The Pei/Wright/Gehry redesign uses clean, uncluttered spaces
     }
     
     initNavigation() {
@@ -421,7 +975,7 @@ class PatentMuseum {
         // - Wing-specific ambient soundscapes + synthesized music
         // - Interaction feedback sounds
         // - Dynamic music based on location
-        this.soundDesign = new CompleteSoundManager();
+        this.soundDesign = new SoundDesignManager();
         
         // Initialize audio on first click (browser requirement)
         const initAudioOnClick = async () => {
@@ -596,10 +1150,21 @@ class PatentMuseum {
         // Resize
         window.addEventListener('resize', () => this.onResize());
         
+        // Debug quality change event
+        document.addEventListener('debug-quality-change', (e) => {
+            const preset = e.detail?.preset;
+            if (preset && this.performanceManager) {
+                this.performanceManager.setQuality(preset);
+                console.log(`Quality preset changed to: ${preset}`);
+            }
+        });
+        
         // Mouse move for raycasting
         window.addEventListener('mousemove', (e) => {
             this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
             this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            this._pointerClientX = e.clientX;
+            this._pointerClientY = e.clientY;
         });
         
         // Click for interaction
@@ -621,16 +1186,10 @@ class PatentMuseum {
             }
         });
         
-        // Gallery menu buttons
+        // Gallery menu - navigation.js handles the wing button clicks with teleportation
+        // We only need to set up the focus trap and close behavior here
         const galleryMenu = document.getElementById('gallery-menu');
         this._galleryMenuPrevFocus = null;
-        document.querySelectorAll('.wing-button').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const wing = btn.dataset.wing;
-                this.teleportToWing(wing);
-                this._closeGalleryMenu(galleryMenu);
-            });
-        });
 
         // Focus trap for gallery menu dialog
         if (galleryMenu) {
@@ -649,6 +1208,162 @@ class PatentMuseum {
                 }
             });
         }
+        
+        // Help button - show navigation instructions
+        const helpButton = document.getElementById('help-button');
+        if (helpButton) {
+            helpButton.addEventListener('click', () => {
+                if (this.navigation) {
+                    this.navigation.showInstructions();
+                }
+            });
+        }
+
+        // Interactive Demo: focus camera on artwork when user clicks Demo in info panel
+        window.addEventListener('patent-demo', (e) => {
+            const patentId = e.detail?.patentId;
+            if (patentId && this.galleryLoader) {
+                const artwork = this.galleryLoader.getArtwork(patentId);
+                this.focusOnArtwork(artwork);
+            }
+        });
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // CULLING SYSTEM
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    initCullingSystem() {
+        // Get draw distance from performance preset
+        const preset = this.performanceManager?.getPreset();
+        const drawDistance = preset?.drawDistance || 80;
+        const maxLights = preset?.maxLights || 8;
+        
+        // Create culling manager
+        this.cullingManager = getCullingManager(this.camera, {
+            drawDistance,
+            maxLights,
+            updateFrequency: 2 // Update every 2 frames
+        });
+        
+        // Register zones for each wing (use COLONY_DATA.wingAngle so boxes align with geometry)
+        const wingLength = DIMENSIONS?.wing?.length || 45;
+        const wingWidth = DIMENSIONS?.wing?.width || 12;
+        
+        COLONY_ORDER.forEach((colony) => {
+            const data = COLONY_DATA[colony];
+            const angle = data?.wingAngle ?? 0;
+            const centerX = Math.cos(angle) * (wingLength / 2 + 10);
+            const centerZ = Math.sin(angle) * (wingLength / 2 + 10);
+            
+            // Find wing group in scene (new naming: wing-${colony})
+            const wingGroup = this.scene.getObjectByName(`wing-${colony}`) || 
+                              this.scene.getObjectByName(`${colony}-wing`) ||
+                              this.scene.getObjectByName(colony);
+            
+            if (wingGroup) {
+                this.cullingManager.registerZone(
+                    colony,
+                    new THREE.Vector3(centerX, 5, centerZ),
+                    new THREE.Vector3(wingWidth, 10, wingLength),
+                    wingGroup
+                );
+            }
+        });
+        
+        // Register rotunda (always visible)
+        const rotundaGroup = this.scene.getObjectByName('rotunda');
+        if (rotundaGroup) {
+            this.cullingManager.registerZone(
+                'rotunda',
+                new THREE.Vector3(0, 5, 0),
+                new THREE.Vector3(40, 10, 40),
+                rotundaGroup
+            );
+        }
+        
+        // Set up zone adjacency (wings adjacent to rotunda)
+        COLONY_ORDER.forEach(colony => {
+            this.cullingManager.zoneCuller.setAdjacency(colony, ['rotunda']);
+        });
+        this.cullingManager.zoneCuller.setAdjacency('rotunda', COLONY_ORDER);
+        
+        // Register artworks for distance/frustum culling (use loadedArtworks, not artworkGroups)
+        if (this.galleryLoader?.loadedArtworks?.size) {
+            const artworks = Array.from(this.galleryLoader.loadedArtworks.values());
+            this.cullingManager.registerArtworks(artworks);
+        }
+        
+        // Register lights
+        const lights = [];
+        this.scene.traverse(obj => {
+            if (obj.isLight && !obj.isAmbientLight && !obj.isHemisphereLight) {
+                lights.push(obj);
+            }
+        });
+        this.cullingManager.lightCuller.registerLights(lights);
+        
+        console.log(`Culling system initialized: ${lights.length} lights, draw distance: ${drawDistance}m`);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // SETTINGS LISTENERS
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    setupSettingsListeners() {
+        // Listen for preset changes
+        document.addEventListener('settings-preset-change', (e) => {
+            const preset = e.detail?.preset;
+            if (preset && this.performanceManager) {
+                this.performanceManager.applyPreset(preset);
+                
+                // Update culling draw distance
+                if (this.cullingManager) {
+                    const presetData = this.performanceManager.getPreset();
+                    this.cullingManager.setDrawDistance(presetData?.drawDistance || 80);
+                }
+            }
+        });
+        
+        // Listen for individual setting changes
+        document.addEventListener('settings-change', (e) => {
+            const { key, value } = e.detail || {};
+            
+            switch (key) {
+                case 'postProcessing':
+                    if (this.postProcessing) {
+                        this.postProcessing.enabled = value;
+                    }
+                    this.debug.systems.postProcessing.enabled = value;
+                    break;
+                    
+                case 'particles':
+                    this.debug.systems.particles.enabled = value;
+                    if (this.wingEnhancements?.enhancements) {
+                        this.wingEnhancements.enhancements.forEach(e => {
+                            if (e.particles) e.particles.visible = value;
+                        });
+                    }
+                    break;
+                    
+                case 'shadows':
+                    if (this.renderer) {
+                        this.renderer.shadowMap.enabled = value;
+                    }
+                    break;
+                    
+                case 'audio':
+                    if (this.soundDesign) {
+                        if (value) {
+                            this.soundDesign.unmute?.();
+                        } else {
+                            this.soundDesign.mute?.();
+                        }
+                    }
+                    this.debug.systems.audio.enabled = value;
+                    break;
+            }
+        });
     }
     
     async initXR() {
@@ -763,13 +1478,37 @@ class PatentMuseum {
     // INTERACTION
     // ═══════════════════════════════════════════════════════════════════════
     
+    /** Traverse up to find patentId on an artwork root */
+    _findPatentId(obj) {
+        let o = obj;
+        while (o) {
+            if (o.userData?.patentId) return o.userData.patentId;
+            o = o.parent;
+        }
+        return null;
+    }
+    
     _rebuildInteractables() {
         this._interactables = [];
         this.scene.traverse((obj) => {
-            if (obj.userData?.interactive || obj.userData?.type === 'fano-node' || obj.userData?.artwork) {
+            if (obj.userData?.interactive || obj.userData?.type === 'fano-node' || obj.userData?.type === 'fano-sculpture' || obj.userData?.artwork) {
                 this._interactables.push(obj);
             }
         });
+        // Build octree from meshes with geometry for O(log n) raycast candidates
+        const meshes = [];
+        this._interactables.forEach((root) => {
+            root.traverse((child) => {
+                if (child.isMesh && child.geometry) meshes.push(child);
+            });
+        });
+        const rootBounds = new THREE.Box3(
+            new THREE.Vector3(-80, -5, -80),
+            new THREE.Vector3(80, 20, 80)
+        );
+        this._interactablesOctree = new SimpleOctree(rootBounds, 5, 8);
+        this.scene.updateMatrixWorld(true);
+        meshes.forEach((m) => this._interactablesOctree.insert(m));
     }
 
     _openGalleryMenu(menu) {
@@ -789,8 +1528,22 @@ class PatentMuseum {
 
     updateHover() {
         this.raycaster.setFromCamera(this.mouse, this.camera);
+        
+        // Animate pulse on hovered object
+        if (this.hoveredObject && this.hoveredObject.userData.pulseActive) {
+            this.hoveredObject.userData.pulsePhase += 0.1;
+            const pulse = 1 + 0.03 * Math.sin(this.hoveredObject.userData.pulsePhase * 3);
+            if (this.hoveredObject.userData.originalScale) {
+                this.hoveredObject.scale.copy(this.hoveredObject.userData.originalScale);
+                this.hoveredObject.scale.multiplyScalar(pulse);
+            }
+        }
 
-        const intersects = this.raycaster.intersectObjects(this._interactables, true);
+        const useOctree = !!this._interactablesOctree;
+        const candidates = useOctree
+            ? this._interactablesOctree.queryRay(this.raycaster.ray)
+            : this._interactables;
+        const intersects = this.raycaster.intersectObjects(candidates, !useOctree);
         
         if (intersects.length > 0) {
             const obj = intersects[0].object;
@@ -810,9 +1563,53 @@ class PatentMuseum {
     }
     
     onHoverStart(obj) {
-        // Show interaction prompt (cached element)
+        // Show interaction prompt with CONTEXT-AWARE text
         if (this._interactionPromptEl) {
+            const actionEl = document.getElementById('prompt-action');
+            const hintEl = document.getElementById('prompt-hint');
+            
+            // Determine action text based on object type
+            let action = 'Interact';
+            let hint = 'Click to explore';
+            
+            // Check if this patent has been viewed (personalization)
+            const patentId = obj.userData?.patentId || obj.userData?.artwork?.id;
+            const isViewed = patentId && this.journeyTracker?.hasViewedPatent(patentId);
+            
+            if (obj.userData?.type === 'fano-node') {
+                const colony = obj.userData.colony;
+                const visited = this.journeyTracker?.state?.visitedWings?.[colony];
+                action = `Explore ${colony.charAt(0).toUpperCase() + colony.slice(1)}`;
+                hint = visited ? 'Return to this wing' : 'Discover this colony';
+            } else if (obj.userData?.artwork || patentId) {
+                const prompt = patentId ? CONTEXT_PROMPTS[patentId] : null;
+                if (prompt) {
+                    action = prompt.action;
+                    hint = prompt.hint;
+                } else {
+                    action = isViewed ? 'Review Patent' : 'View Patent';
+                    hint = patentId 
+                        ? `${patentId} — ${isViewed ? 'Previously viewed' : 'Drag to rotate, scroll to zoom'}` 
+                        : 'Drag to rotate, scroll to zoom';
+                }
+            } else if (obj.userData?.interactive) {
+                action = 'Interact';
+                hint = 'WASD: navigate • Mouse: control parameters';
+            } else if (obj.name?.includes('plaque')) {
+                action = 'Read Details';
+                hint = 'View full patent information';
+            }
+            
+            if (actionEl) actionEl.textContent = action;
+            if (hintEl) hintEl.textContent = hint;
+            
             this._interactionPromptEl.classList.add('visible');
+        }
+
+        // Floating card: quick patent info near cursor
+        const pid = obj.userData?.patentId || this._findPatentId(obj);
+        if (pid && this.floatingCard) {
+            this.floatingCard.show(pid, this._pointerClientX, this._pointerClientY);
         }
         
         // Play hover sound (subtle)
@@ -820,10 +1617,17 @@ class PatentMuseum {
             this.soundDesign.playInteraction('hover');
         }
         
-        // Highlight effect
-        if (obj.material && obj.material.emissive) {
-            obj.userData.originalEmissive = obj.material.emissiveIntensity;
-            obj.material.emissiveIntensity = 1.0;
+        // Highlight effect with pulse
+        if (obj.material) {
+            // Store original values
+            obj.userData.originalScale = obj.scale.clone();
+            obj.userData.pulseActive = true;
+            obj.userData.pulsePhase = 0;
+            
+            if (obj.material.emissive) {
+                obj.userData.originalEmissive = obj.material.emissiveIntensity;
+                obj.material.emissiveIntensity = 0.8;
+            }
         }
     }
     
@@ -831,8 +1635,15 @@ class PatentMuseum {
         if (this._interactionPromptEl) {
             this._interactionPromptEl.classList.remove('visible');
         }
+        if (this.floatingCard) this.floatingCard.hide();
         
-        // Remove highlight
+        // Stop pulse animation
+        obj.userData.pulseActive = false;
+        
+        // Restore original values
+        if (obj.userData.originalScale) {
+            obj.scale.copy(obj.userData.originalScale);
+        }
         if (obj.material && obj.userData.originalEmissive !== undefined) {
             obj.material.emissiveIntensity = obj.userData.originalEmissive;
         }
@@ -847,11 +1658,17 @@ class PatentMuseum {
                 this.soundDesign.playInteraction('click');
             }
             
-            // Fano node interaction
             if (obj.userData?.type === 'fano-node') {
                 this.showColonyInfo(obj.userData.colony);
             }
-            
+            let p = obj;
+            while (p) {
+                if (p.name === 'fano-sculpture') {
+                    window.dispatchEvent(new CustomEvent('fano-sculpture-interact'));
+                    break;
+                }
+                p = p.parent;
+            }
             // Artwork interaction
             if (obj.userData?.artwork) {
                 this.showArtworkPanel(obj.userData.artwork);
@@ -1114,6 +1931,16 @@ class PatentMuseum {
             if (this.postProcessing) {
                 this.postProcessing.setZone(zone);
             }
+            // Atmosphere: fog density and wing particles
+            if (this.atmosphere) {
+                this.atmosphere.setZone(zone);
+            }
+            if (this.turrellLighting?.setZone) {
+                this.turrellLighting.setZone(zone);
+            }
+            if (this.wayfinding?.setZone) {
+                this.wayfinding.setZone(zone);
+            }
         }
     }
     
@@ -1122,105 +1949,158 @@ class PatentMuseum {
     // ═══════════════════════════════════════════════════════════════════════
     
     animate() {
+        // Transition to exploring state when animation starts (after click)
+        if (this.stateMachine.isInState(AppState.READY)) {
+            this.stateMachine.transition(AppState.EXPLORING);
+        }
+        
         this.renderer.setAnimationLoop(() => this.render());
     }
     
     render() {
-        const delta = this.clock.getDelta();
-        this.time += delta;
+        // Update vitals display
+        this._updateVitals();
         
-        // Update performance monitoring
-        if (this.performanceManager) {
+        // Don't render if in error or paused state
+        if (this.stateMachine.isInState(AppState.ERROR) || 
+            this.stateMachine.isInState(AppState.PAUSED) ||
+            this._webglContextLost) {
+            return;
+        }
+        
+        const delta = this.clock.getDelta();
+        // Clamp delta to prevent huge jumps
+        const clampedDelta = Math.min(delta, 0.05); // Max 50ms frame
+        this.time += clampedDelta;
+        
+        // ═══════════════════════════════════════════════════════════════════════
+        // DEBUG & SETTINGS SYSTEM UPDATE (throttled)
+        // ═══════════════════════════════════════════════════════════════════════
+        if (this._frameCount % 4 === 0) {
+            if (this.debug) {
+                this.debug.update(clampedDelta);
+            }
+            
+            // Update settings manager (adaptive quality, performance visualization)
+            if (this.settings && this.renderer) {
+                this.settings.update(clampedDelta, this.renderer.info);
+            }
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════════
+        // MINIMAL MODE - Ultra lightweight for debugging
+        // ═══════════════════════════════════════════════════════════════════════
+        if (this.debug && this.debug.isMinimalMode) {
+            if (this.navigation) {
+                this.navigation.update(clampedDelta);
+            }
+            this.renderer.render(this.scene, this.camera);
+            return;
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════════
+        // NORMAL MODE - OPTIMIZED RENDER LOOP
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        // Increment frame counter early
+        this._frameCount++;
+        
+        // CRITICAL: Navigation first (most important for responsiveness)
+        if (this.navigation) {
+            this.navigation.update(clampedDelta);
+        }
+        
+        // Update culling system (every 3rd frame)
+        if (this._frameCount % 3 === 0 && this.cullingManager) {
+            this.cullingManager.update();
+        }
+        
+        // Performance monitoring (every 8th frame to reduce overhead)
+        if (this._frameCount % 8 === 0 && this.performanceManager) {
             this.performanceManager.update();
         }
         
-        // Update navigation
-        if (this.navigation) {
-            this.navigation.update(delta);
+        // ─────────────────────────────────────────────────────────────────────
+        // STAGGERED UPDATES - Different systems on different frames
+        // This spreads CPU load evenly across frames to prevent hitches
+        // ─────────────────────────────────────────────────────────────────────
+        
+        const framePhase = this._frameCount % 6;
+        
+        // Staggered updates - spread load across frames
+        switch (framePhase) {
+            case 0:
+                // Lighting transitions
+                if (this.turrellLighting && this.debug?.systems?.lighting?.enabled !== false) {
+                    this.turrellLighting.update(clampedDelta * 6, this.time);
+                }
+                if (this.atmosphere) {
+                    this.atmosphere.update(clampedDelta);
+                }
+                break;
+                
+            case 1:
+                // Central sculptures
+                if (this.fanoSculpture) {
+                    animateFanoSculpture(this.fanoSculpture, this.time);
+                }
+                break;
+                
+            case 2:
+                // Hopf projection + gallery artwork
+                if (this.hopfProjection) {
+                    animateHopfProjection(this.hopfProjection, this.time);
+                }
+                if (this.galleryLoader) {
+                    const { artworksAdded } = this.galleryLoader.update(clampedDelta * 6, this.camera);
+                    if (artworksAdded) this._rebuildInteractables();
+                }
+                break;
+                
+            case 3:
+                // Wing enhancements (only if enabled)
+                if (this.wingEnhancements && this.debug?.systems?.wingEnhancements?.enabled !== false) {
+                    this.wingEnhancements.update(clampedDelta * 6, this.camera.position);
+                }
+                break;
+                
+            case 4:
+                // Wayfinding
+                if (this.wayfinding) {
+                    this.wayfinding.update(this.camera, this.time);
+                }
+                // Journey tracker (throttled position updates)
+                if (this.journeyTracker && this._frameCount % 30 === 0) {
+                    this.journeyTracker.updatePosition(this.camera);
+                }
+                break;
+                
+            case 5:
+                // Location display and minimap
+                this.updateLocation();
+                if (this.proximityTriggers) {
+                    this.proximityTriggers.update(clampedDelta * 6, this.camera.position);
+                }
+                this.updateHover();
+                // Minimap rendering handled by wayfinding.js
+                break;
         }
         
-        // Update Turrell lighting (zone detection & transitions)
-        if (this.turrellLighting) {
-            this.turrellLighting.update(delta, this.time);
-        }
-        
-        // Animate Fano sculpture
-        if (this.fanoSculpture) {
-            animateFanoSculpture(this.fanoSculpture, this.time);
-        }
-        
-        // Animate Hopf projection
-        if (this.hopfProjection) {
-            animateHopfProjection(this.hopfProjection, this.time);
-        }
-        
-        // Update gallery artworks
-        if (this.galleryLoader) {
-            this.galleryLoader.update(delta);
-        }
-        
-        // Animate dust particles (with zone-colored tinting)
-        if (this.dustParticles) {
-            this.dustParticles.rotation.y = this.time * 0.01;
-            
-            // Gentle vertical drift
-            const positions = this.dustParticles.geometry.attributes.position.array;
-            for (let i = 0; i < positions.length; i += 3) {
-                positions[i + 1] += Math.sin(this.time + i) * 0.001;
-                if (positions[i + 1] > 25) positions[i + 1] = 0;
-                if (positions[i + 1] < 0) positions[i + 1] = 25;
-            }
-            this.dustParticles.geometry.attributes.position.needsUpdate = true;
-        }
-        
-        // Update hover state
-        this.updateHover();
-        
-        // Update location
-        this.updateLocation();
-        
-        // Update post-processing (film grain time, etc.)
-        if (this.postProcessing) {
-            this.postProcessing.update(delta);
-        }
-        
-        // Update spatial audio listener position
-        if (this.soundDesign && this.soundDesign.isInitialized) {
-            const forward = new THREE.Vector3(0, 0, -1);
-            forward.applyQuaternion(this.camera.quaternion);
-            const up = new THREE.Vector3(0, 1, 0);
-            this.soundDesign.updateListenerPosition(this.camera.position, forward, up);
-        }
-        
-        // Update minimap (every 3rd frame for performance)
-        if (this.minimapCtx && Math.floor(this.time * 60) % 3 === 0) {
-            this.renderMinimap();
+        // Post-processing (throttled if performance is low)
+        if (this.postProcessing && this.debug?.systems?.postProcessing?.enabled !== false) {
+            this.postProcessing.update(clampedDelta);
         }
 
-        // Update crosshair awareness (cached DOM element)
-        if (this._crosshairEl) {
-            if (this.hoveredObject) {
-                this._crosshairEl.classList.add('near-artwork');
-            } else {
-                this._crosshairEl.classList.remove('near-artwork');
-            }
-        }
-
-        // Render
+        // ─────────────────────────────────────────────────────────────────────
+        // RENDER
+        // ─────────────────────────────────────────────────────────────────────
+        
         if (this.xrSession) {
-            // VR mode: render directly (disable post-processing effects that don't work in VR)
-            if (this.postProcessing) {
-                this.postProcessing.setVRMode(true);
-            }
             this.renderer.render(this.scene, this.camera);
+        } else if (this.postProcessing && this.debug.systems.postProcessing.enabled) {
+            this.postProcessing.render();
         } else {
-            // Desktop/mobile: use full post-processing
-            if (this.postProcessing) {
-                this.postProcessing.setVRMode(false);
-                this.postProcessing.render();
-            } else {
-                this.renderer.render(this.scene, this.camera);
-            }
+            this.renderer.render(this.scene, this.camera);
         }
     }
     
@@ -1278,12 +2158,18 @@ class PatentMuseum {
             }, 4500);
         }
 
-        // Particle constellation on loading canvas
+        // Particle constellation on loading canvas - vibrant and crisp
         const canvas = document.getElementById('loading-particles');
         if (canvas) {
             const ctx = canvas.getContext('2d');
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            const dpr = window.devicePixelRatio || 1;
+            
+            // High-DPI canvas for crisp rendering
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = window.innerHeight + 'px';
+            ctx.scale(dpr, dpr);
 
             const particles = [];
             const COLONY_HEX = [
@@ -1291,49 +2177,70 @@ class PatentMuseum {
                 '#9B7EBD', '#F59E0B', '#7EB77F', '#67D4E4'
             ];
 
-            for (let i = 0; i < 60; i++) {
+            // More particles, more vibrant
+            for (let i = 0; i < 100; i++) {
                 particles.push({
-                    x: Math.random() * canvas.width,
-                    y: Math.random() * canvas.height,
-                    vx: (Math.random() - 0.5) * 0.3,
-                    vy: (Math.random() - 0.5) * 0.3,
-                    r: 1 + Math.random() * 1.5,
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                    vx: (Math.random() - 0.5) * 0.5,
+                    vy: (Math.random() - 0.5) * 0.5,
+                    r: 1.5 + Math.random() * 2,
                     color: COLONY_HEX[Math.floor(Math.random() * 7)],
-                    alpha: 0.15 + Math.random() * 0.35
+                    alpha: 0.4 + Math.random() * 0.5,  // More visible
+                    pulse: Math.random() * Math.PI * 2
                 });
             }
 
             const drawParticles = () => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
-                // Draw connections
+                // Draw glowing connections
                 for (let i = 0; i < particles.length; i++) {
                     for (let j = i + 1; j < particles.length; j++) {
                         const dx = particles[i].x - particles[j].x;
                         const dy = particles[i].y - particles[j].y;
                         const dist = Math.sqrt(dx * dx + dy * dy);
-                        if (dist < 120) {
+                        if (dist < 150) {
+                            const alpha = 0.15 * (1 - dist / 150);
                             ctx.beginPath();
                             ctx.moveTo(particles[i].x, particles[i].y);
                             ctx.lineTo(particles[j].x, particles[j].y);
-                            ctx.strokeStyle = `rgba(103, 212, 228, ${0.06 * (1 - dist / 120)})`;
-                            ctx.lineWidth = 0.5;
+                            ctx.strokeStyle = `rgba(103, 212, 228, ${alpha})`;
+                            ctx.lineWidth = 1;
                             ctx.stroke();
                         }
                     }
                 }
 
-                // Draw particles
+                // Draw particles with glow
+                const time = performance.now() * 0.001;
                 for (const p of particles) {
                     p.x += p.vx;
                     p.y += p.vy;
-                    if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
-                    if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+                    if (p.x < 0 || p.x > window.innerWidth) p.vx *= -1;
+                    if (p.y < 0 || p.y > window.innerHeight) p.vy *= -1;
 
+                    // Pulsing glow
+                    const pulse = 0.8 + 0.2 * Math.sin(time * 2 + p.pulse);
+                    const glowRadius = p.r * 3;
+                    
+                    // Outer glow
+                    const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowRadius);
+                    gradient.addColorStop(0, p.color);
+                    gradient.addColorStop(0.4, p.color + '80');
+                    gradient.addColorStop(1, p.color + '00');
+                    
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, glowRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = gradient;
+                    ctx.globalAlpha = p.alpha * pulse * 0.5;
+                    ctx.fill();
+                    
+                    // Core particle
                     ctx.beginPath();
                     ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
                     ctx.fillStyle = p.color;
-                    ctx.globalAlpha = p.alpha;
+                    ctx.globalAlpha = p.alpha * pulse;
                     ctx.fill();
                     ctx.globalAlpha = 1;
                 }
@@ -1352,115 +2259,7 @@ class PatentMuseum {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // MINIMAP
-    // ═══════════════════════════════════════════════════════════════════════
-
-    initMinimap() {
-        const container = document.getElementById('minimap');
-        if (!container) return;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = 300;
-        canvas.height = 300;
-        container.appendChild(canvas);
-        this.minimapCanvas = canvas;
-        this.minimapCtx = canvas.getContext('2d');
-    }
-
-    renderMinimap() {
-        if (!this.minimapCtx) return;
-        const ctx = this.minimapCtx;
-        const w = 300, h = 300;
-        const cx = w / 2, cy = h / 2;
-        const scale = 2.8;
-
-        ctx.clearRect(0, 0, w, h);
-
-        // Background
-        ctx.fillStyle = 'rgba(7, 6, 11, 0.95)';
-        ctx.fillRect(0, 0, w, h);
-
-        const colonyColors = {
-            spark: '#FF6B35', forge: '#D4AF37', flow: '#4ECDC4',
-            nexus: '#9B7EBD', beacon: '#F59E0B', grove: '#7EB77F', crystal: '#67D4E4'
-        };
-
-        // Draw rotunda circle
-        ctx.beginPath();
-        ctx.arc(cx, cy, DIMENSIONS.rotunda.radius * scale, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(103, 212, 228, 0.25)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // Draw wings
-        COLONY_ORDER.forEach(colony => {
-            const data = COLONY_DATA[colony];
-            const angle = data.wingAngle;
-            const startR = DIMENSIONS.rotunda.radius * scale;
-            const endR = startR + DIMENSIONS.wing.length * scale;
-
-            const x1 = cx + Math.cos(angle) * startR;
-            const y1 = cy + Math.sin(angle) * startR;
-            const x2 = cx + Math.cos(angle) * endR;
-            const y2 = cy + Math.sin(angle) * endR;
-
-            ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
-            ctx.strokeStyle = colonyColors[colony] || '#67D4E4';
-            ctx.lineWidth = 3;
-            ctx.globalAlpha = 0.5;
-            ctx.stroke();
-            ctx.globalAlpha = 1;
-
-            // Wing tip dot
-            ctx.beginPath();
-            ctx.arc(x2, y2, 3, 0, Math.PI * 2);
-            ctx.fillStyle = colonyColors[colony];
-            ctx.globalAlpha = 0.6;
-            ctx.fill();
-            ctx.globalAlpha = 1;
-        });
-
-        // Draw player position
-        const px = cx + this.camera.position.x * scale;
-        const py = cy + this.camera.position.z * scale;
-
-        // View direction cone
-        const forward = new THREE.Vector3(0, 0, -1);
-        forward.applyQuaternion(this.camera.quaternion);
-        const viewAngle = Math.atan2(forward.z, forward.x);
-        const coneLen = 12;
-        const coneSpread = 0.35;
-
-        ctx.beginPath();
-        ctx.moveTo(px, py);
-        ctx.lineTo(
-            px + Math.cos(viewAngle - coneSpread) * coneLen,
-            py + Math.sin(viewAngle - coneSpread) * coneLen
-        );
-        ctx.lineTo(
-            px + Math.cos(viewAngle + coneSpread) * coneLen,
-            py + Math.sin(viewAngle + coneSpread) * coneLen
-        );
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(103, 212, 228, 0.15)';
-        ctx.fill();
-
-        // Player dot
-        ctx.beginPath();
-        ctx.arc(px, py, 4, 0, Math.PI * 2);
-        ctx.fillStyle = '#67D4E4';
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(px, py, 6, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(103, 212, 228, 0.4)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // LOADING PROGRESS
+    // LOADING PROGRESS (Minimap handled by wayfinding.js)
     // ═══════════════════════════════════════════════════════════════════════
 
     updateLoadingProgress(percent) {

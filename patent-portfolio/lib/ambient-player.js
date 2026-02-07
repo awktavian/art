@@ -79,8 +79,8 @@ export class AmbientPlayer {
         this.masterGain = null;
         this.currentZone = null;
         this.isInitialized = false;
-        this.isMuted = false;
-        this.volume = 0.3;
+        this.isMuted = true;  // Start muted by default - let user enable
+        this.volume = 0.08;   // Much quieter when enabled
         
         // Audio elements for each zone (preloaded files)
         this.audioElements = new Map();
@@ -180,41 +180,42 @@ export class AmbientPlayer {
         // Create pad oscillators based on character
         const chordNotes = this.getChordForProfile(profile);
         
+        // Much gentler pad sounds - more musical and ambient
         for (const noteOffset of chordNotes) {
             const freq = profile.baseFreq * Math.pow(2, noteOffset / 12);
             
-            // Main oscillator
+            // Main oscillator - always use sine for gentlest sound
             const osc = this.audioContext.createOscillator();
-            osc.type = this.getWaveformForCharacter(profile.character);
+            osc.type = 'sine';  // Always sine for gentle ambient
             osc.frequency.value = freq;
             
-            // Subtle pitch LFO
+            // Very slow pitch drift for organic feel
             const pitchLfo = this.audioContext.createOscillator();
             pitchLfo.type = 'sine';
-            pitchLfo.frequency.value = 0.1 + Math.random() * 0.1;
+            pitchLfo.frequency.value = 0.02 + Math.random() * 0.03;  // Very slow
             
             const pitchLfoGain = this.audioContext.createGain();
-            pitchLfoGain.gain.value = freq * 0.002;  // Very subtle pitch wobble
+            pitchLfoGain.gain.value = freq * 0.001;  // Extremely subtle
             
             pitchLfo.connect(pitchLfoGain);
             pitchLfoGain.connect(osc.frequency);
             
-            // Filter for warmth
+            // Heavy filtering for warm pad sound
             const filter = this.audioContext.createBiquadFilter();
             filter.type = 'lowpass';
-            filter.frequency.value = this.getFilterFreq(profile.character);
-            filter.Q.value = 0.5;
+            filter.frequency.value = Math.min(this.getFilterFreq(profile.character), 600);  // More aggressive filtering
+            filter.Q.value = 0.3;  // Low resonance
             
-            // Amplitude LFO for breathing
+            // Slow breathing amplitude for meditation-like quality
             const ampLfo = this.audioContext.createOscillator();
             ampLfo.type = 'sine';
-            ampLfo.frequency.value = 0.05 + Math.random() * 0.1;
+            ampLfo.frequency.value = 0.015 + Math.random() * 0.02;  // Very slow breath
             
             const ampLfoGain = this.audioContext.createGain();
-            ampLfoGain.gain.value = 0.15;
+            ampLfoGain.gain.value = 0.04;  // Subtle volume modulation
             
             const noteGain = this.audioContext.createGain();
-            noteGain.gain.value = 0.12 / chordNotes.length;
+            noteGain.gain.value = 0.025 / chordNotes.length;  // Much quieter
             
             ampLfo.connect(ampLfoGain);
             ampLfoGain.connect(noteGain.gain);

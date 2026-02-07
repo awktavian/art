@@ -90,7 +90,8 @@ export class Plaque extends THREE.Group {
         const badgeMat = new THREE.MeshBasicMaterial({
             color: priorityColor,
             transparent: true,
-            opacity: 0.9
+            opacity: 0.9,
+            side: THREE.DoubleSide
         });
         const badge = new THREE.Mesh(badgeGeo, badgeMat);
         badge.position.set(width/2 - badgeSize/2 - 0.05, height/2 - badgeSize/2 - 0.05, depth/2 + 0.01);
@@ -118,9 +119,9 @@ export class Plaque extends THREE.Group {
         const colonyColor = COLONY_COLORS[patent.colony] || 0x67D4E4;
         const colonyHex = '#' + colonyColor.toString(16).padStart(6, '0');
         
-        // Create canvas
+        // Create canvas (scale 3 for sharp text and small glyphs)
         const canvas = document.createElement('canvas');
-        const scale = 2; // Higher resolution
+        const scale = 3;
         canvas.width = 512 * scale;
         canvas.height = 300 * scale;
         const ctx = canvas.getContext('2d');
@@ -128,12 +129,12 @@ export class Plaque extends THREE.Group {
         // Scale for retina
         ctx.scale(scale, scale);
         
-        // Clear
-        ctx.fillStyle = 'rgba(10, 10, 16, 0.95)';
+        // Clear — darker background for better contrast
+        ctx.fillStyle = 'rgba(6, 6, 12, 0.98)';
         ctx.fillRect(0, 0, 512, 300);
         
-        // Title
-        ctx.fillStyle = '#F5F0E8';
+        // Title — high contrast
+        ctx.fillStyle = '#FFFFFF';
         ctx.font = 'bold 28px "IBM Plex Sans", sans-serif';
         ctx.textAlign = 'left';
         
@@ -156,16 +157,25 @@ export class Plaque extends THREE.Group {
         }
         ctx.fillText(line.trim(), 30, y);
         
-        // Category
+        // Category with icon (small diamond for category)
         y += 40;
         ctx.fillStyle = colonyHex;
         ctx.font = '500 14px "IBM Plex Mono", monospace';
-        ctx.fillText(patent.categoryName?.toUpperCase() || 'UNKNOWN', 30, y);
+        const catText = patent.categoryName?.toUpperCase() || patent.category || 'UNKNOWN';
+        ctx.beginPath();
+        ctx.moveTo(30, y - 10);
+        ctx.lineTo(38, y - 4);
+        ctx.lineTo(30, y + 2);
+        ctx.lineTo(22, y - 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = colonyHex;
+        ctx.fillText(catText, 44, y);
         
         // Description (if enabled)
         if (showDescription && patent.description) {
             y += 30;
-            ctx.fillStyle = '#9E9994';
+            ctx.fillStyle = '#B8B4AE';
             ctx.font = '400 14px "IBM Plex Sans", sans-serif';
             
             // Word wrap description
@@ -195,10 +205,16 @@ export class Plaque extends THREE.Group {
             }
         }
         
-        // Patent ID and date
+        // Tap to learn more CTA (high contrast)
+        y = 268;
+        ctx.fillStyle = '#67D4E4';
+        ctx.font = '600 13px "IBM Plex Sans", sans-serif';
+        ctx.fillText('Tap to learn more', 30, y);
+        
+        // Patent ID and date (lighter for legibility)
         y = 280;
-        ctx.fillStyle = '#5A5550';
-        ctx.font = '400 12px "IBM Plex Mono", monospace';
+        ctx.fillStyle = '#B0ACA6';
+        ctx.font = '400 13px "IBM Plex Mono", monospace';
         ctx.fillText(`${patent.id} · ${patent.invented || 'N/A'}`, 30, y);
         
         // Priority badge text
@@ -214,15 +230,17 @@ export class Plaque extends THREE.Group {
         ctx.textAlign = 'left';
         ctx.fillText('★'.repeat(novelty) + '☆'.repeat(5 - novelty), 30, 260);
         
-        // Create texture
+        // Create texture (flipY = false so canvas top matches geometry top; avoids inverted text)
         const texture = new THREE.CanvasTexture(canvas);
+        texture.flipY = false;
         texture.needsUpdate = true;
         
-        // Apply to plane
+        // Apply to plane; FrontSide so correct face shows when plaque faces visitor
         const textGeo = new THREE.PlaneGeometry(width - 0.1, height - 0.1);
         const textMat = new THREE.MeshBasicMaterial({
             map: texture,
-            transparent: true
+            transparent: true,
+            side: THREE.FrontSide
         });
         const textPlane = new THREE.Mesh(textGeo, textMat);
         textPlane.position.z = this.options.depth / 2 + 0.005;
@@ -236,16 +254,26 @@ export class Plaque extends THREE.Group {
     onHover() {
         if (!this.options.interactive) return;
         
-        // Animate glow
-        this.glow.material.opacity = 0.3;
+        // Subtle glow pulse (Fibonacci 233ms feel)
+        this.glow.material.opacity = 0.35;
+        if (this._pulseInterval) clearInterval(this._pulseInterval);
+        let phase = 0;
+        this._pulseInterval = setInterval(() => {
+            phase += 0.15;
+            this.glow.material.opacity = 0.25 + 0.12 * Math.sin(phase);
+            if (phase > Math.PI * 2) phase = 0;
+        }, 80);
         
-        // Slight scale
         this.scale.setScalar(1.02);
     }
     
     onHoverEnd() {
         if (!this.options.interactive) return;
         
+        if (this._pulseInterval) {
+            clearInterval(this._pulseInterval);
+            this._pulseInterval = null;
+        }
         this.glow.material.opacity = 0;
         this.scale.setScalar(1.0);
     }

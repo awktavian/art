@@ -3,7 +3,7 @@
  * Provides offline caching and background sync
  */
 
-const CACHE_VERSION = 'code-galaxy-v7.1.0';
+const CACHE_VERSION = 'code-galaxy-v8.0.0';
 const STATIC_CACHE = CACHE_VERSION + '-static';
 const DATA_CACHE = CACHE_VERSION + '-data';
 
@@ -11,6 +11,7 @@ const DATA_CACHE = CACHE_VERSION + '-data';
 const STATIC_ASSETS = [
   './',
   './index.html',
+  './worker.js',
   './manifest.json',
   './icon.svg',
   './icon-192.png',

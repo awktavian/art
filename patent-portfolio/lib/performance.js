@@ -15,27 +15,47 @@ import * as THREE from 'three';
 // ═══════════════════════════════════════════════════════════════════════════
 
 export const QUALITY_PRESETS = {
+    // EMERGENCY preset - absolute minimum for severe performance issues
+    emergency: {
+        name: 'Emergency',
+        shadowMapSize: 0,
+        shadowsEnabled: false,
+        particleCount: 30,
+        dustParticles: 0,
+        postProcessing: false,
+        bloomEnabled: false,
+        pixelRatio: 1.0,
+        antialiasing: false,
+        fogDensityMultiplier: 0.5,
+        maxLights: 4,
+        drawDistance: 30,
+        lodBias: 4.0,
+        disableWingEnhancements: true,
+        disableParticles: true
+    },
     low: {
         name: 'Low',
         shadowMapSize: 512,
         shadowsEnabled: false,
-        particleCount: 100,
-        dustParticles: 50,
+        particleCount: 50,
+        dustParticles: 30,
         postProcessing: false,
         bloomEnabled: false,
         pixelRatio: 1.0,
         antialiasing: false,
         fogDensityMultiplier: 0.7,
-        maxLights: 4,
+        maxLights: 6,
         drawDistance: 50,
-        lodBias: 2.0
+        lodBias: 2.0,
+        disableWingEnhancements: false,
+        disableParticles: false
     },
     medium: {
         name: 'Medium',
         shadowMapSize: 1024,
         shadowsEnabled: true,
-        particleCount: 250,
-        dustParticles: 150,
+        particleCount: 100,
+        dustParticles: 50,
         postProcessing: true,
         bloomEnabled: true,
         pixelRatio: 1.5,
@@ -43,37 +63,43 @@ export const QUALITY_PRESETS = {
         fogDensityMultiplier: 0.85,
         maxLights: 8,
         drawDistance: 80,
-        lodBias: 1.0
+        lodBias: 1.0,
+        disableWingEnhancements: false,
+        disableParticles: false
     },
     high: {
         name: 'High',
+        shadowMapSize: 1024,
+        shadowsEnabled: true,
+        particleCount: 150,
+        dustParticles: 100,
+        postProcessing: true,
+        bloomEnabled: true,
+        pixelRatio: 1.5,
+        antialiasing: true,
+        fogDensityMultiplier: 1.0,
+        maxLights: 12,
+        drawDistance: 100,
+        lodBias: 0.5,
+        disableWingEnhancements: false,
+        disableParticles: false
+    },
+    ultra: {
+        name: 'Ultra',
         shadowMapSize: 2048,
         shadowsEnabled: true,
-        particleCount: 500,
-        dustParticles: 300,
+        particleCount: 200,
+        dustParticles: 150,
         postProcessing: true,
         bloomEnabled: true,
         pixelRatio: 2.0,
         antialiasing: true,
         fogDensityMultiplier: 1.0,
         maxLights: 16,
-        drawDistance: 120,
-        lodBias: 0.5
-    },
-    ultra: {
-        name: 'Ultra',
-        shadowMapSize: 4096,
-        shadowsEnabled: true,
-        particleCount: 1000,
-        dustParticles: 500,
-        postProcessing: true,
-        bloomEnabled: true,
-        pixelRatio: null, // Use device pixel ratio
-        antialiasing: true,
-        fogDensityMultiplier: 1.0,
-        maxLights: 32,
-        drawDistance: 200,
-        lodBias: 0
+        drawDistance: 150,
+        lodBias: 0,
+        disableWingEnhancements: false,
+        disableParticles: false
     }
 };
 
@@ -116,50 +142,62 @@ const KNOWN_HIGH_END_GPUS = [
 ];
 
 function detectGPUTier() {
-    const gl = document.createElement('canvas').getContext('webgl');
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl');
     if (!gl) return 0;
     
-    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-    if (!debugInfo) return 1; // Default to medium if can't detect
+    let tier = 1; // Default to medium
     
-    const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL).toLowerCase();
-    const vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL).toLowerCase();
-    
-    console.log('GPU Detected:', renderer, vendor);
-    
-    // Check for high-end GPUs
-    for (const pattern of KNOWN_HIGH_END_GPUS) {
-        if (renderer.includes(pattern.toLowerCase())) {
-            return 3; // Ultra
+    try {
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        if (!debugInfo) return tier;
+        
+        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL).toLowerCase();
+        const vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL).toLowerCase();
+        
+        console.log('GPU Detected:', renderer, vendor);
+        
+        // Check for high-end GPUs
+        for (const pattern of KNOWN_HIGH_END_GPUS) {
+            if (renderer.includes(pattern.toLowerCase())) {
+                tier = 3; // Ultra
+                break;
+            }
+        }
+        
+        // Check for low-end GPUs (only if not already high-end)
+        if (tier === 1) {
+            for (const pattern of KNOWN_LOW_END_GPUS) {
+                if (renderer.includes(pattern.toLowerCase())) {
+                    tier = 0; // Low
+                    break;
+                }
+            }
+        }
+        
+        // Check for mid-range NVIDIA (only if still default)
+        if (tier === 1 && renderer.includes('nvidia')) {
+            tier = 2; // High - default NVIDIA to high
+        }
+        
+        // Check for mid-range AMD
+        if (tier === 1 && (renderer.includes('amd') || renderer.includes('radeon'))) {
+            tier = 2; // High
+        }
+        
+        // Default based on vendor
+        if (tier === 1 && (vendor.includes('nvidia') || vendor.includes('amd'))) {
+            tier = 2; // High
+        }
+    } finally {
+        // Clean up WebGL context to prevent memory leak
+        const loseContext = gl.getExtension('WEBGL_lose_context');
+        if (loseContext) {
+            loseContext.loseContext();
         }
     }
     
-    // Check for low-end GPUs
-    for (const pattern of KNOWN_LOW_END_GPUS) {
-        if (renderer.includes(pattern.toLowerCase())) {
-            return 0; // Low
-        }
-    }
-    
-    // Check for mid-range NVIDIA
-    if (renderer.includes('nvidia')) {
-        if (renderer.includes('gtx 9') || renderer.includes('gtx 10')) {
-            return 2; // High
-        }
-        return 2; // Default NVIDIA to high
-    }
-    
-    // Check for mid-range AMD
-    if (renderer.includes('amd') || renderer.includes('radeon')) {
-        return 2; // High
-    }
-    
-    // Default based on vendor
-    if (vendor.includes('nvidia') || vendor.includes('amd')) {
-        return 2; // High
-    }
-    
-    return 1; // Medium (unknown)
+    return tier;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -525,11 +563,302 @@ export class PerformanceManager {
                 Avg: ${this.getAverageFPS()}<br>
                 Preset: ${this.currentPreset}<br>
                 GPU Tier: ${this.gpuTier}<br>
-                Mobile: ${this.device.isMobile}
+                Mobile: ${this.device.isMobile}<br>
+                Draw Calls: ${this.renderer?.info?.render?.calls || 0}<br>
+                Triangles: ${this.renderer?.info?.render?.triangles || 0}<br>
+                Textures: ${this.renderer?.info?.memory?.textures || 0}
             `;
         }, 1000);
         
         return overlay;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // LOD (LEVEL OF DETAIL) SYSTEM
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Create LOD group for an object with multiple detail levels
+     * @param {THREE.Object3D[]} objects - Array of objects from high to low detail
+     * @param {number[]} distances - Distances at which to switch
+     * @returns {THREE.LOD}
+     */
+    createLOD(objects, distances) {
+        const lod = new THREE.LOD();
+        
+        // Apply LOD bias from current preset
+        const bias = this.preset?.lodBias || 1.0;
+        
+        objects.forEach((obj, i) => {
+            const distance = (distances[i] || i * 20) * bias;
+            lod.addLevel(obj, distance);
+        });
+        
+        return lod;
+    }
+    
+    /**
+     * Apply LOD to all meshes in a group based on distance from camera
+     * Simpler alternative to THREE.LOD - just hide distant objects
+     */
+    applyDistanceCulling(group, camera, maxDistance = null) {
+        const distance = maxDistance || this.preset?.drawDistance || 100;
+        
+        group.traverse(obj => {
+            if (obj.isMesh) {
+                const dist = obj.position.distanceTo(camera.position);
+                obj.visible = dist < distance;
+                
+                // Reduce material quality for distant objects
+                if (obj.material && dist > distance * 0.5) {
+                    if (obj.material.envMapIntensity !== undefined) {
+                        obj.material.envMapIntensity = 0;
+                    }
+                }
+            }
+        });
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // RAYCASTING THROTTLE
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Create a throttled raycaster that limits checks per frame
+     * @param {number} maxChecksPerFrame - Max raycast operations per frame
+     * @returns {Object} - Throttled raycaster wrapper
+     */
+    createThrottledRaycaster(maxChecksPerFrame = 4) {
+        const raycaster = new THREE.Raycaster();
+        let checksThisFrame = 0;
+        let lastFrameTime = 0;
+        
+        return {
+            raycaster,
+            
+            /**
+             * Perform throttled raycast
+             * @param {THREE.Vector3} origin
+             * @param {THREE.Vector3} direction
+             * @param {THREE.Object3D[]} objects
+             * @returns {THREE.Intersection[]|null} - null if throttled
+             */
+            cast(origin, direction, objects) {
+                const now = performance.now();
+                
+                // Reset counter each frame (~16ms)
+                if (now - lastFrameTime > 16) {
+                    checksThisFrame = 0;
+                    lastFrameTime = now;
+                }
+                
+                // Throttle
+                if (checksThisFrame >= maxChecksPerFrame) {
+                    return null;
+                }
+                
+                checksThisFrame++;
+                raycaster.set(origin, direction);
+                return raycaster.intersectObjects(objects, false);
+            },
+            
+            /**
+             * Force a raycast regardless of throttle (for critical checks)
+             */
+            forceCast(origin, direction, objects) {
+                raycaster.set(origin, direction);
+                return raycaster.intersectObjects(objects, false);
+            },
+            
+            /**
+             * Set raycaster properties
+             */
+            setFar(far) {
+                raycaster.far = far;
+            }
+        };
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // FRUSTUM CULLING HELPER
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Create frustum for manual culling checks
+     * @param {THREE.Camera} camera
+     * @returns {Object} - Frustum helper with update and check methods
+     */
+    createFrustumCuller(camera) {
+        const frustum = new THREE.Frustum();
+        const projScreenMatrix = new THREE.Matrix4();
+        
+        return {
+            frustum,
+            
+            /**
+             * Update frustum from camera
+             */
+            update() {
+                projScreenMatrix.multiplyMatrices(
+                    camera.projectionMatrix,
+                    camera.matrixWorldInverse
+                );
+                frustum.setFromProjectionMatrix(projScreenMatrix);
+            },
+            
+            /**
+             * Check if object is in frustum
+             * @param {THREE.Object3D} object
+             * @returns {boolean}
+             */
+            isVisible(object) {
+                if (object.geometry?.boundingSphere) {
+                    // Check bounding sphere
+                    const sphere = object.geometry.boundingSphere.clone();
+                    sphere.applyMatrix4(object.matrixWorld);
+                    return frustum.intersectsSphere(sphere);
+                }
+                return true; // Assume visible if no bounding sphere
+            },
+            
+            /**
+             * Apply frustum culling to a group
+             */
+            cullGroup(group) {
+                group.traverse(obj => {
+                    if (obj.isMesh) {
+                        obj.visible = this.isVisible(obj);
+                    }
+                });
+            }
+        };
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // MEMORY MANAGEMENT
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Dispose of Three.js object and its resources
+     * @param {THREE.Object3D} object
+     */
+    disposeObject(object) {
+        if (!object) return;
+        
+        // Dispose geometry
+        if (object.geometry) {
+            object.geometry.dispose();
+        }
+        
+        // Dispose material(s)
+        if (object.material) {
+            if (Array.isArray(object.material)) {
+                object.material.forEach(mat => this.disposeMaterial(mat));
+            } else {
+                this.disposeMaterial(object.material);
+            }
+        }
+        
+        // Recurse into children
+        if (object.children) {
+            object.children.forEach(child => this.disposeObject(child));
+        }
+    }
+    
+    /**
+     * Dispose of material and its textures
+     * @param {THREE.Material} material
+     */
+    disposeMaterial(material) {
+        if (!material) return;
+        
+        // Dispose textures
+        const textureProps = [
+            'map', 'normalMap', 'bumpMap', 'roughnessMap', 'metalnessMap',
+            'emissiveMap', 'aoMap', 'envMap', 'lightMap', 'alphaMap'
+        ];
+        
+        textureProps.forEach(prop => {
+            if (material[prop]) {
+                material[prop].dispose();
+            }
+        });
+        
+        material.dispose();
+    }
+    
+    /**
+     * Get memory usage estimate
+     * @returns {Object}
+     */
+    getMemoryUsage() {
+        const info = this.renderer?.info;
+        if (!info) return { textures: 0, geometries: 0 };
+        
+        return {
+            textures: info.memory?.textures || 0,
+            geometries: info.memory?.geometries || 0,
+            programs: info.programs?.length || 0,
+            drawCalls: info.render?.calls || 0,
+            triangles: info.render?.triangles || 0,
+            points: info.render?.points || 0
+        };
+    }
+    
+    /**
+     * Clear unused resources (call periodically)
+     */
+    clearUnusedResources() {
+        if (this.renderer) {
+            this.renderer.info.reset();
+        }
+        
+        // Suggest garbage collection (won't force it, but helps)
+        if (window.gc) {
+            window.gc();
+        }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // GEOMETRY INSTANCING HELPER
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Create instanced mesh from a template geometry
+     * @param {THREE.BufferGeometry} geometry
+     * @param {THREE.Material} material
+     * @param {THREE.Matrix4[]} matrices - Transform for each instance
+     * @returns {THREE.InstancedMesh}
+     */
+    createInstancedMesh(geometry, material, matrices) {
+        const mesh = new THREE.InstancedMesh(geometry, material, matrices.length);
+        
+        matrices.forEach((matrix, i) => {
+            mesh.setMatrixAt(i, matrix);
+        });
+        
+        mesh.instanceMatrix.needsUpdate = true;
+        return mesh;
+    }
+    
+    /**
+     * Convert multiple similar meshes to instanced mesh
+     * @param {THREE.Mesh[]} meshes - Array of similar meshes
+     * @returns {THREE.InstancedMesh}
+     */
+    meshesToInstanced(meshes) {
+        if (meshes.length === 0) return null;
+        
+        const template = meshes[0];
+        const geometry = template.geometry;
+        const material = template.material;
+        
+        const matrices = meshes.map(mesh => {
+            mesh.updateMatrixWorld();
+            return mesh.matrixWorld.clone();
+        });
+        
+        return this.createInstancedMesh(geometry, material, matrices);
     }
 }
 

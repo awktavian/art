@@ -45,13 +45,19 @@
             --text-secondary: #C4BFBA;
             --text-tertiary: #9E9994;
             
-            --colony-spark: #FF6B35;
-            --colony-forge: #D4AF37;
-            --colony-flow: #4ECDC4;
-            --colony-nexus: #9B7EBD;
-            --colony-beacon: #F59E0B;
-            --colony-grove: #7EB77F;
-            --colony-crystal: #67D4E4;
+            /* Colony colors - refined palette */
+            --colony-spark: #E85A2F;   /* Slightly darker, more sophisticated */
+            --colony-forge: #D4AF37;   /* Keep gold (standardized everywhere) */
+            --colony-flow: #4AB5AD;    /* Differentiated from crystal */
+            --colony-nexus: #8B6FA8;   /* Slightly darker purple */
+            --colony-beacon: #E8940A;  /* Slightly darker amber */
+            --colony-grove: #6FA370;   /* More natural green */
+            --colony-crystal: #5BC4D4; /* Refined cyan */
+            
+            /* Status colors - colony-derived */
+            --status-safe: #6FA370;    /* Grove green */
+            --status-warning: #E8940A; /* Beacon amber */
+            --status-danger: #E85A2F;  /* Spark red */
             
             --font-sans: 'IBM Plex Sans', -apple-system, sans-serif;
             --font-mono: 'IBM Plex Mono', monospace;
@@ -128,6 +134,10 @@
             background: var(--void);
             color: var(--text-primary);
             font-family: var(--font-sans);
+            /* Crisp text rendering */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
         }
         
         #canvas-container {
@@ -142,7 +152,7 @@
             display: block;
         }
         
-        /* Loading Screen */
+        /* Loading Screen - Clean fade transition */
         #loading-screen {
             position: fixed;
             top: 0;
@@ -154,9 +164,12 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            z-index: 5000;
-            transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 7000;  /* Above everything */
             overflow: hidden;
+            opacity: 1;
+            visibility: visible;
+            /* Transition both opacity and visibility */
+            transition: opacity 0.6s ease-out, visibility 0s linear 0s;
         }
 
         #loading-particles {
@@ -171,6 +184,9 @@
         #loading-screen.hidden {
             opacity: 0;
             pointer-events: none;
+            visibility: hidden;
+            /* Delay visibility change until after opacity fade */
+            transition: opacity 0.6s ease-out, visibility 0s linear 0.6s;
         }
 
         .loading-content {
@@ -263,51 +279,99 @@
             100% { background-position: -200% 0; }
         }
 
+        /* Fano Star Constellation - 7 colonies arranged in star pattern */
         .loading-colony-reveal {
-            display: flex;
-            gap: 16px;
-            align-items: center;
+            position: relative;
+            width: 160px;
+            height: 160px;
             opacity: 0;
             animation: fade-up 0.6s 1.0s var(--ease-out) forwards;
+            /* Will morph into minimap */
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .loading-colony-reveal.morphing {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 140px;
+            height: 140px;
+            transform: none;
+            z-index: 100;
         }
 
         .colony-dot {
-            width: 8px;
-            height: 8px;
+            position: absolute;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             background: var(--c);
-            opacity: 0.2;
+            opacity: 0.25;
             transition: all 0.4s var(--ease-out);
-            position: relative;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Fano star positions - 7 points evenly distributed */
+        .colony-dot[data-name="Spark"]   { left: 50%; top: 12%; }   /* Top (0°) */
+        .colony-dot[data-name="Forge"]   { left: 82%; top: 28%; }   /* Top-right (51°) */
+        .colony-dot[data-name="Flow"]    { left: 93%; top: 62%; }   /* Right (103°) */
+        .colony-dot[data-name="Nexus"]   { left: 70%; top: 90%; }   /* Bottom-right (154°) */
+        .colony-dot[data-name="Beacon"]  { left: 30%; top: 90%; }   /* Bottom-left (206°) */
+        .colony-dot[data-name="Grove"]   { left: 7%; top: 62%; }    /* Left (257°) */
+        .colony-dot[data-name="Crystal"] { left: 18%; top: 28%; }   /* Top-left (309°) */
+
+        /* Connection lines between colonies (Fano plane structure) */
+        .loading-colony-reveal::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: 
+                /* Radial lines from center */
+                radial-gradient(circle at 50% 50%, transparent 0%, transparent 100%);
+            opacity: 0.15;
+            pointer-events: none;
         }
 
         .colony-dot.lit {
             opacity: 1;
             box-shadow: 0 0 12px var(--c), 0 0 24px var(--c);
-            transform: scale(1.3);
+            transform: translate(-50%, -50%) scale(1.4);
             animation: colony-bloom 0.61s var(--ease-bounce) forwards;
         }
 
         @keyframes colony-bloom {
-            0% { transform: scale(1); opacity: 0.2; }
-            50% { transform: scale(1.8); opacity: 1; box-shadow: 0 0 20px var(--c), 0 0 40px var(--c); }
-            100% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 12px var(--c), 0 0 24px var(--c); }
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 0.25; }
+            50% { transform: translate(-50%, -50%) scale(2); opacity: 1; box-shadow: 0 0 20px var(--c), 0 0 40px var(--c); }
+            100% { transform: translate(-50%, -50%) scale(1.4); opacity: 1; box-shadow: 0 0 12px var(--c), 0 0 24px var(--c); }
         }
 
         .colony-dot.lit::after {
             content: attr(data-name);
             position: absolute;
-            top: 16px;
+            top: 18px;
             left: 50%;
             transform: translateX(-50%);
             font-family: var(--font-mono);
-            font-size: 9px;
+            font-size: 8px;
             color: var(--c);
             white-space: nowrap;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
             opacity: 0;
             animation: fade-up 0.3s var(--ease-out) forwards;
+        }
+
+        /* Central rotunda indicator */
+        .loading-colony-reveal::after {
+            content: '鏡';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+            color: var(--colony-crystal);
+            opacity: 0.4;
+            text-shadow: 0 0 10px var(--colony-crystal);
         }
         
         /* HUD */
@@ -446,6 +510,8 @@
             border-radius: 10px;
             overflow: hidden;
             backdrop-filter: blur(8px);
+            opacity: 0;
+            transition: opacity 0.5s ease-out;
             -webkit-backdrop-filter: blur(8px);
             box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
         }
@@ -468,26 +534,28 @@
             pointer-events: none;
         }
         
-        /* Interaction Prompts */
+        /* Interaction Prompts - Enhanced with context */
         #interaction-prompt {
             position: absolute;
             bottom: 100px;
             left: 50%;
             transform: translateX(-50%) translateY(8px);
-            background: rgba(7, 6, 11, 0.92);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(103, 212, 228, 0.2);
-            padding: 10px 20px;
+            background: rgba(7, 6, 11, 0.95);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(103, 212, 228, 0.4);
+            padding: 14px 24px;
             border-radius: var(--radius-md);
             font-family: var(--font-mono);
-            font-size: 13px;
+            font-size: 14px;
             color: var(--text-secondary);
             opacity: 0;
             transition: opacity 0.2s ease, transform 0.3s var(--ease-out);
             pointer-events: none;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(103, 212, 228, 0.1);
             letter-spacing: 0.05em;
+            text-align: center;
+            min-width: 200px;
         }
 
         #interaction-prompt.visible {
@@ -495,15 +563,31 @@
             transform: translateX(-50%) translateY(0);
         }
 
+        #interaction-prompt .prompt-main {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 15px;
+            color: var(--text-primary);
+        }
+
+        #interaction-prompt .prompt-hint {
+            font-size: 11px;
+            color: #777;
+            margin-top: 8px;
+            font-family: var(--font-sans);
+        }
+
         #interaction-prompt kbd {
-            background: rgba(103, 212, 228, 0.15);
-            border: 1px solid rgba(103, 212, 228, 0.4);
-            border-radius: 3px;
-            padding: 2px 8px;
-            margin-right: 8px;
+            background: rgba(103, 212, 228, 0.2);
+            border: 1px solid rgba(103, 212, 228, 0.5);
+            border-radius: 4px;
+            padding: 5px 12px;
             color: var(--colony-crystal);
-            font-weight: 500;
-            font-size: 12px;
+            font-weight: 600;
+            font-size: 13px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
         
         /* XR Button */
@@ -885,38 +969,15 @@
             }
         }
         
-        /* Arrival transition overlay */
+        /* Arrival transition overlay - SIMPLIFIED for clean transition */
         #arrival-overlay {
             position: fixed;
             inset: 0;
-            background: var(--void);
+            background: transparent;
             z-index: 4800;
             pointer-events: none;
-            opacity: 1;
-            transition: opacity 1.8s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        #arrival-overlay.revealed {
-            opacity: 0;
-        }
-
-        #arrival-overlay .arrival-poem {
-            position: absolute;
-            bottom: 15%;
-            left: 50%;
-            transform: translateX(-50%);
-            font-family: var(--font-sans);
-            font-size: 15px;
-            color: var(--text-secondary);
-            font-style: italic;
-            text-align: center;
-            max-width: 400px;
-            opacity: 1;
-            transition: opacity 1.2s var(--ease-in);
-        }
-
-        #arrival-overlay.revealed .arrival-poem {
-            opacity: 0;
+            opacity: 0;  /* Start hidden - not needed with new flow */
+            display: none;  /* Disable entirely */
         }
     </style>
 </head>
@@ -957,7 +1018,8 @@
         <div id="crosshair" aria-hidden="true"><span class="dot"></span></div>
         <div id="minimap" aria-hidden="true"></div>
         <div id="interaction-prompt" aria-live="polite">
-            <kbd>E</kbd> Examine artwork
+            <div class="prompt-main"><kbd>E</kbd> <span id="prompt-action">Interact</span></div>
+            <div class="prompt-hint" id="prompt-hint">Click or tap to explore</div>
         </div>
     </div>
     
@@ -984,7 +1046,7 @@
             <button class="wing-button" data-wing="forge" style="--wing-color: var(--colony-forge);">
                 <div class="wing-glyph">&#x2692;</div>
                 <div class="wing-name" style="color: var(--colony-forge);">Forge</div>
-                <div class="wing-desc">Where trust is built</div>
+                <div class="wing-desc">Where trust is forged in cryptographic fire — every secret kept</div>
                 <div class="wing-categories">Crypto + Platform &middot; 10 patents</div>
             </button>
             <button class="wing-button" data-wing="flow" style="--wing-color: var(--colony-flow);">
@@ -1002,7 +1064,7 @@
             <button class="wing-button" data-wing="beacon" style="--wing-color: var(--colony-beacon);">
                 <div class="wing-glyph">&#x1F5FC;</div>
                 <div class="wing-name" style="color: var(--colony-beacon);">Beacon</div>
-                <div class="wing-desc">Autonomy, earned and measured</div>
+                <div class="wing-desc">Where autonomous agents earn their keep in the marketplace</div>
                 <div class="wing-categories">Economic &middot; 4 patents</div>
             </button>
             <button class="wing-button" data-wing="grove" style="--wing-color: var(--colony-grove);">
@@ -1014,7 +1076,7 @@
             <button class="wing-button" data-wing="crystal" style="--wing-color: var(--colony-crystal);">
                 <div class="wing-glyph">&#x1F48E;</div>
                 <div class="wing-name" style="color: var(--colony-crystal);">Crystal</div>
-                <div class="wing-desc">Where truth is proven</div>
+                <div class="wing-desc">Where mathematical certainty lives — proofs that cannot lie</div>
                 <div class="wing-categories">Math + Safety &middot; 14 patents</div>
             </button>
         </div>
@@ -1080,6 +1142,31 @@
             top: 20px;
         }
     </style>
+    
+    <!-- Canvas2D roundRect polyfill for older browsers -->
+    <script>
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, radii) {
+                const r = typeof radii === 'number' ? [radii, radii, radii, radii] : 
+                          Array.isArray(radii) ? radii : [0, 0, 0, 0];
+                const [tl, tr, br, bl] = r.length === 1 ? [r[0], r[0], r[0], r[0]] :
+                                          r.length === 2 ? [r[0], r[1], r[0], r[1]] :
+                                          r.length === 3 ? [r[0], r[1], r[2], r[1]] : r;
+                this.beginPath();
+                this.moveTo(x + tl, y);
+                this.lineTo(x + w - tr, y);
+                this.quadraticCurveTo(x + w, y, x + w, y + tr);
+                this.lineTo(x + w, y + h - br);
+                this.quadraticCurveTo(x + w, y + h, x + w - br, y + h);
+                this.lineTo(x + bl, y + h);
+                this.quadraticCurveTo(x, y + h, x, y + h - bl);
+                this.lineTo(x, y + tl);
+                this.quadraticCurveTo(x, y, x + tl, y);
+                this.closePath();
+                return this;
+            };
+        }
+    </script>
     
     <!-- Main Application -->
     <script type="module" src="./main.js"></script>

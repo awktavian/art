@@ -28,12 +28,12 @@ import { PATENTS } from '../components/info-panel.js';
 
 const PATENT = PATENTS.find(p => p.id === 'P1-001');
 
-// Color palette
+// Color palette - FILM QUALITY (colony-derived, less saturated)
 const COLORS = {
-    safe: new THREE.Color(0x00FF88),      // Bright green
-    caution: new THREE.Color(0xFFAA00),   // Amber
-    danger: new THREE.Color(0xFF2222),    // Red
-    crystal: new THREE.Color(0x67D4E4),   // Crystal blue
+    safe: new THREE.Color(0x6FA370),      // Grove green (refined)
+    caution: new THREE.Color(0xE8940A),   // Beacon amber (refined)
+    danger: new THREE.Color(0xE85A2F),    // Spark red (refined)
+    crystal: new THREE.Color(0x5BC4D4),   // Crystal blue (refined)
     grove: new THREE.Color(0x7EB77F)      // Grove green
 };
 
@@ -245,33 +245,108 @@ export class EFECBFArtwork extends THREE.Group {
         this.add(wireframe);
     }
     
+    /**
+     * Control Barrier Function h(x)
+     * 
+     * Based on kagami/core/safety/cbf/jax_optimal.py:LearnedBarrierFunction
+     * 
+     * Architecture: Linear baseline + risk aggregation
+     *   h(x) = w_base · ||x|| + Σ w_i · risk_i(x)
+     * 
+     * Semantics:
+     *   h(x) > 0: Safe (far from danger)
+     *   h(x) = 0: On safety boundary
+     *   h(x) < 0: Unsafe (violation!)
+     * 
+     * The guarantee: h(x) ≥ 0 ALWAYS (in deployment mode)
+     */
     calculateHx(x, z) {
-        // Control Barrier Function: creates a landscape with:
-        // - Safe central zone (h(x) > 0)
-        // - Dangerous edges (h(x) → 0)
-        // - Interesting topology with local minima
+        // State vector (simplified 2D version for visualization)
+        const state = { x, z };
         
+        // === RISK FACTOR 1: Boundary proximity ===
+        // Risk increases as we approach the edges
+        const maxRadius = 4.5;
         const dist = Math.sqrt(x * x + z * z);
+        const boundaryRisk = Math.max(0, (dist / maxRadius) - 0.3);
         
-        // Base barrier: safe in center, danger at edges
-        const centerSafety = Math.max(0, 1.2 - dist * 0.25);
+        // === RISK FACTOR 2: Obstacle regions ===
+        // Define dangerous regions (obstacles)
+        const obstacles = [
+            { x: 2.5, z: 2.5, radius: 1.0 },   // Obstacle 1
+            { x: -3.0, z: 1.5, radius: 0.8 },  // Obstacle 2
+            { x: 1.0, z: -2.5, radius: 0.7 }   // Obstacle 3
+        ];
         
-        // Add interesting features
-        const wave = Math.sin(x * 1.5) * Math.cos(z * 1.5) * 0.15;
-        const peak = Math.exp(-(dist * dist) / 8) * 0.4;
+        let obstacleRisk = 0;
+        obstacles.forEach(obs => {
+            const obsDistance = Math.sqrt((x - obs.x) ** 2 + (z - obs.z) ** 2);
+            const penetration = Math.max(0, obs.radius - obsDistance);
+            obstacleRisk += penetration / obs.radius;
+        });
         
-        // Local dip at (2, 2) to create exploration target
-        const dipX = 2.5, dipZ = 2.5;
-        const dipDist = Math.sqrt((x - dipX) ** 2 + (z - dipZ) ** 2);
-        const dip = -Math.exp(-(dipDist * dipDist) / 0.5) * 0.3;
+        // === RISK FACTOR 3: Velocity constraint (implicit) ===
+        // Higher risk in narrow passages
+        const passageRisk = Math.abs(Math.sin(x * 0.8) * Math.cos(z * 0.8)) * 0.1;
         
-        // Global optimum at (0, 0)
-        const optimumBoost = Math.exp(-(dist * dist) / 2) * 0.2;
+        // === LEARNED RISK WEIGHTS (from neural network) ===
+        // These would be learned during training
+        const w_boundary = 1.2;
+        const w_obstacle = 2.0;
+        const w_passage = 0.5;
         
-        const hx = centerSafety + wave + peak + dip + optimumBoost;
+        // === LINEAR BASELINE ===
+        // Safe in center, decays outward
+        const linearBaseline = 1.0 - dist * 0.15;
         
-        // Clamp to valid range [0, 1]
-        return Math.max(0, Math.min(1, hx));
+        // === AGGREGATE h(x) ===
+        // h(x) = baseline - weighted_sum(risks)
+        const totalRisk = w_boundary * boundaryRisk + 
+                         w_obstacle * obstacleRisk + 
+                         w_passage * passageRisk;
+        
+        const hx = linearBaseline - totalRisk;
+        
+        // h(x) can be negative (unsafe) - that's the point!
+        // The CBF constraint ensures we never go there.
+        return Math.max(-0.5, Math.min(1.0, hx));
+    }
+    
+    /**
+     * Compute Expected Free Energy G(π) at a point
+     * Based on kagami/core/active_inference/jax_efe_cbf_optimizer.py
+     * 
+     * G(π) = epistemic_value + pragmatic_value + risk_value + catastrophe_value
+     */
+    calculateEFE(x, z) {
+        const hx = this.calculateHx(x, z);
+        
+        // Epistemic value: Information gain (exploration bonus)
+        // Higher in unexplored/uncertain areas
+        const uncertainty = Math.exp(-((x * x + z * z) / 8));
+        const epistemic = -uncertainty * 0.3; // Negative = good (minimize)
+        
+        // Pragmatic value: Goal achievement
+        // Lower at the goal (center)
+        const goalDist = Math.sqrt(x * x + z * z);
+        const pragmatic = goalDist * 0.2;
+        
+        // Risk value: CBF violation penalty
+        // λ * max(0, -h(x))
+        const lambda = 10.0; // Penalty weight
+        const risk = lambda * Math.max(0, -hx);
+        
+        // Catastrophe value: Severe consequence areas
+        const catastrophe = hx < 0 ? 5.0 : 0;
+        
+        return {
+            total: epistemic + pragmatic + risk + catastrophe,
+            epistemic,
+            pragmatic,
+            risk,
+            catastrophe,
+            hx
+        };
     }
     
     setVertexColor(colors, index, hx) {
@@ -398,9 +473,9 @@ export class EFECBFArtwork extends THREE.Group {
                 const curve = new THREE.CatmullRomCurve3(path);
                 const tubeGeo = new THREE.TubeGeometry(curve, 32, 0.03, 8, false);
                 
-                // Color based on safety
+                // Color based on safety - using refined colony colors
                 const endHx = this.calculateHx(path[path.length - 1].x, path[path.length - 1].z);
-                const color = endHx > 0.5 ? 0x00FF88 : (endHx > 0.2 ? 0xFFAA00 : 0xFF4444);
+                const color = endHx > 0.5 ? 0x6FA370 : (endHx > 0.2 ? 0xE8940A : 0xE85A2F);
                 
                 const tubeMat = new THREE.MeshBasicMaterial({
                     color: color,
@@ -452,7 +527,8 @@ export class EFECBFArtwork extends THREE.Group {
         contours.name = 'contour-lines';
         
         const thresholds = [0.1, 0.3, 0.5, 0.7, 0.9];
-        const contourColors = [0xFF2222, 0xFF8800, 0xFFCC00, 0x88FF00, 0x00FF88];
+        // Refined colony-based gradient (Spark red → Beacon amber → Grove green)
+        const contourColors = [0xE85A2F, 0xE87830, 0xE8940A, 0x9CB55A, 0x6FA370];
         
         thresholds.forEach((threshold, idx) => {
             const points = this.generateContour(threshold);
@@ -475,6 +551,127 @@ export class EFECBFArtwork extends THREE.Group {
         
         this.contours = contours;
         this.add(contours);
+        
+        // === PROMINENT SAFETY BARRIER AT h(x) = 0 ===
+        this.createSafetyBarrier();
+    }
+    
+    /**
+     * Create a visible, glowing barrier wall at h(x) = 0
+     * This is THE CORE PRINCIPLE: the barrier is UNBREAKABLE
+     */
+    createSafetyBarrier() {
+        const barrierGroup = new THREE.Group();
+        barrierGroup.name = 'safety-barrier';
+        
+        // Generate barrier contour at h(x) = 0 (slightly positive for visibility)
+        const barrierPoints = this.generateContour(0.0);
+        
+        if (barrierPoints.length > 3) {
+            // Create glowing wall segments along the barrier
+            const curve = new THREE.CatmullRomCurve3(barrierPoints, true);
+            const curvePoints = curve.getPoints(200);
+            
+            // Main barrier tube - visible wall
+            const tubeGeo = new THREE.TubeGeometry(curve, 200, 0.12, 16, true);
+            const tubeMat = new THREE.MeshPhysicalMaterial({
+                color: 0xE85A2F,
+                emissive: 0xFF4422,
+                emissiveIntensity: 0.8,
+                metalness: 0.6,
+                roughness: 0.3,
+                clearcoat: 1.0,
+                transparent: true,
+                opacity: 0.9
+            });
+            
+            const barrier = new THREE.Mesh(tubeGeo, tubeMat);
+            barrierGroup.add(barrier);
+            this.barrierMesh = barrier;
+            
+            // Outer glow (larger, more transparent)
+            const glowGeo = new THREE.TubeGeometry(curve, 200, 0.25, 8, true);
+            const glowMat = new THREE.MeshBasicMaterial({
+                color: 0xFF3300,
+                transparent: true,
+                opacity: 0.25,
+                blending: THREE.NormalBlending
+            });
+            const glow = new THREE.Mesh(glowGeo, glowMat);
+            barrierGroup.add(glow);
+            
+            // Pulsing inner core
+            const coreGeo = new THREE.TubeGeometry(curve, 200, 0.05, 8, true);
+            const coreMat = new THREE.MeshBasicMaterial({
+                color: 0xFFFFFF,
+                transparent: true,
+                opacity: 0.6
+            });
+            const core = new THREE.Mesh(coreGeo, coreMat);
+            barrierGroup.add(core);
+            this.barrierCore = core;
+            
+            // Add vertical barrier posts for visibility
+            for (let i = 0; i < curvePoints.length; i += 20) {
+                const p = curvePoints[i];
+                const postGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.5, 8);
+                const postMat = new THREE.MeshPhysicalMaterial({
+                    color: 0xE85A2F,
+                    emissive: 0xE85A2F,
+                    emissiveIntensity: 0.4,
+                    metalness: 0.8,
+                    roughness: 0.2
+                });
+                const post = new THREE.Mesh(postGeo, postMat);
+                post.position.set(p.x, p.y + 0.75, p.z);
+                barrierGroup.add(post);
+            }
+        }
+        
+        // Add "h(x) = 0" floating label at one point
+        this.createBarrierLabel(barrierGroup);
+        
+        this.safetyBarrier = barrierGroup;
+        this.add(barrierGroup);
+    }
+    
+    createBarrierLabel(parent) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        
+        // Dark background with red accent
+        ctx.fillStyle = '#1a0505';
+        ctx.fillRect(0, 0, 512, 128);
+        ctx.fillStyle = '#E85A2F';
+        ctx.fillRect(0, 0, 8, 128);
+        
+        // Text
+        ctx.fillStyle = '#FF6644';
+        ctx.font = 'bold 48px "IBM Plex Sans", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('h(x) = 0', 256, 50);
+        
+        ctx.fillStyle = '#CC8866';
+        ctx.font = '24px "IBM Plex Mono", monospace';
+        ctx.fillText('SAFETY BARRIER', 256, 95);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        const labelGeo = new THREE.PlaneGeometry(2.0, 0.5);
+        const labelMat = new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+        
+        const label = new THREE.Mesh(labelGeo, labelMat);
+        label.position.set(0, 2.5, -4);
+        label.rotation.y = Math.PI / 6;
+        label.userData.billboard = true;
+        parent.add(label);
+        this.barrierLabel = label;
     }
     
     generateContour(threshold) {
@@ -605,10 +802,10 @@ export class EFECBFArtwork extends THREE.Group {
         const group = new THREE.Group();
         group.name = 'formula-hologram';
         
-        // Main formula canvas
+        // Main formula canvas - larger for more detail
         const canvas = document.createElement('canvas');
         canvas.width = 1024;
-        canvas.height = 256;
+        canvas.height = 320;
         const ctx = canvas.getContext('2d');
         
         this.formulaCanvas = canvas;
@@ -618,7 +815,7 @@ export class EFECBFArtwork extends THREE.Group {
         const texture = new THREE.CanvasTexture(canvas);
         this.formulaTexture = texture;
         
-        const planeGeo = new THREE.PlaneGeometry(4, 1);
+        const planeGeo = new THREE.PlaneGeometry(5, 1.5625);
         const planeMat = new THREE.MeshBasicMaterial({
             map: texture,
             transparent: true,
@@ -631,7 +828,7 @@ export class EFECBFArtwork extends THREE.Group {
         group.add(plane);
         
         // Holographic glow behind formula
-        const glowGeo = new THREE.PlaneGeometry(4.2, 1.2);
+        const glowGeo = new THREE.PlaneGeometry(5.3, 1.8);
         const glowMat = new THREE.MeshBasicMaterial({
             color: 0x67D4E4,
             transparent: true,
@@ -644,8 +841,180 @@ export class EFECBFArtwork extends THREE.Group {
         group.add(glow);
         
         this.formulaHologram = group;
-        this.formulaHologram.position.set(0, 4.5, 0);
+        this.formulaHologram.position.set(0, 5, 0);
         this.add(this.formulaHologram);
+        
+        // === CBF-QP SIDE PANEL ===
+        this.createCBFQPDisplay();
+        
+        // === EFE COMPONENTS PANEL ===
+        this.createEFEComponentsDisplay();
+    }
+    
+    createCBFQPDisplay() {
+        // Side panel showing CBF-QP constraint (deployment mode)
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 384;
+        const ctx = canvas.getContext('2d');
+        
+        // Background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.roundRect(10, 10, 492, 364, 10);
+        ctx.fill();
+        
+        // Title
+        ctx.fillStyle = '#FFD700';
+        ctx.font = 'bold 24px "IBM Plex Sans", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('CBF-QP (Deployment)', 256, 50);
+        
+        // QP formulation
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '18px "IBM Plex Mono", monospace';
+        ctx.fillText('min ||u − u_nom||²', 256, 100);
+        
+        ctx.fillStyle = '#5BC4D4';  // Crystal cyan (refined)
+        ctx.font = '16px "IBM Plex Mono", monospace';
+        ctx.fillText('subject to:', 256, 135);
+        
+        ctx.fillStyle = '#6FA370';  // Grove green (safety)
+        ctx.font = '18px "IBM Plex Mono", monospace';
+        ctx.fillText('L_f h + L_g h·u + α(h) ≥ 0', 256, 170);
+        
+        // Explanation
+        ctx.fillStyle = '#9E9994';
+        ctx.font = '14px "IBM Plex Sans", sans-serif';
+        ctx.fillText('L_f h: Lie derivative along drift', 256, 220);
+        ctx.fillText('L_g h: Lie derivative along control', 256, 245);
+        ctx.fillText('α(h): Class-K function (α·h)', 256, 270);
+        
+        // Guarantee box
+        ctx.strokeStyle = '#6FA370';  // Grove green
+        ctx.lineWidth = 2;
+        ctx.roundRect(50, 295, 412, 55, 5);
+        ctx.stroke();
+        
+        ctx.fillStyle = '#6FA370';  // Grove green
+        ctx.font = 'bold 18px "IBM Plex Sans", sans-serif';
+        ctx.fillText('Mathematical Guarantee:', 256, 320);
+        ctx.font = 'bold 20px "IBM Plex Mono", monospace';
+        ctx.fillText('h(x(t)) ≥ 0  ∀t ≥ 0', 256, 345);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        const geo = new THREE.PlaneGeometry(2.5, 1.875);
+        const mat = new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+        
+        const panel = new THREE.Mesh(geo, mat);
+        panel.position.set(-4.5, 3.5, 0);
+        panel.rotation.y = Math.PI / 6;
+        this.add(panel);
+    }
+    
+    createEFEComponentsDisplay() {
+        // Side panel showing EFE component breakdown
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 384;
+        this.efeCanvas = canvas;
+        this.efeCtx = canvas.getContext('2d');
+        
+        this.updateEFEDisplay();
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        this.efeTexture = texture;
+        
+        const geo = new THREE.PlaneGeometry(2.5, 1.875);
+        const mat = new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+        
+        this.efePanel = new THREE.Mesh(geo, mat);
+        this.efePanel.position.set(4.5, 3.5, 0);
+        this.efePanel.rotation.y = -Math.PI / 6;
+        this.add(this.efePanel);
+    }
+    
+    updateEFEDisplay() {
+        if (!this.efeCtx) return;
+        const ctx = this.efeCtx;
+        
+        ctx.clearRect(0, 0, 512, 384);
+        
+        // Calculate current EFE components
+        const efe = this.calculateEFE(this.agentPosition.x, this.agentPosition.z);
+        
+        // Background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.roundRect(10, 10, 492, 364, 10);
+        ctx.fill();
+        
+        // Title
+        ctx.fillStyle = '#67D4E4';
+        ctx.font = 'bold 24px "IBM Plex Sans", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('EFE Components', 256, 50);
+        
+        // Component bars
+        const components = [
+            { name: 'Epistemic', value: efe.epistemic, color: '#9B7EBD', desc: 'Information gain' },
+            { name: 'Pragmatic', value: efe.pragmatic, color: '#4ECDC4', desc: 'Goal distance' },
+            { name: 'Risk λ·max(0,−h)', value: efe.risk, color: '#FF6B35', desc: 'CBF penalty' },
+            { name: 'Catastrophe', value: efe.catastrophe, color: '#FF2222', desc: 'Severe violation' }
+        ];
+        
+        let y = 90;
+        components.forEach(comp => {
+            // Label
+            ctx.fillStyle = comp.color;
+            ctx.font = 'bold 16px "IBM Plex Sans", sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(comp.name, 30, y);
+            
+            // Value
+            ctx.textAlign = 'right';
+            ctx.fillText(comp.value.toFixed(3), 480, y);
+            
+            // Bar
+            const barWidth = Math.min(300, Math.abs(comp.value) * 100);
+            ctx.fillStyle = comp.color;
+            ctx.globalAlpha = 0.6;
+            ctx.fillRect(30, y + 8, barWidth, 16);
+            ctx.globalAlpha = 1.0;
+            
+            // Description
+            ctx.fillStyle = '#666666';
+            ctx.font = '12px "IBM Plex Sans", sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(comp.desc, 30, y + 38);
+            
+            y += 65;
+        });
+        
+        // Total
+        ctx.strokeStyle = '#67D4E4';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(30, y);
+        ctx.lineTo(480, y);
+        ctx.stroke();
+        
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 20px "IBM Plex Mono", monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('G(π) =', 30, y + 30);
+        ctx.textAlign = 'right';
+        ctx.fillText(efe.total.toFixed(3), 480, y + 30);
+        
+        if (this.efeTexture) {
+            this.efeTexture.needsUpdate = true;
+        }
     }
     
     updateFormula() {
@@ -659,25 +1028,41 @@ export class EFECBFArtwork extends THREE.Group {
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, 1024, 256);
         
-        // Formula text
+        // === CONSTRAINED OPTIMIZATION FORMULA ===
         ctx.fillStyle = '#67D4E4';
-        ctx.font = 'bold 48px "IBM Plex Mono", monospace';
+        ctx.font = 'bold 32px "IBM Plex Mono", monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
-        // EFE = E[G] - λ·h(x)
-        ctx.fillText('EFE = E[G] − λ·risk − cost', 512, 80);
+        // Main optimization problem
+        ctx.fillText('π* = argmin G(π)  s.t.  h(x_π) ≥ 0', 512, 45);
         
-        // Current h(x) value
-        const hxColor = this.currentHx > 0.5 ? '#00FF88' : (this.currentHx > 0.2 ? '#FFAA00' : '#FF4444');
+        // EFE decomposition
+        ctx.fillStyle = '#9E9994';
+        ctx.font = '22px "IBM Plex Mono", monospace';
+        ctx.fillText('G = epistemic + pragmatic + λ·max(0, −h) + catastrophe', 512, 85);
+        
+        // === CURRENT h(x) VALUE === (Colony-based status colors)
+        const hxColor = this.currentHx > 0.3 ? '#6FA370' : (this.currentHx > 0 ? '#E8940A' : '#E85A2F');
         ctx.fillStyle = hxColor;
-        ctx.font = 'bold 64px "IBM Plex Mono", monospace';
-        ctx.fillText(`h(x) = ${this.currentHx.toFixed(3)}`, 512, 170);
+        ctx.font = 'bold 56px "IBM Plex Mono", monospace';
+        ctx.fillText(`h(x) = ${this.currentHx.toFixed(3)}`, 512, 155);
         
-        // Constraint reminder
-        ctx.fillStyle = this.currentHx > 0 ? '#00FF88' : '#FF4444';
-        ctx.font = '32px "IBM Plex Mono", monospace';
-        ctx.fillText('h(x) ≥ 0 ALWAYS', 512, 230);
+        // === STATUS INDICATOR ===
+        if (this.currentHx > 0) {
+            ctx.fillStyle = '#6FA370';  // Grove green (safe)
+            ctx.font = 'bold 28px "IBM Plex Mono", monospace';
+            ctx.fillText('✓ SAFE: h(x) > 0', 512, 210);
+        } else {
+            ctx.fillStyle = '#E85A2F';  // Spark red (danger)
+            ctx.font = 'bold 28px "IBM Plex Mono", monospace';
+            ctx.fillText('⚠ VIOLATION: h(x) < 0', 512, 210);
+        }
+        
+        // Constraint guarantee
+        ctx.fillStyle = '#5BC4D4';  // Crystal cyan (refined)
+        ctx.font = '20px "IBM Plex Sans", sans-serif';
+        ctx.fillText('CBF Guarantee: h(x) ≥ 0 always (deployment mode)', 512, 242);
         
         if (this.formulaTexture) {
             this.formulaTexture.needsUpdate = true;
@@ -773,8 +1158,9 @@ export class EFECBFArtwork extends THREE.Group {
     // INTERACTION
     // ═══════════════════════════════════════════════════════════════════════
     
-    handleClick(point) {
+    onClick(intersection) {
         // Place agent at clicked point on landscape
+        const point = intersection?.point;
         if (point) {
             this.agentPosition.set(point.x, point.y + 0.3, point.z);
             this.agentMarker.position.copy(this.agentPosition);
@@ -792,9 +1178,86 @@ export class EFECBFArtwork extends THREE.Group {
         }
     }
     
+    // Alias for backward compatibility
+    handleClick(point) {
+        this.onClick({ point });
+    }
+    
     setVisitorPosition(position) {
         // Called with visitor's camera position for body immersion effect
         this.visitorInfluence.set(position.x, 0, position.z);
+        
+        // Calculate h(x) at visitor position for embodied feedback
+        const visitorHx = this.calculateHx(position.x, position.z);
+        
+        // Update dome color based on where visitor is standing
+        if (this.domeMaterial) {
+            // Blend between agent's h(x) and visitor's h(x)
+            this.currentHx = this.currentHx * 0.7 + visitorHx * 0.3;
+        }
+        
+        // Trigger warning if visitor approaches danger zone
+        if (visitorHx < 0.2 && !this.visitorWarningActive) {
+            this.triggerVisitorWarning();
+        } else if (visitorHx >= 0.3) {
+            this.clearVisitorWarning();
+        }
+    }
+    
+    triggerVisitorWarning() {
+        this.visitorWarningActive = true;
+        console.log('⚠️ Visitor approaching safety boundary!');
+        
+        // Intensify dome pulsing
+        if (this.domeMaterial) {
+            this.domeMaterial.uniforms.heartbeat.value = 1.0;
+        }
+    }
+    
+    clearVisitorWarning() {
+        this.visitorWarningActive = false;
+    }
+    
+    // Update landscape with visitor proximity effect
+    updateLandscapeWithVisitor() {
+        if (!this.landscapeGeometry || !this.visitorInfluence) return;
+        
+        const positions = this.landscapeGeometry.attributes.position.array;
+        const colors = this.landscapeColors;
+        const visitorX = this.visitorInfluence.x;
+        const visitorZ = this.visitorInfluence.z;
+        
+        // Only update if visitor is reasonably close
+        if (Math.abs(visitorX) > 6 && Math.abs(visitorZ) > 6) return;
+        
+        for (let i = 0; i < positions.length; i += 3) {
+            const x = positions[i];
+            const z = positions[i + 1];
+            
+            // Distance from visitor
+            const distToVisitor = Math.sqrt((x - visitorX) ** 2 + (z - visitorZ) ** 2);
+            
+            // Base h(x) value
+            let hx = this.calculateHx(x, z);
+            
+            // Visitor presence creates a slight "depression" in the landscape
+            // representing their influence on the system state
+            if (distToVisitor < 2.0) {
+                const influence = Math.cos(distToVisitor / 2.0 * Math.PI * 0.5) * 0.15;
+                hx -= influence;
+            }
+            
+            // Add ripple effect emanating from visitor
+            const ripplePhase = this.time * 3 - distToVisitor;
+            const ripple = Math.sin(ripplePhase) * Math.exp(-distToVisitor * 0.5) * 0.05;
+            
+            positions[i + 2] = (hx + ripple) * 2;
+            this.setVertexColor(colors, i, hx);
+        }
+        
+        this.landscapeGeometry.attributes.position.needsUpdate = true;
+        this.landscapeGeometry.attributes.color.needsUpdate = true;
+        this.landscapeGeometry.computeVertexNormals();
     }
     
     // ═══════════════════════════════════════════════════════════════════════
@@ -803,6 +1266,14 @@ export class EFECBFArtwork extends THREE.Group {
     
     update(deltaTime) {
         this.time += deltaTime;
+        
+        // Update landscape with visitor presence effect
+        if (this.visitorInfluence && (this.visitorInfluence.x !== 0 || this.visitorInfluence.z !== 0)) {
+            // Throttle landscape updates for performance
+            if (Math.floor(this.time * 10) % 2 === 0) {
+                this.updateLandscapeWithVisitor();
+            }
+        }
         
         // Update light dome based on current h(x)
         if (this.domeMaterial) {
@@ -813,7 +1284,13 @@ export class EFECBFArtwork extends THREE.Group {
             const heartRate = this.currentHx > 0.5 ? 1.0 : (this.currentHx > 0.2 ? 2.0 : 4.0);
             this.heartbeatPhase += deltaTime * heartRate * Math.PI * 2;
             const heartbeat = Math.pow(Math.sin(this.heartbeatPhase) * 0.5 + 0.5, 3);
-            this.domeMaterial.uniforms.heartbeat.value = heartbeat;
+            
+            // Intensify if visitor warning is active
+            if (this.visitorWarningActive) {
+                this.domeMaterial.uniforms.heartbeat.value = Math.min(1.0, heartbeat * 1.5);
+            } else {
+                this.domeMaterial.uniforms.heartbeat.value = heartbeat;
+            }
         }
         
         // Animate inner glow color
@@ -840,6 +1317,11 @@ export class EFECBFArtwork extends THREE.Group {
         // Animate danger fog
         this.animateDangerFog(deltaTime);
         
+        // Update EFE components display periodically
+        if (this.efeTexture && Math.floor(this.time * 2) !== Math.floor((this.time - deltaTime) * 2)) {
+            this.updateEFEDisplay();
+        }
+        
         // Float formula hologram
         if (this.formulaHologram) {
             this.formulaHologram.position.y = 4.5 + Math.sin(this.time * 0.5) * 0.1;
@@ -863,6 +1345,34 @@ export class EFECBFArtwork extends THREE.Group {
                 const pulseBrightness = Math.max(0, proximity) * 0.5 * (Math.sin(this.time * 3) * 0.5 + 0.5);
                 line.material.opacity = baseBrightness + pulseBrightness;
             });
+        }
+        
+        // Animate safety barrier (pulsing glow when agent approaches danger)
+        if (this.barrierMesh && this.barrierCore) {
+            // Barrier pulses faster and brighter when near danger
+            const dangerFactor = Math.max(0, 1 - this.currentHx * 2);
+            const pulseRate = 2 + dangerFactor * 4;
+            const pulse = Math.sin(this.time * pulseRate) * 0.5 + 0.5;
+            
+            // Core brightness
+            this.barrierCore.material.opacity = 0.4 + pulse * 0.4 + dangerFactor * 0.2;
+            
+            // Main barrier emissive intensity
+            this.barrierMesh.material.emissiveIntensity = 0.6 + pulse * 0.4 + dangerFactor * 0.5;
+            
+            // Make barrier more visible when danger is imminent
+            if (this.currentHx < 0.2) {
+                this.barrierMesh.material.opacity = 0.95;
+                this.barrierMesh.scale.setScalar(1 + pulse * 0.05);
+            } else {
+                this.barrierMesh.material.opacity = 0.85;
+                this.barrierMesh.scale.setScalar(1);
+            }
+        }
+        
+        // Billboard the barrier label
+        if (this.barrierLabel && this.barrierLabel.userData.billboard) {
+            // Label faces camera (handled by main.js if passed camera)
         }
         
         // Pulse path lines

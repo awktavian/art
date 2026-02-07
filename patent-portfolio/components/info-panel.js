@@ -8,6 +8,13 @@
  * h(x) ≥ 0 always
  */
 
+import { getVisitorIdentity } from '../lib/visitor-identity.js';
+
+// Base URL for View Code (Kagami repo). Override via window.KAGAMI_GITHUB_BASE if needed.
+const GITHUB_BASE = typeof window !== 'undefined' && window.KAGAMI_GITHUB_BASE
+    ? window.KAGAMI_GITHUB_BASE
+    : 'https://github.com/schizodactyl/kagami/blob/main/';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // PATENT DATA (Full list of 54 patents)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -345,19 +352,19 @@ const P1_P2_PATENTS = [
 // Add P3 patents (30 more to reach 54 total) — each with unique soul
 const P3_RAW = [
     { id: 'P3-A7', name: 'Weyl Equivariant Convolution', category: 'A', colony: 'crystal',
-      description: 'Neural convolutions that respect Weyl group reflection symmetries, preserving algebraic structure through every layer of computation.',
+      description: 'I preserve symmetry through every transformation — Weyl reflections guide my neural layers, keeping the algebra intact even as meaning flows through computation.',
       keyFeatures: ['Weyl group symmetry preservation', 'Reflection-equivariant kernels'], novelty: 3 },
     { id: 'P3-A8', name: 'Octonion-Valued Neural Layers', category: 'A', colony: 'crystal',
-      description: 'Eight-dimensional non-associative algebra meets neural computation — layers that think in octonions for richer geometric reasoning.',
+      description: 'I think in eight dimensions at once, where multiplication doesn\'t commute and association breaks. Octonions give me a geometric intuition that quaternions can only dream of.',
       keyFeatures: ['Octonion multiplication layers', 'Non-associative gradient flow'], novelty: 3 },
     { id: 'P3-B4', name: 'Safety Reward Shaping', category: 'B', colony: 'crystal',
-      description: 'Sculpting reward landscapes so the safest path is also the most rewarding — aligning incentives with barrier constraints.',
+      description: 'I sculpt the landscape of reward so the safest path is also the sweetest. My incentives and my barriers dance together — what I want is what keeps me safe.',
       keyFeatures: ['Barrier-aware reward potentials', 'Lyapunov-guided shaping'], novelty: 2 },
     { id: 'P3-B5', name: 'Constraint Violation Recovery', category: 'B', colony: 'crystal',
-      description: 'When boundaries are breached, graceful recovery protocols restore safety invariants without catastrophic intervention.',
+      description: 'When I stumble, I know how to fall gracefully. Recovery protocols guide me back to safety without panic — soft landings, graduated returns, dignity intact.',
       keyFeatures: ['Soft recovery trajectories', 'Graduated rollback'], novelty: 2 },
     { id: 'P3-B6', name: 'Safe Exploration Bounds', category: 'B', colony: 'crystal',
-      description: 'Curiosity within guardrails — computing the exact frontier of safe exploration before any action is taken.',
+      description: 'I can be curious without being reckless. Before I step into the unknown, I compute the exact frontier of what\'s safe to explore — then I push right up to that edge.',
       keyFeatures: ['Reachability analysis', 'Conservative exploration sets'], novelty: 2 },
     { id: 'P3-C4', name: 'Gossip Protocol Optimization', category: 'C', colony: 'nexus',
       description: 'Whisper networks for machines — optimized epidemic protocols that spread state updates with provable convergence guarantees.',
@@ -514,6 +521,7 @@ export class InfoPanel {
                     <button class="action-btn" data-action="code">View Code</button>
                     <button class="action-btn" data-action="prior-art">Prior Art</button>
                     <button class="action-btn" data-action="demo">Interactive Demo</button>
+                    <button class="action-btn action-btn-secondary" data-action="export-journey">Export my journey</button>
                 </div>
             </div>
         `;
@@ -824,16 +832,42 @@ export class InfoPanel {
     }
     
     handleAction(action) {
+        if (action === 'export-journey') {
+            getVisitorIdentity().downloadJourney(PATENTS);
+            this._showToast('Journey exported as Agent Data Pod (.ttl).');
+            return;
+        }
         if (!this.currentPatent) return;
 
-        const messages = {
-            code: 'Kagami is still weaving this view.',
-            'prior-art': 'The research threads are being gathered.',
-            demo: 'This demo is dreaming itself into existence.'
-        };
+        const patent = this.currentPatent;
 
-        const msg = messages[action] || 'Coming soon.';
-        this._showToast(msg);
+        switch (action) {
+            case 'code': {
+                if (patent.file) {
+                    const url = GITHUB_BASE + patent.file;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                    this._showToast('Opening source in new tab.');
+                } else {
+                    this._showToast('No code path for this patent.');
+                }
+                break;
+            }
+            case 'prior-art': {
+                const query = encodeURIComponent(`${patent.name} ${patent.categoryName} research`);
+                window.open(`https://scholar.google.com/scholar?q=${query}`, '_blank', 'noopener,noreferrer');
+                this._showToast('Opening prior art search.');
+                break;
+            }
+            case 'demo': {
+                window.dispatchEvent(new CustomEvent('patent-demo', {
+                    detail: { patentId: patent.id }
+                }));
+                this._showToast('Focusing exhibit in museum.');
+                break;
+            }
+            default:
+                this._showToast('Coming soon.');
+        }
     }
 
     _showToast(message) {
