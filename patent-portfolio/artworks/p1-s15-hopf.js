@@ -336,6 +336,9 @@ export class S15HopfArtwork extends THREE.Group {
         // Dimensional indicators
         this.dimLabels = [];
         
+        // Microdelight tracking
+        this.microdelights = { fibersRidden: new Set(), allFibersComplete: false };
+        
         this.create();
     }
     
@@ -1228,6 +1231,13 @@ export class S15HopfArtwork extends THREE.Group {
         if (this.rideDisplay) this.rideDisplay.visible = true;
         if (this.ridePrompt) this.ridePrompt.visible = false;
         
+        // Microdelight: track fibers ridden
+        this.microdelights.fibersRidden.add(fiberIndex);
+        if (this.microdelights.fibersRidden.size >= 7 && !this.microdelights.allFibersComplete) {
+            this.microdelights.allFibersComplete = true;
+            this._dispatchMicrodelight('achievement', { name: 'fiber-rider' });
+        }
+        
         // Emit ride start event
         window.dispatchEvent(new CustomEvent('hopf-ride-start', {
             detail: { fiberIndex, colonyName: COLONY_DATA[fiberIndex].name }
@@ -1396,6 +1406,16 @@ export class S15HopfArtwork extends THREE.Group {
                 fiber.material.emissiveIntensity = 0.2 + activity * 0.4;
             }
         });
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // MICRODELIGHTS
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    _dispatchMicrodelight(type, detail = {}) {
+        window.dispatchEvent(new CustomEvent('artwork-microdelight', {
+            detail: { patentId: 'P1-004', type, ...detail }
+        }));
     }
     
     // ═══════════════════════════════════════════════════════════════════════

@@ -59,14 +59,14 @@ export class TurrellLighting {
         this.hemisphere = new THREE.HemisphereLight(
             kelvinToHex(3400),  // Slightly warm sky
             0x060508,
-            0.25
+            0.35               // Raised from 0.25 for baseline visibility
         );
         this.hemisphere.position.set(0, 50, 0);
         this.scene.add(this.hemisphere);
         this.lights.push(this.hemisphere);
 
         // 2. Main directional (sun through aperture) — primary “god ray” source
-        this.sunlight = new THREE.DirectionalLight(kelvinToHex(3500), 1.2);
+        this.sunlight = new THREE.DirectionalLight(kelvinToHex(3500), 1.5);
         this.sunlight.position.set(
             DIMENSIONS.rotunda.apertureOffset,
             rotH + 6,
@@ -140,7 +140,7 @@ export class TurrellLighting {
 
             const galleryX = cos * (rotR + galleryCenterOffset);
             const galleryZ = sin * (rotR + galleryCenterOffset);
-            const accentLight = new THREE.PointLight(profile.color, 0.35, 18, 2);
+            const accentLight = new THREE.PointLight(profile.color, 0.6, 22, 2);
             accentLight.position.set(galleryX, DIMENSIONS.gallery.height * 0.6, galleryZ);
             this.scene.add(accentLight);
             this.lights.push(accentLight);
@@ -204,7 +204,7 @@ export class TurrellLighting {
         });
     }
 
-    update(delta) {
+    update(delta, playerPosition) {
         this._time += delta;
 
         // Wing profiles: slow sine, period = cycleSec, amount tiny
@@ -218,11 +218,75 @@ export class TurrellLighting {
             const base = colony === this.currentZone ? 1.2 : 0.7;
             spotlight.intensity = Math.max(0.2, base * mult);
         });
+        
+        // Atmospheric effects
+        this.updateGanzfeldEffect(playerPosition);
+        this.updateGodRays();
+        this.updateArtworkLighting(playerPosition);
     }
 
-    updateGanzfeldEffect() {}
-    updateGodRays() {}
-    updateArtworkLighting() {}
+    /**
+     * Ganzfeld effect: smooth fog density/color transition at gallery boundaries
+     * Creates a uniform visual field (James Turrell-inspired) when entering colony wings
+     */
+    updateGanzfeldEffect(playerPosition) {
+        if (!playerPosition || !this.scene.fog) return;
+        
+        const isColony = COLONY_ORDER.includes(this.currentZone);
+        const targetDensity = isColony ? 0.009 : 0.006; // Denser fog in galleries
+        const currentDensity = this.scene.fog.density;
+        
+        // Smooth transition (lerp 2% per frame)
+        this.scene.fog.density += (targetDensity - currentDensity) * 0.02;
+        
+        // In colony galleries, subtly pulse fog toward colony color
+        if (isColony) {
+            const colonyHex = COLONY_COLORS[this.currentZone];
+            if (colonyHex) {
+                const target = new THREE.Color(colonyHex);
+                this._fogColor.lerp(target, 0.005);
+                this.scene.fog.color.copy(this._fogColor);
+            }
+        }
+    }
+    
+    /**
+     * God rays: volumetric light shafts from directional sunlight
+     * Subtle intensity modulation for atmospheric depth
+     */
+    updateGodRays() {
+        if (!this.sunlight) return;
+        
+        // Subtle sunlight intensity breathing (very slow, 45-second cycle)
+        const breathe = 1 + Math.sin(this._time * 0.14) * 0.06;
+        this.sunlight.intensity = 0.9 * breathe;
+        
+        // Shift sunlight position slightly over time for dynamic shadows
+        const drift = Math.sin(this._time * 0.02) * 2;
+        this.sunlight.position.x = 10 + drift;
+    }
+    
+    /**
+     * Artwork lighting: proximity-activated illumination for exhibits
+     * Brightens accent lights near player for discovery/reveal effect
+     */
+    updateArtworkLighting(playerPosition) {
+        if (!playerPosition) return;
+        
+        // Update accent lights based on proximity
+        this.lights.forEach(light => {
+            if (!light.isSpotLight && !light.isPointLight) return;
+            if (!light.userData?.isAccentLight) return;
+            
+            const dist = playerPosition.distanceTo(light.position);
+            const proximityFactor = Math.max(0, 1 - dist / 15); // Fade within 15m
+            const baseIntensity = light.userData.baseIntensity || 0.8;
+            
+            // Smooth brighten on approach (lerp)
+            const target = baseIntensity * (0.3 + 0.7 * proximityFactor);
+            light.intensity += (target - light.intensity) * 0.05;
+        });
+    }
 
     dispose() {
         this.lights.forEach(light => {

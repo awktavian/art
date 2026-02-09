@@ -48,6 +48,9 @@ export class QuantumSafeArtwork extends THREE.Group {
         this.dataPackets = [];
         this.orbits = [];
         
+        // Microdelight tracking
+        this.microdelights = { encryptionsDone: 0, quantumAttackTriggered: false };
+        
         this.create();
         this.initCrypto();
     }
@@ -989,6 +992,23 @@ export class QuantumSafeArtwork extends THREE.Group {
         const nextIdx = (currentIdx + 1) % messages.length;
         
         this.encryptMessage(messages[nextIdx]);
+        
+        // Microdelight: track encryptions
+        this.microdelights.encryptionsDone++;
+        if (this.microdelights.encryptionsDone >= 5 && !this.microdelights.quantumAttackTriggered) {
+            this.microdelights.quantumAttackTriggered = true;
+            this._dispatchMicrodelight('achievement', { name: 'crypto-master' });
+        }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // MICRODELIGHTS
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    _dispatchMicrodelight(type, detail = {}) {
+        window.dispatchEvent(new CustomEvent('artwork-microdelight', {
+            detail: { patentId: 'P1-006', type, ...detail }
+        }));
     }
     
     dispose() {

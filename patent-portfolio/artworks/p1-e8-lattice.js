@@ -119,7 +119,8 @@ function dist8D(a, b) {
 
 /**
  * Find nearest neighbors in E8 lattice.
- * In E8, each root has exactly 56 nearest neighbors at distance √2.
+ * Each E8 root at distance √2 from origin has up to 126 neighbors at distance √2.
+ * We display a subset for visual clarity.
  */
 function findNeighbors(roots, index, maxDist = Math.SQRT2 + 1e-6) {
     const neighbors = [];
@@ -164,6 +165,10 @@ export class E8LatticeArtwork extends THREE.Group {
         
         // Toggle: show 8 or all 56 neighbors per node
         this.showAll56Neighbors = false;
+        
+        // Microdelight tracking
+        this.microdelights = { nodesExplored: 0, kissingNumberFound: false };
+        
         // Pre-compute neighbor relationships
         this.computeNeighborMap();
 
@@ -173,7 +178,7 @@ export class E8LatticeArtwork extends THREE.Group {
     computeNeighborMap() {
         for (let i = 0; i < this.roots.length; i++) {
             const neighbors = findNeighbors(this.roots, i);
-            this.neighborMap.set(i, neighbors.slice(0, 56)); // E8 has 56 nearest neighbors
+            this.neighborMap.set(i, neighbors.slice(0, 56)); // Capped at 56 for visual clarity
         }
     }
     
@@ -1105,6 +1110,13 @@ export class E8LatticeArtwork extends THREE.Group {
             const neighbors = this.neighborMap.get(idx);
             const nShow = this.showAll56Neighbors ? 56 : 8;
             neighbors?.slice(0, nShow).forEach(n => this.highlightNode(n.index));
+            
+            // Microdelight: track nodes explored
+            this.microdelights.nodesExplored++;
+            if (this.microdelights.nodesExplored >= 240 && !this.microdelights.kissingNumberFound) {
+                this.microdelights.kissingNumberFound = true;
+                this._dispatchMicrodelight('easter-egg', { name: 'kissing-number' });
+            }
         }
     }
     
@@ -1259,6 +1271,16 @@ export class E8LatticeArtwork extends THREE.Group {
                 line.material.opacity = Math.max(0.1, line.material.opacity * 0.95);
             }
         });
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // MICRODELIGHTS
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    _dispatchMicrodelight(type, detail = {}) {
+        window.dispatchEvent(new CustomEvent('artwork-microdelight', {
+            detail: { patentId: 'P1-003', type, ...detail }
+        }));
     }
     
     // ═══════════════════════════════════════════════════════════════════════

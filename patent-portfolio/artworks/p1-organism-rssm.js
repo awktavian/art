@@ -67,6 +67,9 @@ export class OrganismRSSMArtwork extends THREE.Group {
         this.imaginationHorizon = 4;
         this.currentStep = 0;
         
+        // Microdelight tracking
+        this.microdelights = { dreamTriggered: false, coloniesFocused: new Set() };
+        
         this.create();
     }
     
@@ -74,9 +77,12 @@ export class OrganismRSSMArtwork extends THREE.Group {
         // Main visualization area
         this.createStateSpace();
         this.createColonyRing();
+        this.createBlockGRUVisualization();
+        this.createFanoAttentionPattern();
         this.createPriorPosteriorDisplay();
         this.createTrajectoryVisualization();
         this.createImaginationPanel();
+        this.createDreamSequenceTrigger();
         this.createFormulasDisplay();
         this.createInteractionHints();
         
@@ -184,35 +190,43 @@ export class OrganismRSSMArtwork extends THREE.Group {
         this.zCore = new THREE.Mesh(zCoreGeo, zCoreMat);
         zGroup.add(this.zCore);
         
-        // Uncertainty cloud (samples from posterior)
-        const cloudCount = 30;
+        // Uncertainty cloud (300+ samples from posterior — dense probabilistic field)
+        const cloudCount = 350;
         const cloudGeo = new THREE.BufferGeometry();
         const cloudPositions = new Float32Array(cloudCount * 3);
         const cloudColors = new Float32Array(cloudCount * 3);
+        const cloudSizes = new Float32Array(cloudCount);
         
         for (let i = 0; i < cloudCount; i++) {
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos(2 * Math.random() - 1);
-            const r = 0.15 + Math.random() * 0.15;
+            const r = 0.1 + Math.random() * 0.25;
             
             cloudPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
             cloudPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
             cloudPositions[i * 3 + 2] = r * Math.cos(phi);
             
+            // Color: gradient from orange (high prob) to dim red (low prob)
+            const prob = 1 - (r - 0.1) / 0.25;
             cloudColors[i * 3] = 1;
-            cloudColors[i * 3 + 1] = 0.4;
-            cloudColors[i * 3 + 2] = 0.2;
+            cloudColors[i * 3 + 1] = 0.3 + prob * 0.3;
+            cloudColors[i * 3 + 2] = 0.1 + prob * 0.2;
+            
+            cloudSizes[i] = 0.02 + prob * 0.04;
         }
         
         cloudGeo.setAttribute('position', new THREE.BufferAttribute(cloudPositions, 3));
         cloudGeo.setAttribute('color', new THREE.BufferAttribute(cloudColors, 3));
+        cloudGeo.setAttribute('size', new THREE.BufferAttribute(cloudSizes, 1));
         
         const cloudMat = new THREE.PointsMaterial({
-            size: 0.05,
+            size: 0.04,
             vertexColors: true,
             transparent: true,
-            opacity: 0.7,
-            blending: THREE.AdditiveBlending
+            opacity: 0.6,
+            blending: THREE.AdditiveBlending,
+            sizeAttenuation: true,
+            depthWrite: false
         });
         
         this.zCloud = new THREE.Points(cloudGeo, cloudMat);
@@ -337,6 +351,156 @@ export class OrganismRSSMArtwork extends THREE.Group {
             label.rotation.y += Math.PI;
             this.add(label);
         });
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // BLOCKGRU VISUALIZATION (7 parallel processing streams)
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    createBlockGRUVisualization() {
+        this.gruStreams = [];
+        const gruGroup = new THREE.Group();
+        gruGroup.position.set(0, 4.5, 0);
+        
+        // 7 parallel GRU processing streams arranged in a ring
+        COLONY_DATA.forEach((colony, i) => {
+            const angle = (i / 7) * Math.PI * 2 - Math.PI / 2;
+            const streamX = Math.cos(angle) * 1.2;
+            const streamZ = Math.sin(angle) * 1.2;
+            
+            // Stream tube (represents the GRU cell)
+            const streamGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.8, 8);
+            const streamMat = new THREE.MeshPhysicalMaterial({
+                color: colony.color, emissive: colony.color,
+                emissiveIntensity: 0.2, metalness: 0.5, roughness: 0.3,
+                transparent: true, opacity: 0.8
+            });
+            const stream = new THREE.Mesh(streamGeo, streamMat);
+            stream.position.set(streamX, 0, streamZ);
+            gruGroup.add(stream);
+            
+            // Gate indicators (reset, update, new — 3 small spheres)
+            const gateNames = ['R', 'U', 'N'];
+            const gateColors = [0xFF4444, 0x44FF44, 0x4444FF];
+            for (let g = 0; g < 3; g++) {
+                const gateGeo = new THREE.SphereGeometry(0.03, 8, 8);
+                const gateMat = new THREE.MeshBasicMaterial({
+                    color: gateColors[g], transparent: true, opacity: 0.6
+                });
+                const gate = new THREE.Mesh(gateGeo, gateMat);
+                gate.position.set(streamX + 0.1, -0.3 + g * 0.3, streamZ);
+                gate.userData = { gateType: gateNames[g], colonyIdx: i };
+                gruGroup.add(gate);
+                this.gruStreams.push(gate);
+            }
+        });
+        
+        // BlockGRU label
+        const lblCanvas = document.createElement('canvas');
+        lblCanvas.width = 512;
+        lblCanvas.height = 64;
+        const lctx = lblCanvas.getContext('2d');
+        lctx.fillStyle = '#67D4E4';
+        lctx.font = 'bold 20px "IBM Plex Mono", monospace';
+        lctx.textAlign = 'center';
+        lctx.fillText('BlockGRU — 7 Parallel Streams', 256, 36);
+        const lblTex = new THREE.CanvasTexture(lblCanvas);
+        const lblSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: lblTex, transparent: true, depthWrite: false
+        }));
+        lblSprite.position.set(0, 0.7, 0);
+        lblSprite.scale.set(2.5, 0.35, 1);
+        gruGroup.add(lblSprite);
+        
+        this.blockGRUGroup = gruGroup;
+        this.add(gruGroup);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // FANO ATTENTION PATTERN (colony-to-colony connections)
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    createFanoAttentionPattern() {
+        this.attentionLines = [];
+        const attnGroup = new THREE.Group();
+        
+        // Fano plane incidence: each colony attends to 3 others
+        const fanoConnections = [
+            [0, 1, 3], [1, 2, 4], [2, 3, 5], [3, 4, 6],
+            [4, 5, 0], [5, 6, 1], [6, 0, 2]
+        ];
+        
+        const radius = 2.5;
+        fanoConnections.forEach((line, lineIdx) => {
+            for (let s = 0; s < 2; s++) {
+                const iA = line[s];
+                const iB = line[s + 1];
+                const angleA = (iA / 7) * Math.PI * 2 - Math.PI / 2;
+                const angleB = (iB / 7) * Math.PI * 2 - Math.PI / 2;
+                
+                const from = new THREE.Vector3(
+                    Math.cos(angleA) * radius, 2.5, Math.sin(angleA) * radius
+                );
+                const to = new THREE.Vector3(
+                    Math.cos(angleB) * radius, 2.5, Math.sin(angleB) * radius
+                );
+                const mid = from.clone().add(to).multiplyScalar(0.5);
+                mid.y += 0.5; // Arc upward
+                
+                const curve = new THREE.QuadraticBezierCurve3(from, mid, to);
+                const curvePoints = curve.getPoints(20);
+                const lineGeo = new THREE.BufferGeometry().setFromPoints(curvePoints);
+                const lineMat = new THREE.LineBasicMaterial({
+                    color: COLONY_DATA[iA].color,
+                    transparent: true, opacity: 0.08
+                });
+                const attnLine = new THREE.Line(lineGeo, lineMat);
+                attnLine.userData = { fromColony: iA, toColony: iB, lineIdx };
+                attnGroup.add(attnLine);
+                this.attentionLines.push(attnLine);
+            }
+        });
+        
+        this.add(attnGroup);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // DREAM SEQUENCE TRIGGER (proximity-activated hallucination)
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    createDreamSequenceTrigger() {
+        this.dreamActive = false;
+        this.dreamTimer = 0;
+        this.dreamDuration = 10; // seconds
+        this.proximityTimer = 0;
+        this.proximityThreshold = 5; // seconds of sustained proximity
+        
+        // Imagination rollout branches (10 steps × 3 branches)
+        this.dreamBranches = [];
+        for (let branch = 0; branch < 3; branch++) {
+            const branchPoints = [];
+            let pos = new THREE.Vector3(0, 2.5, 0);
+            for (let step = 0; step < 10; step++) {
+                pos = pos.clone().add(new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.3,
+                    (Math.random() - 0.5) * 0.2,
+                    (Math.random() - 0.5) * 0.3
+                ));
+                branchPoints.push(pos);
+            }
+            
+            const curve = new THREE.CatmullRomCurve3(branchPoints);
+            const tubeGeo = new THREE.TubeGeometry(curve, 40, 0.015, 6, false);
+            const tubeMat = new THREE.MeshBasicMaterial({
+                color: [0xFF6B35, 0x9B7EBD, 0x4ECDC4][branch],
+                transparent: true, opacity: 0,
+                blending: THREE.AdditiveBlending
+            });
+            const tube = new THREE.Mesh(tubeGeo, tubeMat);
+            tube.visible = false;
+            this.add(tube);
+            this.dreamBranches.push({ mesh: tube, points: branchPoints });
+        }
     }
     
     // ═══════════════════════════════════════════════════════════════════════
@@ -723,42 +887,45 @@ export class OrganismRSSMArtwork extends THREE.Group {
     // ANIMATION
     // ═══════════════════════════════════════════════════════════════════════
     
-    update(deltaTime) {
+    update(deltaTime, camera) {
         this.time += deltaTime;
+        const t = this.time;
         
-        // Update h_t position (deterministic trajectory)
-        const hAngle = this.time * 0.5;
-        const hRadius = 0.3 + Math.sin(this.time * 0.3) * 0.2;
-        const hY = 2.5 + Math.sin(this.time * 0.4) * 0.3;
+        // === h_t deterministic state (smooth interpolated trajectory) ===
+        const hAngle = t * 0.5;
+        const hRadius = 0.3 + Math.sin(t * 0.3) * 0.2;
+        const hY = 2.5 + Math.sin(t * 0.4) * 0.3;
         
-        this.hState.position.set(
-            Math.cos(hAngle) * hRadius,
-            hY,
-            Math.sin(hAngle) * hRadius
-        );
-        this.hState.rotation.y = this.time;
+        // Smooth interpolation instead of direct set
+        const targetH = new THREE.Vector3(Math.cos(hAngle) * hRadius, hY, Math.sin(hAngle) * hRadius);
+        this.hState.position.lerp(targetH, 0.15);
+        this.hState.rotation.y += deltaTime * 1.2;
         
-        // Update h trail
+        // Update h trail (every frame for smoothness)
         this.hTrailPoints.pop();
         this.hTrailPoints.unshift(this.hState.position.clone());
         this.hTrail.geometry.setFromPoints(this.hTrailPoints);
         
-        // Update z_t position (follows h_t with stochastic offset)
+        // === z_t stochastic state ===
         const zOffset = new THREE.Vector3(
-            Math.sin(this.time * 3) * 0.15,
-            Math.cos(this.time * 2.5) * 0.1,
-            Math.sin(this.time * 2.8) * 0.15
+            Math.sin(t * 3) * 0.15,
+            Math.cos(t * 2.5) * 0.1,
+            Math.sin(t * 2.8) * 0.15
         );
         this.zState.position.copy(this.hState.position).add(zOffset);
-        this.zCore.rotation.x = this.time * 2;
-        this.zCore.rotation.z = this.time * 1.5;
+        this.zCore.rotation.x = t * 2;
+        this.zCore.rotation.z = t * 1.5;
         
-        // Update z cloud (uncertainty samples)
+        // Update 350-particle uncertainty cloud with breathing
         const cloudPositions = this.zCloud.geometry.attributes.position.array;
-        for (let i = 0; i < cloudPositions.length / 3; i++) {
+        const cloudCount = cloudPositions.length / 3;
+        // Only update a subset each frame for performance (batch of 50)
+        const batchStart = (Math.floor(t * 10) * 50) % cloudCount;
+        const batchEnd = Math.min(batchStart + 50, cloudCount);
+        for (let i = batchStart; i < batchEnd; i++) {
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos(2 * Math.random() - 1);
-            const uncertainty = 0.15 + Math.sin(this.time + i) * 0.05;
+            const uncertainty = 0.15 + Math.sin(t * 0.8 + i * 0.02) * 0.08;
             const r = uncertainty + Math.random() * 0.1;
             
             cloudPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
@@ -767,29 +934,121 @@ export class OrganismRSSMArtwork extends THREE.Group {
         }
         this.zCloud.geometry.attributes.position.needsUpdate = true;
         
-        // Update colony nodes (activity based on proximity to h_t)
+        // === Colony nodes with attention-based activity ===
         this.colonyNodes.forEach((node, i) => {
             const dist = node.position.distanceTo(this.hState.position);
             const activity = Math.max(0, 1 - dist / 3);
             node.material.emissiveIntensity = 0.2 + activity * 0.6;
-            
-            // Subtle float
-            node.position.y = 2.5 + Math.sin(this.time * 2 + i * 0.9) * 0.05;
+            node.position.y = 2.5 + Math.sin(t * 2 + i * 0.9) * 0.05;
+            node.scale.setScalar(1 + activity * 0.2);
         });
         
-        // Update state space wireframe rotation
-        if (this.stateSpace) {
-            this.stateSpace.rotation.y = this.time * 0.1;
+        // === Fano attention lines pulse with h_t proximity ===
+        if (this.attentionLines) {
+            this.attentionLines.forEach(line => {
+                const { fromColony } = line.userData;
+                const fromNode = this.colonyNodes[fromColony];
+                if (fromNode) {
+                    const dist = fromNode.position.distanceTo(this.hState.position);
+                    const activity = Math.max(0, 1 - dist / 3);
+                    line.material.opacity = 0.05 + activity * 0.25;
+                }
+            });
         }
         
-        // Update prior/posterior display
-        if (Math.floor(this.time * 5) % 3 === 0) {
+        // === BlockGRU gate activity ===
+        if (this.gruStreams) {
+            this.gruStreams.forEach(gate => {
+                const { colonyIdx, gateType } = gate.userData;
+                const node = this.colonyNodes[colonyIdx];
+                if (!node) return;
+                const dist = node.position.distanceTo(this.hState.position);
+                const activity = Math.max(0, 1 - dist / 3);
+                
+                // Different gates activate differently
+                let gateActivity;
+                if (gateType === 'R') gateActivity = Math.sin(t * 3 + colonyIdx) * 0.5 + 0.5;
+                else if (gateType === 'U') gateActivity = activity;
+                else gateActivity = Math.sin(t * 2 + colonyIdx * 0.5) * 0.5 + 0.5;
+                
+                gate.material.opacity = 0.2 + gateActivity * 0.8;
+                gate.scale.setScalar(0.8 + gateActivity * 0.4);
+            });
+        }
+        
+        // === Dream sequence ===
+        this._updateDreamSequence(deltaTime, camera);
+        
+        // === State space wireframe ===
+        if (this.stateSpace) {
+            this.stateSpace.rotation.y = t * 0.1;
+        }
+        
+        // Update prior/posterior display (throttled)
+        if (Math.floor(t * 5) % 3 === 0) {
             this.updatePriorPosteriorDisplay();
         }
         
-        // Update imagination display
-        if (Math.floor(this.time * 3) % 2 === 0) {
+        // Update imagination display (throttled)
+        if (Math.floor(t * 3) % 2 === 0) {
             this.updateImaginationDisplay();
+        }
+    }
+    
+    _updateDreamSequence(dt, camera) {
+        if (!camera) return;
+        
+        // Check proximity for dream trigger
+        const dist = camera.position?.distanceTo?.(this.position) || Infinity;
+        
+        if (dist < 6 && !this.dreamActive) {
+            this.proximityTimer += dt;
+            if (this.proximityTimer >= this.proximityThreshold) {
+                this.dreamActive = true;
+                this.dreamTimer = 0;
+                this.proximityTimer = 0;
+                // Show dream branches
+                this.dreamBranches.forEach(b => { b.mesh.visible = true; });
+                
+                // Microdelight: dream sequence discovered
+                if (!this.microdelights.dreamTriggered) {
+                    this.microdelights.dreamTriggered = true;
+                    this._dispatchMicrodelight('discovery', { name: 'dream-sequence' });
+                }
+            }
+        } else if (dist >= 6) {
+            this.proximityTimer = Math.max(0, this.proximityTimer - dt);
+        }
+        
+        if (this.dreamActive) {
+            this.dreamTimer += dt;
+            const progress = Math.min(this.dreamTimer / this.dreamDuration, 1);
+            
+            // Animate dream branches fading in and growing
+            this.dreamBranches.forEach((branch, bIdx) => {
+                const branchDelay = bIdx * 0.8;
+                const branchProgress = Math.max(0, (this.dreamTimer - branchDelay) / (this.dreamDuration - branchDelay));
+                branch.mesh.material.opacity = Math.sin(branchProgress * Math.PI) * 0.4;
+                branch.mesh.rotation.y += dt * (0.1 + bIdx * 0.05);
+            });
+            
+            // Transform uncertainty cloud during dream
+            if (this.zCloud?.material) {
+                this.zCloud.material.opacity = 0.3 + Math.sin(this.dreamTimer * 2) * 0.3;
+                this.zCloud.material.size = 0.05 + Math.sin(this.dreamTimer * 1.5) * 0.02;
+            }
+            
+            if (progress >= 1) {
+                this.dreamActive = false;
+                this.dreamBranches.forEach(b => {
+                    b.mesh.visible = false;
+                    b.mesh.material.opacity = 0;
+                });
+                if (this.zCloud?.material) {
+                    this.zCloud.material.opacity = 0.6;
+                    this.zCloud.material.size = 0.04;
+                }
+            }
         }
     }
     
@@ -818,16 +1077,68 @@ export class OrganismRSSMArtwork extends THREE.Group {
     
     highlightColony(index) {
         const colony = COLONY_DATA[index];
-        console.log(`🔬 Colony ${colony.name} (${colony.basis}) selected`);
+        
+        // Microdelight: track colonies focused
+        this.microdelights.coloniesFocused.add(index);
+        if (this.microdelights.coloniesFocused.size >= 7) {
+            this._dispatchMicrodelight('achievement', { name: 'neural-cartographer' });
+            this.microdelights.coloniesFocused = new Set(); // Reset so it only fires once per full set
+        }
         
         // Pulse the selected colony
         const node = this.colonyNodes[index];
         const originalIntensity = node.material.emissiveIntensity;
         node.material.emissiveIntensity = 1.0;
+        node.scale.setScalar(1.5);
         
+        // Highlight all Fano attention lines connected to this colony
+        if (this.attentionLines) {
+            this.attentionLines.forEach(line => {
+                if (line.userData.fromColony === index || line.userData.toColony === index) {
+                    line.material.opacity = 0.5;
+                    line.material.color.setHex(0xFFFFFF);
+                }
+            });
+        }
+        
+        // Show GRU gate activations for this colony
+        if (this.gruStreams) {
+            this.gruStreams.forEach(gate => {
+                if (gate.userData.colonyIdx === index) {
+                    gate.material.opacity = 1.0;
+                    gate.scale.setScalar(2.0);
+                }
+            });
+        }
+        
+        // Restore after 2 seconds
         setTimeout(() => {
             node.material.emissiveIntensity = originalIntensity;
-        }, 500);
+            node.scale.setScalar(1.0);
+            if (this.attentionLines) {
+                this.attentionLines.forEach(line => {
+                    line.material.opacity = 0.08;
+                    line.material.color.setHex(COLONY_DATA[line.userData.fromColony].color);
+                });
+            }
+            if (this.gruStreams) {
+                this.gruStreams.forEach(gate => {
+                    if (gate.userData.colonyIdx === index) {
+                        gate.scale.setScalar(1.0);
+                    }
+                });
+            }
+        }, 2000);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // MICRODELIGHTS
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    _dispatchMicrodelight(type, detail = {}) {
+        window.dispatchEvent(new CustomEvent('artwork-microdelight', {
+            detail: { patentId: 'P1-005', type, ...detail }
+        }));
     }
     
     dispose() {

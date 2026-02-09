@@ -106,14 +106,15 @@ export class GalleryLoader {
         this.pendingArtworks = [];
         this.loadedColonies = new Set();
         
-        // Listen for patent selection events
-        window.addEventListener('patent-select', (e) => {
+        // Listen for patent selection events (bound for cleanup)
+        this._onPatentSelect = (e) => {
             const patentId = e.detail?.patentId;
             if (patentId) {
                 getVisitorIdentity().recordVisit(patentId);
                 this.infoPanel.show(patentId);
             }
-        });
+        };
+        window.addEventListener('patent-select', this._onPatentSelect);
     }
     
     /**
@@ -393,10 +394,31 @@ export class GalleryLoader {
                 }
             });
         }
+        // LOD: only update artworks based on distance to camera
+        const camPos = camera?.position;
         this.loadedArtworks.forEach(artwork => {
-            if (artwork.update) {
-                artwork.update(deltaTime, camera);
+            if (!artwork.update) return;
+            
+            if (camPos && artwork.position) {
+                const dist = camPos.distanceTo(artwork.position);
+                
+                // Far artworks: reduce update frequency
+                if (dist > 60) {
+                    // Very far: skip entirely (frozen)
+                    artwork.visible = false;
+                    return;
+                }
+                artwork.visible = true;
+                
+                if (dist > 30) {
+                    // Medium distance: update every 4th frame
+                    this._lodFrame = (this._lodFrame || 0) + 1;
+                    if (this._lodFrame % 4 !== 0) return;
+                }
+                // Close: update every frame
             }
+            
+            artwork.update(deltaTime, camera);
         });
         return { artworksAdded };
     }
@@ -405,6 +427,12 @@ export class GalleryLoader {
      * Dispose all loaded artworks
      */
     dispose() {
+        // Remove event listener
+        if (this._onPatentSelect) {
+            window.removeEventListener('patent-select', this._onPatentSelect);
+            this._onPatentSelect = null;
+        }
+        
         this.loadedArtworks.forEach(artwork => {
             if (artwork.dispose) {
                 artwork.dispose();

@@ -655,6 +655,10 @@ export class InteractionManager {
         // Discovery tracking
         this.discoveries = new Set();
         
+        // Hover state machine: idle -> approaching -> hover -> engaged
+        this.hoverState = 'idle';
+        this.hoverStateTimer = 0;
+        
         this.init();
     }
     
@@ -671,6 +675,11 @@ export class InteractionManager {
         const rect = this.renderer.domElement.getBoundingClientRect();
         this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
         this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        
+        // Throttle hover raycasting to max 15fps (67ms) for performance
+        const now = performance.now();
+        if (now - (this._lastHoverCheck || 0) < 67) return;
+        this._lastHoverCheck = now;
         
         this.checkHover();
     }
@@ -693,17 +702,30 @@ export class InteractionManager {
         }
     }
     
+    /**
+     * Rebuild the cached interactable objects list.
+     * Call this after loading new gallery content.
+     */
+    rebuildInteractableCache() {
+        this._cachedInteractables = [];
+        this.scene.traverse(obj => {
+            if (obj.userData?.interactive) {
+                this._cachedInteractables.push(obj);
+            }
+        });
+    }
+    
     checkHover() {
         this.raycaster.setFromCamera(this.mouse, this.camera);
         
-        const interactables = [];
-        this.scene.traverse(obj => {
-            if (obj.userData?.interactive) {
-                interactables.push(obj);
-            }
-        });
+        // Use cached interactables — rebuild every 5 seconds or on demand
+        const now = performance.now();
+        if (!this._cachedInteractables || now - (this._lastCacheRebuild || 0) > 5000) {
+            this.rebuildInteractableCache();
+            this._lastCacheRebuild = now;
+        }
         
-        const intersects = this.raycaster.intersectObjects(interactables, true);
+        const intersects = this.raycaster.intersectObjects(this._cachedInteractables, true);
         
         if (intersects.length > 0) {
             const newHovered = intersects[0].object;
@@ -730,14 +752,29 @@ export class InteractionManager {
     }
     
     onHoverEnter(object, intersection) {
-        // Spark: immediate feedback
+        this.hoverState = 'approaching';
+        this.hoverStateTimer = 0;
+        
+        // Visual: subtle glow pulse
         this.effects.createGlowPulse(object, 0x67D4E4, 0.5);
         
-        // Cursor change
+        // Cursor
         document.body.style.cursor = 'pointer';
+        
+        // Mobile haptics: subtle tap on hover
+        if (navigator.vibrate) navigator.vibrate([10]);
+        
+        // Transition to 'hover' after 150ms
+        setTimeout(() => {
+            if (this.hoveredObject === object) {
+                this.hoverState = 'hover';
+            }
+        }, 150);
     }
     
     onHoverExit(object) {
+        this.hoverState = 'idle';
+        this.hoverStateTimer = 0;
         document.body.style.cursor = 'default';
     }
     
@@ -754,6 +791,18 @@ export class InteractionManager {
         const intersects = this.raycaster.intersectObjects(interactables, true);
         
         if (intersects.length > 0) {
+            // Click feedback: scale bounce
+            const clickedObj = intersects[0].object;
+            if (clickedObj.scale) {
+                const origScale = clickedObj.scale.clone();
+                clickedObj.scale.multiplyScalar(0.95);
+                setTimeout(() => clickedObj.scale.multiplyScalar(1.05 / 0.95), 80);
+                setTimeout(() => clickedObj.scale.copy(origScale), 200);
+            }
+            
+            // Mobile haptics: click pattern
+            if (navigator.vibrate) navigator.vibrate([20, 10, 20]);
+            
             const clicked = intersects[0].object;
             const point = intersects[0].point;
             

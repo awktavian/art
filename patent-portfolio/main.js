@@ -23,6 +23,7 @@ import {
 } from './museum/architecture.js';
 import { MuseumNavigation } from './museum/navigation.js';
 import { GalleryLoader } from './museum/gallery-loader.js';
+import { PATENTS } from './components/info-panel.js';
 import { TurrellLighting } from './museum/lighting.js';
 import { WingEnhancementManager } from './museum/wing-enhancements.js';
 import { WayfindingManager } from './museum/wayfinding.js';
@@ -273,6 +274,16 @@ class PatentMuseum {
                 this.initPostProcessing();
             }
             
+            // Re-apply environment map (materials need it after context restore)
+            if (this.environmentMap) {
+                this.applyEnvironmentMap();
+            }
+            
+            // Rebuild culling system
+            if (this.cullingSystem) {
+                this.initCullingSystem();
+            }
+            
             // Restart animation loop
             this.animate();
             
@@ -494,9 +505,21 @@ class PatentMuseum {
             
             // Initialize collision (unless noclip mode)
             if (this.navigation && !this.debug.noclipEnabled) {
-                const collisionCount = this.navigation.forceRebuildCollision();
-                console.log(`Collision system initialized with ${collisionCount} objects`);
+                try {
+                    const collisionCount = this.navigation.forceRebuildCollision();
+                    if (collisionCount === 0) {
+                        console.warn('Collision system: 0 objects found — walls may be passable');
+                    } else {
+                        console.log(`Collision system initialized with ${collisionCount} objects`);
+                    }
+                } catch (collisionError) {
+                    console.error('Collision system initialization failed:', collisionError);
+                    // Continue without collision — museum still usable
+                }
             }
+            
+            // Initialize culling system (early — needed for performance)
+            this.initCullingSystem();
             
             this.lightColonyDot(5);
             this.updateLoadingProgress(90);
@@ -523,9 +546,6 @@ class PatentMuseum {
             this.debug.lighting = this.turrellLighting;
             this.debug.wingEnhancements = this.wingEnhancements;
             this.debug.soundDesign = this.soundDesign;
-            
-            // Initialize culling system
-            this.initCullingSystem();
             
             // Initialize settings UI and sync with performance manager
             this.settings.syncWithPerformanceManager(this.performanceManager);
@@ -865,6 +885,19 @@ class PatentMuseum {
         if (this.wayfinding.minimap) {
             this.wayfinding.minimap.setVisitedWings(this.journeyTracker.state.visitedWings);
             
+            // Click-to-teleport from minimap
+            this.wayfinding.minimap.onTeleport = ({ worldX, worldZ, colony }) => {
+                if (colony) {
+                    // Teleport to colony wing entrance
+                    this.teleportToWing(colony);
+                } else {
+                    // Teleport to clicked position
+                    const target = new THREE.Vector3(worldX, 1.6, worldZ);
+                    this.navigation?.teleportTo(target);
+                }
+                if (this.soundDesign) this.soundDesign.playInteraction('teleport');
+            };
+            
             // Listen for zone changes
             this.journeyTracker.on('zoneChange', ({ to }) => {
                 this.wayfinding.minimap.setVisitedWings(this.journeyTracker.state.visitedWings);
@@ -931,6 +964,26 @@ class PatentMuseum {
         this.galleryLoader.loadAllGalleries();
         // Gallery loading is synchronous — _rebuildInteractables() in finally block
         // will capture all gallery objects since it runs after this returns.
+        
+        // Feed artwork positions to minimap for markers
+        if (this.wayfinding?.minimap && this.galleryLoader.loadedArtworks?.size) {
+            const positions = [];
+            this.galleryLoader.loadedArtworks.forEach((artwork, patentId) => {
+                if (artwork.position) {
+                    const patent = PATENTS.find(p => p.id === patentId);
+                    positions.push({
+                        x: artwork.position.x,
+                        z: artwork.position.z,
+                        patentId,
+                        colony: patent?.colony || 'crystal',
+                        viewed: false
+                    });
+                }
+            });
+            if (positions.length > 0) {
+                this.wayfinding.minimap.setArtworkPositions(positions);
+            }
+        }
     }
 
     initProximityTriggers() {
@@ -1218,6 +1271,17 @@ class PatentMuseum {
                 }
             });
         }
+
+        // Microdelight handler — achievement/discovery/easter-egg sounds and visuals
+        window.addEventListener('artwork-microdelight', (e) => {
+            const { type, patentId, name } = e.detail || {};
+            console.log(`✨ Microdelight [${type}]: ${name} (${patentId})`);
+            if (this.soundDesign) {
+                if (type === 'achievement') this.soundDesign.playInteraction('consensus');
+                else if (type === 'easter-egg') this.soundDesign.playInteraction('discovery');
+                else this.soundDesign.playInteraction('success');
+            }
+        });
 
         // Interactive Demo: focus camera on artwork when user clicks Demo in info panel
         window.addEventListener('patent-demo', (e) => {
@@ -1660,6 +1724,16 @@ class PatentMuseum {
             
             if (obj.userData?.type === 'fano-node') {
                 this.showColonyInfo(obj.userData.colony);
+                // Highlight beam from crystal to wing
+                if (this.fanoSculpture?.userData?._animator) {
+                    this.fanoSculpture.userData._animator.highlightColonyBeam(obj.userData.colony);
+                }
+            }
+            if (obj.userData?.type === 'fano-nexus') {
+                // Full consensus demonstration
+                if (this.fanoSculpture?.userData?._animator) {
+                    this.fanoSculpture.userData._animator.triggerNexusConsensus();
+                }
             }
             let p = obj;
             while (p) {
@@ -1673,18 +1747,37 @@ class PatentMuseum {
             if (obj.userData?.artwork) {
                 this.showArtworkPanel(obj.userData.artwork);
             }
+            
+            // Forward click to artwork's onClick handler (for demoMode toggles)
+            let artworkGroup = obj;
+            while (artworkGroup) {
+                if (artworkGroup.userData?.patentId && typeof artworkGroup.onClick === 'function') {
+                    artworkGroup.onClick();
+                    break;
+                }
+                artworkGroup = artworkGroup.parent;
+            }
         }
     }
     
     showColonyInfo(colony) {
         const data = COLONY_DATA[colony];
-        console.log(`Colony: ${data.name}`, data);
+        if (!data) return;
         
         // Play colony-specific note
         if (this.soundDesign) {
             this.soundDesign.playColonyNote(colony, 0.3);
         }
-        // TODO: Show info panel
+        
+        // Show info panel via event dispatch
+        window.dispatchEvent(new CustomEvent('colony-select', { 
+            detail: { 
+                colony, 
+                name: data.name,
+                description: data.description,
+                patents: data.patents
+            } 
+        }));
     }
     
     showArtworkPanel(artwork) {
@@ -1695,10 +1788,31 @@ class PatentMuseum {
             this.soundDesign.playInteraction('discovery');
         }
 
+        const patentId = artwork?.patentId || artwork?.id;
+
+        // Discovery particle burst (first-time viewing)
+        if (!this._discoveredArtworks) this._discoveredArtworks = new Set();
+        const artworkId = patentId || artwork?.userData?.patentId;
+        if (artworkId && !this._discoveredArtworks.has(artworkId)) {
+            this._discoveredArtworks.add(artworkId);
+            // Achievement check: first wing complete, all P1s, all exhibits
+            if (this._discoveredArtworks.size === 6) {
+                // All P1s discovered
+                if (this.soundDesign) this.soundDesign.playInteraction('consensus');
+            }
+            if (this._discoveredArtworks.size === 54) {
+                // All exhibits discovered (6 P1 + 18 P2 + 30 P3)
+                if (this.soundDesign) this.soundDesign.playInteraction('consensus');
+                if (this.fanoSculpture?.userData?._animator) {
+                    this.fanoSculpture.userData._animator.triggerCelebration();
+                }
+            }
+        }
+
         // Dispatch to the InfoPanel system
-        if (artwork?.patentId || artwork?.id) {
+        if (patentId) {
             window.dispatchEvent(new CustomEvent('patent-select', {
-                detail: { patentId: artwork.patentId || artwork.id }
+                detail: { patentId }
             }));
         }
     }
@@ -2032,7 +2146,7 @@ class PatentMuseum {
             case 0:
                 // Lighting transitions
                 if (this.turrellLighting && this.debug?.systems?.lighting?.enabled !== false) {
-                    this.turrellLighting.update(clampedDelta * 6, this.time);
+                    this.turrellLighting.update(clampedDelta * 6, this.camera?.position);
                 }
                 if (this.atmosphere) {
                     this.atmosphere.update(clampedDelta);
@@ -2042,7 +2156,7 @@ class PatentMuseum {
             case 1:
                 // Central sculptures
                 if (this.fanoSculpture) {
-                    animateFanoSculpture(this.fanoSculpture, this.time);
+                    animateFanoSculpture(this.fanoSculpture, this.time, delta, this.camera?.position);
                 }
                 break;
                 

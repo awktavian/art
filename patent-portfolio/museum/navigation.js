@@ -527,6 +527,7 @@ export class MuseumNavigation {
         this.collisionObjects = [];
         this.collisionMargin = 0.5; // Distance to keep from walls (increased for better feel)
         this.collisionRays = 8; // Number of rays to cast around player
+        this._collisionEnabled = true; // Explicit flag — can be toggled by debug
         
         // Note: Don't call rebuildCollisionObjects() here - scene isn't populated yet
         // It will be called via setTimeout in init() and can be triggered manually
@@ -558,7 +559,11 @@ export class MuseumNavigation {
                 nameLower.includes('wall') ||
                 nameLower.includes('pillar') ||
                 nameLower.includes('column') ||
-                nameLower.includes('portal');  // Triangular portals are collidable
+                nameLower.includes('portal') ||
+                nameLower.includes('pedestal') ||
+                nameLower.includes('artwork') ||
+                nameLower.includes('exhibit') ||
+                nameLower.includes('kiosk');
             
             if (isCollidable) {
                 this.collisionObjects.push(object);
@@ -579,6 +584,7 @@ export class MuseumNavigation {
      */
     forceRebuildCollision() {
         this.rebuildCollisionObjects();
+        this._rebuildFloorObjects();
         return this.collisionObjects.length;
     }
     
@@ -644,40 +650,50 @@ export class MuseumNavigation {
             this._groundOrigin = new THREE.Vector3();
             this._groundDir = new THREE.Vector3(0, -1, 0);  // Straight down
         }
-        
+
+        // Cache floor objects (only rebuild when explicitly requested)
+        if (!this._floorObjects) {
+            this._rebuildFloorObjects();
+        }
+
         // Cast ray from high above downward
         this._groundOrigin.set(x, 20, z);  // Start from ceiling
         this._groundRaycaster.set(this._groundOrigin, this._groundDir);
         this._groundRaycaster.far = 25;  // Max fall distance
-        
-        // Find floor objects
-        const floorObjects = [];
-        this.scene.traverse((object) => {
-            if (object.isMesh) {
-                const nameLower = (object.name || '').toLowerCase();
-                // Include floors, platforms, and any horizontal surfaces
-                if (nameLower.includes('floor') || 
-                    nameLower.includes('platform') ||
-                    nameLower.includes('base') ||
-                    nameLower.includes('ground') ||
-                    object.rotation.x === -Math.PI / 2) {  // Horizontal planes
-                    floorObjects.push(object);
-                }
-            }
-        });
-        
-        if (floorObjects.length === 0) {
+
+        if (this._floorObjects.length === 0) {
             return 0;  // Default floor at Y=0
         }
-        
-        const intersections = this._groundRaycaster.intersectObjects(floorObjects, false);
-        
+
+        const intersections = this._groundRaycaster.intersectObjects(this._floorObjects, false);
+
         if (intersections.length > 0) {
             // Return the Y position of the highest floor below us
             return intersections[0].point.y;
         }
-        
+
         return 0;  // Default floor at Y=0
+    }
+
+    /**
+     * Rebuild cached floor objects list
+     * Called lazily on first use and can be forced via forceRebuildCollision()
+     */
+    _rebuildFloorObjects() {
+        this._floorObjects = [];
+        this.scene.traverse((object) => {
+            if (object.isMesh) {
+                const nameLower = (object.name || '').toLowerCase();
+                // Include floors, platforms, and any horizontal surfaces
+                if (nameLower.includes('floor') ||
+                    nameLower.includes('platform') ||
+                    nameLower.includes('base') ||
+                    nameLower.includes('ground') ||
+                    object.rotation.x === -Math.PI / 2) {  // Horizontal planes
+                    this._floorObjects.push(object);
+                }
+            }
+        });
     }
     
     // ═══════════════════════════════════════════════════════════════════════
@@ -772,17 +788,15 @@ export class MuseumNavigation {
                     this.camera.position.addScaledVector(this._forward, moveZ);
                     this.camera.position.addScaledVector(this._right, moveX);
                 } else {
-                    // Slide along wall
-                    this._rightSlide.set(this._collisionDir.z, 0, -this._collisionDir.x);
-                    this._leftSlide.set(-this._collisionDir.z, 0, this._collisionDir.x);
+                    // Wall sliding: project movement onto wall-parallel plane
+                    const slideMove = this.calculateSlideMovement(this._moveVector, this._collisionDir);
+                    const slideDistance = slideMove.length();
                     
-                    const rightDot = Math.abs(this._rightSlide.dot(this._moveVector));
-                    const leftDot = Math.abs(this._leftSlide.dot(this._moveVector));
-                    const slideDir = rightDot > leftDot ? this._rightSlide : this._leftSlide;
-                    const slideDistance = moveDistance * 0.3;
-                    
-                    if (!this.checkCollision(slideDir, slideDistance)) {
-                        this.camera.position.addScaledVector(slideDir, slideDistance);
+                    if (slideDistance > 0.001) {
+                        const slideDirNorm = slideMove.clone().normalize();
+                        if (!this.checkCollision(slideDirNorm, slideDistance)) {
+                            this.camera.position.add(slideMove);
+                        }
                     }
                 }
             } else {
@@ -792,8 +806,7 @@ export class MuseumNavigation {
             }
         }
         
-        // Apply gravity
-        this.velocity.y -= 25 * deltaTime;  // Gravity
+        // Apply vertical velocity (gravity was already applied at line 730)
         this.camera.position.y += this.velocity.y * deltaTime;
         
         // Ground raycast for proper floor detection

@@ -57,6 +57,9 @@ export class EFECBFArtwork extends THREE.Group {
         this.raycaster = new THREE.Raycaster();
         this.interactiveObjects = [];
         
+        // Microdelight tracking
+        this.microdelights = { barrierChallengeComplete: false, dangerZoneCount: 0 };
+        
         this.create();
     }
     
@@ -1333,6 +1336,15 @@ export class EFECBFArtwork extends THREE.Group {
             this.animateCelebration();
         }
         
+        // Microdelight: track danger zone proximity without violation
+        if (this.currentHx > 0 && this.currentHx < 0.3) {
+            this.microdelights.dangerZoneCount++;
+            if (this.microdelights.dangerZoneCount >= 50 && !this.microdelights.barrierChallengeComplete) {
+                this.microdelights.barrierChallengeComplete = true;
+                this._dispatchMicrodelight('achievement', { name: 'barrier-master' });
+            }
+        }
+        
         // Rotate contours slightly
         if (this.contours) {
             this.contours.rotation.y = Math.sin(this.time * 0.1) * 0.05;
@@ -1474,6 +1486,16 @@ export class EFECBFArtwork extends THREE.Group {
             }
             this.optimumReward.children[1].geometry.attributes.position.needsUpdate = true;
         }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // MICRODELIGHTS
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    _dispatchMicrodelight(type, detail = {}) {
+        window.dispatchEvent(new CustomEvent('artwork-microdelight', {
+            detail: { patentId: 'P1-001', type, ...detail }
+        }));
     }
     
     // ═══════════════════════════════════════════════════════════════════════

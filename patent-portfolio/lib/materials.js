@@ -400,7 +400,8 @@ export function createConcreteMaterial(options = {}) {
         roughness,
         metalness: 0.05,
         envMap,
-        envMapIntensity: 0.3
+        envMapIntensity: 0.3,
+        side: THREE.DoubleSide  // Visible from both sides (critical for rotunda cylinder)
     });
     const nm = normalMap || createProceduralNormalMap(256, 6);
     material.normalMap = nm;
@@ -412,7 +413,7 @@ export function createConcreteMaterial(options = {}) {
  * Polished concrete for thresholds (roughness 0.1).
  */
 export function createConcretePolishedMaterial(options = {}) {
-    return createConcreteMaterial({ ...options, roughness: 0.1, normalScale: 0.15 });
+    return createConcreteMaterial({ ...options, roughness: 0.1, normalScale: 0.2 });
 }
 
 /**

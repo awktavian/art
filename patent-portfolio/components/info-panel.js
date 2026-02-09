@@ -474,11 +474,149 @@ export const PATENTS = Object.freeze([...P1_P2_PATENTS, ...P3_PATENTS]);
 // INFO PANEL CLASS
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════
+// GLOSSARY — hover-tooltip definitions for technical terms
+// ═══════════════════════════════════════════════════════════════════════════
+
+const GLOSSARY = {
+    'EFE': 'Expected Free Energy — a decision metric from active inference that balances exploration (information gain) with exploitation (goal achievement).',
+    'CBF': 'Control Barrier Function — a mathematical function h(x) that guarantees safety: if h(x) ≥ 0, the system is in a safe state.',
+    'RSSM': 'Recurrent State-Space Model — a neural architecture that maintains a latent world model, predicting future states from past observations.',
+    'Fano plane': 'The smallest finite projective plane: 7 points and 7 lines, where every line contains 3 points and every point lies on 3 lines.',
+    'E8': 'The largest exceptional simple Lie group, with 248 dimensions and 240 root vectors forming the densest lattice packing in 8 dimensions.',
+    'S15': 'The 15-dimensional sphere — a high-dimensional manifold used for encoding rich state representations via Hopf fibration.',
+    'Hopf fibration': 'A way to decompose a higher-dimensional sphere into a base sphere and fiber circles, revealing hidden structure in state spaces.',
+    'Lie algebra': 'The tangent space at the identity of a Lie group, capturing infinitesimal symmetries and used for smooth state evolution.',
+    'Kyber': 'ML-KEM (Kyber) — a post-quantum key encapsulation mechanism based on lattice problems, standardized by NIST.',
+    'AES-256-GCM': 'Advanced Encryption Standard with 256-bit keys in Galois/Counter Mode — authenticated encryption providing both confidentiality and integrity.',
+    'Byzantine fault': 'A failure mode where a node can behave arbitrarily (including maliciously), not just crash. BFT systems tolerate up to f < n/3 such faults.',
+    'CRDT': 'Conflict-free Replicated Data Type — a data structure that can be replicated across multiple nodes and merged without conflicts.',
+    'KAN': 'Kolmogorov-Arnold Network — a neural network architecture based on the Kolmogorov-Arnold representation theorem, using learnable spline functions.',
+    'catastrophe theory': 'A branch of mathematics studying how small changes in parameters can cause sudden qualitative changes in system behavior (folds, cusps, etc.).',
+    'zero-knowledge proof': 'A cryptographic protocol where one party proves knowledge of a secret without revealing the secret itself.',
+    'HRTF': 'Head-Related Transfer Function — describes how sound is filtered by the shape of the head and ears, enabling 3D audio perception.',
+    'QP': 'Quadratic Programming — an optimization technique for minimizing a quadratic objective subject to linear constraints.',
+    'active inference': 'A framework where agents minimize expected free energy by both acting on and perceiving their environment, unifying perception, learning, and action.',
+    'h(x) ≥ 0': 'The safety invariant: the barrier function h(x) must remain non-negative at all times, ensuring the system stays within its safe operating region.',
+    'equivariant': 'A function or network that preserves symmetry: transforming the input and then applying the function gives the same result as applying the function first.',
+    'G2': 'The smallest exceptional Lie group (14-dimensional), which is the automorphism group of the octonions.',
+    'F4': 'An exceptional Lie group with 52 dimensions, related to Jordan algebras and self-dual cone optimization.',
+    'octonions': 'An 8-dimensional non-associative division algebra — the last of the normed division algebras (reals, complex, quaternions, octonions).',
+    'Monte Carlo': 'A computational technique using random sampling to estimate quantities that are difficult to compute analytically.',
+    'EFE-CBF': 'The combined framework where Expected Free Energy drives decision-making while Control Barrier Functions guarantee safety constraints.'
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REAL-WORLD EXAMPLES — one per patent
+// ═══════════════════════════════════════════════════════════════════════════
+
+const REAL_WORLD_EXAMPLES = {
+    'P1-001': 'A smart home assistant that can explore new ways to help you but is mathematically guaranteed never to take unsafe actions — like a self-driving car that can learn new routes but provably won\'t cross a red light.',
+    'P1-002': 'Seven specialized AI modules vote on decisions using a geometry that guarantees fairness — even if two modules malfunction, the remaining five reach correct consensus.',
+    'P1-003': 'When you say "dim the lights and play jazz," the system routes your intent through 8-dimensional space to find the closest match among hundreds of possible skills, instantly.',
+    'P1-004': 'The AI\'s complete mental state is encoded on a high-dimensional sphere, where each of seven specialized subsystems occupies its own "fiber" — think of it as seven radio stations on one carrier wave.',
+    'P1-005': 'An AI that literally dreams — replaying past experiences during downtime to refine its world model, so it wakes up smarter about your home, your schedule, and your preferences.',
+    'P1-006': 'Your data is protected by TWO layers of encryption: one that\'s secure against today\'s hackers, and one that\'s secure against tomorrow\'s quantum computers. Belt and suspenders.',
+    'P2-A4': 'Neural networks that automatically respect the symmetries of physical laws — if you rotate a molecule, the network\'s prediction rotates perfectly with it.',
+    'P2-A5': 'Belief states are encoded in a space where the mathematical symmetries of E7 are preserved, making inference more efficient and geometrically natural.',
+    'P2-A6': 'Optimization on self-dual cones: think of it as finding the best answer in a space where "good" and "bad" are perfect mirrors of each other.',
+    'P2-B2': 'Three nested safety rings: the outer ring warns ("approaching boundary"), the middle ring slows ("reducing speed"), the inner ring stops ("full halt"). No panic, just graduated grace.',
+    'P2-B3': 'Content enters through a WildGuard classifier (is this request harmful?), then passes through a mathematical barrier function (is the response provably safe?).',
+    'P2-C2': 'Two smart home hubs in different rooms can independently accept commands and automatically sync state — no conflicts, no data loss, even if WiFi drops.',
+    'P2-C3': 'When your home network splits (basement vs. upstairs), both halves keep working independently. When they reconnect, they smoothly merge state without losing anything.',
+    'P2-D2': 'Detects when an AI model is about to undergo a sudden behavioral shift (like a bridge about to buckle) and intervenes before the catastrophe happens.',
+    'P2-D3': 'Training an AI through 14 carefully designed phases — like a martial arts belt system, each phase builds on the last, from basic perception to complex reasoning.',
+    'P2-D4': 'Three search strategies (tree search, game theory, and free energy) combined into one: the AI picks the best approach for each decision automatically.',
+    'P2-E2': 'Encryption keys that only work in the right context — a key generated for "store my medical data" literally cannot decrypt "read my medical data" without explicit permission.',
+    'P2-F1': 'Real-time audio analysis that decomposes sound into frequencies and maps them to light behaviors — your room literally dances to the music.',
+    'P2-F2': 'Lights that respond to music in real-time: bass makes the floor glow warm, treble sparkles the ceiling, and the beat syncs the pulse of every bulb.',
+    'P2-G1': 'Distinct sounds for every action — a gentle chime when lights adjust, a warm tone when temperature changes, a crisp click for confirmations. Eyes-free feedback.',
+    'P2-H1': 'An AI that autonomously bids on freelance jobs: it evaluates risk, estimates effort, prices competitively, and manages multiple concurrent contracts.',
+    'P2-H2': 'Every economic decision is scored by Expected Free Energy — balancing expected revenue against risk and information gain, like a financial advisor that uses physics.',
+    'P2-I1': 'Events flow through 248 channels organized by the E8 lattice — each event type finds its natural channel, enabling O(1) routing to the right handler.',
+    'P2-I2': 'Six independent judges evaluate every output across correctness, safety, privacy, craft, performance, and alignment. All must score ≥90/100 or the output is rejected.'
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EDUCATIONAL PANELS — "What You're Looking At" + "Try This" + "Go Deeper"
+// One per P1 exhibit. Feynman-level accessible, factually verified.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const EDUCATIONAL_CONTENT = {
+    'P1-001': {
+        whatYoureLookingAt: 'A safety landscape — the colored terrain shows how safe or dangerous different states are. Green peaks are safe zones where h(x) > 0. Red valleys are danger zones. The dome around you changes color to match.',
+        tryThis: [
+            'Click anywhere on the landscape to place an agent and watch it seek safety',
+            'Walk close to a red zone — feel the dome shift from green to amber to red',
+            'Find the hidden optimum at the center of the landscape (the safest possible point)'
+        ],
+        goDeeper: 'A Control Barrier Function h(x) defines a "force field" around unsafe states. If h(x) ≥ 0, the system is safe. The CBF-QP (Quadratic Program) finds the closest safe action to what the agent wants to do: min ||u − u_desired||² subject to the constraint that h(x) can never decrease below zero. Combined with Expected Free Energy (EFE), the agent balances curiosity and goal-seeking while provably staying safe. This is not a heuristic — it is a mathematical guarantee under the assumptions of Lipschitz continuity and bounded disturbances.',
+        realWorldAnalogy: 'Imagine a self-driving car approaching a crosswalk. The barrier function defines an invisible boundary around every pedestrian. The car can optimize its route however it wants, but the math guarantees it will never cross that boundary — even if a pedestrian steps out suddenly.',
+        factCheck: 'CBF safety guarantee h(x(t)) ≥ 0 ∀t holds under continuous-time control with correct system model. In discrete implementations, additional margins are needed. The EFE "catastrophe" term shown is a Kagami-specific extension beyond standard active inference.'
+    },
+    'P1-002': {
+        whatYoureLookingAt: 'Seven voting stations arranged on a Fano plane — the smallest perfect geometry where every group of 3 shares exactly one communication line. The colonies vote, and even if 2 are lying, the truth emerges.',
+        tryThis: [
+            'Click any colony node to cast a vote (toggles approve/reject)',
+            'Press the "Attack" button to become a Byzantine attacker controlling 2 nodes',
+            'Watch the message particles flow along the Fano lines during consensus rounds'
+        ],
+        goDeeper: 'Byzantine Fault Tolerance (BFT) solves the oldest problem in distributed computing: how can honest nodes agree when some nodes may lie? The answer: you need n ≥ 3f + 1 total nodes to tolerate f Byzantine faults. With 7 nodes, we tolerate f = 2 faults (since 7 ≥ 3×2+1). Consensus requires ⌈7 × 2/3⌉ = 5 agreeing votes. The Fano plane topology is optimal because every pair of nodes shares at least one communication line (3 nodes per line, 3 lines per node), minimizing message complexity.',
+        realWorldAnalogy: 'The Byzantine Generals Problem: seven generals must coordinate an attack, but two might be traitors sending conflicting messages. The Fano communication structure lets the five honest generals detect and exclude the liars by cross-checking messages along shared lines.',
+        factCheck: 'The Fano plane structure (7 points, 7 lines, 3 per line, 3 per point) is mathematically exact. BFT threshold n ≥ 3f+1 is the proven lower bound (Lamport, Shostak, Pease 1982). With n=7, f=2 is the maximum tolerable fault count.'
+    },
+    'P1-003': {
+        whatYoureLookingAt: 'A crystal in 8 dimensions, projected into 3D. Each glowing node is one of 240 root vectors of the E8 lattice — the densest possible sphere packing in 8 dimensions. Meaning flows through the lattice like electricity through a circuit.',
+        tryThis: [
+            'Click any node to see its 8D coordinates and connections',
+            'Type a word or phrase to watch it get routed through the lattice as a semantic query',
+            'Compare the lattice comparison panel: see how E8 (240 neighbors) dwarfs simpler lattices'
+        ],
+        goDeeper: 'E8 is the largest exceptional simple Lie group. Its root system has 240 vectors in 8 dimensions: 112 from permutations of (±1, ±1, 0, 0, 0, 0, 0, 0) and 128 from (±½)⁸ with an even number of minus signs. The kissing number is 240 — each point touches exactly 240 neighbors, the maximum possible in 8D (proved by Viazovska, 2016 Fields Medal). For semantic routing, text is embedded into 8D space, and the nearest E8 root determines which colony handles the query — like a switchboard with 240 perfectly positioned operators.',
+        realWorldAnalogy: 'When you say "dim the lights and play jazz," your words become a point in 8-dimensional meaning-space. The E8 lattice instantly finds the nearest root vector — which maps to the colony best equipped to handle your request. It\'s like GPS for meaning.',
+        factCheck: 'E8 root count (240), kissing number (240), and packing density (π⁴/384) are exact. Viazovska\'s 2016 proof confirmed E8 gives the densest sphere packing in 8D. The D8 definition (even-sum integer vectors) is standard. The semantic routing uses a toy embedding, not a learned model.'
+    },
+    'P1-004': {
+        whatYoureLookingAt: 'The octonionic Hopf fibration: a 15-dimensional sphere decomposed into a base sphere (S⁸) threaded by seven fiber loops (S⁷). Each colored tube is one fiber — one colony\'s contribution to the whole. Click a fiber to ride it.',
+        tryThis: [
+            'Click any colored fiber tube to take a "fiber ride" — your camera follows the loop',
+            'Watch the S¹⁵ coordinates update in real-time as you ride',
+            'Ride all 7 fibers to unlock the achievement'
+        ],
+        goDeeper: 'There are exactly four Hopf fibrations in mathematics: S¹→S¹ (real), S¹→S³→S² (complex), S³→S⁷→S⁴ (quaternionic), and S⁷→S¹⁵→S⁸ (octonionic). The last one uses octonions — the largest normed division algebra, which is non-commutative AND non-associative: (a×b)×c ≠ a×(b×c). The fibration projects 15D state space onto an 8D base, with 7D fiber structure preserving the colony decomposition. Each colony occupies one "fiber direction," and the total state is their composition on S¹⁵.',
+        realWorldAnalogy: 'Think of seven radio stations broadcasting on one carrier wave. Each station (colony) has its own frequency (fiber), but they all combine into one signal (the 15-sphere). The Hopf fibration is the math that lets you tune into any station without interference.',
+        factCheck: 'The four Hopf fibrations (S⁰→S¹→S¹, S¹→S³→S², S³→S⁷→S⁴, S⁷→S¹⁵→S⁸) are the only ones that exist (Adams, 1960). Octonions are indeed the last normed division algebra (Hurwitz theorem). Non-associativity is correctly demonstrated. The 3D visualization is a projection from 15D — necessarily lossy but topologically faithful.'
+    },
+    'P1-005': {
+        whatYoureLookingAt: 'A living world model — seven colonies processing information in parallel. The top half shows deterministic state (what the model knows), the bottom shows stochastic state (what it\'s uncertain about). The gap between prediction and observation is the KL divergence.',
+        tryThis: [
+            'Click any colony node to highlight its hidden state and attention connections',
+            'Stand near the exhibit for 5 seconds to trigger a "dream sequence" — watch the model imagine without observations',
+            'Watch the prior/posterior bars diverge when the model is surprised'
+        ],
+        goDeeper: 'The Recurrent State-Space Model (RSSM, from DreamerV3 by Hafner et al.) maintains two state representations: a deterministic hidden state h_t computed by a GRU, and a stochastic latent z_t sampled from a categorical distribution. The prior p(z_t|h_t) is the model\'s prediction; the posterior q(z_t|h_t,o_t) incorporates observations. The KL divergence KL(q‖p) = Σ q_k log(q_k/p_k) measures surprise. During imagination, the model rolls forward using only priors — no observations needed — enabling planning through dreaming.',
+        realWorldAnalogy: 'Your brain constantly predicts what happens next — "the coffee cup is where I left it, the door will be locked." When reality matches prediction (low KL divergence), you barely notice. When it doesn\'t (the cup is gone!), you pay attention. This model does the same.',
+        factCheck: 'RSSM architecture matches DreamerV3 (Hafner et al., 2023). KL divergence formula for categorical distributions is standard. The dual loss with stop-gradients (α_dyn·KL(sg(q)‖p) + α_rep·KL(q‖sg(p))) is correctly attributed to DreamerV3. The "Lie algebra" claim in the description is aspirational — the current visualization shows GRU dynamics, not Lie algebra evolution.'
+    },
+    'P1-006': {
+        whatYoureLookingAt: 'A real encryption demonstration. The classical channel (AES-256-GCM) and quantum-safe channel (ML-KEM/Kyber) combine into hybrid encryption. The left terminal is Alice, the right is Bob. The data packets flowing between them are actual encrypted bytes.',
+        tryThis: [
+            'Click anywhere to encrypt a message with real AES-256-GCM via WebCrypto',
+            'Watch the ciphertext appear — it\'s genuinely encrypted, not simulated',
+            'Observe the key exchange beam showing how Alice and Bob establish shared secrets'
+        ],
+        goDeeper: 'Shor\'s algorithm can break RSA and elliptic curve cryptography on a quantum computer. Grover\'s algorithm halves the effective security of symmetric ciphers (AES-256 drops to ~128-bit equivalent, still considered secure). ML-KEM (formerly Kyber), standardized by NIST in 2024, uses the Learning With Errors (LWE) problem on polynomial rings R_q = Z_q[X]/(X^n+1) with n=256, q=3329. Hybrid encryption combines classical (AES-256-GCM) with post-quantum (ML-KEM) so that breaking the system requires defeating BOTH — belt and suspenders against an unknown future.',
+        realWorldAnalogy: 'Today\'s encryption is like a safe with one lock. A quantum computer is a new kind of lockpick. Hybrid encryption adds a second lock of a completely different type — even if the quantum lockpick defeats lock #1, lock #2 (based on lattice math) remains secure.',
+        factCheck: 'ML-KEM (Kyber) was standardized in FIPS 203 (August 2024). AES-256 under Grover\'s attack has ~128-bit equivalent security (square root of keyspace). The polynomial ring R_q parameters (n=256, q=3329) are correct for Kyber-768. The WebCrypto AES-256-GCM demo uses real browser APIs — the encryption is genuine.'
+    }
+};
+
 export class InfoPanel {
     constructor() {
         this.element = null;
         this.isVisible = false;
         this.currentPatent = null;
+        this.expertMode = false;  // false = beginner, true = expert
         
         this.create();
     }
@@ -496,9 +634,38 @@ export class InfoPanel {
                 <div class="patent-header">
                     <span class="patent-priority"></span>
                     <span class="patent-category"></span>
+                    <button class="detail-toggle" aria-label="Toggle detail level" title="Switch beginner/expert view">
+                        <span class="toggle-label">Beginner</span>
+                    </button>
                 </div>
                 <h2 class="patent-title"></h2>
                 <p class="patent-description"></p>
+                <div class="real-world-example" style="display:none">
+                    <h3>In Plain English</h3>
+                    <p class="example-text"></p>
+                </div>
+                <div class="educational-section" style="display:none">
+                    <div class="edu-what">
+                        <h3>What You're Looking At</h3>
+                        <p class="edu-what-text"></p>
+                    </div>
+                    <div class="edu-try">
+                        <h3>Try This</h3>
+                        <ul class="edu-try-list"></ul>
+                    </div>
+                    <div class="edu-analogy">
+                        <h3>Real-World Analogy</h3>
+                        <p class="edu-analogy-text"></p>
+                    </div>
+                    <details class="edu-deeper">
+                        <summary>Go Deeper (Expert)</summary>
+                        <p class="edu-deeper-text"></p>
+                    </details>
+                    <details class="edu-factcheck">
+                        <summary>Fact Check</summary>
+                        <p class="edu-factcheck-text"></p>
+                    </details>
+                </div>
                 <div class="patent-meta">
                     <div class="meta-item">
                         <span class="meta-label">Invented</span>
@@ -524,6 +691,7 @@ export class InfoPanel {
                     <button class="action-btn action-btn-secondary" data-action="export-journey">Export my journey</button>
                 </div>
             </div>
+            <div class="glossary-tooltip" style="display:none" role="tooltip"></div>
         `;
         
         // Add styles
@@ -704,6 +872,79 @@ export class InfoPanel {
                 font-size: 10px;
             }
             
+            /* Educational sections */
+            .educational-section {
+                margin-bottom: 24px;
+            }
+            
+            .educational-section h3 {
+                font-family: 'IBM Plex Sans', sans-serif;
+                font-size: 13px;
+                font-weight: 600;
+                color: #67D4E4;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                margin-bottom: 8px;
+            }
+            
+            .edu-what, .edu-try, .edu-analogy {
+                margin-bottom: 20px;
+            }
+            
+            .edu-what-text, .edu-analogy-text {
+                color: #C4BFBA;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+            
+            .edu-try-list {
+                list-style: none;
+                padding: 0;
+                margin: 0;
+            }
+            
+            .edu-try-list li {
+                padding: 6px 0 6px 24px;
+                color: #F5F0E8;
+                font-size: 14px;
+                position: relative;
+            }
+            
+            .edu-try-list li::before {
+                content: '▸';
+                position: absolute;
+                left: 4px;
+                color: #F59E0B;
+                font-size: 12px;
+            }
+            
+            .edu-deeper, .edu-factcheck {
+                margin-bottom: 12px;
+                border: 1px solid rgba(103, 212, 228, 0.15);
+                border-radius: 8px;
+                padding: 0;
+            }
+            
+            .edu-deeper summary, .edu-factcheck summary {
+                padding: 10px 16px;
+                font-family: 'IBM Plex Mono', monospace;
+                font-size: 12px;
+                color: #9E9994;
+                cursor: pointer;
+                letter-spacing: 0.05em;
+            }
+            
+            .edu-deeper summary:hover, .edu-factcheck summary:hover {
+                color: #67D4E4;
+            }
+            
+            .edu-deeper-text, .edu-factcheck-text {
+                padding: 0 16px 16px;
+                color: #9E9994;
+                font-size: 13px;
+                line-height: 1.6;
+            }
+            
             .patent-actions {
                 display: flex;
                 gap: 12px;
@@ -742,6 +983,101 @@ export class InfoPanel {
                 box-shadow: 0 0 40px rgba(103, 212, 228, 0.5);
             }
             
+            /* Beginner/Expert toggle */
+            .detail-toggle {
+                margin-left: auto;
+                padding: 4px 12px;
+                background: rgba(103, 212, 228, 0.1);
+                border: 1px solid rgba(103, 212, 228, 0.25);
+                border-radius: 12px;
+                color: #67D4E4;
+                font-family: 'IBM Plex Mono', monospace;
+                font-size: 11px;
+                cursor: pointer;
+                transition: all 0.144s ease;
+            }
+            .detail-toggle:hover {
+                background: rgba(103, 212, 228, 0.2);
+                border-color: #67D4E4;
+            }
+            .detail-toggle.expert {
+                background: rgba(255, 215, 0, 0.15);
+                border-color: rgba(255, 215, 0, 0.4);
+                color: #FFD700;
+            }
+            
+            /* Real-world example */
+            .real-world-example {
+                background: rgba(76, 255, 76, 0.05);
+                border: 1px solid rgba(76, 255, 76, 0.15);
+                border-radius: 8px;
+                padding: 16px;
+                margin-bottom: 24px;
+            }
+            .real-world-example h3 {
+                font-size: 12px;
+                color: #4CFF4C;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                margin-bottom: 8px;
+            }
+            .real-world-example .example-text {
+                color: #C4BFBA;
+                font-size: 14px;
+                line-height: 1.6;
+                margin: 0;
+            }
+            
+            /* Glossary tooltip */
+            .glossary-tooltip {
+                position: fixed;
+                max-width: 300px;
+                padding: 12px 16px;
+                background: rgba(18, 16, 26, 0.95);
+                border: 1px solid rgba(103, 212, 228, 0.4);
+                border-radius: 8px;
+                color: #E0E0E0;
+                font-family: 'IBM Plex Sans', sans-serif;
+                font-size: 13px;
+                line-height: 1.5;
+                z-index: 4000;
+                pointer-events: none;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+                transition: opacity 0.144s ease;
+            }
+            .glossary-tooltip .glossary-term {
+                color: #67D4E4;
+                font-family: 'IBM Plex Mono', monospace;
+                font-weight: 600;
+                font-size: 12px;
+                display: block;
+                margin-bottom: 4px;
+            }
+            
+            /* Glossary-highlighted terms in text */
+            .glossary-highlight {
+                color: #67D4E4;
+                border-bottom: 1px dotted rgba(103, 212, 228, 0.4);
+                cursor: help;
+            }
+
+            .glossary-highlight:focus {
+                outline: 2px solid #67D4E4;
+                outline-offset: 2px;
+                border-radius: 2px;
+            }
+            
+            .action-btn-secondary {
+                background: rgba(158, 153, 148, 0.1);
+                border-color: rgba(158, 153, 148, 0.3);
+                color: #9E9994;
+            }
+            .action-btn-secondary:hover {
+                background: rgba(158, 153, 148, 0.2);
+                border-color: #9E9994;
+                box-shadow: 0 0 20px rgba(158, 153, 148, 0.2);
+            }
+            
             @media (max-width: 500px) {
                 .info-panel {
                     width: 100%;
@@ -760,6 +1096,48 @@ export class InfoPanel {
                 const action = e.target.dataset.action;
                 this.handleAction(action);
             });
+        });
+        
+        // Beginner/Expert toggle
+        this.element.querySelector('.detail-toggle').addEventListener('click', () => {
+            this.expertMode = !this.expertMode;
+            const toggle = this.element.querySelector('.detail-toggle');
+            toggle.classList.toggle('expert', this.expertMode);
+            toggle.querySelector('.toggle-label').textContent = this.expertMode ? 'Expert' : 'Beginner';
+            // Re-render current patent with new detail level
+            if (this.currentPatent) this._updateDetailLevel();
+        });
+        
+        // Glossary tooltip hover/focus handling
+        const showTooltipFor = (target) => {
+            const term = target.dataset.term;
+            const def = GLOSSARY[term];
+            if (!def) return;
+            const tooltip = this.element.querySelector('.glossary-tooltip');
+            tooltip.innerHTML = `<span class="glossary-term">${term}</span>${def}`;
+            tooltip.style.display = 'block';
+            const rect = target.getBoundingClientRect();
+            tooltip.style.left = Math.min(rect.left, window.innerWidth - 320) + 'px';
+            tooltip.style.top = (rect.bottom + 8) + 'px';
+        };
+        const hideTooltip = () => {
+            this.element.querySelector('.glossary-tooltip').style.display = 'none';
+        };
+
+        this.element.addEventListener('mouseover', (e) => {
+            const target = e.target.closest('.glossary-highlight');
+            if (target) showTooltipFor(target);
+        });
+        this.element.addEventListener('mouseout', (e) => {
+            if (!e.target.closest('.glossary-highlight')) hideTooltip();
+        });
+        // Keyboard accessibility: show tooltip on focus
+        this.element.addEventListener('focusin', (e) => {
+            const target = e.target.closest('.glossary-highlight');
+            if (target) showTooltipFor(target);
+        });
+        this.element.addEventListener('focusout', (e) => {
+            if (e.target.closest('.glossary-highlight')) hideTooltip();
         });
         
         // Close on Escape
@@ -798,19 +1176,58 @@ export class InfoPanel {
         el.querySelector('.patent-priority').className = `patent-priority ${patent.priority}`;
         el.querySelector('.patent-category').textContent = patent.categoryName;
         el.querySelector('.patent-title').textContent = patent.name;
-        el.querySelector('.patent-description').textContent = patent.description;
+        
+        // Description with glossary highlighting
+        el.querySelector('.patent-description').innerHTML = this._highlightGlossaryTerms(patent.description);
+        
         el.querySelector('.patent-date').textContent = patent.invented;
         el.querySelector('.patent-novelty').textContent = '★'.repeat(patent.novelty);
         el.querySelector('.patent-colony').textContent = patent.colony.charAt(0).toUpperCase() + patent.colony.slice(1);
         
-        // Update features list (safe DOM construction)
+        // Real-world example
+        const exampleSection = el.querySelector('.real-world-example');
+        const example = REAL_WORLD_EXAMPLES[patent.id];
+        if (example) {
+            exampleSection.style.display = 'block';
+            exampleSection.querySelector('.example-text').textContent = example;
+        } else {
+            exampleSection.style.display = 'none';
+        }
+        
+        // Update features list (safe DOM construction, with glossary)
         const featuresList = el.querySelector('.features-list');
         featuresList.innerHTML = '';
         for (const feature of (patent.keyFeatures || [])) {
             const li = document.createElement('li');
-            li.textContent = feature;
+            li.innerHTML = this._highlightGlossaryTerms(feature);
             featuresList.appendChild(li);
         }
+        
+        // Educational content (P1 exhibits)
+        const eduSection = el.querySelector('.educational-section');
+        const edu = EDUCATIONAL_CONTENT[patent.id];
+        if (edu) {
+            eduSection.style.display = 'block';
+            
+            el.querySelector('.edu-what-text').innerHTML = this._highlightGlossaryTerms(edu.whatYoureLookingAt);
+            
+            const tryList = el.querySelector('.edu-try-list');
+            tryList.innerHTML = '';
+            for (const hint of (edu.tryThis || [])) {
+                const li = document.createElement('li');
+                li.textContent = hint;
+                tryList.appendChild(li);
+            }
+            
+            el.querySelector('.edu-analogy-text').innerHTML = this._highlightGlossaryTerms(edu.realWorldAnalogy);
+            el.querySelector('.edu-deeper-text').innerHTML = this._highlightGlossaryTerms(edu.goDeeper);
+            el.querySelector('.edu-factcheck-text').textContent = edu.factCheck;
+        } else {
+            eduSection.style.display = 'none';
+        }
+        
+        // Apply detail level
+        this._updateDetailLevel();
         
         // Show panel and move focus
         this.element.classList.add('visible');
@@ -819,6 +1236,53 @@ export class InfoPanel {
         requestAnimationFrame(() => {
             this.element.querySelector('.info-panel-close').focus();
         });
+    }
+    
+    /**
+     * Highlight glossary terms in text with hover-able spans.
+     * @param {string} text - Plain text to process.
+     * @returns {string} HTML with glossary terms wrapped in spans.
+     */
+    _highlightGlossaryTerms(text) {
+        if (!text) return '';
+        let result = text;
+        // Sort terms by length (longest first) to avoid partial matches
+        const terms = Object.keys(GLOSSARY).sort((a, b) => b.length - a.length);
+        for (const term of terms) {
+            // Case-insensitive match, but only on word boundaries (rough)
+            const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(?<![<\\w])${escaped}(?![\\w>])`, 'gi');
+            result = result.replace(regex, (match) =>
+                `<span class="glossary-highlight" data-term="${term}" tabindex="0" role="button" aria-label="${term}: ${GLOSSARY[term].substring(0, 80)}...">${match}</span>`
+            );
+        }
+        return result;
+    }
+    
+    /**
+     * Update visibility of sections based on beginner/expert mode.
+     */
+    _updateDetailLevel() {
+        const el = this.element;
+        const expert = this.expertMode;
+        // In beginner mode: show real-world example prominently, show simpler features
+        // In expert mode: show all technical details, hide simplified explanation
+        const exampleSection = el.querySelector('.real-world-example');
+        if (exampleSection && REAL_WORLD_EXAMPLES[this.currentPatent?.id]) {
+            exampleSection.style.display = expert ? 'none' : 'block';
+        }
+        // Meta section: always visible in expert, collapsed in beginner
+        const metaSection = el.querySelector('.patent-meta');
+        if (metaSection) {
+            metaSection.style.display = expert ? 'grid' : 'none';
+        }
+        // Features: always visible
+        // Toggle label
+        const toggle = el.querySelector('.detail-toggle');
+        if (toggle) {
+            toggle.querySelector('.toggle-label').textContent = expert ? 'Expert' : 'Beginner';
+            toggle.classList.toggle('expert', expert);
+        }
     }
     
     hide() {

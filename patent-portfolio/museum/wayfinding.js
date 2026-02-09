@@ -58,6 +58,16 @@ export class Minimap {
         };
         this.wingProgress = {};  // Percentage of patents viewed per wing
         
+        // Artwork marker positions (populated externally)
+        this.artworkPositions = [];  // [{x, z, patentId, colony, viewed}]
+        
+        // Click-to-teleport callback
+        this.onTeleport = null;
+        
+        // Zoom level (0 = overview, 1 = detail)
+        this.zoomLevel = 0;
+        this.zoomScales = [0.7, 1.4];
+        
         // Cached vector for direction calculation (avoid GC pressure)
         this._directionVector = new THREE.Vector3();
         this._pulsePhase = 0;
@@ -87,8 +97,70 @@ export class Minimap {
         this.element.appendChild(this.canvas);
         this.ctx = this.canvas.getContext('2d');
         
+        // Click-to-teleport handler
+        this.canvas.style.cursor = 'pointer';
+        this.canvas.addEventListener('click', (e) => this._handleClick(e));
+        
+        // Double-click to toggle zoom
+        this.canvas.addEventListener('dblclick', () => this.toggleZoom());
+        
         // Initial draw
         this.drawStaticElements();
+    }
+    
+    /**
+     * Toggle between overview and detail zoom levels
+     */
+    toggleZoom() {
+        this.zoomLevel = (this.zoomLevel + 1) % this.zoomScales.length;
+        this.options.scale = this.zoomScales[this.zoomLevel];
+        this.drawStaticElements();
+    }
+    
+    /**
+     * Set artwork positions for display on minimap
+     * @param {Array} positions - [{x, z, patentId, colony, viewed}]
+     */
+    setArtworkPositions(positions) {
+        this.artworkPositions = positions;
+        this.drawStaticElements();
+    }
+    
+    /**
+     * Handle click on minimap — teleport to clicked world position
+     */
+    _handleClick(e) {
+        if (!this.onTeleport) return;
+        const rect = this.canvas.getBoundingClientRect();
+        const dpr = this.canvas.width / rect.width;
+        const cx = (e.clientX - rect.left) * dpr;
+        const cy = (e.clientY - rect.top) * dpr;
+        
+        const size = this.canvas.width;
+        const center = size / 2;
+        const scale = this.options.scale * 2;
+        
+        // Convert minimap coords back to world coords
+        const worldX = ((cx - center) / (55 * scale)) * 100;
+        const worldZ = ((cy - center) / (55 * scale)) * 100;
+        
+        // Check if click is near a wing endpoint for smarter teleport
+        let targetColony = null;
+        const wingLength = 42 * scale;
+        COLONY_ORDER.forEach((colony, i) => {
+            const angle = (i / 7) * Math.PI * 2 - Math.PI / 2;
+            const endDist = 22 * scale + wingLength - 5;
+            const endX = center + Math.cos(angle) * endDist;
+            const endY = center + Math.sin(angle) * endDist;
+            const dist = Math.sqrt((cx - endX) ** 2 + (cy - endY) ** 2);
+            if (dist < 20 * scale) targetColony = colony;
+        });
+        
+        // Also check center for rotunda
+        const centerDist = Math.sqrt((cx - center) ** 2 + (cy - center) ** 2);
+        if (centerDist < 25 * scale) targetColony = 'rotunda';
+        
+        this.onTeleport({ worldX, worldZ, colony: targetColony });
     }
     
     /**
@@ -239,6 +311,25 @@ export class Minimap {
         // Restore static background
         if (this.staticBackground) {
             ctx.putImageData(this.staticBackground, 0, 0);
+        }
+        
+        // Draw artwork markers
+        if (this.artworkPositions.length > 0) {
+            this.artworkPositions.forEach(art => {
+                const mapX = center + (art.x / 100) * 55 * scale;
+                const mapY = center + (art.z / 100) * 55 * scale;
+                const colonyData = COLONY_COLORS[art.colony];
+                const r = colonyData ? (colonyData.hex >> 16) & 255 : 103;
+                const g = colonyData ? (colonyData.hex >> 8) & 255 : 212;
+                const b = colonyData ? colonyData.hex & 255 : 228;
+                
+                ctx.beginPath();
+                ctx.arc(mapX, mapY, art.viewed ? 2.5 * scale : 1.5 * scale, 0, Math.PI * 2);
+                ctx.fillStyle = art.viewed 
+                    ? `rgba(${r}, ${g}, ${b}, 0.8)` 
+                    : `rgba(${r}, ${g}, ${b}, 0.3)`;
+                ctx.fill();
+            });
         }
         
         // Update player position from camera
@@ -721,6 +812,91 @@ export class SignageSystem {
                     Math.sin(angle) * (rotundaRadius + 5)
                 )
             );
+        });
+        
+        // Return-to-rotunda arrows at gallery far ends
+        this.createReturnArrows();
+    }
+    
+    /**
+     * Place return-to-rotunda chevron arrows at the far end of each gallery.
+     * Glowing arrow pointing back toward rotunda.
+     */
+    createReturnArrows() {
+        const rotundaRadius = DIMENSIONS.rotunda.radius;
+        const wingLength = DIMENSIONS.wing.length;
+        const vestibuleDepth = DIMENSIONS.wing.vestibuleDepth ?? 6;
+        const galleryDepth = DIMENSIONS.gallery.depth;
+        
+        COLONY_ORDER.forEach((colony, i) => {
+            const data = COLONY_COLORS[colony];
+            const angle = (i / 7) * Math.PI * 2;
+            const cos = Math.cos(angle), sin = Math.sin(angle);
+            
+            // Position at gallery far end
+            const farDist = rotundaRadius + wingLength + vestibuleDepth + galleryDepth - 2;
+            const x = cos * farDist;
+            const z = sin * farDist;
+            
+            const group = new THREE.Group();
+            group.name = `return-arrow-${colony}`;
+            
+            // Chevron arrow shape (pointing back toward rotunda)
+            const shape = new THREE.Shape();
+            shape.moveTo(0, 0.5);
+            shape.lineTo(-0.4, 0);
+            shape.lineTo(-0.15, 0);
+            shape.lineTo(-0.15, -0.5);
+            shape.lineTo(0.15, -0.5);
+            shape.lineTo(0.15, 0);
+            shape.lineTo(0.4, 0);
+            shape.closePath();
+            
+            const arrowGeo = new THREE.ShapeGeometry(shape);
+            const arrowMat = new THREE.MeshBasicMaterial({
+                color: data.hex,
+                transparent: true,
+                opacity: 0.7,
+                side: THREE.DoubleSide
+            });
+            
+            const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+            arrow.rotation.x = -Math.PI / 2;  // Lay flat on floor
+            arrow.rotation.z = angle + Math.PI; // Point toward rotunda
+            arrow.position.set(x, 0.03, z);
+            group.add(arrow);
+            
+            // Glow light
+            const light = new THREE.PointLight(data.hex, 0.3, 5, 2);
+            light.position.set(x, 0.5, z);
+            group.add(light);
+            
+            // "← Rotunda" text sprite
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, 512, 128);
+            ctx.font = '32px "IBM Plex Sans", sans-serif';
+            ctx.fillStyle = `#${data.hex.toString(16).padStart(6, '0')}`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('← Rotunda', 256, 64);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({
+                map: texture,
+                transparent: true,
+                opacity: 0.8
+            });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.position.set(x, 2.5, z);
+            sprite.scale.set(3, 0.75, 1);
+            group.add(sprite);
+            
+            this.scene.add(group);
+            this.directionalSigns.push(group);
         });
     }
     

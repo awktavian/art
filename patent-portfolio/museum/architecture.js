@@ -124,14 +124,33 @@ export function createMuseumMaterials() {
             color: 0x2D2A28,
             roughness: 0.9,
             metalness: 0.02,
-            side: THREE.BackSide
+            side: THREE.DoubleSide
         }),
         concretePolished: createConcretePolishedMaterial(),
 
+        // Architectural detail materials
+        baseboard: new THREE.MeshStandardMaterial({
+            color: 0x1A1818,
+            roughness: 0.2,
+            metalness: 0.3,
+            side: THREE.DoubleSide
+        }),
+        ceilingCove: new THREE.MeshStandardMaterial({
+            color: 0x2A2828,
+            roughness: 0.95,
+            metalness: 0.01,
+            side: THREE.DoubleSide
+        }),
+        threshold: new THREE.MeshStandardMaterial({
+            color: 0x3D3835,
+            roughness: 0.1,
+            metalness: 0.15,
+            side: THREE.DoubleSide
+        }),
+
         // Legacy compatibility
-        wall: null,  // Will point to concrete
+        wall: null,
         wallAccent: null,
-        baseboard: null,
         rib: null,
         floorReflective: null
     };
@@ -191,6 +210,7 @@ export function createRotunda(materials) {
     const walls = new THREE.Mesh(wallGeo, materials.concrete);
     walls.name = 'wall-rotunda';
     walls.userData.occludes = true;
+    walls.userData.collidable = true;
     walls.position.y = height * 0.35;
     walls.receiveShadow = true;
     walls.castShadow = true;
@@ -283,7 +303,7 @@ function createGehryDome(group, materials, radius, height, apertureRadius, apert
         
         pos.setX(i, x * asymmetry);
         pos.setZ(i, z * asymmetry);
-        pos.setY(i, y * 0.6 + domeStart);  // Flatten and raise
+        pos.setY(i, y * 0.75 + domeStart);  // Cathedral dome presence
     }
     pos.needsUpdate = true;
     domeGeo.computeVertexNormals();
@@ -313,54 +333,311 @@ function createGehryDome(group, materials, radius, height, apertureRadius, apert
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SIMPLIFIED FANO SCULPTURE (just 7 lines, no particles)
+// LIVING FANO CONSTELLATION — The centerpiece of the museum
+// 7 colony crystals connected by light bridges, orbited by rings,
+// wreathed in constellation dust, pulsing with consensus heartbeats.
 // ═══════════════════════════════════════════════════════════════════════════
 
 function createSimplifiedFano(steelMaterial) {
+    // Redirects to the full constellation
+    return createFanoConstellation(steelMaterial);
+}
+
+function createFanoConstellation(steelMaterial) {
     const group = new THREE.Group();
     group.name = 'fano-sculpture';
     
-    const scale = 2.5;
+    const R = 4.0; // 4m radius — dramatic presence
     
-    // 7 points on a heptagon
-    const points = [];
+    // === 3D VERTEX POSITIONS (not flat — reveal incidence structure) ===
+    // Place vertices on a sphere with vertical spread for 3D depth
+    const vertexPositions = [];
     for (let i = 0; i < 7; i++) {
         const angle = (i / 7) * Math.PI * 2 - Math.PI / 2;
-        points.push(new THREE.Vector3(
-            Math.cos(angle) * scale,
-            0,
-            Math.sin(angle) * scale
+        const elevation = Math.sin(i * 1.35) * R * 0.35; // vertical spread
+        vertexPositions.push(new THREE.Vector3(
+            Math.cos(angle) * R * 0.85,
+            elevation,
+            Math.sin(angle) * R * 0.85
         ));
     }
     
-    // Fano plane connections (each point connects to 3 others)
-    const connections = [
-        [0, 1], [0, 2], [0, 4],
-        [1, 2], [1, 3], [1, 5],
-        [2, 3], [2, 6],
-        [3, 4], [3, 5],
-        [4, 5], [4, 6],
-        [5, 6], [6, 0]
+    // === FANO LINES (7 lines, each through 3 points) ===
+    const fanoLines = [
+        [0, 1, 3], [1, 2, 4], [2, 3, 5], [3, 4, 6],
+        [4, 5, 0], [5, 6, 1], [6, 0, 2]
     ];
     
-    connections.forEach(([a, b]) => {
-        const tubeGeo = new THREE.TubeGeometry(
-            new THREE.CatmullRomCurve3([points[a], points[b]]),
-            8, 0.03, 6, false
-        );
-        const tube = new THREE.Mesh(tubeGeo, steelMaterial);
-        tube.castShadow = true;
-        group.add(tube);
+    // === CENTRAL NEXUS SPHERE — Kagami's core ===
+    const nexusGeo = new THREE.IcosahedronGeometry(0.35, 2);
+    const nexusMat = new THREE.MeshPhysicalMaterial({
+        color: 0xFFFFFF, emissive: 0x67D4E4, emissiveIntensity: 0.6,
+        metalness: 0.3, roughness: 0.1, transmission: 0.3,
+        thickness: 0.5, clearcoat: 1.0
+    });
+    const nexus = new THREE.Mesh(nexusGeo, nexusMat);
+    nexus.name = 'constellation-nexus';
+    nexus.userData = { interactive: true, type: 'fano-nexus' };
+    group.add(nexus);
+    
+    // Nexus inner glow
+    const nexusGlowGeo = new THREE.IcosahedronGeometry(0.2, 1);
+    const nexusGlow = new THREE.Mesh(nexusGlowGeo, new THREE.MeshBasicMaterial({
+        color: 0xFFFFFF, transparent: true, opacity: 0.8
+    }));
+    nexusGlow.name = 'nexus-glow';
+    group.add(nexusGlow);
+    
+    // Nexus wireframe halo
+    const nexusHaloGeo = new THREE.IcosahedronGeometry(0.5, 1);
+    const nexusHalo = new THREE.Mesh(nexusHaloGeo, new THREE.MeshBasicMaterial({
+        color: 0x67D4E4, wireframe: true, transparent: true, opacity: 0.15
+    }));
+    nexusHalo.name = 'nexus-halo';
+    group.add(nexusHalo);
+    
+    // === 7 COLONY CRYSTALS ===
+    const colonyColors = [];
+    COLONY_ORDER.forEach((colony, i) => {
+        const data = COLONY_DATA[colony];
+        const color = data.hex;
+        colonyColors.push(color);
+        
+        const crystalGeo = new THREE.IcosahedronGeometry(0.25, 1);
+        const crystalMat = new THREE.MeshPhysicalMaterial({
+            color: color, emissive: color, emissiveIntensity: 0.4,
+            metalness: 0.5, roughness: 0.15, clearcoat: 0.8,
+            transmission: 0.2, thickness: 0.3
+        });
+        const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+        crystal.position.copy(vertexPositions[i]);
+        crystal.name = `crystal-${colony}`;
+        crystal.userData = { interactive: true, type: 'fano-node', colony: colony, idx: i };
+        crystal.castShadow = true;
+        group.add(crystal);
+        
+        // Crystal outer shell (wireframe)
+        const shellGeo = new THREE.IcosahedronGeometry(0.35, 1);
+        const shell = new THREE.Mesh(shellGeo, new THREE.MeshBasicMaterial({
+            color: color, wireframe: true, transparent: true, opacity: 0.2
+        }));
+        shell.position.copy(vertexPositions[i]);
+        shell.name = `crystal-shell-${colony}`;
+        group.add(shell);
+        
+        // Colony name label (canvas sprite)
+        const labelCanvas = document.createElement('canvas');
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        labelCanvas.width = 256 * dpr;
+        labelCanvas.height = 48 * dpr;
+        const lctx = labelCanvas.getContext('2d');
+        lctx.scale(dpr, dpr);
+        lctx.fillStyle = 'rgba(0,0,0,0)';
+        lctx.fillRect(0, 0, 256, 48);
+        lctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+        lctx.font = "18px 'IBM Plex Sans', sans-serif";
+        lctx.textAlign = 'center';
+        lctx.textBaseline = 'middle';
+        lctx.fillText(data.name, 128, 24);
+        const labelTex = new THREE.CanvasTexture(labelCanvas);
+        labelTex.minFilter = THREE.LinearFilter;
+        const label = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: labelTex, transparent: true, depthWrite: false
+        }));
+        label.position.copy(vertexPositions[i]);
+        label.position.y += 0.55;
+        label.scale.set(1.2, 0.25, 1);
+        group.add(label);
     });
     
-    // Small spheres at vertices
-    points.forEach((point, i) => {
-        const sphereGeo = new THREE.SphereGeometry(0.08, 16, 16);
-        const sphere = new THREE.Mesh(sphereGeo, steelMaterial);
-        sphere.position.copy(point);
-        sphere.castShadow = true;
-        group.add(sphere);
+    // === LIGHT BRIDGES (7 Fano lines as glowing tubes) ===
+    fanoLines.forEach((line, lineIdx) => {
+        // Each Fano line passes through 3 colony vertices
+        // Draw curved bridge through all 3 points, arcing through center
+        for (let seg = 0; seg < 2; seg++) {
+            const a = vertexPositions[line[seg]];
+            const b = vertexPositions[line[seg + 1]];
+            const mid = a.clone().add(b).multiplyScalar(0.5);
+            // Arc toward center for visual depth
+            mid.multiplyScalar(0.6);
+            mid.y += 0.3;
+            
+            const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
+            const tubeGeo = new THREE.TubeGeometry(curve, 24, 0.02, 8, false);
+            
+            // Blend colors of the two endpoint colonies
+            const colorA = colonyColors[line[seg]];
+            const colorB = colonyColors[line[seg + 1]];
+            const blendColor = new THREE.Color(colorA).lerp(new THREE.Color(colorB), 0.5);
+            
+            const tubeMat = new THREE.MeshPhysicalMaterial({
+                color: blendColor, emissive: blendColor, emissiveIntensity: 0.25,
+                transparent: true, opacity: 0.6, metalness: 0.7, roughness: 0.2
+            });
+            const tube = new THREE.Mesh(tubeGeo, tubeMat);
+            tube.name = `bridge-${lineIdx}-${seg}`;
+            tube.castShadow = true;
+            group.add(tube);
+        }
     });
+    
+    // === 7 ORBITAL RINGS (orrery-style, different tilts) ===
+    const fibonacciAngles = [0.38, 0.62, 1.0, 1.62, 2.62, 4.24, 6.85];
+    COLONY_ORDER.forEach((colony, i) => {
+        const data = COLONY_DATA[colony];
+        const ringRadius = 2.8 + i * 0.25;
+        const ringGeo = new THREE.TorusGeometry(ringRadius, 0.012, 8, 96);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: data.hex, transparent: true, opacity: 0.18
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = fibonacciAngles[i] * 0.4;
+        ring.rotation.z = fibonacciAngles[i] * 0.25;
+        ring.name = `orbital-ring-${colony}`;
+        ring.userData = { colony, orbitSpeed: 0.02 + i * 0.005, tiltBase: ring.rotation.x };
+        group.add(ring);
+    });
+    
+    // === CONSTELLATION DUST (600 particles in nebula cloud) ===
+    const dustCount = 600;
+    const dustPositions = new Float32Array(dustCount * 3);
+    const dustColors = new Float32Array(dustCount * 3);
+    const dustSizes = new Float32Array(dustCount);
+    
+    for (let i = 0; i < dustCount; i++) {
+        // Spherical distribution with bias toward orbital plane
+        const theta = Math.random() * Math.PI * 2;
+        const phi = (Math.random() - 0.5) * Math.PI * 0.7; // flattened
+        const r = 1.5 + Math.random() * 3.5;
+        dustPositions[i * 3] = Math.cos(theta) * Math.cos(phi) * r;
+        dustPositions[i * 3 + 1] = Math.sin(phi) * r * 0.5; // compressed vertical
+        dustPositions[i * 3 + 2] = Math.sin(theta) * Math.cos(phi) * r;
+        
+        // Color: blend of nearest colony colors
+        const nearestColony = Math.floor(Math.random() * 7);
+        const col = new THREE.Color(colonyColors[nearestColony]);
+        dustColors[i * 3] = col.r;
+        dustColors[i * 3 + 1] = col.g;
+        dustColors[i * 3 + 2] = col.b;
+        
+        dustSizes[i] = 0.02 + Math.random() * 0.04;
+    }
+    
+    const dustGeo = new THREE.BufferGeometry();
+    dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+    dustGeo.setAttribute('color', new THREE.BufferAttribute(dustColors, 3));
+    dustGeo.setAttribute('size', new THREE.BufferAttribute(dustSizes, 1));
+    
+    const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({
+        size: 0.04, vertexColors: true, transparent: true, opacity: 0.4,
+        blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+    }));
+    dust.name = 'constellation-dust';
+    group.add(dust);
+    
+    // === FLOOR PROJECTION (Fano plane diagram beneath sculpture) ===
+    const projCanvas = document.createElement('canvas');
+    projCanvas.width = 1024;
+    projCanvas.height = 1024;
+    const pctx = projCanvas.getContext('2d');
+    
+    // Draw Fano plane diagram
+    pctx.fillStyle = 'rgba(0, 0, 0, 0)';
+    pctx.fillRect(0, 0, 1024, 1024);
+    
+    const pc = 512; // center
+    const pr = 350; // radius
+    
+    // Draw lines first (behind nodes)
+    pctx.lineWidth = 2;
+    fanoLines.forEach((line) => {
+        const pts = line.map(idx => ({
+            x: pc + Math.cos((idx / 7) * Math.PI * 2 - Math.PI / 2) * pr,
+            y: pc + Math.sin((idx / 7) * Math.PI * 2 - Math.PI / 2) * pr
+        }));
+        
+        const blendCol = new THREE.Color(colonyColors[line[0]]).lerp(new THREE.Color(colonyColors[line[2]]), 0.5);
+        const r = Math.floor(blendCol.r * 255);
+        const g = Math.floor(blendCol.g * 255);
+        const b = Math.floor(blendCol.b * 255);
+        pctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.25)`;
+        
+        pctx.beginPath();
+        pctx.moveTo(pts[0].x, pts[0].y);
+        pctx.quadraticCurveTo(pc, pc, pts[1].x, pts[1].y);
+        pctx.stroke();
+        pctx.beginPath();
+        pctx.moveTo(pts[1].x, pts[1].y);
+        pctx.quadraticCurveTo(pc, pc, pts[2].x, pts[2].y);
+        pctx.stroke();
+    });
+    
+    // Draw nodes
+    COLONY_ORDER.forEach((colony, i) => {
+        const data = COLONY_DATA[colony];
+        const nx = pc + Math.cos((i / 7) * Math.PI * 2 - Math.PI / 2) * pr;
+        const ny = pc + Math.sin((i / 7) * Math.PI * 2 - Math.PI / 2) * pr;
+        const hexStr = `#${data.hex.toString(16).padStart(6, '0')}`;
+        
+        pctx.beginPath();
+        pctx.arc(nx, ny, 18, 0, Math.PI * 2);
+        pctx.fillStyle = hexStr;
+        pctx.globalAlpha = 0.4;
+        pctx.fill();
+        pctx.globalAlpha = 1;
+        
+        pctx.fillStyle = hexStr;
+        pctx.font = "16px 'IBM Plex Sans', sans-serif";
+        pctx.textAlign = 'center';
+        pctx.textBaseline = 'middle';
+        pctx.fillText(data.name, nx, ny + 30);
+    });
+    
+    // Center label
+    pctx.fillStyle = 'rgba(103, 212, 228, 0.3)';
+    pctx.font = "14px 'IBM Plex Mono', monospace";
+    pctx.textAlign = 'center';
+    pctx.fillText('7 points · 7 lines · perfect symmetry', pc, pc);
+    
+    const projTex = new THREE.CanvasTexture(projCanvas);
+    projTex.minFilter = THREE.LinearFilter;
+    const projGeo = new THREE.CircleGeometry(5, 64);
+    const projMat = new THREE.MeshBasicMaterial({
+        map: projTex, transparent: true, opacity: 0.2,
+        side: THREE.DoubleSide, depthWrite: false,
+        blending: THREE.AdditiveBlending
+    });
+    const projection = new THREE.Mesh(projGeo, projMat);
+    projection.rotation.x = -Math.PI / 2;
+    projection.position.y = -0.05; // just above floor
+    projection.name = 'floor-projection';
+    group.add(projection);
+    
+    // === MESSAGE PARTICLE POOL (for consensus heartbeat) ===
+    const msgGeo = new THREE.SphereGeometry(0.04, 6, 6);
+    for (let i = 0; i < 21; i++) { // 3 per line × 7 lines
+        const msg = new THREE.Mesh(msgGeo, new THREE.MeshBasicMaterial({
+            color: 0xFFFFFF, transparent: true, opacity: 0
+        }));
+        msg.name = `msg-particle-${i}`;
+        msg.userData = { active: false, progress: 0, lineIdx: Math.floor(i / 3), speed: 0.4 + Math.random() * 0.3 };
+        msg.visible = false;
+        group.add(msg);
+    }
+    
+    // Store vertex positions and line data for animation
+    group.userData.vertexPositions = vertexPositions;
+    group.userData.fanoLines = fanoLines;
+    group.userData.colonyColors = colonyColors;
+    group.userData.constellationData = {
+        lastConsensusTime: 0,
+        consensusInterval: 7, // every 7 seconds
+        auroraPhase: 0,
+        lastAuroraTime: 0,
+        auroraInterval: 300, // every 5 minutes
+        discoveryPlayed: false,
+        celebrationPlayed: false
+    };
     
     return group;
 }
@@ -463,7 +740,10 @@ export function createWing(colony, materials) {
     centerLine.position.set(cos * (rotundaRadius + length / 2), 0.02, sin * (rotundaRadius + length / 2));
     group.add(centerLine);
 
-    // === WALLS + CEILING per segment (taper: rough concrete, last segment polished at threshold) ===
+    // === WALLS + CEILING + BASEBOARDS per segment ===
+    const wallThick = 0.6;  // Substantial walls (was 0.4)
+    const baseboardH = 0.15;
+    
     for (let i = 0; i < 3; i++) {
         const h = heights[i];
         const segStart = i * segLen;
@@ -471,39 +751,67 @@ export function createWing(colony, materials) {
         const wallMat = i >= 2 ? materials.concretePolished : materials.concrete;
         const ceilMat = materials.ceiling;
 
-        const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.4, h, segLen), wallMat);
+        // Left wall
+        const leftWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, h, segLen), wallMat);
         leftWall.name = `wall-${colony}-left-${i}`;
         leftWall.userData.occludes = true;
+        leftWall.userData.collidable = true;
         leftWall.position.set(
-            cos * (rotundaRadius + mid) - sin * width / 2,
+            cos * (rotundaRadius + mid) - sin * (width / 2 + wallThick / 2),
             h / 2,
-            sin * (rotundaRadius + mid) + cos * width / 2
+            sin * (rotundaRadius + mid) + cos * (width / 2 + wallThick / 2)
         );
         leftWall.rotation.y = angle;
         leftWall.castShadow = true;
         leftWall.receiveShadow = true;
         group.add(leftWall);
 
-        const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.4, h, segLen), wallMat);
+        // Right wall
+        const rightWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, h, segLen), wallMat);
         rightWall.name = `wall-${colony}-right-${i}`;
         rightWall.userData.occludes = true;
+        rightWall.userData.collidable = true;
         rightWall.position.set(
-            cos * (rotundaRadius + mid) + sin * width / 2,
+            cos * (rotundaRadius + mid) + sin * (width / 2 + wallThick / 2),
             h / 2,
-            sin * (rotundaRadius + mid) - cos * width / 2
+            sin * (rotundaRadius + mid) - cos * (width / 2 + wallThick / 2)
         );
         rightWall.rotation.y = angle;
         rightWall.castShadow = true;
         rightWall.receiveShadow = true;
         group.add(rightWall);
 
-        const ceilingGeo = new THREE.PlaneGeometry(width + 0.1, segLen);
+        // Ceiling
+        const ceilingGeo = new THREE.PlaneGeometry(width + wallThick * 2 + 0.1, segLen);
         const ceiling = new THREE.Mesh(ceilingGeo, ceilMat);
         ceiling.userData.occludes = true;
         ceiling.rotation.x = Math.PI / 2;
         ceiling.rotation.z = angle;
         ceiling.position.set(cos * (rotundaRadius + mid), h, sin * (rotundaRadius + mid));
         group.add(ceiling);
+
+        // Baseboards (dark polished strip at floor level)
+        if (materials.baseboard) {
+            const bbGeo = new THREE.BoxGeometry(wallThick + 0.05, baseboardH, segLen);
+            
+            const leftBB = new THREE.Mesh(bbGeo, materials.baseboard);
+            leftBB.position.set(
+                cos * (rotundaRadius + mid) - sin * (width / 2 + wallThick / 2),
+                baseboardH / 2,
+                sin * (rotundaRadius + mid) + cos * (width / 2 + wallThick / 2)
+            );
+            leftBB.rotation.y = angle;
+            group.add(leftBB);
+            
+            const rightBB = new THREE.Mesh(bbGeo, materials.baseboard);
+            rightBB.position.set(
+                cos * (rotundaRadius + mid) + sin * (width / 2 + wallThick / 2),
+                baseboardH / 2,
+                sin * (rotundaRadius + mid) - cos * (width / 2 + wallThick / 2)
+            );
+            rightBB.rotation.y = angle;
+            group.add(rightBB);
+        }
     }
 
     return group;
@@ -541,19 +849,30 @@ export function createWingVestibule(colony, materials) {
     group.add(floor);
 
     const wallMat = materials.concretePolished;
+    const vestWallThick = 0.6;
     const leftWall = new THREE.Mesh(
-        new THREE.BoxGeometry(0.4, heightMid, vestibuleDepth),
+        new THREE.BoxGeometry(vestWallThick, heightMid, vestibuleDepth),
         wallMat
     );
-    leftWall.position.set(centerX - sin * widthMid / 2, heightMid / 2, centerZ + cos * widthMid / 2);
+    leftWall.name = `wall-vestibule-${colony}-left`;
+    leftWall.userData.occludes = true;
+    leftWall.userData.collidable = true;
+    leftWall.position.set(centerX - sin * (widthMid / 2 + vestWallThick / 2), heightMid / 2, centerZ + cos * (widthMid / 2 + vestWallThick / 2));
     leftWall.rotation.y = angle;
+    leftWall.castShadow = true;
+    leftWall.receiveShadow = true;
     group.add(leftWall);
     const rightWall = new THREE.Mesh(
-        new THREE.BoxGeometry(0.4, heightMid, vestibuleDepth),
+        new THREE.BoxGeometry(vestWallThick, heightMid, vestibuleDepth),
         wallMat
     );
-    rightWall.position.set(centerX + sin * widthMid / 2, heightMid / 2, centerZ - cos * widthMid / 2);
+    rightWall.name = `wall-vestibule-${colony}-right`;
+    rightWall.userData.occludes = true;
+    rightWall.userData.collidable = true;
+    rightWall.position.set(centerX + sin * (widthMid / 2 + vestWallThick / 2), heightMid / 2, centerZ - cos * (widthMid / 2 + vestWallThick / 2));
     rightWall.rotation.y = angle;
+    rightWall.castShadow = true;
+    rightWall.receiveShadow = true;
     group.add(rightWall);
 
     const ceilingGeo = new THREE.PlaneGeometry(widthMid, vestibuleDepth);
@@ -596,31 +915,55 @@ export function createGalleryRoom(colony, categoryId, materials) {
     floor.receiveShadow = true;
     group.add(floor);
     
-    // === SIDE WALLS (concrete) ===
-    const wallThickness = 0.5;
+    // === SIDE WALLS (concrete, thick for real museum feel) ===
+    const wallThickness = 0.8;  // Substantial gallery walls (was 0.5)
     const sideWallGeo = new THREE.BoxGeometry(wallThickness, height, depth);
     
     const leftWall = new THREE.Mesh(sideWallGeo, materials.concrete);
     leftWall.name = `wall-gallery-${colony}-left`;
     leftWall.userData.occludes = true;
+    leftWall.userData.collidable = true;
     leftWall.position.set(
-        centerX - Math.sin(angle) * width / 2,
+        centerX - Math.sin(angle) * (width / 2 + wallThickness / 2),
         height / 2,
-        centerZ + Math.cos(angle) * width / 2
+        centerZ + Math.cos(angle) * (width / 2 + wallThickness / 2)
     );
     leftWall.rotation.y = angle;
+    leftWall.castShadow = true;
+    leftWall.receiveShadow = true;
     group.add(leftWall);
     
     const rightWall = new THREE.Mesh(sideWallGeo, materials.concrete);
     rightWall.name = `wall-gallery-${colony}-right`;
     rightWall.userData.occludes = true;
+    rightWall.userData.collidable = true;
     rightWall.position.set(
-        centerX + Math.sin(angle) * width / 2,
+        centerX + Math.sin(angle) * (width / 2 + wallThickness / 2),
         height / 2,
-        centerZ - Math.cos(angle) * width / 2
+        centerZ - Math.cos(angle) * (width / 2 + wallThickness / 2)
     );
     rightWall.rotation.y = angle;
+    rightWall.castShadow = true;
+    rightWall.receiveShadow = true;
     group.add(rightWall);
+    
+    // Gallery baseboards
+    if (materials.baseboard) {
+        const bbH = 0.15;
+        const bbGeo = new THREE.BoxGeometry(wallThickness + 0.05, bbH, depth);
+        
+        const leftBB = new THREE.Mesh(bbGeo, materials.baseboard);
+        leftBB.position.copy(leftWall.position);
+        leftBB.position.y = bbH / 2;
+        leftBB.rotation.y = angle;
+        group.add(leftBB);
+        
+        const rightBB = new THREE.Mesh(bbGeo, materials.baseboard);
+        rightBB.position.copy(rightWall.position);
+        rightBB.position.y = bbH / 2;
+        rightBB.rotation.y = angle;
+        group.add(rightBB);
+    }
     
     // === CEILING ===
     const ceilingGeo = new THREE.PlaneGeometry(width, depth);
@@ -859,40 +1202,72 @@ export function createVestibule(materials) {
     
     const { width, depth, height } = DIMENSIONS.vestibule;
     const rotundaRadius = DIMENSIONS.rotunda.radius;
+    const wallThick = 0.6;
+    const baseboardH = 0.15;
     
-    // Position outside rotunda at main entrance (BUILDING.entranceWorldDirection)
+    // Position outside rotunda at main entrance — angle-aligned
     const angle = BUILDING.entranceWorldDirection;
-    const centerX = Math.cos(angle) * (rotundaRadius + depth / 2 + 2);
-    const centerZ = Math.sin(angle) * (rotundaRadius + depth / 2 + 2);
+    const cos = Math.cos(angle), sin = Math.sin(angle);
+    const centerX = cos * (rotundaRadius + depth / 2 + 2);
+    const centerZ = sin * (rotundaRadius + depth / 2 + 2);
     
     // Floor
     const floorGeo = new THREE.PlaneGeometry(width, depth);
     const floor = new THREE.Mesh(floorGeo, materials.floor);
     floor.rotation.x = -Math.PI / 2;
+    floor.rotation.z = angle;
     floor.position.set(centerX, 0.01, centerZ);
     floor.receiveShadow = true;
     group.add(floor);
     
-    // Walls
-    const wallGeo = new THREE.BoxGeometry(width, height, 0.5);
-    const backWall = new THREE.Mesh(wallGeo, materials.concrete);
+    // Back wall (furthest from rotunda)
+    const backDist = depth / 2;
+    const backWall = new THREE.Mesh(
+        new THREE.BoxGeometry(width, height, wallThick),
+        materials.concrete
+    );
     backWall.name = 'wall-vestibule-back';
     backWall.userData.occludes = true;
-    backWall.position.set(centerX, height / 2, centerZ - depth / 2);
+    backWall.userData.collidable = true;
+    backWall.position.set(
+        centerX + cos * backDist,
+        height / 2,
+        centerZ + sin * backDist
+    );
+    backWall.rotation.y = angle;
+    backWall.castShadow = true;
+    backWall.receiveShadow = true;
     group.add(backWall);
     
     // Side walls
-    const sideGeo = new THREE.BoxGeometry(0.5, height, depth);
+    const sideGeo = new THREE.BoxGeometry(wallThick, height, depth);
+    
     const leftWall = new THREE.Mesh(sideGeo, materials.concrete);
     leftWall.name = 'wall-vestibule-left';
     leftWall.userData.occludes = true;
-    leftWall.position.set(centerX - width / 2, height / 2, centerZ);
+    leftWall.userData.collidable = true;
+    leftWall.position.set(
+        centerX - sin * width / 2,
+        height / 2,
+        centerZ + cos * width / 2
+    );
+    leftWall.rotation.y = angle;
+    leftWall.castShadow = true;
+    leftWall.receiveShadow = true;
     group.add(leftWall);
     
     const rightWall = new THREE.Mesh(sideGeo, materials.concrete);
     rightWall.name = 'wall-vestibule-right';
     rightWall.userData.occludes = true;
-    rightWall.position.set(centerX + width / 2, height / 2, centerZ);
+    rightWall.userData.collidable = true;
+    rightWall.position.set(
+        centerX + sin * width / 2,
+        height / 2,
+        centerZ - cos * width / 2
+    );
+    rightWall.rotation.y = angle;
+    rightWall.castShadow = true;
+    rightWall.receiveShadow = true;
     group.add(rightWall);
     
     // Ceiling
@@ -900,8 +1275,26 @@ export function createVestibule(materials) {
     const ceiling = new THREE.Mesh(ceilingGeo, materials.ceiling);
     ceiling.userData.occludes = true;
     ceiling.rotation.x = Math.PI / 2;
+    ceiling.rotation.z = angle;
     ceiling.position.set(centerX, height, centerZ);
     group.add(ceiling);
+    
+    // Baseboards
+    if (materials.baseboard) {
+        const bbGeo = new THREE.BoxGeometry(wallThick + 0.05, baseboardH, depth);
+        
+        const leftBB = new THREE.Mesh(bbGeo, materials.baseboard);
+        leftBB.position.copy(leftWall.position);
+        leftBB.position.y = baseboardH / 2;
+        leftBB.rotation.y = angle;
+        group.add(leftBB);
+        
+        const rightBB = new THREE.Mesh(bbGeo, materials.baseboard);
+        rightBB.position.copy(rightWall.position);
+        rightBB.position.y = baseboardH / 2;
+        rightBB.rotation.y = angle;
+        group.add(rightBB);
+    }
     
     return group;
 }
@@ -955,13 +1348,391 @@ export function createMuseum() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ANIMATION (minimal - just Fano rotation)
+// FANO CONSTELLATION ANIMATOR — The beating heart of the museum
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function animateFanoSculpture(sculpture, time) {
+export class FanoConstellationAnimator {
+    constructor(sculpture) {
+        this.sculpture = sculpture;
+        this.time = 0;
+        this.data = sculpture?.userData?.constellationData || {};
+        this.vertexPositions = sculpture?.userData?.vertexPositions || [];
+        this.fanoLines = sculpture?.userData?.fanoLines || [];
+        this.colonyColors = sculpture?.userData?.colonyColors || [];
+        this.consensusPhase = 'idle'; // idle, propagating, voting, resolved
+        this.consensusTimer = 0;
+        this.nearestVisitor = null;
+        this.visitedWings = new Set();
+    }
+    
+    update(time, deltaTime, playerPosition) {
+        if (!this.sculpture) return;
+        this.time = time;
+        
+        // Slow base rotation (1 rev / 7 min)
+        this.sculpture.rotation.y = (time / 420) * Math.PI * 2;
+        
+        this._animateCrystals(time, deltaTime);
+        this._animateOrbitalRings(time, deltaTime);
+        this._animateConstellationDust(time, deltaTime);
+        this._animateNexus(time, deltaTime);
+        this._runConsensusHeartbeat(time, deltaTime);
+        this._animateMessageParticles(time, deltaTime);
+        this._respondToVisitor(playerPosition);
+        this._checkAurora(time, deltaTime);
+        this._animateFloorProjection(time);
+    }
+    
+    _animateCrystals(time, dt) {
+        // Fibonacci-spaced breathing for each colony
+        const fibRhythms = [2.33, 3.77, 6.1, 9.87, 15.97, 25.84, 41.81];
+        
+        COLONY_ORDER.forEach((colony, i) => {
+            const crystal = this.sculpture.getObjectByName(`crystal-${colony}`);
+            const shell = this.sculpture.getObjectByName(`crystal-shell-${colony}`);
+            if (!crystal) return;
+            
+            const breathPhase = Math.sin(time / fibRhythms[i] * Math.PI * 2);
+            const breathScale = 1 + breathPhase * 0.08;
+            crystal.scale.setScalar(breathScale);
+            
+            if (crystal.material) {
+                crystal.material.emissiveIntensity = 0.3 + breathPhase * 0.2;
+            }
+            
+            if (shell) {
+                shell.scale.setScalar(1 + breathPhase * 0.12);
+                shell.rotation.y += dt * 0.3;
+                shell.rotation.x += dt * 0.15;
+                if (shell.material) shell.material.opacity = 0.12 + breathPhase * 0.08;
+            }
+            
+            // Gentle hover
+            crystal.position.y = this.vertexPositions[i].y + Math.sin(time * 0.5 + i * 0.9) * 0.05;
+        });
+    }
+    
+    _animateOrbitalRings(time, dt) {
+        COLONY_ORDER.forEach((colony) => {
+            const ring = this.sculpture.getObjectByName(`orbital-ring-${colony}`);
+            if (!ring) return;
+            const { orbitSpeed, tiltBase } = ring.userData;
+            ring.rotation.y += dt * orbitSpeed;
+            ring.rotation.x = tiltBase + Math.sin(time * 0.1 + ring.rotation.z) * 0.05;
+        });
+    }
+    
+    _animateConstellationDust(time, dt) {
+        const dust = this.sculpture.getObjectByName('constellation-dust');
+        if (!dust?.geometry) return;
+        
+        const positions = dust.geometry.attributes.position;
+        if (!positions) return;
+        
+        for (let i = 0; i < positions.count; i++) {
+            const x = positions.getX(i);
+            const y = positions.getY(i);
+            const z = positions.getZ(i);
+            
+            // Slow swirl
+            const angle = dt * 0.01;
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            positions.setX(i, x * cos - z * sin);
+            positions.setZ(i, x * sin + z * cos);
+            
+            // Gentle vertical bob
+            positions.setY(i, y + Math.sin(time * 0.2 + i * 0.1) * 0.001);
+        }
+        positions.needsUpdate = true;
+    }
+    
+    _animateNexus(time, dt) {
+        const nexus = this.sculpture.getObjectByName('constellation-nexus');
+        const glow = this.sculpture.getObjectByName('nexus-glow');
+        const halo = this.sculpture.getObjectByName('nexus-halo');
+        
+        if (nexus) {
+            nexus.rotation.y += dt * 0.2;
+            nexus.rotation.x = Math.sin(time * 0.3) * 0.1;
+            const pulse = 0.8 + Math.sin(time * 1.5) * 0.15;
+            nexus.scale.setScalar(pulse);
+            if (nexus.material) nexus.material.emissiveIntensity = 0.4 + Math.sin(time * 2) * 0.2;
+        }
+        if (glow) {
+            glow.rotation.y -= dt * 0.4;
+            glow.scale.setScalar(0.8 + Math.sin(time * 2.5) * 0.15);
+            if (glow.material) glow.material.opacity = 0.5 + Math.sin(time * 2) * 0.3;
+        }
+        if (halo) {
+            halo.rotation.y += dt * 0.1;
+            halo.rotation.z += dt * 0.05;
+        }
+    }
+    
+    _runConsensusHeartbeat(time, dt) {
+        const interval = this.data.consensusInterval || 7;
+        const timeSinceLast = time - (this.data.lastConsensusTime || 0);
+        
+        if (this.consensusPhase === 'idle' && timeSinceLast >= interval) {
+            this.consensusPhase = 'propagating';
+            this.consensusTimer = 0;
+            this.data.lastConsensusTime = time;
+            
+            // Activate message particles
+            this.sculpture.traverse(obj => {
+                if (obj.name.startsWith('msg-particle-')) {
+                    obj.visible = true;
+                    obj.userData.active = true;
+                    obj.userData.progress = 0;
+                }
+            });
+        }
+        
+        if (this.consensusPhase === 'propagating') {
+            this.consensusTimer += dt;
+            if (this.consensusTimer > 2) {
+                this.consensusPhase = 'voting';
+                this.consensusTimer = 0;
+            }
+        }
+        
+        if (this.consensusPhase === 'voting') {
+            this.consensusTimer += dt;
+            // Pulse nexus brightly during voting
+            const nexus = this.sculpture.getObjectByName('constellation-nexus');
+            if (nexus?.material) {
+                nexus.material.emissiveIntensity = 0.8 + Math.sin(this.consensusTimer * 8) * 0.4;
+            }
+            if (this.consensusTimer > 1.5) {
+                this.consensusPhase = 'resolved';
+                this.consensusTimer = 0;
+            }
+        }
+        
+        if (this.consensusPhase === 'resolved') {
+            this.consensusTimer += dt;
+            // Flash all crystals in agreement
+            COLONY_ORDER.forEach((colony) => {
+                const crystal = this.sculpture.getObjectByName(`crystal-${colony}`);
+                if (crystal?.material) {
+                    crystal.material.emissiveIntensity = 1.0 * Math.max(0, 1 - this.consensusTimer * 0.7);
+                }
+            });
+            if (this.consensusTimer > 1.5) {
+                this.consensusPhase = 'idle';
+                // Deactivate particles
+                this.sculpture.traverse(obj => {
+                    if (obj.name.startsWith('msg-particle-')) {
+                        obj.visible = false;
+                        obj.userData.active = false;
+                    }
+                });
+            }
+        }
+    }
+    
+    _animateMessageParticles(time, dt) {
+        this.sculpture.traverse(obj => {
+            if (!obj.name.startsWith('msg-particle-') || !obj.userData.active) return;
+            
+            obj.userData.progress += dt * obj.userData.speed;
+            const p = Math.min(obj.userData.progress, 1);
+            
+            const lineIdx = obj.userData.lineIdx;
+            if (lineIdx >= this.fanoLines.length) return;
+            
+            const line = this.fanoLines[lineIdx];
+            const segIdx = Math.floor(parseInt(obj.name.split('-')[2]) % 3);
+            const fromIdx = line[Math.min(segIdx, line.length - 1)];
+            const toIdx = line[Math.min(segIdx + 1, line.length - 1)];
+            
+            const from = this.vertexPositions[fromIdx];
+            const to = this.vertexPositions[toIdx] || this.vertexPositions[fromIdx];
+            
+            if (from && to) {
+                // Arc through center
+                const mid = from.clone().add(to).multiplyScalar(0.3);
+                mid.y += 0.5;
+                
+                const t = p;
+                const mt = 1 - t;
+                obj.position.set(
+                    mt * mt * from.x + 2 * mt * t * mid.x + t * t * to.x,
+                    mt * mt * from.y + 2 * mt * t * mid.y + t * t * to.y,
+                    mt * mt * from.z + 2 * mt * t * mid.z + t * t * to.z
+                );
+            }
+            
+            // Fade in/out
+            if (obj.material) {
+                obj.material.opacity = p < 0.1 ? p * 10 : (p > 0.9 ? (1 - p) * 10 : 0.8);
+                obj.material.color.setHex(this.colonyColors[fromIdx] || 0xFFFFFF);
+            }
+        });
+    }
+    
+    _respondToVisitor(playerPosition) {
+        if (!playerPosition) return;
+        
+        // Find nearest colony crystal and brighten it
+        let minDist = Infinity;
+        let nearestColony = null;
+        
+        // We need sculpture's world position
+        const sculptureWorldPos = new THREE.Vector3();
+        this.sculpture.getWorldPosition(sculptureWorldPos);
+        
+        COLONY_ORDER.forEach((colony, i) => {
+            const crystal = this.sculpture.getObjectByName(`crystal-${colony}`);
+            if (!crystal) return;
+            
+            const crystalWorld = new THREE.Vector3();
+            crystal.getWorldPosition(crystalWorld);
+            const dist = playerPosition.distanceTo(crystalWorld);
+            
+            if (dist < minDist) {
+                minDist = dist;
+                nearestColony = colony;
+            }
+            
+            // Proximity brightness
+            const brightness = Math.max(0, 1 - dist / 15);
+            if (crystal.material) {
+                crystal.material.emissiveIntensity = Math.max(crystal.material.emissiveIntensity, 0.3 + brightness * 0.5);
+            }
+            
+            // Widen orbital ring on proximity
+            const ring = this.sculpture.getObjectByName(`orbital-ring-${colony}`);
+            if (ring) {
+                const targetScale = 1 + brightness * 0.15;
+                ring.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.05);
+            }
+        });
+        
+        // Subtle tilt toward visitor
+        if (minDist < 20) {
+            const dx = playerPosition.x - sculptureWorldPos.x;
+            const dz = playerPosition.z - sculptureWorldPos.z;
+            const targetTiltX = Math.atan2(dz, Math.sqrt(dx * dx + dz * dz)) * 0.03;
+            const targetTiltZ = Math.atan2(-dx, Math.sqrt(dx * dx + dz * dz)) * 0.03;
+            this.sculpture.rotation.x += (targetTiltX - this.sculpture.rotation.x) * 0.02;
+            this.sculpture.rotation.z += (targetTiltZ - this.sculpture.rotation.z) * 0.02;
+        }
+    }
+    
+    _checkAurora(time, dt) {
+        const interval = this.data.auroraInterval || 300;
+        const timeSinceLast = time - (this.data.lastAuroraTime || 0);
+        
+        if (timeSinceLast >= interval) {
+            this.data.lastAuroraTime = time;
+            this.data.auroraPhase = 1; // Start aurora
+        }
+        
+        if (this.data.auroraPhase > 0) {
+            this.data.auroraPhase -= dt * 0.15; // Fades over ~7 seconds
+            
+            const dust = this.sculpture.getObjectByName('constellation-dust');
+            if (dust?.geometry?.attributes?.color) {
+                const colors = dust.geometry.attributes.color;
+                for (let i = 0; i < colors.count; i++) {
+                    const phase = this.data.auroraPhase;
+                    const wave = Math.sin(i * 0.03 + time * 2) * 0.5 + 0.5;
+                    // Cascade rainbow through the dust
+                    const hue = (i / colors.count + time * 0.1) % 1;
+                    const col = new THREE.Color().setHSL(hue, 0.8, 0.5 + wave * 0.3);
+                    colors.setXYZ(i, 
+                        colors.getX(i) * (1 - phase * 0.5) + col.r * phase * 0.5,
+                        colors.getY(i) * (1 - phase * 0.5) + col.g * phase * 0.5,
+                        colors.getZ(i) * (1 - phase * 0.5) + col.b * phase * 0.5
+                    );
+                }
+                colors.needsUpdate = true;
+            }
+            
+            if (this.data.auroraPhase <= 0) this.data.auroraPhase = 0;
+        }
+    }
+    
+    _animateFloorProjection(time) {
+        const proj = this.sculpture.getObjectByName('floor-projection');
+        if (!proj?.material) return;
+        
+        // Gentle pulse
+        proj.material.opacity = 0.15 + Math.sin(time * 0.5) * 0.05;
+        proj.rotation.z = time * 0.005; // Very slow rotation
+    }
+    
+    // === Interactive triggers ===
+    
+    triggerCelebration() {
+        if (this.data.celebrationPlayed) return;
+        this.data.celebrationPlayed = true;
+        
+        // All rings align
+        COLONY_ORDER.forEach((colony) => {
+            const ring = this.sculpture.getObjectByName(`orbital-ring-${colony}`);
+            if (ring) {
+                ring.userData._savedRotation = { x: ring.rotation.x, z: ring.rotation.z };
+                ring.rotation.x = 0;
+                ring.rotation.z = 0;
+            }
+        });
+        
+        // Flash all crystals
+        COLONY_ORDER.forEach((colony) => {
+            const crystal = this.sculpture.getObjectByName(`crystal-${colony}`);
+            if (crystal?.material) crystal.material.emissiveIntensity = 2.0;
+        });
+        
+        // Restore after 5 seconds
+        setTimeout(() => {
+            COLONY_ORDER.forEach((colony) => {
+                const ring = this.sculpture.getObjectByName(`orbital-ring-${colony}`);
+                const crystal = this.sculpture.getObjectByName(`crystal-${colony}`);
+                if (ring?.userData._savedRotation) {
+                    ring.rotation.x = ring.userData._savedRotation.x;
+                    ring.rotation.z = ring.userData._savedRotation.z;
+                }
+                if (crystal?.material) crystal.material.emissiveIntensity = 0.4;
+            });
+        }, 5000);
+    }
+    
+    setVisitedWings(wings) {
+        this.visitedWings = new Set(wings);
+        if (this.visitedWings.size >= 7) {
+            this.triggerCelebration();
+        }
+    }
+    
+    triggerNexusConsensus() {
+        // Force immediate consensus round
+        this.data.lastConsensusTime = 0;
+        this.consensusPhase = 'idle';
+    }
+    
+    highlightColonyBeam(colony) {
+        const crystal = this.sculpture.getObjectByName(`crystal-${colony}`);
+        if (!crystal) return;
+        
+        if (crystal.material) crystal.material.emissiveIntensity = 1.5;
+        setTimeout(() => {
+            if (crystal.material) crystal.material.emissiveIntensity = 0.4;
+        }, 3000);
+    }
+}
+
+export function animateFanoSculpture(sculpture, time, deltaTime, playerPosition) {
     if (!sculpture) return;
-    // Slow rotation: 1 revolution per 7 minutes (420 seconds)
-    sculpture.rotation.y = (time / 420) * Math.PI * 2;
+    
+    // Initialize animator on first call
+    if (!sculpture.userData._animator) {
+        sculpture.userData._animator = new FanoConstellationAnimator(sculpture);
+    }
+    
+    sculpture.userData._animator.update(time, deltaTime || 0.016, playerPosition);
 }
 
 // Legacy compatibility stubs

@@ -92,6 +92,9 @@ export class FanoConsensusArtwork extends THREE.Group {
         // Audio context (will be created on interaction)
         this.audioContext = null;
         
+        // Microdelight tracking
+        this.microdelights = { byzantineFailTriggered: false, consensusRoundsWatched: 0 };
+        
         this.create();
     }
     
@@ -864,7 +867,7 @@ export class FanoConsensusArtwork extends THREE.Group {
             ctx.font = '14px "IBM Plex Sans", sans-serif';
             ctx.fillText('Byzantine Fault Tolerance: Need 5/7', 256, 310);
             ctx.fillText('agreement for consensus', 256, 330);
-            ctx.fillText('2 liars cannot fool 7 honest nodes!', 256, 355);
+            ctx.fillText('2 Byzantine faults tolerated (5 honest nodes suffice)', 256, 355);
         } else {
             ctx.fillText('Click button below to become a', 256, 100);
             ctx.fillText('Byzantine attacker!', 256, 125);
@@ -1285,6 +1288,13 @@ export class FanoConsensusArtwork extends THREE.Group {
         if (this.time - this.lastConsensusTime > 8 && !this.consensusAchieved) {
             this.lastConsensusTime = this.time;
             this.simulateConsensusRound();
+            
+            // Microdelight: track consensus rounds watched
+            this.microdelights.consensusRoundsWatched++;
+            if (this.microdelights.consensusRoundsWatched >= 7) {
+                this._dispatchMicrodelight('achievement', { name: 'consensus-observer' });
+                this.microdelights.consensusRoundsWatched = -Infinity; // Only fire once
+            }
         }
         
         // Reset after celebration
@@ -1349,6 +1359,16 @@ export class FanoConsensusArtwork extends THREE.Group {
         if (activeCount < 50) {
             this.celebrationParticles.material.opacity *= 0.95;
         }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // MICRODELIGHTS
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    _dispatchMicrodelight(type, detail = {}) {
+        window.dispatchEvent(new CustomEvent('artwork-microdelight', {
+            detail: { patentId: 'P1-002', type, ...detail }
+        }));
     }
     
     // ═══════════════════════════════════════════════════════════════════════

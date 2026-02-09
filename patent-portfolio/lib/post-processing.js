@@ -69,14 +69,14 @@ export const POST_PROCESSING_QUALITY = {
         ssaoSamples: 16,
         ssaoRadius: 1.2,
         ssaoIntensity: 0.7,
-        ssr: false,
-        ssrMaxDistance: 0,
+        ssr: true,             // Screen-space reflections on polished surfaces
+        ssrMaxDistance: 50,
         dof: false,
         taa: true,             // Anti-aliasing for crisp edges
         bloom: true,
-        bloomStrength: 0.35,   // Subtle glow
-        bloomThreshold: 0.92,  // Only bright emissives
-        bloomRadius: 0.25,     // Tight, crisp bloom
+        bloomStrength: 0.4,    // Moderate — lets emissive materials glow without over-brightening
+        bloomThreshold: 0.7,   // Low enough to catch emissive materials (MeshStandardMaterial emissiveIntensity > 0)
+        bloomRadius: 0.3,      // Slightly wider for softer falloff
         grain: 0,              // NO grain
         chromatic: 0,          // NO chromatic aberration
         vignette: 0,           // NO vignette
@@ -844,11 +844,15 @@ export class PostProcessingManager {
         // BLOOM
         // ─────────────────────────────────────────────────────────────────────
         if (this.quality.bloom) {
+            // Bloom tuned for emissive materials:
+            //   threshold 0.6–0.8  →  catches MeshStandardMaterial with emissiveIntensity > 0
+            //   strength  0.3–0.5  →  visible glow without washing out the scene
+            //   radius    0.25–0.4 →  soft falloff, not a hard halo
             const bloomPass = new UnrealBloomPass(
                 new THREE.Vector2(width, height),
-                this.quality.bloomStrength,  // strength
-                0.5,                          // radius
-                0.75                          // threshold
+                this.quality.bloomStrength,    // strength (per-preset)
+                this.quality.bloomRadius || 0.3,  // radius (per-preset, fallback 0.3)
+                this.quality.bloomThreshold ?? 0.7 // threshold (per-preset, fallback 0.7)
             );
             this.composer.addPass(bloomPass);
             this.passes.bloom = bloomPass;
@@ -1106,6 +1110,32 @@ export class PostProcessingManager {
         
         const distance = this.camera.position.distanceTo(targetPosition);
         this.currentFocus += (distance - this.currentFocus) * this.focusSmoothing;
+        
+        if (this.passes.dof.uniforms && this.passes.dof.uniforms.focus) {
+            this.passes.dof.uniforms.focus.value = this.currentFocus;
+        }
+    }
+    
+    /**
+     * Auto-focus DoF by raycasting from camera center into the scene.
+     * Call each frame (or throttled) to keep BokehPass focus tracking
+     * whatever the camera is looking at.
+     * 
+     * @param {THREE.Raycaster} raycaster - Raycaster to reuse (avoids allocation)
+     * @param {THREE.Camera} camera - Camera whose forward direction defines the ray
+     * @param {number} [defaultDistance=10] - Fallback focus distance when nothing is hit
+     */
+    updateFocalPoint(raycaster, camera, defaultDistance = 10) {
+        if (!this.passes.dof) return;
+        
+        // Cast from camera center (0,0 in NDC) along the forward axis
+        raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+        const hits = raycaster.intersectObjects(this.scene.children, true);
+        
+        const targetDistance = hits.length > 0 ? hits[0].distance : defaultDistance;
+        
+        // Smooth toward target to avoid jarring focus pops
+        this.currentFocus += (targetDistance - this.currentFocus) * this.focusSmoothing;
         
         if (this.passes.dof.uniforms && this.passes.dof.uniforms.focus) {
             this.passes.dof.uniforms.focus.value = this.currentFocus;
