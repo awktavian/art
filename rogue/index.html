@@ -1,0 +1,1846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="description" content="Shattered Mirror — Hex roguelite deckbuilder. Descend the Void.">
+  <meta name="theme-color" content="#0a0812">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
+  <meta name="kagami:agent-id" content="shattered-mirror">
+  <meta name="kagami:capabilities" content="display,interact,compute,store">
+  <meta name="kagami:permissions" content="storage.local,display,interact,compute">
+  <meta name="kagami:colony" content="spark">
+  <meta name="kagami:version" content="1.0.0">
+  <meta name="kagami:sandbox" content="false">
+  <meta name="kagami:consensus-vote" content="true">
+  <meta name="kagami:consensus-propose" content="false">
+  <meta name="kagami:consensus-weight" content="1">
+  <meta name="kagami:category" content="entertainment">
+  <script type="application/ld+json">
+  {"@context":{"agent":"https://awkronos.github.io/web/vocab#","foaf":"http://xmlns.com/foaf/0.1/","dct":"http://purl.org/dc/terms/"},"@id":"#shattered-mirror","@type":"agent:AIAgent","foaf:name":"Shattered Mirror","dct:description":"Hex roguelite deckbuilder — 80+ cards, 30 enemies, 3 acts, daily puzzles.","dct:created":"2026-02-07","agent:capabilities":{"@type":"agent:CapabilitySet","agent:capability":[{"@type":"agent:Capability","agent:name":"play_game"},{"@type":"agent:Capability","agent:name":"save_state","agent:requiredPermission":"storage.local"}]}}
+  </script>
+  <title>Shattered Mirror | 鏡割れ</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+    :root {
+      --bg-base:#080610;--bg-raised:#12101c;--bg-elevated:#1a1726;--bg-overlay:#242030;--bg-glass:rgba(18,16,28,0.75);
+      --primary:#67d4e4;--secondary:#7eb77f;--tertiary:#9b7ebd;--warning:#f59e0b;--danger:#ef4444;--success:#22c55e;
+      --primary-rgb:103,212,228;--secondary-rgb:126,183,127;--danger-rgb:239,68,68;--success-rgb:34,197,94;--warning-rgb:245,158,11;
+      --text:#eee8df;--text-dim:rgba(238,232,223,0.7);--text-muted:rgba(238,232,223,0.42);--text-ghost:rgba(238,232,223,0.15);
+      --font-display:'IBM Plex Sans',-apple-system,sans-serif;--font-body:'IBM Plex Sans',-apple-system,sans-serif;--font-mono:'IBM Plex Mono',monospace;
+      --text-2xs:0.625rem;--text-xs:0.75rem;--text-sm:0.875rem;--text-base:1rem;--text-lg:1.125rem;--text-xl:1.25rem;--text-2xl:1.5rem;--text-3xl:2rem;--text-4xl:2.75rem;
+      --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--space-6:32px;--space-8:48px;--space-10:64px;
+      --radius-sm:6px;--radius-md:10px;--radius-lg:14px;--radius-xl:20px;--radius-full:9999px;
+      --border-subtle:rgba(255,255,255,0.05);--border-default:rgba(255,255,255,0.1);--border-strong:rgba(255,255,255,0.18);--border-glow:rgba(var(--primary-rgb),0.25);
+      --shadow-sm:0 2px 8px rgba(0,0,0,0.4);--shadow-md:0 4px 24px rgba(0,0,0,0.5);--shadow-lg:0 8px 40px rgba(0,0,0,0.6);
+      --shadow-glow:0 0 30px rgba(var(--primary-rgb),0.2),0 0 60px rgba(var(--primary-rgb),0.08);
+      --shadow-card:0 4px 16px rgba(0,0,0,0.5),0 0 1px rgba(255,255,255,0.08);
+      --shadow-card-hover:0 12px 32px rgba(0,0,0,0.6),0 0 20px rgba(var(--primary-rgb),0.12);
+      --shadow-card-selected:0 0 24px rgba(var(--primary-rgb),0.35),0 0 48px rgba(var(--primary-rgb),0.15),0 8px 32px rgba(0,0,0,0.5);
+      --dur-select:80ms;--dur-play:230ms;--dur-draw:280ms;--dur-float:700ms;--dur-shake:280ms;
+      --dur-death:400ms;--dur-block:200ms;--dur-heal:500ms;--dur-banner:800ms;--dur-transition:350ms;
+      --dur-refan:200ms;--dur-pulse:2000ms;--dur-press:100ms;
+      --ease-out:cubic-bezier(0.16,1,0.3,1);--ease-spring:cubic-bezier(0.34,1.56,0.64,1);
+      --spark:#ff6b35;--forge:#d4af37;--flow:#4ecdc4;--nexus:#9b7ebd;--beacon:#f59e0b;--grove:#7eb77f;--crystal:#67d4e4;
+      --hex-size:48px;--card-w:120px;--card-h:168px;--card-w-lg:156px;--card-h-lg:218px;
+    }
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    html{font-size:16px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+    body{font-family:var(--font-body);background:var(--bg-base);color:var(--text);line-height:1.5;min-height:100vh;min-height:100dvh;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+
+    /* ── Screens ── */
+    .screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity var(--dur-transition) var(--ease-out);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:var(--space-4)}
+    .screen.active{opacity:1;pointer-events:auto}
+
+    /* ── Void Background ── */
+    .void-bg{position:fixed;inset:0;z-index:0;
+      background:
+        radial-gradient(ellipse 100% 70% at 50% 15%,rgba(103,212,228,0.07) 0%,transparent 50%),
+        radial-gradient(ellipse 70% 50% at 85% 85%,rgba(155,126,189,0.06) 0%,transparent 40%),
+        radial-gradient(ellipse 60% 40% at 15% 70%,rgba(255,107,53,0.04) 0%,transparent 40%),
+        var(--bg-base)}
+    .void-bg::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.015'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+    .void-bg::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,transparent 20%,rgba(0,0,0,0.4) 65%,rgba(0,0,0,0.7) 100%);pointer-events:none}
+    .floor-tint{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0;transition:opacity 0.6s ease}
+    .floor-tint.active{opacity:1}
+    .floor-tint.act-0{background:radial-gradient(ellipse at 50% 40%,rgba(67,80,175,0.1),transparent 55%)}
+    .floor-tint.act-1{background:radial-gradient(ellipse at 50% 40%,rgba(200,150,40,0.08),transparent 55%)}
+    .floor-tint.act-2{background:radial-gradient(ellipse at 50% 40%,rgba(160,30,40,0.12),transparent 55%)}
+    .game-container{position:relative;z-index:1;width:100%;height:100dvh;display:flex;flex-direction:column}
+
+    /* ── Glass Panel ── */
+    .glass{background:var(--bg-glass);backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3);border:1px solid var(--border-default);border-radius:var(--radius-lg)}
+
+    /* ── Title Screen ── */
+    #title-screen{gap:var(--space-5);padding:var(--space-8)}
+    .title-logo{font-family:var(--font-display);font-size:clamp(2.8rem,7vw,4.5rem);font-weight:700;letter-spacing:-0.04em;line-height:1;text-align:center;background:linear-gradient(135deg,var(--crystal) 0%,var(--nexus) 40%,var(--spark) 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 40px rgba(var(--primary-rgb),0.2));animation:titleGlow 4s ease-in-out infinite}
+    @keyframes titleGlow{0%,100%{filter:drop-shadow(0 0 40px rgba(var(--primary-rgb),0.2))}50%{filter:drop-shadow(0 0 60px rgba(var(--primary-rgb),0.35))}}
+    .title-sub{font-family:var(--font-mono);font-size:var(--text-lg);color:var(--text-muted);letter-spacing:0.3em;margin-top:calc(-1*var(--space-2))}
+    .title-flavor{max-width:440px;text-align:center;color:var(--text-dim);font-size:var(--text-sm);line-height:1.8}
+    .title-btns{display:flex;gap:var(--space-3);flex-wrap:wrap;justify-content:center;margin-top:var(--space-2)}
+    .title-meta{display:flex;gap:var(--space-5);font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);padding:var(--space-3) var(--space-5);border-radius:var(--radius-lg);background:var(--bg-glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--border-subtle)}
+
+    /* ── Buttons ── */
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);padding:var(--space-3) var(--space-6);border-radius:var(--radius-md);border:1px solid var(--border-default);font-family:var(--font-body);font-size:var(--text-sm);font-weight:500;cursor:pointer;transition:all 150ms var(--ease-out);color:var(--text);background:var(--bg-glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);min-height:44px;min-width:44px;letter-spacing:0.01em}
+    .btn:hover{background:var(--bg-overlay);transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:var(--border-strong)}
+    .btn:active{transform:translateY(0) scale(0.97);transition-duration:var(--dur-press)}
+    .btn-primary{background:linear-gradient(135deg,var(--primary),#4fb8cc);color:var(--bg-base);border-color:transparent;font-weight:600;box-shadow:0 4px 20px rgba(var(--primary-rgb),0.25)}
+    .btn-primary:hover{filter:brightness(1.1);box-shadow:0 8px 30px rgba(var(--primary-rgb),0.35)}
+    .btn-sm{padding:var(--space-2) var(--space-4);font-size:var(--text-xs)}
+    .btn-danger{border-color:rgba(var(--danger-rgb),0.3);color:var(--danger)}
+    .btn-danger:hover{background:rgba(var(--danger-rgb),0.15);border-color:var(--danger)}
+
+    /* ── Cards ── */
+    .card{width:var(--card-w);height:var(--card-h);border-radius:var(--radius-md);cursor:pointer;transition:transform 150ms var(--ease-spring),box-shadow 150ms var(--ease-out),filter 150ms;position:relative;flex-shrink:0;filter:brightness(0.95)}
+    .card:hover{transform:translateY(-16px) scale(1.06);z-index:20;filter:brightness(1.05);box-shadow:var(--shadow-card-hover)}
+    .card.selected{transform:translateY(-28px) scale(1.12);z-index:25;filter:brightness(1.15);box-shadow:var(--shadow-card-selected)}
+    .card.selected::after{content:'';position:absolute;inset:-3px;border-radius:calc(var(--radius-md) + 3px);border:2px solid var(--primary);opacity:0.8;animation:selectedPulse 1.2s ease-in-out infinite;pointer-events:none}
+    @keyframes selectedPulse{0%,100%{opacity:0.5;box-shadow:0 0 12px rgba(var(--primary-rgb),0.2)}50%{opacity:1;box-shadow:0 0 24px rgba(var(--primary-rgb),0.4)}}
+    .card.unplayable{opacity:0.4;filter:saturate(0.3) brightness(0.7);cursor:not-allowed}
+    .card.unplayable:hover{transform:none;filter:saturate(0.3) brightness(0.7);box-shadow:none}
+    .card-inner{width:100%;height:100%;border-radius:var(--radius-md);background:linear-gradient(180deg,var(--bg-elevated) 0%,var(--bg-raised) 100%);border:1.5px solid var(--border-default);display:flex;flex-direction:column;overflow:hidden;position:relative;box-shadow:var(--shadow-card)}
+    .card.upgraded .card-inner{border-color:rgba(var(--primary-rgb),0.5);box-shadow:var(--shadow-card),inset 0 0 20px rgba(var(--primary-rgb),0.06),0 0 16px rgba(var(--primary-rgb),0.2)}
+    .card.prismatic .card-inner{border-color:transparent;background:linear-gradient(180deg,rgba(20,18,30,1) 0%,rgba(18,16,28,1) 100%);box-shadow:var(--shadow-card),0 0 24px rgba(155,126,189,0.3);animation:prismShimmer 3s ease-in-out infinite}
+    .card.prismatic .card-inner::before{content:'';position:absolute;inset:-1.5px;border-radius:calc(var(--radius-md) + 1.5px);background:linear-gradient(135deg,var(--crystal),var(--nexus),var(--spark),var(--crystal));z-index:-1;animation:prismRotate 4s linear infinite}
+    @keyframes prismRotate{to{filter:hue-rotate(360deg)}}
+    .card.rarity-uncommon .card-inner{border-color:rgba(var(--secondary-rgb),0.4);box-shadow:var(--shadow-card),0 0 8px rgba(var(--secondary-rgb),0.12)}
+    .card.rarity-rare .card-inner{border-color:rgba(var(--danger-rgb),0.4);box-shadow:var(--shadow-card),0 0 8px rgba(var(--danger-rgb),0.12)}
+    .card.power-card .card-inner{background:linear-gradient(180deg,rgba(155,126,189,0.12) 0%,var(--bg-raised) 100%);border-color:rgba(155,126,189,0.3)}
+    @keyframes prismShimmer{0%,100%{filter:brightness(1)}50%{filter:brightness(1.1)}}
+    .card-art-svg{width:100%;flex:1;min-height:44px;display:flex;align-items:center;justify-content:center;padding:var(--space-1)}
+    .card-art-svg svg{width:85%;height:85%;object-fit:contain}
+    .card-header{display:flex;justify-content:space-between;align-items:center;padding:var(--space-1) var(--space-2)}
+    .card-cost{width:26px;height:26px;border-radius:50%;background:linear-gradient(145deg,#f0d060,#c49a28);color:#1a1810;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.2)}
+    .card-name{font-size:var(--text-xs);font-weight:600;text-align:center;padding:1px var(--space-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0.02em}
+    .card-desc{font-size:0.625rem;color:var(--text-dim);text-align:center;padding:2px var(--space-2) var(--space-1);line-height:1.4;min-height:26px}
+    .card-colony-bar{height:3px;border-radius:0 0 var(--radius-md) var(--radius-md);opacity:0.85}
+    .card-kw{font-size:0.5rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);text-align:center;padding:0 var(--space-1);font-family:var(--font-mono)}
+    .card-plus{position:absolute;top:4px;right:4px;width:18px;height:18px;background:var(--primary);color:var(--bg-base);border-radius:50%;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;z-index:2;box-shadow:0 0 8px rgba(var(--primary-rgb),0.4)}
+    .card[data-colony="spark"] .card-colony-bar{background:linear-gradient(90deg,var(--spark),#ff9060)}
+    .card[data-colony="forge"] .card-colony-bar{background:linear-gradient(90deg,var(--forge),#e8c547)}
+    .card[data-colony="flow"] .card-colony-bar{background:linear-gradient(90deg,var(--flow),#6ee8dc)}
+    .card[data-colony="nexus"] .card-colony-bar{background:linear-gradient(90deg,var(--nexus),#b99ed8)}
+    .card[data-colony="beacon"] .card-colony-bar{background:linear-gradient(90deg,var(--beacon),#ffc040)}
+    .card[data-colony="grove"] .card-colony-bar{background:linear-gradient(90deg,var(--grove),#a0d8a0)}
+    .card[data-colony="crystal"] .card-colony-bar{background:linear-gradient(90deg,var(--crystal),#90e8f0)}
+    .card[data-colony="colorless"] .card-colony-bar{background:linear-gradient(90deg,var(--text-muted),var(--text-ghost))}
+    .card-enter{animation:cardEnter var(--dur-draw) var(--ease-spring) forwards;opacity:0;transform:translateY(30px) scale(0.92) rotate(2deg)}
+    @keyframes cardEnter{to{opacity:1;transform:translateY(0) scale(1) rotate(0deg)}}
+    .card-fly{position:fixed;z-index:1000;pointer-events:none;transition:none}
+
+    /* ── Hex Grid ── */
+    .combat-mid{display:flex;align-items:center;justify-content:center;position:relative;flex:1;min-height:0}
+    .hex-grid{position:relative;width:480px;height:440px}
+    .hex{position:absolute;width:calc(var(--hex-size)*1.732);height:calc(var(--hex-size)*2);cursor:pointer;transition:all var(--dur-select) var(--ease-out)}
+    .hex-shape{width:100%;height:100%;clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);background:rgba(18,16,28,0.6);border:1px solid var(--border-subtle);transition:all 150ms var(--ease-out)}
+    .hex:hover .hex-shape{background:rgba(26,23,38,0.8);border-color:var(--border-default)}
+    .hex.valid-target .hex-shape{background:rgba(var(--primary-rgb),0.15);border-color:rgba(var(--primary-rgb),0.3);box-shadow:inset 0 0 24px rgba(var(--primary-rgb),0.2);animation:hexPulse var(--dur-pulse) ease-in-out infinite}
+    @keyframes hexPulse{0%,100%{box-shadow:inset 0 0 24px rgba(var(--primary-rgb),0.15)}50%{box-shadow:inset 0 0 32px rgba(var(--primary-rgb),0.3)}}
+    .hex.player-hex .hex-shape{background:rgba(var(--primary-rgb),0.18);border-color:rgba(var(--primary-rgb),0.35);box-shadow:inset 0 0 20px rgba(var(--primary-rgb),0.15),0 0 16px rgba(var(--primary-rgb),0.1)}
+    .hex.enemy-hex .hex-shape{background:rgba(var(--danger-rgb),0.1);border-color:rgba(var(--danger-rgb),0.2)}
+    .hex-content{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:2}
+    .token{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:5}
+    .token-player{filter:drop-shadow(0 0 8px rgba(var(--primary-rgb),0.4))}
+    .token-enemy{filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))}
+    .token svg{width:100%;height:100%}
+    .token-idle{animation:tokenIdle 3s ease-in-out infinite}
+    @keyframes tokenIdle{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+
+    /* ── Combat Layout ── */
+    #combat-screen{justify-content:flex-start;padding:var(--space-2)}
+    .combat-layout{display:grid;grid-template-rows:auto 1fr auto;width:100%;height:100%;gap:0}
+    .combat-top{display:flex;justify-content:space-between;align-items:flex-start;padding:var(--space-2) var(--space-3);min-height:auto;flex-wrap:wrap;gap:var(--space-2)}
+    .enemy-panel{display:flex;gap:var(--space-2);flex-wrap:wrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .enemy-card{background:var(--bg-glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);min-width:120px;display:flex;flex-direction:column;gap:3px;transition:all var(--dur-select);flex-shrink:0}
+    .enemy-card.dead{opacity:0.25;pointer-events:none;filter:grayscale(1)}
+    .enemy-name{font-weight:600;font-size:var(--text-xs);letter-spacing:0.02em}
+    .enemy-hp-bar{height:6px;background:rgba(255,255,255,0.06);border-radius:var(--radius-full);overflow:hidden}
+    .enemy-hp-fill{height:100%;background:linear-gradient(90deg,var(--danger),#f87171);border-radius:var(--radius-full);transition:width var(--dur-play) var(--ease-out);box-shadow:0 0 6px rgba(var(--danger-rgb),0.3)}
+    .enemy-hp-text{font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted)}
+    .enemy-intent{font-size:var(--text-2xs);padding:2px var(--space-2);border-radius:var(--radius-sm);background:rgba(255,255,255,0.06);width:fit-content;font-family:var(--font-mono);letter-spacing:0.02em}
+    .enemy-statuses{display:flex;gap:2px;flex-wrap:wrap}
+    .run-info{display:flex;flex-direction:column;align-items:flex-end;gap:3px;font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono)}
+
+    /* ── Player Stats Bar ── */
+    .player-stats{display:flex;align-items:center;gap:var(--space-4);padding:var(--space-2) var(--space-4);background:var(--bg-glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--border-default);border-radius:var(--radius-full);position:absolute;bottom:174px;left:50%;transform:translateX(-50%);z-index:10;white-space:nowrap;box-shadow:var(--shadow-md)}
+    .stat{display:flex;align-items:center;gap:var(--space-1);font-family:var(--font-mono);font-size:var(--text-xs);font-weight:600}
+    .stat-hp{color:var(--danger)}.stat-block{color:var(--flow)}.stat-energy{color:var(--beacon)}.stat-gold{color:var(--forge)}
+    .energy-orb{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:radial-gradient(circle at 40% 35%,var(--beacon),#c47800);color:var(--bg-base);font-family:var(--font-mono);font-size:var(--text-xs);font-weight:700;box-shadow:0 0 12px rgba(var(--warning-rgb),0.35),inset 0 1px 0 rgba(255,255,255,0.2);animation:orbPulse 2.5s ease-in-out infinite}
+    @keyframes orbPulse{0%,100%{box-shadow:0 0 12px rgba(var(--warning-rgb),0.3)}50%{box-shadow:0 0 20px rgba(var(--warning-rgb),0.5)}}
+    .potion-bar{display:flex;gap:var(--space-1);align-items:center}
+    .potion-slot{width:32px;height:32px;border-radius:var(--radius-sm);background:rgba(255,255,255,0.04);border:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;min-width:32px;min-height:32px;transition:all 150ms}
+    .potion-slot.filled{border-color:rgba(var(--primary-rgb),0.3);background:rgba(var(--primary-rgb),0.06)}
+    .potion-slot.filled:hover{border-color:var(--primary);transform:scale(1.1);box-shadow:0 0 12px rgba(var(--primary-rgb),0.2)}
+    .potion-slot.empty{opacity:0.3;cursor:default}
+
+    /* ── Hand & Bottom Bar ── */
+    .combat-bottom{display:flex;flex-direction:column;align-items:center;gap:var(--space-2);padding-bottom:env(safe-area-inset-bottom,var(--space-2))}
+    .hand{display:flex;justify-content:center;gap:var(--space-2);min-height:calc(var(--card-h) + 20px);max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:10px var(--space-3) 0;scroll-snap-type:x proximity;perspective:800px}
+    .hand .card{scroll-snap-align:center}
+    .bottom-bar{display:flex;align-items:center;gap:var(--space-5);width:100%;justify-content:center;padding:0 var(--space-3)}
+    .end-turn-btn{padding:var(--space-2) var(--space-6);font-size:var(--text-sm);font-weight:600;background:linear-gradient(135deg,rgba(var(--primary-rgb),0.12),rgba(var(--primary-rgb),0.06));border:1.5px solid rgba(var(--primary-rgb),0.25);color:var(--primary);border-radius:var(--radius-full);cursor:pointer;font-family:var(--font-body);transition:all 150ms var(--ease-out);min-height:44px;letter-spacing:0.03em;text-transform:uppercase}
+    .end-turn-btn:hover{background:linear-gradient(135deg,rgba(var(--primary-rgb),0.2),rgba(var(--primary-rgb),0.1));box-shadow:0 0 20px rgba(var(--primary-rgb),0.15);border-color:var(--primary)}
+    .end-turn-btn:active{transform:scale(0.95);transition-duration:var(--dur-press)}
+    .deck-info{display:flex;gap:var(--space-4);font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono)}
+    .relic-bar{display:flex;gap:var(--space-1);align-items:center;flex-wrap:wrap}
+    .relic-icon{width:30px;height:30px;border-radius:var(--radius-sm);background:rgba(255,255,255,0.04);border:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:center;font-size:0.9rem;cursor:help;transition:all 150ms}
+    .relic-icon:hover{transform:scale(1.15);border-color:var(--border-strong);background:var(--bg-overlay)}
+
+    /* ── Reward Screen ── */
+    #reward-screen,#gameover-screen,#victory-screen{gap:var(--space-5)}
+    .reward-title,.result-title{font-family:var(--font-display);font-size:var(--text-2xl);font-weight:700;letter-spacing:-0.02em}
+    .reward-cards{display:flex;gap:var(--space-4);flex-wrap:wrap;justify-content:center}
+    .reward-card{width:var(--card-w-lg);height:var(--card-h-lg);cursor:pointer;transition:all 200ms var(--ease-spring)}
+    .reward-card:hover{transform:translateY(-12px) scale(1.05);box-shadow:var(--shadow-card-hover)}
+    .reward-card .card-inner{width:100%;height:100%;border-radius:var(--radius-lg)}
+    .result-icon{font-size:4rem;filter:drop-shadow(0 0 20px rgba(var(--primary-rgb),0.3))}
+    .result-stats{display:flex;gap:var(--space-6);font-family:var(--font-mono);font-size:var(--text-sm);color:var(--text-dim);flex-wrap:wrap;justify-content:center}
+    .result-stat-value{font-size:var(--text-xl);font-weight:700;color:var(--text)}
+    .reward-gold{font-family:var(--font-mono);color:var(--forge);font-size:var(--text-lg);font-weight:600;text-shadow:0 0 12px rgba(212,175,55,0.3)}
+    .reward-potion{display:flex;gap:var(--space-2);align-items:center;font-size:var(--text-sm);cursor:pointer;padding:var(--space-2) var(--space-4);border-radius:var(--radius-md);background:var(--bg-glass);border:1px solid var(--border-default);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:all 150ms}
+    .reward-potion:hover{border-color:var(--primary);transform:translateY(-2px)}
+
+    /* ── Rest Site ── */
+    #rest-screen{gap:var(--space-5)}
+    .rest-header{text-align:center;display:flex;flex-direction:column;align-items:center;gap:var(--space-2)}
+    .rest-header .rest-icon{font-size:2.5rem;filter:drop-shadow(0 0 16px rgba(255,107,53,0.3));animation:fireGlow 2s ease-in-out infinite}
+    @keyframes fireGlow{0%,100%{filter:drop-shadow(0 0 16px rgba(255,107,53,0.3))}50%{filter:drop-shadow(0 0 24px rgba(255,107,53,0.5))}}
+    .rest-actions{display:flex;gap:var(--space-4);flex-wrap:wrap;justify-content:center}
+    .rest-action{padding:var(--space-5) var(--space-6);border-radius:var(--radius-lg);border:1.5px solid var(--border-default);background:var(--bg-glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);cursor:pointer;transition:all 200ms var(--ease-out);text-align:center;min-width:160px}
+    .rest-action:hover{border-color:var(--primary);box-shadow:var(--shadow-glow);transform:translateY(-4px)}
+    .rest-action:active{transform:translateY(0) scale(0.97)}
+    .rest-action-icon{font-size:1.5rem;margin-bottom:var(--space-2)}
+    .rest-action h3{font-size:var(--text-base);font-weight:600;margin-bottom:var(--space-1)}
+    .rest-action p{font-size:var(--text-xs);color:var(--text-dim)}
+    .card-grid{display:flex;gap:var(--space-2);flex-wrap:wrap;justify-content:center;max-height:300px;overflow-y:auto;padding:var(--space-3)}
+
+    /* ── Nexus ── */
+    #nexus-screen{gap:var(--space-4);padding:var(--space-4)}
+    .nexus-title{font-size:var(--text-2xl);font-weight:700;color:var(--nexus)}
+    .nexus-circle{width:180px;height:180px;border-radius:50%;border:3px dashed var(--nexus);display:flex;align-items:center;justify-content:center;background:rgba(155,126,189,0.08);box-shadow:0 0 30px rgba(155,126,189,0.1);transition:all 300ms}
+
+    /* ── Event Screen ── */
+    #event-screen{gap:var(--space-5);padding:var(--space-8);text-align:center}
+    .event-panel{max-width:520px;padding:var(--space-6) var(--space-8);background:var(--bg-glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border-default);border-radius:var(--radius-xl);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;gap:var(--space-5);align-items:center}
+    .event-icon{font-size:2.5rem;filter:drop-shadow(0 0 12px rgba(var(--primary-rgb),0.2))}
+    .event-text{max-width:440px;font-size:var(--text-base);line-height:1.9;color:var(--text-dim)}
+    .event-choices{display:flex;gap:var(--space-3);flex-wrap:wrap;justify-content:center}
+    .event-choices .btn{padding:var(--space-3) var(--space-5);font-size:var(--text-sm);min-width:140px}
+
+    /* ── Shop ── */
+    #shop-screen{gap:var(--space-5);padding:var(--space-5);overflow-y:auto}
+    .shop-header{text-align:center;display:flex;flex-direction:column;align-items:center;gap:var(--space-1)}
+    .shop-title{font-family:var(--font-display);font-size:var(--text-2xl);font-weight:700;background:linear-gradient(135deg,var(--forge),#f0d060);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+    .shop-section{display:flex;flex-direction:column;gap:var(--space-3);align-items:center}
+    .shop-section h3{font-size:var(--text-2xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:2px;font-family:var(--font-mono);font-weight:500}
+    .shop-items{display:flex;gap:var(--space-3);flex-wrap:wrap;justify-content:center}
+    .shop-item{cursor:pointer;transition:all 200ms var(--ease-spring);position:relative}
+    .shop-item:hover{transform:translateY(-6px)}
+    .shop-item.sold{opacity:0.2;pointer-events:none;filter:grayscale(1)}
+    .shop-price{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-family:var(--font-mono);font-size:var(--text-xs);font-weight:600;color:var(--forge);white-space:nowrap;text-shadow:0 0 8px rgba(212,175,55,0.2)}
+
+    /* ── Map ── */
+    #map-screen{padding:var(--space-4);gap:var(--space-3)}
+    .map-header{text-align:center}
+    .map-container{width:100%;max-width:420px;overflow-y:auto;max-height:70dvh;padding:var(--space-2)}
+    .map-svg{width:100%;display:block}
+    .map-node-circle{cursor:pointer;transition:all 200ms var(--ease-out)}
+    .map-node-circle:hover{filter:brightness(1.4);transform-origin:center;r:12}
+    .map-footer{display:flex;gap:var(--space-4);align-items:center;padding:var(--space-3) var(--space-5);background:var(--bg-glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--border-subtle);border-radius:var(--radius-full)}
+
+    /* ── Overlays ── */
+    .narrative-overlay{position:fixed;inset:0;background:rgba(8,6,16,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;padding:var(--space-8);opacity:0;pointer-events:none;transition:opacity var(--dur-transition)}
+    .narrative-overlay.active{opacity:1;pointer-events:auto}
+    .narrative-text{max-width:560px;font-size:var(--text-lg);line-height:1.8;color:var(--text);text-align:center;min-height:4em;font-weight:400}
+    @keyframes blink{50%{opacity:0}}
+
+    /* ── Float Text ── */
+    .float-text{position:fixed;font-family:var(--font-mono);font-weight:700;font-size:var(--text-xl);pointer-events:none;z-index:90;animation:floatUp var(--dur-float) var(--ease-out) forwards;text-shadow:0 2px 8px rgba(0,0,0,0.5)}
+    .float-text.damage{color:var(--danger)}.float-text.block{color:var(--flow)}.float-text.heal{color:var(--success)}.float-text.buff{color:var(--nexus)}
+    @keyframes floatUp{0%{opacity:1;transform:translateY(0) scale(1)}60%{opacity:1}100%{opacity:0;transform:translateY(-44px) scale(1.3)}}
+
+    /* ── Screen Shake ── */
+    .shake{animation:shake var(--dur-shake) var(--ease-out)}
+    @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
+
+    /* ── Turn Banner ── */
+    .turn-banner{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.9);font-family:var(--font-display);font-size:var(--text-2xl);font-weight:700;letter-spacing:0.04em;text-transform:uppercase;padding:var(--space-3) var(--space-10);background:var(--bg-glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border-default);border-radius:var(--radius-xl);z-index:60;opacity:0;pointer-events:none;transition:opacity 200ms,transform 200ms var(--ease-spring);box-shadow:var(--shadow-lg)}
+    .turn-banner.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+    /* ── Particles ── */
+    #particle-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+    /* ── Status Icons ── */
+    .status-icon{display:inline-flex;align-items:center;gap:1px;font-size:0.5625rem;padding:1px 4px;border-radius:4px;background:rgba(255,255,255,0.06);font-family:var(--font-mono)}
+
+    /* ── Inspect Overlay ── */
+    .inspect-overlay{position:fixed;inset:0;background:rgba(8,6,16,0.88);display:flex;align-items:center;justify-content:center;z-index:200;opacity:0;pointer-events:none;transition:opacity var(--dur-transition);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+    .inspect-overlay.active{opacity:1;pointer-events:auto}
+    .inspect-card{width:var(--card-w-lg);height:var(--card-h-lg);transform:scale(1.6)}
+
+    /* ── Deck Viewer ── */
+    .deck-viewer{position:fixed;inset:0;background:rgba(8,6,16,0.94);z-index:150;display:flex;flex-direction:column;align-items:center;padding:var(--space-5);gap:var(--space-4);opacity:0;pointer-events:none;transition:opacity var(--dur-transition);overflow-y:auto;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+    .deck-viewer.active{opacity:1;pointer-events:auto}
+    .deck-viewer h2{font-size:var(--text-lg);font-weight:600;letter-spacing:-0.01em}
+    .deck-viewer-tabs{display:flex;gap:var(--space-2)}
+    .deck-viewer-cards{display:flex;flex-wrap:wrap;gap:var(--space-2);justify-content:center;max-width:720px}
+
+    /* ── Share Modal ── */
+    .share-modal{position:fixed;inset:0;background:rgba(8,6,16,0.92);z-index:180;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--space-4);opacity:0;pointer-events:none;transition:opacity var(--dur-transition);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+    .share-modal.active{opacity:1;pointer-events:auto}
+    .share-grid{font-family:var(--font-mono);font-size:var(--text-base);line-height:1.5;text-align:center;white-space:pre;padding:var(--space-4);background:var(--bg-glass);border:1px solid var(--border-subtle);border-radius:var(--radius-lg)}
+
+    /* ── Daily/Puzzle Screens ── */
+    #puzzle-screen,#daily-screen{gap:var(--space-5);padding:var(--space-5)}
+    .puzzle-header{text-align:center}
+    .puzzle-header h2{font-size:var(--text-2xl);font-weight:700;color:var(--crystal)}
+    .daily-modifier{padding:var(--space-3) var(--space-4);border-radius:var(--radius-md);background:var(--bg-glass);border:1px solid var(--border-default);font-size:var(--text-sm);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+
+    /* ── Utilities ── */
+    .hidden{display:none!important}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+    .encounter-label{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);padding:var(--space-1) var(--space-3);background:rgba(255,255,255,0.04);border-radius:var(--radius-full)}
+
+    /* ── Accessibility ── */
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}}
+    :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+    /* ── Responsive: Phone ── */
+    @media(max-width:600px){
+      :root{--hex-size:min(44px,calc((100vw - 24px)/7));--card-w:100px;--card-h:144px;--card-w-lg:124px;--card-h-lg:176px}
+      .screen{padding:var(--space-2)}
+      .combat-layout{gap:0}
+      .combat-top{flex-direction:column;min-height:auto;padding:0 var(--space-2)}
+      .enemy-panel{overflow-x:auto;flex-wrap:nowrap}
+      .player-stats{bottom:150px;padding:var(--space-1) var(--space-3);gap:var(--space-3)}
+      .hand{min-height:var(--card-h);flex-wrap:nowrap;justify-content:flex-start;padding:6px var(--space-3) 0}
+      .hex-grid{width:min(480px,calc(100vw - 12px));height:min(440px,48dvh)}
+      .card-desc{font-size:0.5625rem}
+      .card-name{font-size:var(--text-2xs)}
+      #title-screen{padding:var(--space-4)}
+      .title-logo{font-size:clamp(2rem,9vw,3rem)}
+      .rest-actions{gap:var(--space-3)}
+      .rest-action{min-width:120px;padding:var(--space-3) var(--space-4)}
+      .event-panel{padding:var(--space-4) var(--space-5);margin:0 var(--space-2)}
+    }
+    /* ── Tablet ── */
+    @media(min-width:601px) and (max-width:1024px){
+      :root{--hex-size:44px;--card-w:112px;--card-h:156px}
+      .hand{flex-wrap:nowrap;overflow-x:auto}
+    }
+    /* ── Display glasses / immersive ── */
+    @media(display-mode:immersive){
+      :root{--text-base:1.25rem;--hex-size:56px;--card-w:140px;--card-h:196px}
+      .card-desc{font-size:12px}
+      .btn{min-height:60px;min-width:60px}
+    }
+  </style>
+</head>
+<body>
+  <div class="void-bg" aria-hidden="true"></div>
+  <canvas id="particle-canvas" aria-hidden="true"></canvas>
+  <div id="floor-tint" class="floor-tint" aria-hidden="true"></div>
+  <div id="game" class="game-container" role="application" aria-label="Shattered Mirror">
+    <a href="#main" class="sr-only">Skip to game</a>
+
+    <div id="title-screen" class="screen active" role="region" aria-label="Title">
+      <div class="title-logo">Shattered Mirror</div>
+      <div class="title-sub">鏡 割 れ</div>
+      <p class="title-flavor">The Mirror of Kagami held seven aspects in balance. It shattered. You are the Reflection — descend the Void, recover the shards, reassemble yourself.</p>
+      <div class="title-btns">
+        <button class="btn btn-primary" id="start-btn">Begin Run</button>
+        <button class="btn" id="daily-puzzle-btn">Daily Puzzle</button>
+        <button class="btn" id="daily-run-btn">Daily Run</button>
+      </div>
+      <div class="title-meta">
+        <span id="title-asc">Ascension: 0</span>
+        <span id="title-best">Best: —</span>
+        <span id="title-streak">Streak: 0</span>
+      </div>
+    </div>
+
+    <div id="map-screen" class="screen" role="region" aria-label="Map">
+      <div class="map-header"><h2 class="reward-title" id="map-title">Act 1 — Shadows</h2></div>
+      <div class="map-container" id="map-container"></div>
+      <div class="map-footer">
+        <span class="stat stat-hp" id="map-hp"></span>
+        <span class="stat stat-gold" id="map-gold"></span>
+        <button class="btn btn-sm" id="map-deck-btn">Deck</button>
+      </div>
+    </div>
+
+    <div id="combat-screen" class="screen" role="region" aria-label="Combat">
+      <div class="combat-layout">
+        <div class="combat-top">
+          <div class="enemy-panel" id="enemy-panel"></div>
+          <div class="run-info">
+            <div class="relic-bar" id="relic-bar"></div>
+            <span class="encounter-label" id="run-info"></span>
+            <span id="turn-info"></span>
+            <div class="potion-bar" id="potion-bar"></div>
+          </div>
+        </div>
+        <div class="combat-mid" id="combat-mid">
+          <div class="hex-grid" id="hex-grid" role="grid"></div>
+          <div class="player-stats" id="player-stats"></div>
+        </div>
+        <div class="combat-bottom">
+          <div class="hand" id="hand" role="list"></div>
+          <div class="bottom-bar">
+            <div class="deck-info" id="deck-info"></div>
+            <button class="end-turn-btn" id="end-turn-btn">End Turn</button>
+            <span class="stat stat-gold" id="combat-gold"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="rest-screen" class="screen" role="region" aria-label="Rest">
+      <div class="rest-header">
+        <div class="rest-icon">🔥</div>
+        <h2 class="reward-title">Rest Site</h2>
+        <p class="title-flavor">Catch your breath. Hone a card. Or let go of one.</p>
+      </div>
+      <div class="rest-actions" id="rest-actions">
+        <div class="rest-action" data-action="rest"><div class="rest-action-icon">💤</div><h3>Rest</h3><p>Heal 30% max HP</p></div>
+        <div class="rest-action" data-action="smith"><div class="rest-action-icon">⚒️</div><h3>Smith</h3><p>Upgrade a card</p></div>
+        <div class="rest-action" data-action="meditate"><div class="rest-action-icon">🧘</div><h3>Meditate</h3><p>Remove a card</p></div>
+      </div>
+      <div class="card-grid hidden" id="smith-cards"></div>
+      <div class="card-grid hidden" id="meditate-cards"></div>
+    </div>
+
+    <div id="nexus-screen" class="screen" role="region" aria-label="Fusion">
+      <div class="nexus-title">Nexus — Fuse two cards</div>
+      <p class="title-flavor">Choose two cards to merge into one.</p>
+      <div class="card-grid" id="nexus-deck"></div>
+      <div class="nexus-circle" id="nexus-circle">Drop 2</div>
+      <div class="hidden" id="nexus-preview"></div>
+      <div style="display:flex;gap:var(--space-3)"><button class="btn" id="nexus-cancel">Cancel</button><button class="btn btn-primary hidden" id="nexus-confirm">Fuse</button></div>
+    </div>
+
+    <div id="event-screen" class="screen" role="region" aria-label="Event">
+      <div class="event-panel">
+        <div class="event-icon" id="event-icon">✦</div>
+        <p class="event-text" id="event-text"></p>
+        <div class="event-choices" id="event-choices"></div>
+      </div>
+    </div>
+
+    <div id="reward-screen" class="screen" role="region" aria-label="Reward">
+      <div class="reward-title">Victory</div>
+      <div class="reward-gold" id="reward-gold"></div>
+      <p class="title-flavor">Choose a card to add — or skip.</p>
+      <div class="reward-cards" id="reward-cards"></div>
+      <div id="reward-potion" class="hidden"></div>
+      <button class="btn" id="skip-reward-btn">Skip</button>
+    </div>
+
+    <div id="shop-screen" class="screen" role="region" aria-label="Shop">
+      <div class="shop-header"><div class="shop-title">Shop</div>
+      <span class="stat stat-gold" id="shop-gold"></span></div>
+      <div class="shop-section"><h3>Cards</h3><div class="shop-items" id="shop-cards"></div></div>
+      <div class="shop-section"><h3>Relics</h3><div class="shop-items" id="shop-relics"></div></div>
+      <div class="shop-section"><h3>Potions</h3><div class="shop-items" id="shop-potions"></div></div>
+      <div style="display:flex;gap:var(--space-3)">
+        <button class="btn" id="shop-remove-btn">Remove Card (75g)</button>
+        <button class="btn btn-primary" id="shop-leave-btn">Leave</button>
+      </div>
+    </div>
+
+    <div id="gameover-screen" class="screen" role="region" aria-label="Game over">
+      <div class="result-icon">&#9760;</div>
+      <div class="result-title" style="color:var(--danger)">Shattered</div>
+      <p class="title-flavor">The shards drift apart. You forget what you were trying to remember.</p>
+      <div class="result-stats" id="gameover-stats"></div>
+      <button class="btn btn-primary" id="retry-btn">Try Again</button>
+    </div>
+
+    <div id="victory-screen" class="screen" role="region" aria-label="Victory">
+      <div class="result-icon">&#128142;</div>
+      <div class="result-title" style="color:var(--success)">Mirror Restored</div>
+      <p class="title-flavor">Seven shards. Seven aspects. The Mirror reforms — not as it was, but as you are now.</p>
+      <div class="result-stats" id="victory-stats"></div>
+      <div style="display:flex;gap:var(--space-3)">
+        <button class="btn" id="share-victory-btn">Share</button>
+        <button class="btn btn-primary" id="victory-btn">Play Again</button>
+      </div>
+    </div>
+
+    <div id="puzzle-screen" class="screen" role="region" aria-label="Daily Puzzle">
+      <div class="puzzle-header"><h2>Mirror Puzzle</h2><p class="title-flavor" id="puzzle-date"></p></div>
+      <div id="puzzle-combat"></div>
+      <div id="puzzle-result" class="hidden" style="text-align:center"></div>
+    </div>
+
+    <div id="daily-screen" class="screen" role="region" aria-label="Daily Run">
+      <h2 class="reward-title" style="color:var(--crystal)">Daily Mirror Run</h2>
+      <p class="title-flavor" id="daily-date"></p>
+      <div id="daily-modifiers" style="display:flex;gap:var(--space-2);flex-wrap:wrap;justify-content:center"></div>
+      <button class="btn btn-primary" id="daily-start-btn">Begin Daily</button>
+    </div>
+
+    <div class="narrative-overlay" id="narrative-overlay">
+      <p class="narrative-text" id="narrative-text"></p>
+    </div>
+    <div class="turn-banner" id="turn-banner"></div>
+  </div>
+
+  <div class="deck-viewer" id="deck-viewer">
+    <h2 id="deck-viewer-title">Deck</h2>
+    <div class="deck-viewer-tabs">
+      <button class="btn btn-sm" data-tab="deck">Deck</button>
+      <button class="btn btn-sm" data-tab="discard">Discard</button>
+      <button class="btn btn-sm" data-tab="exhaust">Exhaust</button>
+    </div>
+    <div class="deck-viewer-cards" id="deck-viewer-cards"></div>
+    <button class="btn" id="deck-viewer-close">Close</button>
+  </div>
+
+  <div class="inspect-overlay" id="inspect-overlay">
+    <div id="inspect-content"></div>
+  </div>
+
+  <div class="share-modal" id="share-modal">
+    <div class="share-grid" id="share-grid-text"></div>
+    <div style="display:flex;gap:var(--space-3)">
+      <button class="btn btn-primary" id="share-copy-btn">Copy</button>
+      <button class="btn" id="share-close-btn">Close</button>
+    </div>
+  </div>
+
+  <script type="module">
+    // ═══ CONSTANTS ══════════════════════════════════════════════════════════
+    const SITE_URL = 'https://awktavian.github.io/art/rogue/';
+    const SAVE_KEY = 'kagami:sm:save';
+    const META_KEY = 'kagami:sm:meta';
+    const EP_KEY = 'kagami:shattered-mirror:episodes';
+
+    // ═══ SEEDED PRNG (mulberry32) ══════════════════════════════════════════
+    function mulberry32(a){ return ()=>{ a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t^=t+Math.imul(t^t>>>7,61|t);return((t^t>>>14)>>>0)/4294967296; }; }
+    function dateSeed(){ const d=new Date(); return d.getFullYear()*10000+d.getMonth()*100+d.getDate(); }
+    function shuffle(arr,rng){ const a=[...arr]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(rng()*((i|0)+1));[a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+    // ═══ HAPTIC ════════════════════════════════════════════════════════════
+    function haptic(s){ if(!navigator.vibrate)return; const p={tap:[10],play:[20,10,20],hit:[30,20,30],kill:[50],victory:[50,50,50,50,100],defeat:[200]}; navigator.vibrate(p[s]||[10]); }
+
+    // ═══ AUDIO ENGINE (stubs) ══════════════════════════════════════════════
+    class AudioEngine {
+      constructor(){ this.ctx=null; this.muted=false; this.vol=0.5; }
+      init(){ try{ this.ctx=new(window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+      play(name){ /* stub: card_play,damage,block,heal,kill,victory,defeat,ui_click,draw,end_turn */ }
+      music(track){ /* stub: title,combat_1,combat_2,combat_3,boss */ }
+      setVolume(v){ this.vol=Math.max(0,Math.min(1,v)); }
+    }
+    const audio = new AudioEngine();
+
+    // ═══ HEX MATH ══════════════════════════════════════════════════════════
+    const HEX = {
+      size:44,
+      dirs:[[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]],
+      toPixel(q,r){ return {x:this.size*(Math.sqrt(3)*q+Math.sqrt(3)/2*r),y:this.size*(3/2*r)}; },
+      neighbors(q,r){ return this.dirs.map(([dq,dr])=>[q+dq,r+dr]); },
+      distance(q1,r1,q2,r2){ return(Math.abs(q1-q2)+Math.abs(q1+r1-q2-r2)+Math.abs(r1-r2))/2; },
+      ring(rad){ if(!rad)return[[0,0]];const o=[];let q=rad,r=0;for(let i=0;i<6;i++)for(let j=0;j<rad;j++){o.push([q,r]);q+=this.dirs[(i+2)%6][0];r+=this.dirs[(i+2)%6][1];}return o; },
+      allHexes(mr){ const h=[];for(let r=0;r<=mr;r++)h.push(...this.ring(r));return h; },
+      key(q,r){ return q+','+r; }
+    };
+
+    // ═══ COLONY PALETTES ═══════════════════════════════════════════════════
+    const COLORS={spark:{main:'#ff6b35',light:'#ff8c5a',dark:'#c44e1a'},forge:{main:'#d4af37',light:'#e8c547',dark:'#8b6914'},flow:{main:'#4ecdc4',light:'#7dd9d2',dark:'#2a9d96'},nexus:{main:'#9b7ebd',light:'#b99bcf',dark:'#6b5090'},beacon:{main:'#f59e0b',light:'#fbbf24',dark:'#b45309'},grove:{main:'#7eb77f',light:'#9dc99e',dark:'#5a8f5b'},crystal:{main:'#67d4e4',light:'#8ee0ed',dark:'#3ba8b8'},colorless:{main:'#999',light:'#bbb',dark:'#555'}};
+
+    // ═══ SVG ART ═══════════════════════════════════════════════════════════
+    function renderCardArt(id,col,type,w,h){
+      const c=COLORS[col]||COLORS.crystal;const main=c.main;const dark=c.dark;
+      let s=0;for(let i=0;i<id.length;i++)s+=id.charCodeAt(i);const rnd=()=>{s=(s*9301+49297)%233280;return s/233280;};
+      const shapes=[];
+      if(type==='attack'){for(let i=0;i<4;i++)shapes.push(`<line x1="${50+rnd()*20}" y1="${50+rnd()*20}" x2="${50+rnd()*40}" y2="${50+rnd()*40}" stroke="${main}" stroke-width="2" opacity="0.8"/>`);for(let i=0;i<6;i++)shapes.push(`<circle cx="${30+rnd()*40}" cy="${30+rnd()*40}" r="${2+rnd()*3}" fill="${main}" opacity="${0.4+rnd()*0.4}"/>`);}
+      else if(type==='skill'||type==='power'){for(let i=0;i<3;i++)shapes.push(`<circle cx="50" cy="50" r="${15+i*12}" fill="none" stroke="${main}" stroke-width="1.5" opacity="${0.9-i*0.25}"/>`);shapes.push(`<path d="M50 20 L60 50 L50 80 L40 50 Z" fill="none" stroke="${main}" opacity="0.7"/>`);}
+      else{for(let i=0;i<5;i++)shapes.push(`<path d="M${20+rnd()*30} ${40+rnd()*40} Q${50+rnd()*20} ${20+rnd()*30} ${70+rnd()*20} ${50+rnd()*30}" fill="none" stroke="${main}" stroke-width="1.5" opacity="${0.5+rnd()*0.4}"/>`);}
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${w}" height="${h}"><defs><linearGradient id="g-${id}" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:${main}"/><stop offset="100%" style="stop-color:${dark}"/></linearGradient></defs><rect width="100" height="100" fill="url(#g-${id})" opacity="0.25"/><g>${shapes.join('')}</g></svg>`;
+    }
+    function renderTokenArt(type){
+      const tokens={player:'<svg viewBox="0 0 40 40"><polygon points="20,4 36,30 4,30" fill="#67d4e4" opacity="0.9"/><circle cx="20" cy="20" r="6" fill="#fff" opacity="0.8"/></svg>',shade:'<svg viewBox="0 0 40 40"><ellipse cx="20" cy="22" rx="14" ry="16" fill="#444" opacity="0.9"/><circle cx="15" cy="18" r="2" fill="#e85555"/><circle cx="25" cy="18" r="2" fill="#e85555"/></svg>',phantom:'<svg viewBox="0 0 40 40"><path d="M20 4 Q36 20 28 36 L12 36 Q4 20 20 4Z" fill="#9b7ebd" opacity="0.7"/><circle cx="16" cy="18" r="2" fill="#fff"/><circle cx="24" cy="18" r="2" fill="#fff"/></svg>',brute:'<svg viewBox="0 0 40 40"><rect x="8" y="8" width="24" height="28" rx="4" fill="#666" opacity="0.9"/><rect x="12" y="14" width="6" height="3" fill="#e85555"/><rect x="22" y="14" width="6" height="3" fill="#e85555"/><rect x="14" y="22" width="12" height="2" fill="#e85555"/></svg>',boss:'<svg viewBox="0 0 40 40"><polygon points="20,2 38,20 20,38 2,20" fill="none" stroke="#ff6b35" stroke-width="2"/><polygon points="20,8 32,20 20,32 8,20" fill="#ff6b35" opacity="0.4"/><circle cx="20" cy="20" r="4" fill="#fff"/></svg>',elite:'<svg viewBox="0 0 40 40"><polygon points="20,4 36,16 32,34 8,34 4,16" fill="#d4af37" opacity="0.5"/><circle cx="20" cy="20" r="5" fill="#d4af37"/></svg>'};
+      return tokens[type]||tokens.shade;
+    }
+
+    // ═══ STATUS EFFECTS ════════════════════════════════════════════════════
+    const STATUS_DEFS={
+      vulnerable:{name:'Vulnerable',icon:'💥',stack:'duration',desc:'Take 50% more damage'},
+      weak:{name:'Weak',icon:'📉',stack:'duration',desc:'Deal 25% less damage'},
+      strength:{name:'Strength',icon:'💪',stack:'intensity',desc:'+N attack damage'},
+      dexterity:{name:'Dexterity',icon:'🛡',stack:'intensity',desc:'+N block gained'},
+      thorn:{name:'Thorn',icon:'🌹',stack:'intensity',desc:'Deal N to attackers'},
+      artifact:{name:'Artifact',icon:'✨',stack:'intensity',desc:'Negate N debuffs'},
+      poison:{name:'Poison',icon:'☠',stack:'intensity',desc:'Take N at turn start,-1'},
+      plated_armor:{name:'Plated',icon:'🔰',stack:'intensity',desc:'Gain N block turn end'},
+      frail:{name:'Frail',icon:'💔',stack:'duration',desc:'25% less block'},
+      ritual:{name:'Ritual',icon:'🔮',stack:'intensity',desc:'+N Str turn end'},
+      intangible:{name:'Intangible',icon:'👻',stack:'duration',desc:'All damage=1'},
+      regen:{name:'Regen',icon:'💚',stack:'intensity',desc:'Heal N turn end,-1'}
+    };
+    function applyStatus(entity,status,amount){
+      const def=STATUS_DEFS[status];if(!def)return;
+      if(def.stack==='duration'||def.stack==='intensity'){
+        if(entity.artifact&&entity.artifact>0&&(status==='vulnerable'||status==='weak'||status==='frail'||status==='poison')){entity.artifact--;return;}
+        entity[status]=(entity[status]||0)+amount;
+      }
+    }
+    function tickStatuses(entity,phase){
+      if(phase==='turnStart'){
+        if(entity.poison>0){entity.hp=Math.max(0,entity.hp-entity.poison);entity.poison--;}
+      }
+      if(phase==='turnEnd'){
+        if(entity.regen>0){entity.hp=Math.min(entity.maxHp||999,entity.hp+entity.regen);entity.regen--;}
+        if(entity.ritual>0){entity.strength=(entity.strength||0)+entity.ritual;}
+        if(entity.plated_armor>0){entity.block=(entity.block||0)+entity.plated_armor;}
+        ['vulnerable','weak','frail','intangible'].forEach(s=>{if(entity[s]>0)entity[s]--;});
+      }
+    }
+    function statusStr(entity){
+      let s='';for(const[k,d]of Object.entries(STATUS_DEFS)){if(entity[k]>0)s+=`<span class="status-icon" title="${d.desc}">${d.icon}${entity[k]}</span>`;}return s;
+    }
+
+    // ═══ CARD DEFINITIONS ══════════════════════════════════════════════════
+    const CARDS={};
+    function adjE(g){return g.enemies.filter(e=>e.hp>0&&HEX.distance(g.player.q,g.player.r,e.q,e.r)<=1);}
+    function rngE(g,r){return g.enemies.filter(e=>e.hp>0&&HEX.distance(g.player.q,g.player.r,e.q,e.r)<=r);}
+    function allE(g){return g.enemies.filter(e=>e.hp>0);}
+    function adjT(g){return adjE(g).map(e=>({q:e.q,r:e.r}));}
+    function rng2T(g){return rngE(g,2).map(e=>({q:e.q,r:e.r}));}
+    function allT(g){return allE(g).map(e=>({q:e.q,r:e.r}));}
+    function selfT(){return[{q:'self',r:'self'}];}
+    function selfIfAdj(g){return adjE(g).length?selfT():[];}
+    function moveT(g,r){return g.hexes.filter(([q,r2])=>g.hexExists(q,r2)&&g.isHexEmpty(q,r2)&&HEX.distance(g.player.q,g.player.r,q,r2)<=r&&HEX.distance(g.player.q,g.player.r,q,r2)>0).map(([q,r])=>({q,r}));}
+    function selfOrMove(g,r){return[...selfT(),...moveT(g,r||1)];}
+
+    function D(id,name,colony,cost,type,rarity,desc,effect,targets,kw,ud,ufx){
+      CARDS[id]={id,name,colony,cost,type,rarity,desc,effect,validTargets:targets,keywords:kw||[],upgraded:ud?{desc:ud,effect:ufx}:null};
+    }
+    // Helper: basic damage to target
+    function atkAdj(dmg){return(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;g.dealDamage(e,dmg);return true;};}
+    function atkR2(dmg){return(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||HEX.distance(g.player.q,g.player.r,t.q,t.r)>2)return false;g.dealDamage(e,dmg);return true;};}
+
+    // ── SPARK ──
+    D('strike','Strike','spark',1,'attack','common','Deal 6 adj.',atkAdj(6),adjT,[],'Deal 8.',atkAdj(8));
+    D('ignite','Ignite','spark',1,'attack','common','Deal 4 ALL adj.',(g)=>{const a=adjE(g);if(!a.length)return false;a.forEach(e=>g.dealDamage(e,4));return true;},selfIfAdj,[],'Deal 5 ALL adj. 1 Weak.',(g)=>{const a=adjE(g);if(!a.length)return false;a.forEach(e=>{g.dealDamage(e,5);applyStatus(e,'weak',1);});return true;});
+    D('dash_strike','Dash Strike','spark',1,'attack','common','Move toward enemy, deal 7.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e)return false;const nb=HEX.neighbors(g.player.q,g.player.r).filter(([q,r])=>g.hexExists(q,r)&&g.isHexEmpty(q,r));if(nb.length){nb.sort((a,b)=>HEX.distance(a[0],a[1],e.q,e.r)-HEX.distance(b[0],b[1],e.q,e.r));g.movePlayer(nb[0][0],nb[0][1]);}if(g.isAdj(e))g.dealDamage(e,7);return true;},rng2T,[],'Move toward, deal 10.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e)return false;const nb=HEX.neighbors(g.player.q,g.player.r).filter(([q,r])=>g.hexExists(q,r)&&g.isHexEmpty(q,r));if(nb.length){nb.sort((a,b)=>HEX.distance(a[0],a[1],e.q,e.r)-HEX.distance(b[0],b[1],e.q,e.r));g.movePlayer(nb[0][0],nb[0][1]);}if(g.isAdj(e))g.dealDamage(e,10);return true;});
+    D('flashpoint','Flashpoint','spark',1,'attack','common','Deal 5 adj. Kill: draw 1.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;g.dealDamage(e,5);if(e.hp<=0)g.drawCards(1);return true;},adjT,[],'Deal 7. Kill: draw 1.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;g.dealDamage(e,7);if(e.hp<=0)g.drawCards(1);return true;});
+    D('flare','Flare','spark',0,'skill','common','Draw 1. Discard 1.',(g)=>{g.drawCards(1);if(g.hand.length)g.discardPile.push(g.hand.splice(Math.floor(Math.random()*g.hand.length),1)[0]);return true;},selfT,[],'Draw 2. Discard 1.',(g)=>{g.drawCards(2);if(g.hand.length)g.discardPile.push(g.hand.splice(Math.floor(Math.random()*g.hand.length),1)[0]);return true;});
+    D('eruption','Eruption','spark',2,'attack','uncommon','Deal 12 range 2.',atkR2(12),rng2T,[],'Deal 16 range 2.',atkR2(16));
+    D('wildfire','Wildfire','spark',2,'attack','uncommon','Deal 3 ALL enemies.',(g)=>{allE(g).forEach(e=>g.dealDamage(e,3));return true;},g=>allE(g).length?selfT():[],[],'Deal 5 ALL.',(g)=>{allE(g).forEach(e=>g.dealDamage(e,5));return true;});
+    D('ember_chain','Ember Chain','spark',1,'skill','uncommon','Next 3 attacks +2.',(g)=>{g.player.attacksWithBonus=(g.player.attacksWithBonus||0)+3;g.player.attackBonus=(g.player.attackBonus||0)+2;return true;},selfT,[],'Next 3 attacks +3.',(g)=>{g.player.attacksWithBonus=(g.player.attacksWithBonus||0)+3;g.player.attackBonus=(g.player.attackBonus||0)+3;return true;});
+    D('combustion','Combustion','spark',1,'power','rare','End of turn: deal 3 ALL adj.',(g)=>{g.addPower('combustion',{dmg:3});return true;},selfT,['power'],'End of turn: deal 5 ALL adj.',(g)=>{g.addPower('combustion',{dmg:5});return true;});
+    D('supernova','Supernova','spark',3,'attack','rare','Deal 20 range 2. Exhaust.',atkR2(20),rng2T,['exhaust'],'Deal 28 range 2. Exhaust.',atkR2(28));
+
+    // ── FORGE ──
+    D('temper','Temper','forge',1,'skill','common','Gain 3 Block. Next atk +3.',(g)=>{g.gainBlock(3);g.player.nextAttackBonus=(g.player.nextAttackBonus||0)+3;return true;},selfT,[],'Gain 5 Block. Next +5.',(g)=>{g.gainBlock(5);g.player.nextAttackBonus=(g.player.nextAttackBonus||0)+5;return true;});
+    D('anvil_strike','Anvil Strike','forge',1,'attack','common','Deal 5 adj. Gain 3 Block.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;g.dealDamage(e,5);g.gainBlock(3);return true;},adjT,[],'Deal 7. Gain 4 Block.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;g.dealDamage(e,7);g.gainBlock(4);return true;});
+    D('harden','Harden','forge',1,'skill','common','Gain 7 Block.',(g)=>{g.gainBlock(7);return true;},selfT,[],'Gain 10 Block.',(g)=>{g.gainBlock(10);return true;});
+    D('iron_will','Iron Will','forge',1,'skill','common','Gain 4 Block. +1 Str.',(g)=>{g.gainBlock(4);g.player.strength=(g.player.strength||0)+1;return true;},selfT,[],'Gain 6 Block. +2 Str.',(g)=>{g.gainBlock(6);g.player.strength=(g.player.strength||0)+2;return true;});
+    D('forge_blade','Forge Blade','forge',2,'attack','uncommon','Deal 8 adj. Block>0: 12.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;g.dealDamage(e,g.player.block>0?12:8);return true;},adjT,[],'Deal 10/16.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;g.dealDamage(e,g.player.block>0?16:10);return true;});
+    D('forge_armor','Forge Armor','forge',2,'skill','uncommon','Gain Block = cards played x3.',(g)=>{g.gainBlock((g.player.cardsPlayedThisTurn||0)*3);return true;},selfT,[],'x4.',(g)=>{g.gainBlock((g.player.cardsPlayedThisTurn||0)*4);return true;});
+    D('metallurgy','Metallurgy','forge',1,'power','uncommon','Retain 3 Block at turn start.',(g)=>{g.addPower('metallurgy',{retain:3});return true;},selfT,['power'],'Retain 5.',(g)=>{g.addPower('metallurgy',{retain:5});return true;});
+    D('tempered_edge','Tempered Edge','forge',1,'power','rare','Attacks +1 per 5 Block.',(g)=>{g.addPower('tempered_edge',{per:5});return true;},selfT,['power'],'Per 4 Block.',(g)=>{g.addPower('tempered_edge',{per:4});return true;});
+    D('meltdown','Meltdown','forge',2,'attack','rare','Lose Block. Deal 2x as dmg adj.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;const b=g.player.block;g.player.block=0;g.dealDamage(e,b*2);return true;},adjT,[],'Deal 2.5x.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;const b=g.player.block;g.player.block=0;g.dealDamage(e,Math.floor(b*2.5));return true;});
+    D('reforged','Reforged','forge',3,'skill','rare','Gain 20 Block. Exhaust.',(g)=>{g.gainBlock(20);return true;},selfT,['exhaust'],'Gain 28 Block.',(g)=>{g.gainBlock(28);return true;});
+
+    // ── FLOW ──
+    D('advance','Advance','flow',0,'move','common','Move to adj empty hex.',(g,t)=>{if(!t||!g.isHexEmpty(t.q,t.r)||HEX.distance(g.player.q,g.player.r,t.q,t.r)>1)return false;g.movePlayer(t.q,t.r);return true;},g=>moveT(g,1),[],'Move up to 2.',(g,t)=>{if(!t||!g.isHexEmpty(t.q,t.r)||HEX.distance(g.player.q,g.player.r,t.q,t.r)>2)return false;g.movePlayer(t.q,t.r);return true;});
+    D('mend','Mend','flow',1,'skill','common','Heal 4. Optional move 1.',(g,t)=>{g.healPlayer(4);if(t&&t.q!=='self'&&g.isHexEmpty(t.q,t.r)&&HEX.distance(g.player.q,g.player.r,t.q,t.r)<=1)g.movePlayer(t.q,t.r);return true;},g=>selfOrMove(g,1),[],'Heal 6.',(g,t)=>{g.healPlayer(6);if(t&&t.q!=='self'&&g.isHexEmpty(t.q,t.r)&&HEX.distance(g.player.q,g.player.r,t.q,t.r)<=1)g.movePlayer(t.q,t.r);return true;});
+    D('ebb','Ebb','flow',1,'skill','common','Move 1. Gain 5 Block.',(g,t)=>{if(t&&t.q!=='self'&&g.isHexEmpty(t.q,t.r)&&HEX.distance(g.player.q,g.player.r,t.q,t.r)<=1)g.movePlayer(t.q,t.r);g.gainBlock(5);return true;},g=>selfOrMove(g,1),[],'Gain 7 Block.',(g,t)=>{if(t&&t.q!=='self'&&g.isHexEmpty(t.q,t.r)&&HEX.distance(g.player.q,g.player.r,t.q,t.r)<=1)g.movePlayer(t.q,t.r);g.gainBlock(7);return true;});
+    D('ripple','Ripple','flow',0,'skill','common','Heal 2 per hex moved this turn.',(g)=>{g.healPlayer((g.player.hexesMovedThisTurn||0)*2);return true;},selfT,[],'Heal 3 per hex.',(g)=>{g.healPlayer((g.player.hexesMovedThisTurn||0)*3);return true;});
+    D('current','Current','flow',1,'move','uncommon','Move up to 2.',(g,t)=>{if(!t||!g.isHexEmpty(t.q,t.r)||HEX.distance(g.player.q,g.player.r,t.q,t.r)>2)return false;g.movePlayer(t.q,t.r);return true;},g=>moveT(g,2),[],'Move up to 3.',(g,t)=>{if(!t||!g.isHexEmpty(t.q,t.r)||HEX.distance(g.player.q,g.player.r,t.q,t.r)>3)return false;g.movePlayer(t.q,t.r);return true;});
+    D('tidal_sweep','Tidal Sweep','flow',2,'attack','uncommon','Move 1, deal 5 ALL adj.',(g,t)=>{if(t&&t.q!=='self'&&g.isHexEmpty(t.q,t.r)&&HEX.distance(g.player.q,g.player.r,t.q,t.r)<=1)g.movePlayer(t.q,t.r);adjE(g).forEach(e=>g.dealDamage(e,5));return true;},g=>selfOrMove(g,1),[],'Deal 7 ALL adj.',(g,t)=>{if(t&&t.q!=='self'&&g.isHexEmpty(t.q,t.r)&&HEX.distance(g.player.q,g.player.r,t.q,t.r)<=1)g.movePlayer(t.q,t.r);adjE(g).forEach(e=>g.dealDamage(e,7));return true;});
+    D('undertow','Undertow','flow',1,'attack','uncommon','Pull enemy 1 hex. Deal 4.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e)return false;g.pullEnemy(e);g.dealDamage(e,4);return true;},rng2T,[],'Deal 6.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e)return false;g.pullEnemy(e);g.dealDamage(e,6);return true;});
+    D('tidal_wall','Tidal Wall','flow',2,'skill','uncommon','Gain 4 Block per adj enemy.',(g)=>{g.gainBlock(adjE(g).length*4);return true;},selfT,[],'6 per adj.',(g)=>{g.gainBlock(adjE(g).length*6);return true;});
+    D('spring','Spring','flow',1,'power','rare','Heal 1 at turn start.',(g)=>{g.addPower('spring',{heal:1});return true;},selfT,['power'],'Heal 2.',(g)=>{g.addPower('spring',{heal:2});return true;});
+    D('deluge','Deluge','flow',3,'attack','rare','Deal 4 ALL. Push 1 hex.',(g)=>{allE(g).forEach(e=>{g.dealDamage(e,4);g.pushEnemy(e);});return true;},g=>allE(g).length?selfT():[],[],'Deal 6 ALL.',(g)=>{allE(g).forEach(e=>{g.dealDamage(e,6);g.pushEnemy(e);});return true;});
+
+    // ── NEXUS ──
+    D('link','Link','nexus',1,'attack','common','Deal 3 target+adj, range 2.',(g,t)=>{const m=t&&g.getEnemyAt(t.q,t.r);if(!m||HEX.distance(g.player.q,g.player.r,t.q,t.r)>2)return false;g.dealDamage(m,3);g.enemies.filter(e=>e.hp>0&&e!==m&&HEX.distance(t.q,t.r,e.q,e.r)<=1).forEach(e=>g.dealDamage(e,3));return true;},rng2T,[],'Deal 5.',(g,t)=>{const m=t&&g.getEnemyAt(t.q,t.r);if(!m||HEX.distance(g.player.q,g.player.r,t.q,t.r)>2)return false;g.dealDamage(m,5);g.enemies.filter(e=>e.hp>0&&e!==m&&HEX.distance(t.q,t.r,e.q,e.r)<=1).forEach(e=>g.dealDamage(e,5));return true;});
+    D('thread','Thread','nexus',0,'attack','common','Deal 3 to furthest enemy.',(g)=>{const es=allE(g);if(!es.length)return false;es.sort((a,b)=>HEX.distance(g.player.q,g.player.r,b.q,b.r)-HEX.distance(g.player.q,g.player.r,a.q,a.r));g.dealDamage(es[0],3);return true;},g=>allE(g).length?selfT():[],[],'Deal 5.',(g)=>{const es=allE(g);if(!es.length)return false;es.sort((a,b)=>HEX.distance(g.player.q,g.player.r,b.q,b.r)-HEX.distance(g.player.q,g.player.r,a.q,a.r));g.dealDamage(es[0],5);return true;});
+    D('convergence','Convergence','nexus',1,'skill','common','Draw 1 per colony type in hand.',(g)=>{const cols=new Set(g.hand.map(c=>{const d=g.getCardDef(c);return d?d.colony:null;}));g.drawCards(cols.size);return true;},selfT,[],'Also +1 Energy.',(g)=>{const cols=new Set(g.hand.map(c=>{const d=g.getCardDef(c);return d?d.colony:null;}));g.drawCards(cols.size);g.player.energy++;return true;});
+    D('severed_link','Severed Link','nexus',1,'attack','common','Deal 8 to isolated enemy.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e)return false;const hasAdj=g.enemies.some(x=>x.hp>0&&x!==e&&HEX.distance(e.q,e.r,x.q,x.r)<=1);g.dealDamage(e,hasAdj?4:8);return true;},rng2T,[],'Deal 11 isolated.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e)return false;const hasAdj=g.enemies.some(x=>x.hp>0&&x!==e&&HEX.distance(e.q,e.r,x.q,x.r)<=1);g.dealDamage(e,hasAdj?5:11);return true;});
+    D('resonance','Resonance','nexus',1,'attack','uncommon','Deal 2 per colony in hand.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;const cols=new Set(g.hand.map(c=>{const d=g.getCardDef(c);return d?d.colony:null;}));g.dealDamage(e,cols.size*2);return true;},adjT,[],'3 per colony.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;const cols=new Set(g.hand.map(c=>{const d=g.getCardDef(c);return d?d.colony:null;}));g.dealDamage(e,cols.size*3);return true;});
+    D('entangle','Entangle','nexus',1,'attack','uncommon','Deal 5 r2. 1 Weak target+adj.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||HEX.distance(g.player.q,g.player.r,t.q,t.r)>2)return false;g.dealDamage(e,5);applyStatus(e,'weak',1);g.enemies.filter(x=>x.hp>0&&x!==e&&HEX.distance(e.q,e.r,x.q,x.r)<=1).forEach(x=>applyStatus(x,'weak',1));return true;},rng2T,[],'Deal 7.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||HEX.distance(g.player.q,g.player.r,t.q,t.r)>2)return false;g.dealDamage(e,7);applyStatus(e,'weak',1);g.enemies.filter(x=>x.hp>0&&x!==e&&HEX.distance(e.q,e.r,x.q,x.r)<=1).forEach(x=>applyStatus(x,'weak',1));return true;});
+    D('weave','Weave','nexus',2,'skill','uncommon','Copy last card played.',(g)=>{if(g.lastCardPlayed){g.hand.push({...g.lastCardPlayed,temp:true});}return true;},selfT,[],'Upgrade the copy.',(g)=>{if(g.lastCardPlayed){g.hand.push({...g.lastCardPlayed,upgraded:true,temp:true});}return true;});
+    D('lattice','Lattice','nexus',1,'skill','rare','Gain 2 Block per card in hand.',(g)=>{g.gainBlock(g.hand.length*2);return true;},selfT,[],'3 per card.',(g)=>{g.gainBlock(g.hand.length*3);return true;});
+    D('harmony','Harmony','nexus',2,'power','rare','3+ colony types/turn: draw 2.',(g)=>{g.addPower('harmony',{draw:2,threshold:3});return true;},selfT,['power'],'Draw 3.',(g)=>{g.addPower('harmony',{draw:3,threshold:3});return true;});
+    D('fusion_pulse','Fusion Pulse','nexus',2,'attack','rare','Deal 15 if prismatic in deck. Exhaust.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;const hasPris=g.deck.some(c=>c.fused);g.dealDamage(e,hasPris?15:7);return true;},adjT,['exhaust'],'Deal 20.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;const hasPris=g.deck.some(c=>c.fused);g.dealDamage(e,hasPris?20:10);return true;});
+
+    // ── BEACON ──
+    D('foresight','Foresight','beacon',0,'skill','common','Draw 2.',(g)=>{g.drawCards(2);return true;},selfT,[],'Draw 3.',(g)=>{g.drawCards(3);return true;});
+    D('recharge','Recharge','beacon',0,'skill','common','Gain 1 Energy.',(g)=>{g.player.energy++;return true;},selfT,[],'Gain 2.',(g)=>{g.player.energy+=2;return true;});
+    D('signal_fire','Signal Fire','beacon',1,'attack','common','Deal 4 r2. Draw 1.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||HEX.distance(g.player.q,g.player.r,t.q,t.r)>2)return false;g.dealDamage(e,4);g.drawCards(1);return true;},rng2T,[],'Deal 6. Draw 1.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||HEX.distance(g.player.q,g.player.r,t.q,t.r)>2)return false;g.dealDamage(e,6);g.drawCards(1);return true;});
+    D('scan','Scan','beacon',0,'skill','common','Reveal all intents.',(g)=>{g.intentsRevealed=true;return true;},selfT,[],'Also draw 1.',(g)=>{g.intentsRevealed=true;g.drawCards(1);return true;});
+    D('illuminate','Illuminate','beacon',1,'skill','uncommon','Look at top 3, pick 1 to draw.',(g)=>{const top=g.drawPile.slice(-3);if(top.length){g.hand.push(g.drawPile.pop());}return true;},selfT,[],'Top 5.',(g)=>{const top=g.drawPile.slice(-5);if(top.length){g.hand.push(g.drawPile.pop());g.hand.push(g.drawPile.pop());}return true;});
+    D('amplify','Amplify','beacon',1,'skill','uncommon','Next card costs 0.',(g)=>{g.player.nextCardFree=true;return true;},selfT,[],'Next card played twice.',(g)=>{g.player.nextCardFree=true;g.player.nextCardDouble=true;return true;});
+    D('overload','Overload','beacon',0,'skill','rare','Draw 4. Discard 2.',(g)=>{g.drawCards(4);for(let i=0;i<2&&g.hand.length;i++)g.discardPile.push(g.hand.splice(Math.floor(Math.random()*g.hand.length),1)[0]);return true;},selfT,[],'Draw 5. Discard 1.',(g)=>{g.drawCards(5);if(g.hand.length)g.discardPile.push(g.hand.splice(Math.floor(Math.random()*g.hand.length),1)[0]);return true;});
+    D('focus','Focus','beacon',1,'power','common','+1 card draw per turn.',(g)=>{g.addPower('focus',{extraDraw:1});return true;},selfT,['power'],'+2 draw.',(g)=>{g.addPower('focus',{extraDraw:2});return true;});
+    D('lighthouse','Lighthouse','beacon',2,'power','rare','See intents 2 turns ahead.',(g)=>{g.addPower('lighthouse',{});return true;},selfT,['power'],'3 turns.',(g)=>{g.addPower('lighthouse',{});return true;});
+    D('clarity_b','Clarity','beacon',0,'skill','uncommon','Draw 2. Gain 1 Energy.',(g)=>{g.drawCards(2);g.player.energy++;return true;},selfT,[],'Draw 3.',(g)=>{g.drawCards(3);g.player.energy++;return true;});
+
+    // ── GROVE ──
+    D('defend','Defend','grove',1,'skill','common','Gain 5 Block.',(g)=>{g.gainBlock(5);return true;},selfT,[],'Gain 7.',(g)=>{g.gainBlock(7);return true;});
+    D('regrowth','Regrowth','grove',1,'skill','common','Heal 3. Gain 3 Block.',(g)=>{g.healPlayer(3);g.gainBlock(3);return true;},selfT,[],'5/5.',(g)=>{g.healPlayer(5);g.gainBlock(5);return true;});
+    D('bristle','Bristle','grove',1,'skill','common','Gain 4 Block. +1 Thorn.',(g)=>{g.gainBlock(4);g.player.thorn=(g.player.thorn||0)+1;return true;},selfT,[],'6 Block. +2 Thorn.',(g)=>{g.gainBlock(6);g.player.thorn=(g.player.thorn||0)+2;return true;});
+    D('living_shield','Living Shield','grove',1,'skill','uncommon','Gain 5 Block. If blocking, draw 1.',(g)=>{const had=g.player.block>0;g.gainBlock(5);if(had)g.drawCards(1);return true;},selfT,[],'7 Block. Draw 1.',(g)=>{const had=g.player.block>0;g.gainBlock(7);if(had)g.drawCards(1);return true;});
+    D('bulwark','Bulwark','grove',2,'skill','uncommon','Gain 12 Block.',(g)=>{g.gainBlock(12);return true;},selfT,[],'Gain 16.',(g)=>{g.gainBlock(16);return true;});
+    D('root_network','Root Network','grove',1,'skill','uncommon','Gain 3 Block per Grove in discard.',(g)=>{const cnt=g.discardPile.filter(c=>{const d=g.getCardDef(c);return d&&d.colony==='grove';}).length;g.gainBlock(cnt*3);return true;},selfT,[],'4 per.',(g)=>{const cnt=g.discardPile.filter(c=>{const d=g.getCardDef(c);return d&&d.colony==='grove';}).length;g.gainBlock(cnt*4);return true;});
+    D('bark_skin','Bark Skin','grove',1,'power','common','Gain 2 Thorn.',(g)=>{g.player.thorn=(g.player.thorn||0)+2;return true;},selfT,['power'],'3 Thorn.',(g)=>{g.player.thorn=(g.player.thorn||0)+3;return true;});
+    D('entrenched','Entrenched','grove',2,'skill','uncommon','Double current Block.',(g)=>{g.gainBlock(g.player.block);return true;},selfT,[],'Double +4.',(g)=>{g.gainBlock(g.player.block+4);return true;});
+    D('canopy','Canopy','grove',2,'skill','rare','Gain 8 Block. If hit: double.',(g)=>{g.gainBlock(8);g.player.canopyActive=2;return true;},selfT,[],'If hit: triple.',(g)=>{g.gainBlock(8);g.player.canopyActive=3;return true;});
+    D('overgrowth','Overgrowth','grove',3,'power','rare','Turn start: Block = maxHP-HP.',(g)=>{g.addPower('overgrowth',{heal:0});return true;},selfT,['power'],'Also heal 1.',(g)=>{g.addPower('overgrowth',{heal:1});return true;});
+
+    // ── CRYSTAL ──
+    D('reflect','Reflect','crystal',1,'skill','common','Gain 4 Block. If blocking, 8.',(g)=>{g.gainBlock(g.player.block>0?8:4);return true;},selfT,[],'5/12.',(g)=>{g.gainBlock(g.player.block>0?12:5);return true;});
+    D('facet','Facet','crystal',1,'attack','common','Deal 5 adj. Gain 3 Block.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;g.dealDamage(e,5);g.gainBlock(3);return true;},adjT,[],'7 dmg, 5 Block.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;g.dealDamage(e,7);g.gainBlock(5);return true;});
+    D('fracture_point','Fracture Point','crystal',1,'attack','common','Apply 2 Vulnerable adj.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;applyStatus(e,'vulnerable',2);return true;},adjT,[],'Apply 3.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;applyStatus(e,'vulnerable',3);return true;});
+    D('prism','Prism','crystal',1,'skill','uncommon','Gain 6 Block. Draw 1 per 10 Block.',(g)=>{g.gainBlock(6);g.drawCards(Math.floor((g.player.block+6)/10));return true;},selfT,[],'8 Block.',(g)=>{g.gainBlock(8);g.drawCards(Math.floor((g.player.block+8)/10));return true;});
+    D('shatter','Shatter','crystal',2,'attack','uncommon','Deal Block as dmg adj.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e)||g.player.block<=0)return false;g.dealDamage(e,g.player.block);return true;},g=>g.player.block>0?adjT(g):[],[],'Range 2.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||HEX.distance(g.player.q,g.player.r,t.q,t.r)>2||g.player.block<=0)return false;g.dealDamage(e,g.player.block);return true;});
+    D('diamond_edge','Diamond Edge','crystal',2,'attack','rare','Deal 7+Block/2 adj.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;g.dealDamage(e,7+Math.floor(g.player.block/2));return true;},adjT,[],'7+Block.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;g.dealDamage(e,7+g.player.block);return true;});
+    D('mirror_coat','Mirror Coat','crystal',1,'power','common','When hit, gain 2 Block.',(g)=>{g.addPower('mirror_coat',{blk:2});return true;},selfT,['power'],'Gain 3.',(g)=>{g.addPower('mirror_coat',{blk:3});return true;});
+    D('crystallize','Crystallize','crystal',3,'skill','rare','Retain Block. Gain 6. Exhaust.',(g)=>{g.gainBlock(6);g.player.retainAllBlock=true;return true;},selfT,['exhaust'],'Gain 10.',(g)=>{g.gainBlock(10);g.player.retainAllBlock=true;return true;});
+    D('refraction','Refraction','crystal',1,'skill','uncommon','Gain 4 Block now, 4 next turn.',(g)=>{g.gainBlock(4);g.player.nextTurnBlock=(g.player.nextTurnBlock||0)+4;return true;},selfT,[],'6/6.',(g)=>{g.gainBlock(6);g.player.nextTurnBlock=(g.player.nextTurnBlock||0)+6;return true;});
+    D('absolute_zero','Absolute Zero','crystal',2,'attack','rare','Remove target Block. Deal that+5. Exhaust.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;const b=e.block||0;e.block=0;g.dealDamage(e,b+5);return true;},adjT,['exhaust'],'Deal +8.',(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(!e||!g.isAdj(e))return false;const b=e.block||0;e.block=0;g.dealDamage(e,b+8);return true;});
+
+    // ── COLORLESS ──
+    D('sidestep','Sidestep','colorless',0,'move','common','Move 1. Draw 1.',(g,t)=>{if(t&&t.q!=='self'&&g.isHexEmpty(t.q,t.r)&&HEX.distance(g.player.q,g.player.r,t.q,t.r)<=1)g.movePlayer(t.q,t.r);g.drawCards(1);return true;},g=>selfOrMove(g,1));
+    D('bide','Bide','colorless',1,'skill','common','Gain 8 Block. Exhaust.',(g)=>{g.gainBlock(8);return true;},selfT,['exhaust'],'Gain 12.',(g)=>{g.gainBlock(12);return true;});
+    D('versatile','Versatile','colorless',1,'skill','uncommon','Gain 4 Block. Deal 4 adj.',(g)=>{g.gainBlock(4);adjE(g).forEach(e=>g.dealDamage(e,4));return true;},selfT,[],'6/6.',(g)=>{g.gainBlock(6);adjE(g).forEach(e=>g.dealDamage(e,6));return true;});
+    D('transcend','Transcend','colorless',0,'skill','rare','Exhaust hand. Draw that many +1.',(g)=>{const n=g.hand.length;g.hand.forEach(c=>g.exhaustPile.push(c));g.hand=[];g.drawCards(n+1);return true;},selfT,['exhaust'],'Draw +2.',(g)=>{const n=g.hand.length;g.hand.forEach(c=>g.exhaustPile.push(c));g.hand=[];g.drawCards(n+2);return true;});
+    D('patience_p','Patience','colorless',0,'power','uncommon','Turn start: 4+ cards = +1E.',(g)=>{g.addPower('patience',{threshold:4});return true;},selfT,['power'],'3+ cards.',(g)=>{g.addPower('patience',{threshold:3});return true;});
+    D('adaptation','Adaptation','colorless',1,'power','rare','First card each turn costs 0.',(g)=>{g.addPower('adaptation',{count:1});return true;},selfT,['power'],'First 2.',(g)=>{g.addPower('adaptation',{count:2});return true;});
+
+    // ── CURSES & STATUS CARDS ──
+    D('doubt','Doubt','colorless',0,'skill','curse','Unplayable.',()=>false,()=>[],['unplayable']);
+    D('regret_c','Regret','colorless',0,'skill','curse','End of turn: lose 1 HP per card in hand.',()=>false,()=>[],['unplayable']);
+    D('decay','Decay','colorless',0,'skill','curse','End of turn: lose 1 HP.',()=>false,()=>[],['unplayable']);
+    D('shame','Shame','colorless',0,'skill','curse','Unplayable. Ethereal.',()=>false,()=>[],['unplayable','ethereal']);
+    D('writhe_c','Writhe','colorless',0,'skill','curse','Unplayable. Innate.',()=>false,()=>[],['unplayable','innate']);
+    D('dazed','Dazed','colorless',0,'skill','status','Unplayable. Ethereal.',()=>false,()=>[],['unplayable','ethereal']);
+    D('wound','Wound','colorless',0,'skill','status','Unplayable.',()=>false,()=>[],['unplayable']);
+    D('slimed','Slimed','colorless',1,'skill','status','Exhaust.',(g)=>{return true;},selfT,['exhaust']);
+    D('burn_c','Burn','colorless',0,'skill','status','End of turn: take 2 dmg. Unplayable.',()=>false,()=>[],['unplayable']);
+
+    const STARTER_DECK=['strike','strike','strike','strike','defend','defend','defend','advance','advance','advance'];
+    const CARD_POOLS={
+      common:['ignite','dash_strike','flashpoint','flare','temper','anvil_strike','harden','iron_will','mend','ebb','ripple','link','thread','convergence','severed_link','foresight','recharge','signal_fire','scan','regrowth','bristle','reflect','facet','fracture_point','sidestep'],
+      uncommon:['eruption','wildfire','ember_chain','forge_blade','forge_armor','tidal_sweep','undertow','tidal_wall','current','resonance','entangle','weave','illuminate','amplify','clarity_b','living_shield','bulwark','root_network','entrenched','prism','shatter','refraction','versatile','bide'],
+      rare:['combustion','supernova','metallurgy','tempered_edge','meltdown','reforged','spring','deluge','lattice','harmony','fusion_pulse','overload','focus','lighthouse','canopy','overgrowth','bark_skin','diamond_edge','mirror_coat','crystallize','absolute_zero','transcend','patience_p','adaptation']
+    };
+
+    // ═══ ENEMIES ═══════════════════════════════════════════════════════════
+    const ENEMIES={
+      // Act 1
+      shade:{name:'Umbra',maxHp:22,act:1,tier:'normal',token:'shade',getIntent(s,g){const d=HEX.distance(s.q,s.r,g.player.q,g.player.r);if(d<=1)return Math.random()<0.6?{type:'attack',value:7,label:'Atk 7'}:{type:'block',value:5,label:'Blk 5'};return{type:'move',value:1,label:'Move'};}},
+      phantom:{name:'Echo',maxHp:16,act:1,tier:'normal',token:'phantom',getIntent(s,g){const d=HEX.distance(s.q,s.r,g.player.q,g.player.r);if(d<=2)return{type:'attack',value:5,label:'Atk 5'};return{type:'move',value:1,label:'Move'};}},
+      wisp:{name:'Wisp',maxHp:12,act:1,tier:'normal',token:'phantom',getIntent(s,g){const d=HEX.distance(s.q,s.r,g.player.q,g.player.r);if(d<=1)return{type:'attack',value:8,label:'Atk 8 (die)',die:true};return{type:'move',value:1,label:'Move'};}},
+      hollow:{name:'Hollow',maxHp:20,act:1,tier:'normal',token:'shade',getIntent(s){s._tc=(s._tc||0)+1;return s._tc%2===1?{type:'block',value:6,label:'Blk 6'}:{type:'attack',value:6,label:'Atk 6'};}},
+      splinter:{name:'Splinter',maxHp:14,act:1,tier:'normal',token:'shade',getIntent(){return{type:'attack',value:4,label:'Atk 4'};},onDeath(s,g){g.spawnEnemy('wisp',s.q,s.r);}},
+      mirage:{name:'Mirage',maxHp:18,act:1,tier:'normal',token:'phantom',getIntent(s,g){const last=g.lastPlayedType||'attack';return last==='attack'?{type:'attack',value:6,label:'Atk 6'}:{type:'block',value:6,label:'Blk 6'};}},
+      sentinel:{name:'Sentinel',maxHp:40,act:1,tier:'elite',token:'elite',getIntent(s){s._tc=(s._tc||0)+1;const p=s._tc%4;return[{type:'block',value:10,label:'Blk 10'},{type:'attack',value:8,label:'Atk 8'},{type:'block',value:10,label:'Blk 10'},{type:'attack',value:12,label:'Atk 12'}][p];}},
+      doppelganger:{name:'Doppelganger',maxHp:35,act:1,tier:'elite',token:'elite',getIntent(s,g){const last=g.lastPlayedType||'attack';return last==='attack'?{type:'attack',value:7,label:'Atk 7'}:{type:'block',value:8,label:'Blk 8'};}},
+      umbra_prime:{name:'Umbra Prime',maxHp:70,act:1,tier:'boss',token:'boss',getIntent(s,g){s._tc=(s._tc||0)+1;if(s.hp<=35&&!s._enraged){s._enraged=true;s.strength=(s.strength||0)+2;}if(s._tc%3===0)return{type:'attack',value:12,label:'Atk 12'};if(s._tc%3===1)return{type:'block',value:8,label:'Blk 8'};return{type:'attack',value:8,label:'Atk 8 +heal',heal:5};}},
+      kaleidoscope:{name:'The Kaleidoscope',maxHp:65,act:1,tier:'boss',token:'boss',getIntent(s){s._tc=(s._tc||0)+1;const p=s._tc%3;return[{type:'attack',value:5,label:'AoE 5',aoe:true},{type:'block',value:12,label:'Blk 12'},{type:'attack',value:4,label:'Reflect 4',reflect:true}][p];}},
+      // Act 2
+      fracture:{name:'Fracture',maxHp:36,act:2,tier:'normal',token:'brute',getIntent(s,g){const d=HEX.distance(s.q,s.r,g.player.q,g.player.r);if(d<=1){const r=Math.random();if(r<0.5)return{type:'attack',value:10,label:'Atk 10'};if(r<0.8)return{type:'attack',value:6,label:'Atk 6'};return{type:'block',value:8,label:'Blk 8'};}return{type:'move',value:1,label:'Move'};}},
+      shade_swarm:{name:'Shade Swarm',maxHp:10,act:2,tier:'normal',token:'shade',getIntent(){return{type:'attack',value:4,label:'Atk 4'};}},
+      corruptor:{name:'Corruptor',maxHp:28,act:2,tier:'normal',token:'phantom',getIntent(s,g){s._tc=(s._tc||0)+1;if(s._tc%3===0)return{type:'attack',value:5,label:'Atk 5 +Curse',curse:true};return{type:'attack',value:5,label:'Atk 5'};}},
+      phaser:{name:'Phaser',maxHp:22,act:2,tier:'normal',token:'phantom',getIntent(s,g){s._tc=(s._tc||0)+1;if(s._tc%2===0){const empties=g.hexes.filter(([q,r])=>g.isHexEmpty(q,r));if(empties.length){const e=empties[Math.floor(Math.random()*empties.length)];s.q=e[0];s.r=e[1];}}return{type:'attack',value:8,label:'Atk 8'};}},
+      glass_golem:{name:'Glass Golem',maxHp:45,act:2,tier:'normal',token:'brute',getIntent(s){s._tc=(s._tc||0)+1;s.strength=(s.strength||0)+1;return{type:'attack',value:5,label:`Atk ${5+(s.strength||0)}`};}},
+      prism_warden:{name:'Prism Warden',maxHp:30,act:2,tier:'normal',token:'elite',getIntent(){return{type:'attack',value:6,label:'Atk 6 (reflect)',reflect:0.5};}},
+      void_walker:{name:'Void Walker',maxHp:55,act:2,tier:'elite',token:'elite',getIntent(s,g){s._tc=(s._tc||0)+1;if(s._tc%3===0){const empties=g.hexes.filter(([q,r])=>g.isHexEmpty(q,r));if(empties.length){const e=empties[Math.floor(Math.random()*empties.length)];s.q=e[0];s.r=e[1];}return{type:'attack',value:10,label:'Teleport+Atk 10'};}return{type:'attack',value:8,label:'Atk 8'};}},
+      crystal_guardian:{name:'Crystal Guardian',maxHp:50,act:2,tier:'elite',token:'elite',getIntent(s){s._tc=(s._tc||0)+1;if(s._tc%2===1)return{type:'block',value:15,label:'Blk 15'};return{type:'attack',value:10,label:'Atk 10'};}},
+      shattered_self:{name:'The Shattered Self',maxHp:90,act:2,tier:'boss',token:'boss',getIntent(s,g){s._tc=(s._tc||0)+1;if(s._tc%4===0)return{type:'attack',value:6,label:'Spawn Clone',spawn:'shade_swarm'};return{type:'attack',value:8,label:'Atk 8'};}},
+      nexus_weaver:{name:'Nexus Weaver',maxHp:85,act:2,tier:'boss',token:'boss',getIntent(s){s._tc=(s._tc||0)+1;if(s._tc%3===0)return{type:'block',value:12,label:'Blk 12 +Link'};return{type:'attack',value:10,label:'Atk 10'};}},
+      // Act 3
+      void_eater:{name:'Void Eater',maxHp:40,act:3,tier:'normal',token:'brute',getIntent(s,g){if(!s._wasAttacked){s.strength=(s.strength||0)+2;}s._wasAttacked=false;return{type:'attack',value:8,label:`Atk ${8+(s.strength||0)}`};}},
+      entropy:{name:'Entropy',maxHp:35,act:3,tier:'normal',token:'phantom',getIntent(){return{type:'attack',value:6,label:'Atk 6 +Dazed',addCard:'dazed'};}},
+      resonance_ghost:{name:'Resonance Ghost',maxHp:30,act:3,tier:'normal',token:'phantom',getIntent(s){return s.vulnerable>0?{type:'attack',value:10,label:'Atk 10'}:{type:'block',value:99,label:'Immune'};}},
+      titan_shard:{name:'Titan Shard',maxHp:60,act:3,tier:'normal',token:'brute',getIntent(s){s._tc=(s._tc||0)+1;return s._tc%2===1?{type:'block',value:20,label:'Blk 20'}:{type:'attack',value:15,label:'Atk 15'};}},
+      phase_beast:{name:'Phase Beast',maxHp:25,act:3,tier:'normal',token:'phantom',getIntent(s,g){s._tc=(s._tc||0)+1;return s._tc%2===1?{type:'attack',value:6,label:'Atk 6 (½dmg)',halfDmg:true}:{type:'attack',value:12,label:'Atk 12 (2x)'};}},
+      memory_thief:{name:'Memory Thief',maxHp:28,act:3,tier:'normal',token:'shade',getIntent(){return{type:'attack',value:7,label:'Atk 7 +Exhaust',exhaustCard:true};}},
+      the_collector:{name:'The Collector',maxHp:65,act:3,tier:'elite',token:'elite',getIntent(s,g){s._tc=(s._tc||0)+1;if(s._tc%3===0&&g.drawPile.length>=2){const stolen=g.drawPile.splice(-2,2);s._stolen=stolen;return{type:'attack',value:12,label:'Steal+Atk 12'};}return{type:'attack',value:10,label:'Atk 10'};}},
+      aspect_of_void:{name:'Aspect of Void',maxHp:70,act:3,tier:'elite',token:'elite',getIntent(s){s._tc=(s._tc||0)+1;const dmg=4+s._tc*2;return{type:'attack',value:dmg,label:`Atk ${dmg}`};}},
+      the_other:{name:'The Other',maxHp:100,act:3,tier:'boss',token:'boss',getIntent(s,g){s._tc=(s._tc||0)+1;const p=s._tc%4;if(s.hp<=30&&!s._phase2){s._phase2=true;s.strength=(s.strength||0)+3;}return[{type:'attack',value:8,label:'Atk 8'},{type:'attack',value:12,label:'Atk 12'},{type:'block',value:10,label:'Blk 10'},{type:'attack',value:6,label:'Atk 6x2',hits:2}][p];}},
+      kagami_inverse:{name:'Kagami Inverse',maxHp:110,act:3,tier:'boss',token:'boss',getIntent(s,g){s._tc=(s._tc||0)+1;if(s._tc%3===0)return{type:'block',value:g.player.block||8,label:`Mirror Blk ${g.player.block||8}`};return{type:'attack',value:10,label:'Atk 10'};}}
+    };
+
+    // ═══ ENCOUNTERS BY ACT ═════════════════════════════════════════════════
+    const ACT_ENEMIES={
+      1:{normal:['shade','phantom','wisp','hollow','splinter','mirage'],elite:['sentinel','doppelganger'],boss:['umbra_prime','kaleidoscope']},
+      2:{normal:['fracture','shade_swarm','corruptor','phaser','glass_golem','prism_warden'],elite:['void_walker','crystal_guardian'],boss:['shattered_self','nexus_weaver']},
+      3:{normal:['void_eater','entropy','resonance_ghost','titan_shard','phase_beast','memory_thief'],elite:['the_collector','aspect_of_void'],boss:['the_other','kagami_inverse']}
+    };
+    const ACT_NAMES=['Shadows','Corruption','The Void'];
+    const ACT_NARRATIVES={1:['The Void is quiet here. Almost peaceful. But the edges are wrong.','Echoes repeat what should not be said.','Something massive displaces the nothing.'],2:['The glass beneath fractures with each step.','Reality warps. You see yourself, wrong.','The corruption deepens.'],3:['The Void stares back.','Everything you were is laid bare.','One of you is the reflection.']};
+
+    // ═══ RELICS ════════════════════════════════════════════════════════════
+    const RELICS={
+      spark_shard:{name:'Spark Shard',desc:'+1 atk dmg',icon:'🔥',rarity:'common',onDamageCalc:(g,d)=>d+1},
+      iron_scales:{name:'Iron Scales',desc:'+3 Block turn 1',icon:'🛡',rarity:'common',onCombatStart:(g)=>{if(g.turn===1)g.gainBlock(3);}},
+      quick_draw:{name:'Quick Draw',desc:'+1 starting card',icon:'🃏',rarity:'common',extraDraw:1},
+      blood_vial:{name:'Blood Vial',desc:'Heal 2 combat start',icon:'🩸',rarity:'common',onCombatStart:(g)=>g.healPlayer(2)},
+      bag_of_marbles:{name:'Bag of Marbles',desc:'Vuln 1 all enemies turn 1',icon:'🔮',rarity:'common',onCombatStart:(g)=>{if(g.turn===1)allE(g).forEach(e=>applyStatus(e,'vulnerable',1));}},
+      anchor:{name:'Anchor',desc:'+10 Block turn 1',icon:'⚓',rarity:'common',onCombatStart:(g)=>{if(g.turn===1)g.gainBlock(10);}},
+      lantern:{name:'Lantern',desc:'+1 Energy turn 1',icon:'🏮',rarity:'common',onCombatStart:(g)=>{if(g.turn===1)g.player.energy++;}},
+      smooth_stone:{name:'Smooth Stone',desc:'+1 Dexterity',icon:'🪨',rarity:'common',onPickup:(g)=>{g.player.dexterity=(g.player.dexterity||0)+1;}},
+      boot:{name:'Boot',desc:'Move +1 range',icon:'🥾',rarity:'common'},
+      vajra:{name:'Vajra',desc:'+1 Strength',icon:'💎',rarity:'common',onPickup:(g)=>{g.player.strength=(g.player.strength||0)+1;}},
+      beacon_lens:{name:'Beacon Lens',desc:'See all intents',icon:'🔍',rarity:'uncommon'},
+      grove_root:{name:'Grove Root',desc:'Heal 2/turn',icon:'🌱',rarity:'uncommon',onTurnStart:(g)=>g.healPlayer(2)},
+      crystal_facet:{name:'Crystal Facet',desc:'+3 max HP',icon:'💠',rarity:'uncommon',onPickup:(g)=>{g.player.maxHp+=3;g.player.hp+=3;}},
+      nexus_prism:{name:'Nexus Prism',desc:'Fusions +2 stats',icon:'🌈',rarity:'uncommon'},
+      ornamental_fan:{name:'Ornamental Fan',desc:'3+ atks = +4 Block',icon:'🪭',rarity:'uncommon'},
+      meat_on_bone:{name:'Meat on Bone',desc:'End combat ≤50%: heal 12',icon:'🍖',rarity:'uncommon'},
+      kunai:{name:'Kunai',desc:'3 atks = +1 Dex this combat',icon:'🗡',rarity:'uncommon'},
+      mercury_hourglass:{name:'Mercury Hourglass',desc:'3 dmg ALL turn start',icon:'⏳',rarity:'uncommon',onTurnStart:(g)=>{allE(g).forEach(e=>g.dealDamageRaw(e,3));}},
+      self_forming_clay:{name:'Self-Forming Clay',desc:'Lose HP = +3 Block next turn',icon:'🏺',rarity:'uncommon'},
+      pen_nib:{name:'Pen Nib',desc:'10th atk = double',icon:'🖊',rarity:'uncommon'},
+      mirror_shard_r:{name:'Mirror Shard',desc:'+2 temp Prismatic cards/combat',icon:'🪞',rarity:'rare'},
+      void_crystal:{name:'Void Crystal',desc:'On death: heal 25% once',icon:'💜',rarity:'rare'},
+      dead_branch:{name:'Dead Branch',desc:'Exhaust = random card',icon:'🌿',rarity:'rare'},
+      unceasing_top:{name:'Unceasing Top',desc:'0 hand = draw 1',icon:'🎯',rarity:'rare'},
+      ice_cream:{name:'Ice Cream',desc:'Energy carries over',icon:'🍦',rarity:'rare'},
+      tungsten_rod:{name:'Tungsten Rod',desc:'Lose HP: -1',icon:'🔩',rarity:'rare'},
+      astrolabe:{name:'Astrolabe',desc:'Upgrade 3 random cards',icon:'🌟',rarity:'boss',onPickup:(g)=>{let u=0;for(const c of shuffle(g.deck,Math.random)){if(u>=3)break;if(!c.upgraded&&CARDS[c.id]&&CARDS[c.id].upgraded){c.upgraded=true;u++;}}}},
+      crown:{name:'Crown',desc:'+1 Energy, -2 reward choices',icon:'👑',rarity:'boss',onPickup:(g)=>{g.player.maxEnergy++;}},
+      black_star:{name:'Black Star',desc:'Elites drop extra relic',icon:'⭐',rarity:'boss'},
+      calling_bell:{name:'Calling Bell',desc:'Random relic + Curse',icon:'🔔',rarity:'boss'},
+      sacred_bark:{name:'Sacred Bark',desc:'Double potion effect',icon:'🌳',rarity:'boss'},
+      runic_dome:{name:'Runic Dome',desc:'+1 Energy, hide intents',icon:'🏛',rarity:'boss',onPickup:(g)=>{g.player.maxEnergy++;}}
+    };
+    const RELIC_POOLS={common:Object.keys(RELICS).filter(k=>RELICS[k].rarity==='common'),uncommon:Object.keys(RELICS).filter(k=>RELICS[k].rarity==='uncommon'),rare:Object.keys(RELICS).filter(k=>RELICS[k].rarity==='rare'),boss:Object.keys(RELICS).filter(k=>RELICS[k].rarity==='boss')};
+
+    // ═══ POTIONS ═══════════════════════════════════════════════════════════
+    const POTIONS={
+      health:{name:'Health Potion',desc:'Heal 20',icon:'❤',effect:(g)=>g.healPlayer(20)},
+      block_p:{name:'Block Potion',desc:'Gain 12 Block',icon:'🛡',effect:(g)=>g.gainBlock(12)},
+      fire:{name:'Fire Potion',desc:'Deal 20 to target',icon:'🔥',effect:(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(e)g.dealDamage(e,20);},needsTarget:true},
+      strength_p:{name:'Strength Potion',desc:'+2 Str combat',icon:'💪',effect:(g)=>{g.player.strength=(g.player.strength||0)+2;}},
+      energy_p:{name:'Energy Potion',desc:'+2 Energy',icon:'⚡',effect:(g)=>{g.player.energy+=2;}},
+      draw_p:{name:'Draw Potion',desc:'Draw 3',icon:'🃏',effect:(g)=>g.drawCards(3)},
+      fear:{name:'Fear Potion',desc:'3 Vuln target',icon:'😱',effect:(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(e)applyStatus(e,'vulnerable',3);},needsTarget:true},
+      weak_p:{name:'Weak Potion',desc:'3 Weak target',icon:'😰',effect:(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);if(e)applyStatus(e,'weak',3);},needsTarget:true},
+      explosive:{name:'Explosive Potion',desc:'10 ALL enemies',icon:'💣',effect:(g)=>allE(g).forEach(e=>g.dealDamage(e,10))},
+      fairy:{name:'Fairy Potion',desc:'Auto on death: heal 30%',icon:'🧚',auto:true,effect:(g)=>g.healPlayer(Math.ceil(g.player.maxHp*0.3))}
+    };
+    const POTION_IDS=Object.keys(POTIONS);
+
+    // ═══ EVENTS ════════════════════════════════════════════════════════════
+    const EVENTS=[
+      {text:'A mirror fragment glimmers. Touch it?',choices:[{text:'Touch it (-5 HP, gain relic)',effect:(g)=>{g.player.hp-=5;g.grantRelic();}},{text:'Walk past (+1 draw)',effect:(g)=>{g.player.extraDrawNext=1;}}]},
+      {text:'A voice from the void whispers your name.',choices:[{text:'Answer (-8 HP, gain card)',effect:(g)=>{g.player.hp-=8;g.addRandomCard('rare');}},{text:'Silence (+5 Block)',effect:(g)=>{g.player.block+=5;}}]},
+      {text:'A memory pool reflects scenes. Dive in?',choices:[{text:'Remove 2 cards',effect:(g)=>{for(let i=0;i<2&&g.deck.length>5;i++)g.deck.splice(Math.floor(Math.random()*g.deck.length),1);}},{text:'Gain 50 gold',effect:(g)=>{g.player.gold+=50;}}]},
+      {text:'A colony shrine pulses with energy.',choices:[{text:'Upgrade all Spark cards',effect:(g)=>{g.deck.forEach(c=>{if(CARDS[c.id]&&CARDS[c.id].colony==='spark')c.upgraded=true;});}},{text:'Upgrade all Grove cards',effect:(g)=>{g.deck.forEach(c=>{if(CARDS[c.id]&&CARDS[c.id].colony==='grove')c.upgraded=true;});}}]},
+      {text:'A void gamble — risk and reward.',choices:[{text:'Gamble (50/50 rare relic or 2 curses)',effect:(g)=>{if(Math.random()<0.5)g.grantRelic('rare');else{g.deck.push(deckCard('doubt'));g.deck.push(deckCard('doubt'));}}},{text:'Walk away',effect:()=>{}}]},
+      {text:'An ancient forge still burns.',choices:[{text:'Transform a card',effect:(g)=>{if(g.deck.length>0){const i=Math.floor(Math.random()*g.deck.length);const pool=CARD_POOLS.uncommon;g.deck[i]=deckCard(pool[Math.floor(Math.random()*pool.length)]);}}},{text:'Leave',effect:()=>{}}]},
+      {text:'A collector offers a bargain.',choices:[{text:'Offer 3 cards, take 1 rare',effect:(g)=>{for(let i=0;i<3&&g.deck.length>5;i++)g.deck.splice(Math.floor(Math.random()*g.deck.length),1);g.addRandomCard('rare');}},{text:'Decline',effect:()=>{}}]},
+      {text:'Darkness offers rest.',choices:[{text:'Full heal + Doubt curse',effect:(g)=>{g.player.hp=g.player.maxHp;g.deck.push(deckCard('doubt'));}},{text:'Decline',effect:()=>{}}]},
+      {text:'A prism well radiates energy.',choices:[{text:'Gain random fused card',effect:(g)=>{const keys=Object.keys(FUSION_RECIPES);if(keys.length){const k=keys[Math.floor(Math.random()*keys.length)];const f=FUSION_RECIPES[k];g.deck.push(deckCard(f.id||('fused_'+k),false,true,f));}}},{text:'Move on',effect:()=>{}}]},
+      {text:'The Balance speaks: sacrifice for power.',choices:[{text:'-7 max HP, +1 Energy permanent',effect:(g)=>{g.player.maxHp-=7;g.player.hp=Math.min(g.player.hp,g.player.maxHp);g.player.maxEnergy++;}},{text:'Decline',effect:()=>{}}]}
+    ];
+
+    // ═══ FUSION RECIPES ════════════════════════════════════════════════════
+    const FUSION_RECIPES={
+      'advance,strike':{name:'Lunge',cost:1,colony:'spark',type:'attack',desc:'Move 1. Deal 8.',effect:(g,t)=>{const e=t&&g.getEnemyAt(t.q,t.r);const nb=HEX.neighbors(g.player.q,g.player.r).filter(([q,r])=>g.hexExists(q,r)&&g.isHexEmpty(q,r));if(nb.length&&e){nb.sort((a,b)=>HEX.distance(a[0],a[1],e.q,e.r)-HEX.distance(b[0],b[1],e.q,e.r));g.movePlayer(nb[0][0],nb[0][1]);}if(e&&g.isAdj(e))g.dealDamage(e,8);return true;},validTargets:g=>allE(g).map(e=>({q:e.q,r:e.r}))},
+      'defend,reflect':{name:'Aegis',cost:1,colony:'grove',type:'skill',desc:'Gain 10 Block. If blocking, 15.',effect:g=>{g.gainBlock(g.player.block>0?15:10);return true;},validTargets:selfT},
+      'foresight,recharge':{name:'Clarity',cost:0,colony:'beacon',type:'skill',desc:'Draw 2. +1 Energy.',effect:g=>{g.drawCards(2);g.player.energy++;return true;},validTargets:selfT},
+      'ignite,link':{name:'Chain Lightning',cost:1,colony:'spark',type:'attack',desc:'Deal 4 ALL within 2.',effect:g=>{rngE(g,2).forEach(e=>g.dealDamage(e,4));return true;},validTargets:g=>rngE(g,2).length?selfT():[]},
+      'mend,bulwark':{name:'Living Wall',cost:2,colony:'flow',type:'skill',desc:'Heal 4. Gain 10 Block.',effect:g=>{g.healPlayer(4);g.gainBlock(10);return true;},validTargets:selfT},
+      'temper,forge_blade':{name:'Masterwork',cost:2,colony:'forge',type:'attack',desc:'Gain 5 Block. Deal 14 adj.',effect:(g,t)=>{g.gainBlock(5);const e=t&&g.getEnemyAt(t.q,t.r);if(e&&g.isAdj(e))g.dealDamage(e,14);return true;},validTargets:adjT}
+    };
+    function fusionKey(a,b){const k=[a,b].sort().join(',');return FUSION_RECIPES[k]?k:null;}
+    function getFusedCard(a,b){const k=fusionKey(a,b);if(k)return{...FUSION_RECIPES[k],id:'fused_'+k,fused:true};const ca=CARDS[a],cb=CARDS[b];if(!ca||!cb)return null;return{id:'fused_'+a+'_'+b,name:ca.name+'+'+cb.name,colony:ca.colony,cost:Math.max(1,Math.min(ca.cost,cb.cost)),type:ca.type,desc:ca.desc+' '+cb.desc,effect:(g,t)=>{ca.effect(g,t);return cb.effect(g,t);},validTargets:ca.validTargets,fused:true};}
+
+    // ═══ MAP GENERATOR ═════════════════════════════════════════════════════
+    function generateMap(act,rng){
+      const rows=15,cols=4;
+      const map=[];
+      for(let r=0;r<rows;r++){
+        const row=[];const nc=r===0||r===rows-1?1:2+Math.floor(rng()*2);
+        for(let c=0;c<nc;c++){
+          let type='combat';
+          if(r===rows-1)type='boss';
+          else if(r===0)type='combat';
+          else if(r===7||r===12)type='rest';
+          else if(r===4||r===9)type='elite';
+          else if(r===3||r===8)type='event';
+          else if(r===6)type='shop';
+          else type=rng()<0.7?'combat':rng()<0.5?'event':'combat';
+          row.push({type,row:r,col:c,edges:[]});
+        }
+        map.push(row);
+      }
+      for(let r=0;r<rows-1;r++){
+        map[r].forEach((node,ci)=>{
+          const next=map[r+1];
+          const targets=[];
+          targets.push(Math.min(ci,next.length-1));
+          if(ci>0&&next.length>1)targets.push(Math.max(0,ci-1));
+          if(ci<next.length-1)targets.push(ci+1);
+          const unique=[...new Set(targets)];
+          node.edges=unique;
+        });
+      }
+      return map;
+    }
+    function renderMapSVG(map,currentRow,currentCol,visited){
+      const rH=40,cW=80,pad=40,w=cW*4+pad*2,h=rH*map.length+pad*2;
+      let svg=`<svg class="map-svg" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">`;
+      const nodePos=(r,c,total)=>({x:pad+cW*(c+0.5*(4-total)),y:pad+rH*r});
+      // edges
+      for(let r=0;r<map.length-1;r++){
+        map[r].forEach((node,ci)=>{
+          const p=nodePos(r,ci,map[r].length);
+          node.edges.forEach(ti=>{
+            const p2=nodePos(r+1,ti,map[r+1].length);
+            const vis=visited.has(`${r},${ci}`);
+            svg+=`<line x1="${p.x}" y1="${p.y}" x2="${p2.x}" y2="${p2.y}" stroke="${vis?'rgba(103,212,228,0.4)':'rgba(255,255,255,0.1)'}" stroke-width="1.5"/>`;
+          });
+        });
+      }
+      // nodes
+      const icons={combat:'⚔',elite:'★',boss:'💀',rest:'🔥',shop:'💰',event:'?',nexus:'◈'};
+      const colors={combat:'#e85555',elite:'#d4af37',boss:'#ff6b35',rest:'#7eb77f',shop:'#d4af37',event:'#f59e0b',nexus:'#9b7ebd'};
+      for(let r=0;r<map.length;r++){
+        map[r].forEach((node,ci)=>{
+          const p=nodePos(r,ci,map[r].length);
+          const isCurrent=r===currentRow&&ci===currentCol;
+          const isVisited=visited.has(`${r},${ci}`);
+          const isNext=r===currentRow+1&&(currentCol===-1||map[currentRow]?.[currentCol]?.edges?.includes(ci));
+          const col=colors[node.type]||'#888';
+          svg+=`<circle class="map-node-circle" cx="${p.x}" cy="${p.y}" r="14" fill="${isVisited?'rgba(255,255,255,0.05)':col+'33'}" stroke="${isCurrent?'#67d4e4':isNext?col:'rgba(255,255,255,0.15)'}" stroke-width="${isCurrent?3:isNext?2:1}" data-row="${r}" data-col="${ci}" style="cursor:${isNext?'pointer':'default'};opacity:${isVisited&&!isCurrent?0.4:1}"/>`;
+          svg+=`<text x="${p.x}" y="${p.y+4}" text-anchor="middle" fill="${isVisited?'rgba(255,255,255,0.3)':'#fff'}" font-size="10" pointer-events="none">${icons[node.type]||'?'}</text>`;
+        });
+      }
+      svg+=`</svg>`;return svg;
+    }
+
+    // ═══ GAME STATE ═════════════════════════════════════════════════════════
+    function deckCard(id,upgraded,fused,fusedData){return{id,upgraded:!!upgraded,fused:!!fused,fusedData:fusedData||null};}
+
+    class Game {
+      constructor(){ this.hexes=HEX.allHexes(2); this.hexSet=new Set(this.hexes.map(([q,r])=>HEX.key(q,r))); this.reset(); }
+      reset(){
+        this.player={q:0,r:0,hp:60,maxHp:60,block:0,energy:0,maxEnergy:3,gold:99,strength:0,dexterity:0,thorn:0,artifact:0,vulnerable:0,weak:0,frail:0,nextAttackBonus:0,attacksWithBonus:0,attackBonus:0,cardsPlayedThisTurn:0,hexesMovedThisTurn:0,nextCardFree:false,nextCardDouble:false,retainAllBlock:false,canopyActive:0,nextTurnBlock:0,extraDrawNext:0};
+        this.enemies=[];this.deck=STARTER_DECK.map(id=>deckCard(id));
+        this.drawPile=[];this.discardPile=[];this.hand=[];this.exhaustPile=[];
+        this.powers=[];this.relics=[];this.potions=[null,null];
+        this.act=1;this.floor=0;this.map=null;this.mapRow=-1;this.mapCol=0;this.visited=new Set();
+        this.turn=0;this.selectedCard=null;this.validTargets=[];this.phase='title';
+        this.totalDamageDealt=0;this.cardsPlayed=0;this.turnsPlayed=0;this.score=0;
+        this.ascension=this.loadMeta().ascension||0;this.lastCardPlayed=null;this.lastPlayedType=null;
+        this.intentsRevealed=false;this.removals=0;this.justDrewCards=false;
+        this.isDaily=false;this.isPuzzle=false;this.dailySeed=0;this.rng=Math.random;
+      }
+      loadMeta(){try{return JSON.parse(localStorage.getItem(META_KEY))||{};}catch(e){return{};}}
+      saveMeta(data){try{const m=this.loadMeta();Object.assign(m,data);localStorage.setItem(META_KEY,JSON.stringify(m));}catch(e){}}
+      hexExists(q,r){return this.hexSet.has(HEX.key(q,r));}
+      isHexEmpty(q,r){if(q===this.player.q&&r===this.player.r)return false;return!this.enemies.some(e=>e.hp>0&&e.q===q&&e.r===r);}
+      getEnemyAt(q,r){return this.enemies.find(e=>e.hp>0&&e.q===q&&e.r===r);}
+      isAdj(e){return HEX.distance(this.player.q,this.player.r,e.q,e.r)<=1;}
+      getCardDef(card){if(card.fused&&card.fusedData)return card.fusedData;const c=CARDS[card.id];if(!c)return null;return card.upgraded&&c.upgraded?{...c,name:c.name+'+',desc:c.upgraded.desc,effect:c.upgraded.effect,validTargets:c.validTargets}:c;}
+      addPower(id,params){this.powers.push({id,...params});}
+      getPower(id){return this.powers.filter(p=>p.id===id);}
+      shuffleDeck(){
+        this.drawPile=this.deck.map(c=>({...c}));
+        for(let i=this.drawPile.length-1;i>0;i--){const j=Math.floor(this.rng()*(i+1));[this.drawPile[i],this.drawPile[j]]=[this.drawPile[j],this.drawPile[i]];}
+        this.discardPile=[];this.hand=[];this.exhaustPile=[];this.powers=[];
+      }
+      drawCards(n){
+        for(let i=0;i<n;i++){
+          if(!this.drawPile.length&&this.discardPile.length){this.drawPile=[...this.discardPile];this.discardPile=[];for(let j=this.drawPile.length-1;j>0;j--){const k=Math.floor(this.rng()*(j+1));[this.drawPile[j],this.drawPile[k]]=[this.drawPile[k],this.drawPile[j]];}}
+          if(this.drawPile.length)this.hand.push(this.drawPile.pop());
+        }
+        // Unceasing Top
+        if(this.hand.length===0&&this.relics.includes('unceasing_top')&&this.drawPile.length)this.drawCards(1);
+      }
+      startEncounter(enemyTypes,positions){
+        this.enemies=enemyTypes.map((type,i)=>{
+          const def=ENEMIES[type];if(!def)return null;
+          const pos=positions[i]||{q:0,r:-2};
+          return{...def,type,q:pos.q,r:pos.r,hp:Math.floor(def.maxHp*(1+this.ascension*0.04)),maxHp:Math.floor(def.maxHp*(1+this.ascension*0.04)),block:0,intent:null,id:i,vulnerable:0,weak:0,strength:def.strength||0,artifact:0,_tc:0};
+        }).filter(Boolean);
+        this.player.q=0;this.player.r=0;this.player.block=0;this.player.nextAttackBonus=0;this.player.canopyActive=0;
+        this.player.cardsPlayedThisTurn=0;this.player.hexesMovedThisTurn=0;
+        this.turn=0;this.phase='player';this.intentsRevealed=false;
+        this.shuffleDeck();
+        // Relic: onCombatStart
+        this.relics.forEach(r=>{const R=RELICS[r];if(R&&R.onCombatStart)R.onCombatStart(this);});
+        this.startPlayerTurn();
+      }
+      startPlayerTurn(){
+        this.turn++;this.turnsPlayed++;
+        // Metallurgy: retain some block
+        let retainedBlock=0;
+        this.getPower('metallurgy').forEach(p=>{retainedBlock+=p.retain;});
+        if(this.player.retainAllBlock)retainedBlock=this.player.block;
+        this.player.block=retainedBlock;this.player.retainAllBlock=false;
+        // Next turn block (Refraction)
+        if(this.player.nextTurnBlock>0){this.gainBlock(this.player.nextTurnBlock);this.player.nextTurnBlock=0;}
+        this.player.energy=this.player.maxEnergy;
+        // Ice Cream: carry over energy
+        if(!this.relics.includes('ice_cream'))this.player.energy=this.player.maxEnergy;
+        // Process statuses
+        tickStatuses(this.player,'turnStart');
+        this.enemies.forEach(e=>{if(e.hp>0)tickStatuses(e,'turnStart');});
+        // Overgrowth power
+        this.getPower('overgrowth').forEach(p=>{
+          const blk=Math.max(0,this.player.maxHp-this.player.hp);
+          if(blk>0)this.gainBlock(blk);
+          if(p.heal>0)this.healPlayer(p.heal);
+        });
+        // Spring power
+        this.getPower('spring').forEach(p=>this.healPlayer(p.heal));
+        // Patience power
+        this.getPower('patience').forEach(p=>{if(this.hand.length>=p.threshold)this.player.energy++;});
+        // Relic: onTurnStart
+        this.relics.forEach(r=>{const R=RELICS[r];if(R&&R.onTurnStart)R.onTurnStart(this);});
+        // Adaptation power
+        this.player._adaptationLeft=0;
+        this.getPower('adaptation').forEach(p=>{this.player._adaptationLeft+=p.count;});
+        // Draw
+        let drawCount=5;
+        this.relics.forEach(r=>{if(RELICS[r]&&RELICS[r].extraDraw)drawCount+=RELICS[r].extraDraw;});
+        this.getPower('focus').forEach(p=>{drawCount+=p.extraDraw;});
+        if(this.player.extraDrawNext){drawCount+=this.player.extraDrawNext;this.player.extraDrawNext=0;}
+        this.drawCards(drawCount);
+        this.justDrewCards=true;
+        this.rollEnemyIntents();
+        this.player.cardsPlayedThisTurn=0;this.player.hexesMovedThisTurn=0;
+        this.selectedCard=null;this.validTargets=[];this.phase='player';
+      }
+      rollEnemyIntents(){this.enemies.forEach(e=>{if(e.hp>0)e.intent=e.getIntent(e,this);});}
+      playCard(idx,target){
+        const card=this.hand[idx];const def=this.getCardDef(card);
+        if(!def||def.keywords?.includes('unplayable'))return false;
+        let cost=def.cost;
+        if(this.player.nextCardFree){cost=0;this.player.nextCardFree=false;}
+        else if(this.player._adaptationLeft>0){cost=0;this.player._adaptationLeft--;}
+        if(this.player.energy<cost)return false;
+        const success=def.effect(this,target);if(!success)return false;
+        this.player.energy-=cost;this.cardsPlayed++;this.player.cardsPlayedThisTurn++;
+        this.lastCardPlayed=card;this.lastPlayedType=def.type;
+        this.hand.splice(idx,1);
+        // Keywords
+        if(def.keywords?.includes('exhaust')||def.type==='power')this.exhaustPile.push(card);
+        else this.discardPile.push(card);
+        // Dead Branch relic
+        if((def.keywords?.includes('exhaust')||def.type==='power')&&this.relics.includes('dead_branch')){
+          const pool=[...CARD_POOLS.common,...CARD_POOLS.uncommon];
+          this.hand.push(deckCard(pool[Math.floor(this.rng()*pool.length)]));
+        }
+        // Harmony power check
+        if(this.player.cardsPlayedThisTurn>=1){
+          const colonies=new Set();
+          // Check all cards played this turn (approximate with hand+discard)
+          this.discardPile.slice(-this.player.cardsPlayedThisTurn).forEach(c=>{const d=this.getCardDef(c);if(d)colonies.add(d.colony);});
+          this.getPower('harmony').forEach(p=>{if(colonies.size>=p.threshold&&!this.player._harmonyTriggered){this.player._harmonyTriggered=true;this.drawCards(p.draw);}});
+        }
+        // Ornamental Fan relic
+        if(def.type==='attack'){
+          this.player._atkCount=(this.player._atkCount||0)+1;
+          if(this.relics.includes('ornamental_fan')&&this.player._atkCount%3===0)this.gainBlock(4);
+          if(this.relics.includes('kunai')&&this.player._atkCount%3===0)this.player.dexterity=(this.player.dexterity||0)+1;
+          if(this.relics.includes('pen_nib')){this.player._penNibCount=(this.player._penNibCount||0)+1;}
+        }
+        this.selectedCard=null;this.validTargets=[];
+        if(this.enemies.every(e=>e.hp<=0)){this.phase='between';return'victory';}
+        return true;
+      }
+      endPlayerTurn(){
+        // Ethereal cards exhaust
+        this.hand=this.hand.filter(c=>{const d=this.getCardDef(c);if(d&&d.keywords?.includes('ethereal')){this.exhaustPile.push(c);return false;}return true;});
+        // Curse effects
+        this.hand.forEach(c=>{
+          if(c.id==='regret_c')this.player.hp=Math.max(0,this.player.hp-this.hand.length);
+          if(c.id==='decay'||c.id==='burn_c')this.player.hp=Math.max(0,this.player.hp-2);
+        });
+        // Combustion power
+        this.getPower('combustion').forEach(p=>{adjE(this).forEach(e=>this.dealDamageRaw(e,p.dmg));});
+        // Process end-of-turn statuses
+        tickStatuses(this.player,'turnEnd');
+        this.enemies.forEach(e=>{if(e.hp>0)tickStatuses(e,'turnEnd');});
+        // Discard hand (retain cards stay)
+        const retained=[];const discarded=[];
+        this.hand.forEach(c=>{const d=this.getCardDef(c);if(d&&d.keywords?.includes('retain'))retained.push(c);else discarded.push(c);});
+        this.discardPile.push(...discarded);this.hand=retained;
+        this.phase='enemy';this.selectedCard=null;this.validTargets=[];
+        this.player._harmonyTriggered=false;this.player._atkCount=0;
+        audio.play('end_turn');
+      }
+      async executeEnemyTurns(renderer){
+        for(const e of this.enemies){
+          if(e.hp<=0||!e.intent)continue;e.block=0;
+          const intent=e.intent;
+          if(intent.type==='attack'){
+            let dmg=intent.value+(e.strength||0);
+            if(e.weak)dmg=Math.floor(dmg*0.75);
+            if(intent.halfDmg)dmg=Math.floor(dmg*0.5);
+            const hits=intent.hits||1;
+            for(let i=0;i<hits;i++){this.dealDamageToPlayer(dmg);renderer.shakeScreen();haptic('hit');await this.wait(180);}
+            if(intent.curse)this.discardPile.push(deckCard('doubt'));
+            if(intent.addCard)this.drawPile.push(deckCard(intent.addCard));
+            if(intent.exhaustCard&&this.hand.length)this.exhaustPile.push(this.hand.splice(Math.floor(Math.random()*this.hand.length),1)[0]);
+            if(intent.heal)this.healEnemy(e,intent.heal);
+            if(intent.spawn)this.spawnEnemy(intent.spawn,0,-2);
+            // Void Eater tracking
+            if(e.type==='void_eater')e._wasAttacked=false;
+          } else if(intent.type==='block'){
+            e.block+=intent.value;
+          } else if(intent.type==='move'){
+            this.moveEnemyToward(e);
+          }
+          renderer.render();await this.wait(250);
+        }
+        if(this.player.hp<=0){
+          // Fairy potion check
+          const fairyIdx=this.potions.findIndex(p=>p&&p.id==='fairy');
+          if(fairyIdx>=0){POTIONS.fairy.effect(this);this.potions[fairyIdx]=null;}
+          // Void Crystal relic
+          else if(this.relics.includes('void_crystal')&&!this.player._voidCrystalUsed){this.player._voidCrystalUsed=true;this.healPlayer(Math.ceil(this.player.maxHp*0.25));}
+          else{this.phase='dead';return;}
+        }
+        this.startPlayerTurn();
+      }
+      spawnEnemy(type,q,r){
+        const def=ENEMIES[type];if(!def)return;
+        const empties=this.hexes.filter(([hq,hr])=>this.isHexEmpty(hq,hr)&&!(hq===0&&hr===0));
+        if(!empties.length)return;
+        const pos=empties[Math.floor(this.rng()*empties.length)];
+        this.enemies.push({...def,type,q:pos[0],r:pos[1],hp:def.maxHp,maxHp:def.maxHp,block:0,intent:null,id:this.enemies.length,vulnerable:0,weak:0,strength:0,artifact:0,_tc:0});
+      }
+      moveEnemyToward(e){
+        const n=HEX.neighbors(e.q,e.r).filter(([q,r])=>this.hexExists(q,r)&&this.isHexEmpty(q,r));
+        if(!n.length)return;n.sort((a,b)=>HEX.distance(a[0],a[1],this.player.q,this.player.r)-HEX.distance(b[0],b[1],this.player.q,this.player.r));
+        e.q=n[0][0];e.r=n[0][1];
+      }
+      pullEnemy(e){
+        const n=HEX.neighbors(e.q,e.r).filter(([q,r])=>this.hexExists(q,r)&&this.isHexEmpty(q,r));
+        if(!n.length)return;n.sort((a,b)=>HEX.distance(a[0],a[1],this.player.q,this.player.r)-HEX.distance(b[0],b[1],this.player.q,this.player.r));
+        e.q=n[0][0];e.r=n[0][1];
+      }
+      pushEnemy(e){
+        const n=HEX.neighbors(e.q,e.r).filter(([q,r])=>this.hexExists(q,r)&&this.isHexEmpty(q,r));
+        if(!n.length)return;n.sort((a,b)=>HEX.distance(b[0],b[1],this.player.q,this.player.r)-HEX.distance(a[0],a[1],this.player.q,this.player.r));
+        e.q=n[0][0];e.r=n[0][1];
+      }
+      dealDamage(enemy,amount){
+        let dmg=amount+(this.player.nextAttackBonus||0);
+        if(this.player.nextAttackBonus){this.player.nextAttackBonus=0;}
+        if(this.player.attacksWithBonus>0){dmg+=this.player.attackBonus||0;this.player.attacksWithBonus--;}
+        if(this.player.strength)dmg+=this.player.strength;
+        if(this.player.weak)dmg=Math.floor(dmg*0.75);
+        // Tempered Edge power
+        this.getPower('tempered_edge').forEach(p=>{dmg+=Math.floor(this.player.block/p.per);});
+        // Pen Nib relic
+        if(this.relics.includes('pen_nib')&&(this.player._penNibCount||0)%10===0&&this.player._penNibCount>0)dmg*=2;
+        // Relic: spark_shard
+        this.relics.forEach(r=>{const R=RELICS[r];if(R&&R.onDamageCalc)dmg=R.onDamageCalc(this,dmg);});
+        if(enemy.vulnerable)dmg=Math.floor(dmg*1.5);
+        // Prism Warden reflect
+        if(enemy.reflect){this.dealDamageToPlayer(Math.floor(dmg*enemy.reflect));}
+        if(enemy.intangible)dmg=Math.min(1,dmg);
+        if(enemy.block>0){const b=Math.min(enemy.block,dmg);enemy.block-=b;dmg-=b;}
+        if(dmg>0){
+          const wasAlive=enemy.hp>0;enemy.hp=Math.max(0,enemy.hp-dmg);this.totalDamageDealt+=dmg;
+          this.showFloat(enemy,'-'+dmg,'damage');audio.play('damage');
+          if(window.emitParticles){window.emitParticles({type:'slash',from:{q:this.player.q,r:this.player.r},to:{q:enemy.q,r:enemy.r},color:'spark'});
+          if(wasAlive&&enemy.hp<=0){window.emitParticles({type:'deathShatter',at:{q:enemy.q,r:enemy.r}});haptic('kill');audio.play('kill');
+            if(enemy.onDeath)enemy.onDeath(enemy,this);
+            // Void Eater: mark as attacked
+            if(enemy.type==='void_eater')enemy._wasAttacked=true;
+          }}
+        }
+      }
+      dealDamageRaw(enemy,amount){
+        if(enemy.block>0){const b=Math.min(enemy.block,amount);enemy.block-=b;amount-=b;}
+        if(amount>0){enemy.hp=Math.max(0,enemy.hp-amount);this.totalDamageDealt+=amount;}
+      }
+      dealDamageToPlayer(amount){
+        let dmg=amount;
+        if(this.player.intangible)dmg=1;
+        if(this.player.vulnerable)dmg=Math.floor(dmg*1.5);
+        if(this.relics.includes('tungsten_rod')&&dmg>0)dmg=Math.max(1,dmg-1);
+        if(this.player.block>0){const b=Math.min(this.player.block,dmg);this.player.block-=b;dmg-=b;if(b>0)this.showFloat(this.player,'-'+b+' blocked','block');}
+        if(dmg>0){
+          this.player.hp=Math.max(0,this.player.hp-dmg);this.showFloat(this.player,'-'+dmg,'damage');
+          audio.play('damage');
+          if(window.emitParticles)window.emitParticles({type:'playerHit',at:{q:this.player.q,r:this.player.r}});
+          // Mirror Coat power
+          this.getPower('mirror_coat').forEach(p=>this.gainBlock(p.blk));
+          // Canopy
+          if(this.player.canopyActive>1){this.player.block*=this.player.canopyActive;this.player.canopyActive=0;}
+          // Self-Forming Clay relic
+          if(this.relics.includes('self_forming_clay'))this.player.nextTurnBlock=(this.player.nextTurnBlock||0)+3;
+          // Thorn
+          if(this.player.thorn>0){/* find attacking enemy - approximate */}
+        }
+      }
+      gainBlock(amt){
+        let blk=amt+(this.player.dexterity||0);
+        if(this.player.frail)blk=Math.floor(blk*0.75);
+        this.player.block+=blk;this.showFloat(this.player,'+'+blk+' Block','block');
+        audio.play('block');if(window.emitParticles)window.emitParticles({type:'block',at:{q:this.player.q,r:this.player.r}});
+      }
+      healPlayer(amt){const h=Math.min(amt,this.player.maxHp-this.player.hp);this.player.hp+=h;if(h>0){this.showFloat(this.player,'+'+h,'heal');audio.play('heal');if(window.emitParticles)window.emitParticles({type:'heal',at:{q:this.player.q,r:this.player.r}});}}
+      healEnemy(e,amt){e.hp=Math.min(e.maxHp,e.hp+amt);}
+      movePlayer(q,r){this.player.q=q;this.player.r=r;this.player.hexesMovedThisTurn=(this.player.hexesMovedThisTurn||0)+1;}
+      grantRelic(rarity){
+        const pool=rarity?RELIC_POOLS[rarity]:RELIC_POOLS.common;
+        const available=pool.filter(r=>!this.relics.includes(r));
+        if(!available.length)return;
+        const id=available[Math.floor(this.rng()*available.length)];
+        this.relics.push(id);
+        if(RELICS[id].onPickup)RELICS[id].onPickup(this);
+      }
+      addRandomCard(rarity){
+        const pool=CARD_POOLS[rarity]||CARD_POOLS.common;
+        this.deck.push(deckCard(pool[Math.floor(this.rng()*pool.length)]));
+      }
+      generateCombatEnemies(){
+        const act=ACT_ENEMIES[this.act];if(!act)return{types:['shade'],pos:[{q:0,r:-2}]};
+        const pool=act.normal;const count=1+Math.floor(this.rng()*2);
+        const types=[];const positions=[{q:1,r:-1},{q:-1,r:1},{q:0,r:-2},{q:2,r:-1},{q:-2,r:1}];
+        for(let i=0;i<count;i++)types.push(pool[Math.floor(this.rng()*pool.length)]);
+        return{types,pos:positions.slice(0,types.length)};
+      }
+      generateEliteEnemies(){
+        const act=ACT_ENEMIES[this.act];if(!act)return{types:['sentinel'],pos:[{q:0,r:-2}]};
+        return{types:[act.elite[Math.floor(this.rng()*act.elite.length)]],pos:[{q:0,r:-2}]};
+      }
+      generateBossEnemies(){
+        const act=ACT_ENEMIES[this.act];if(!act)return{types:['umbra_prime'],pos:[{q:0,r:-2}]};
+        const boss=act.boss[Math.floor(this.rng()*act.boss.length)];
+        return{types:[boss],pos:[{q:0,r:-2}]};
+      }
+      calculateScore(){
+        let s=this.totalDamageDealt+this.cardsPlayed*2+(this.act-1)*500;
+        if(this.player.hp>0)s+=this.player.hp*3;
+        s+=this.player.gold;
+        s+=this.relics.length*50;
+        this.score=s;return s;
+      }
+      showFloat(entity,text,type){
+        const grid=document.getElementById('hex-grid');if(!grid)return;
+        const rect=grid.getBoundingClientRect();const pos=HEX.toPixel(entity.q,entity.r);
+        const el=document.createElement('div');el.className='float-text '+type;el.textContent=text;
+        el.style.left=(rect.left+rect.width/2+pos.x-20)+'px';el.style.top=(rect.top+rect.height/2+pos.y-30)+'px';
+        document.body.appendChild(el);setTimeout(()=>el.remove(),700);
+      }
+      wait(ms){return new Promise(r=>setTimeout(r,ms));}
+      // Save/Load
+      saveRun(){
+        try{
+          const state={player:{...this.player},deck:this.deck,relics:this.relics,potions:this.potions,
+            act:this.act,floor:this.floor,mapRow:this.mapRow,mapCol:this.mapCol,
+            visited:[...this.visited],score:this.score,totalDamageDealt:this.totalDamageDealt,
+            cardsPlayed:this.cardsPlayed,turnsPlayed:this.turnsPlayed,ascension:this.ascension,
+            removals:this.removals,isDaily:this.isDaily,dailySeed:this.dailySeed};
+          localStorage.setItem(SAVE_KEY,JSON.stringify(state));
+        }catch(e){}
+      }
+      loadRun(){
+        try{
+          const s=JSON.parse(localStorage.getItem(SAVE_KEY));if(!s)return false;
+          Object.assign(this.player,s.player);this.deck=s.deck;this.relics=s.relics;this.potions=s.potions;
+          this.act=s.act;this.floor=s.floor;this.mapRow=s.mapRow;this.mapCol=s.mapCol;
+          this.visited=new Set(s.visited);this.score=s.score;this.totalDamageDealt=s.totalDamageDealt;
+          this.cardsPlayed=s.cardsPlayed;this.turnsPlayed=s.turnsPlayed;this.ascension=s.ascension;
+          this.removals=s.removals||0;this.isDaily=s.isDaily;this.dailySeed=s.dailySeed;
+          return true;
+        }catch(e){return false;}
+      }
+      clearSave(){try{localStorage.removeItem(SAVE_KEY);}catch(e){}}
+    }
+
+    // ═══ RENDERER ══════════════════════════════════════════════════════════
+    class Renderer {
+      constructor(game){
+        this.game=game;this.el={};
+        ['title-screen','map-screen','combat-screen','rest-screen','nexus-screen','event-screen','reward-screen','shop-screen','gameover-screen','victory-screen','puzzle-screen','daily-screen','hex-grid','hand','enemy-panel','player-stats','deck-info','relic-bar','run-info','turn-info','turn-banner','narrative-overlay','narrative-text','smith-cards','meditate-cards','nexus-deck','nexus-circle','nexus-preview','nexus-confirm','event-text','event-choices','reward-cards','gameover-stats','victory-stats','map-container','map-title','map-hp','map-gold','potion-bar','combat-gold','reward-gold','shop-gold','shop-cards','shop-relics','shop-potions'].forEach(id=>{this.el[id]=document.getElementById(id);});
+      }
+      showScreen(name){
+        ['title','map','combat','rest','nexus','event','reward','shop','gameover','victory','puzzle','daily'].forEach(s=>{const el=document.getElementById(s+'-screen');if(el)el.classList.remove('active');});
+        const el=document.getElementById(name+'-screen');if(el)el.classList.add('active');
+        const tint=document.getElementById('floor-tint');
+        if(tint){if(name==='combat'){tint.className='floor-tint active act-'+(this.game.act-1);}else tint.className='floor-tint';}
+      }
+      async showBanner(text,dur=800){const b=document.getElementById('turn-banner');if(!b)return;b.textContent=text;b.classList.add('show');await this.game.wait(dur);b.classList.remove('show');}
+      shakeScreen(){const g=document.getElementById('game');if(g){g.classList.add('shake');setTimeout(()=>g.classList.remove('shake'),280);}}
+      showNarrative(text){const ov=this.el['narrative-overlay'];const tx=this.el['narrative-text'];if(!ov||!tx)return;tx.textContent='';ov.classList.add('active');let i=0;const type=()=>{if(i<text.length){tx.textContent+=text[i++];setTimeout(type,25);}};type();}
+      hideNarrative(){const ov=this.el['narrative-overlay'];if(ov)ov.classList.remove('active');}
+      render(){this.renderHexGrid();this.renderHand();this.renderEnemies();this.renderPlayerStats();this.renderDeckInfo();this.renderRelics();this.renderRunInfo();this.renderPotions();}
+      renderHexGrid(){
+        const grid=this.el['hex-grid'];if(!grid)return;grid.innerHTML='';
+        const gw=grid.offsetWidth||480,gh=grid.offsetHeight||440;
+        const cx=gw/2,cy=gh/2;
+        this.game.hexes.forEach(([q,r])=>{
+          const pos=HEX.toPixel(q,r);const hex=document.createElement('div');hex.className='hex';
+          hex.dataset.q=q;hex.dataset.r=r;
+          hex.style.left=(cx+pos.x-HEX.size*0.866)+'px';hex.style.top=(cy+pos.y-HEX.size)+'px';
+          if(q===this.game.player.q&&r===this.game.player.r)hex.classList.add('player-hex');
+          const enemyHere=this.game.getEnemyAt(q,r);if(enemyHere)hex.classList.add('enemy-hex');
+          if(this.game.validTargets.some(t=>t.q===q&&t.r===r))hex.classList.add('valid-target');
+          const tokenType=enemyHere?(enemyHere.tier==='boss'?'boss':enemyHere.tier==='elite'?'elite':enemyHere.token||'shade'):'shade';
+          hex.innerHTML='<div class="hex-shape"></div><div class="hex-content">'+(q===this.game.player.q&&r===this.game.player.r?'<div class="token token-player token-idle">'+renderTokenArt('player')+'</div>':'')+(enemyHere?'<div class="token token-enemy token-idle">'+renderTokenArt(tokenType)+'</div>':'')+'</div>';
+          hex.addEventListener('click',()=>this.onHexClick(q,r));
+          grid.appendChild(hex);
+        });
+      }
+      renderHand(){
+        const hand=this.el.hand;if(!hand)return;hand.innerHTML='';
+        this.game.hand.forEach((card,i)=>{
+          const def=this.game.getCardDef(card);if(!def)return;
+          const playable=this.game.player.energy>=def.cost&&this.game.phase==='player'&&!def.keywords?.includes('unplayable');
+          const selected=this.game.selectedCard===i;
+          const div=document.createElement('div');
+          let cls='card'+(selected?' selected':'')+(card.upgraded?' upgraded':'')+(card.fused?' prismatic':'')+(playable?'':' unplayable');
+          if(def.rarity==='uncommon')cls+=' rarity-uncommon';if(def.rarity==='rare')cls+=' rarity-rare';
+          if(def.type==='power')cls+=' power-card';
+          if(this.game.justDrewCards){cls+=' card-enter';div.style.animationDelay=(i*80)+'ms';}
+          div.className=cls;div.dataset.colony=def.colony;
+          const art=renderCardArt(def.id,def.colony,def.type,100,60);
+          const kwStr=def.keywords?.length?'<div class="card-kw">'+def.keywords.join(' ')+'</div>':'';
+          div.innerHTML='<div class="card-inner">'+(card.upgraded?'<div class="card-plus">+</div>':'')+
+            '<div class="card-header"><div class="card-cost">'+def.cost+'</div></div>'+
+            '<div class="card-art-svg">'+art+'</div>'+
+            '<div class="card-name">'+def.name+'</div><div class="card-desc">'+def.desc+'</div>'+kwStr+
+            '<div class="card-colony-bar"></div></div>';
+          div.addEventListener('click',()=>this.onCardClick(i));
+          hand.appendChild(div);
+        });
+        if(this.game.justDrewCards)this.game.justDrewCards=false;
+      }
+      renderEnemies(){
+        const panel=this.el['enemy-panel'];if(!panel)return;panel.innerHTML='';
+        const hideIntents=this.game.relics.includes('runic_dome')&&!this.game.intentsRevealed;
+        this.game.enemies.forEach(e=>{
+          const card=document.createElement('div');card.className='enemy-card'+(e.hp<=0?' dead':'');
+          const pct=Math.round(100*e.hp/e.maxHp);
+          const statuses=statusStr(e);
+          card.innerHTML='<div class="enemy-name">'+e.name+'</div><div class="enemy-hp-bar"><div class="enemy-hp-fill" style="width:'+pct+'%"></div></div><div class="enemy-hp-text">'+e.hp+'/'+e.maxHp+(e.block?' | 🛡'+e.block:'')+'</div>'+(statuses?'<div class="enemy-statuses">'+statuses+'</div>':'')+(e.intent&&e.hp>0&&!hideIntents?'<div class="enemy-intent">'+e.intent.label+'</div>':'');
+          panel.appendChild(card);
+        });
+      }
+      renderPlayerStats(){
+        const p=this.game.player;const el=this.el['player-stats'];if(!el)return;
+        const statuses=statusStr(p);
+        const hpPct=Math.round(100*p.hp/p.maxHp);
+        const hpColor=hpPct>60?'var(--danger)':hpPct>30?'var(--warning)':'#ff2020';
+        el.innerHTML='<div class="stat stat-hp"><span style="color:'+hpColor+'">♥</span> '+p.hp+'/'+p.maxHp+'</div>'+(p.block>0?'<div class="stat stat-block">🛡 '+p.block+'</div>':'')+
+          '<div class="energy-orb" title="Energy">'+p.energy+'</div>'+
+          (statuses?'<div style="display:flex;gap:2px">'+statuses+'</div>':'');
+      }
+      renderDeckInfo(){const d=this.el['deck-info'];if(d)d.innerHTML='Draw:'+this.game.drawPile.length+' | Disc:'+this.game.discardPile.length+' | Ex:'+this.game.exhaustPile.length;
+        const cg=this.el['combat-gold'];if(cg)cg.textContent='💰'+this.game.player.gold;}
+      renderRelics(){const bar=this.el['relic-bar'];if(!bar)return;bar.innerHTML=this.game.relics.map(r=>'<span class="relic-icon" title="'+RELICS[r].name+': '+RELICS[r].desc+'">'+RELICS[r].icon+'</span>').join('');}
+      renderRunInfo(){const ri=this.el['run-info'];const ti=this.el['turn-info'];if(ri)ri.textContent='Act '+this.game.act+' | A'+this.game.ascension;if(ti)ti.textContent='Turn '+this.game.turn;}
+      renderPotions(){
+        const bar=this.el['potion-bar'];if(!bar)return;
+        bar.innerHTML=this.game.potions.map((p,i)=>{
+          if(p)return'<div class="potion-slot filled" data-idx="'+i+'" title="'+POTIONS[p.id].name+': '+POTIONS[p.id].desc+'">'+POTIONS[p.id].icon+'</div>';
+          return'<div class="potion-slot empty">·</div>';
+        }).join('');
+        bar.querySelectorAll('.potion-slot.filled').forEach(el=>{
+          el.addEventListener('click',()=>{
+            const idx=parseInt(el.dataset.idx);const p=this.game.potions[idx];if(!p)return;
+            if(POTIONS[p.id].needsTarget){/* simplified: use on nearest enemy */const es=allE(this.game);if(es.length)POTIONS[p.id].effect(this.game,{q:es[0].q,r:es[0].r});}
+            else POTIONS[p.id].effect(this.game);
+            this.game.potions[idx]=null;this.render();
+          });
+        });
+      }
+      onCardClick(i){
+        if(this.game.phase!=='player')return;
+        const card=this.game.hand[i];const def=this.game.getCardDef(card);if(!def)return;
+        if(def.keywords?.includes('unplayable'))return;
+        let cost=def.cost;
+        if(this.game.player.nextCardFree||this.game.player._adaptationLeft>0)cost=0;
+        if(this.game.player.energy<cost)return;
+        if(this.game.selectedCard===i){this.game.selectedCard=null;this.game.validTargets=[];this.render();haptic('tap');return;}
+        this.game.selectedCard=i;haptic('tap');audio.play('ui_click');
+        const targets=def.validTargets(this.game);
+        this.game.validTargets=targets.filter(t=>t.q!=='self');
+        if(targets.length&&targets.every(t=>t.q==='self')){this.playSelectedCard(null);return;}
+        if(!this.game.validTargets.length)this.game.selectedCard=null;
+        this.render();
+      }
+      onHexClick(q,r){
+        if(this.game.phase!=='player'||this.game.selectedCard===null)return;
+        if(!this.game.validTargets.some(t=>t.q===q&&t.r===r))return;
+        this.playSelectedCard({q,r});
+      }
+      async playSelectedCard(target){
+        const idx=this.game.selectedCard;if(idx===null)return;
+        const handEl=this.el.hand;const gridEl=this.el['hex-grid'];
+        const cardEl=handEl&&handEl.children[idx];
+        const tHex=target&&target.q!=='self'?target:{q:this.game.player.q,r:this.game.player.r};
+        let clone=null,dx=0,dy=0;
+        if(cardEl&&gridEl){
+          const rect=cardEl.getBoundingClientRect();const gridRect=gridEl.getBoundingClientRect();
+          const pos=HEX.toPixel(tHex.q,tHex.r);
+          const hcx=gridRect.left+gridRect.width/2+pos.x,hcy=gridRect.top+gridRect.height/2+pos.y;
+          dx=hcx-(rect.left+rect.width/2);dy=hcy-(rect.top+rect.height/2);
+          clone=cardEl.cloneNode(true);clone.classList.add('card-fly');clone.style.left=rect.left+'px';clone.style.top=rect.top+'px';clone.style.width=rect.width+'px';clone.style.height=rect.height+'px';clone.style.transition='transform 0.23s var(--ease-out),opacity 0.23s';document.body.appendChild(clone);
+        }
+        haptic('play');audio.play('card_play');
+        const result=this.game.playCard(idx,target);
+        if(clone){requestAnimationFrame(()=>{clone.style.transform=`translate(${dx}px,${dy}px) scale(0.7)`;clone.style.opacity='0';});await this.game.wait(260);clone.remove();}
+        if(result===true)this.render();
+        else if(result==='victory'){this.render();await this.game.wait(500);this.onCombatVictory();}
+      }
+      async onEndTurn(){
+        if(this.game.phase!=='player')return;
+        this.game.endPlayerTurn();this.render();
+        await this.showBanner('Enemy Turn',500);
+        await this.game.executeEnemyTurns(this);
+        if(this.game.phase==='dead'){await this.game.wait(300);this.game.calculateScore();this.renderResultStats(this.el['gameover-stats']);this.showScreen('gameover');haptic('defeat');audio.play('defeat');this.game.clearSave();this.saveEpisode('defeat');return;}
+        this.render();
+      }
+      async onCombatVictory(){
+        // Meat on Bone relic
+        if(this.game.relics.includes('meat_on_bone')&&this.game.player.hp<=this.game.player.maxHp*0.5)this.game.healPlayer(12);
+        // Gold reward
+        const goldReward=10+Math.floor(this.game.rng()*15);this.game.player.gold+=goldReward;
+        this.renderReward(goldReward);this.showScreen('reward');
+        this.game.saveRun();
+      }
+      renderReward(gold){
+        const container=this.el['reward-cards'];if(!container)return;container.innerHTML='';
+        if(this.el['reward-gold'])this.el['reward-gold'].textContent='+'+gold+' gold';
+        // Card rewards
+        const act=this.game.act;let pool;
+        const roll=this.game.rng();
+        if(roll<0.6)pool=CARD_POOLS.common;else if(roll<0.9)pool=CARD_POOLS.uncommon;else pool=CARD_POOLS.rare;
+        let numChoices=3;if(this.game.relics.includes('crown'))numChoices=1;
+        const available=shuffle(pool,this.game.rng).slice(0,numChoices);
+        available.forEach(cardId=>{
+          const def=CARDS[cardId];if(!def)return;
+          const div=document.createElement('div');div.className='reward-card card';div.dataset.colony=def.colony;
+          div.innerHTML='<div class="card-inner"><div class="card-header"><div class="card-cost">'+def.cost+'</div></div><div class="card-art-svg">'+renderCardArt(def.id,def.colony,def.type,100,80)+'</div><div class="card-name">'+def.name+'</div><div class="card-desc">'+def.desc+'</div><div class="card-colony-bar"></div></div>';
+          div.addEventListener('click',()=>{this.game.deck.push(deckCard(cardId));this.proceedFromReward();});
+          container.appendChild(div);
+        });
+        // Potion reward (30% chance)
+        const potDiv=document.getElementById('reward-potion');
+        if(potDiv){potDiv.classList.add('hidden');
+          if(this.game.rng()<0.3){
+            const emptySlot=this.game.potions.findIndex(p=>p===null);
+            if(emptySlot>=0){
+              const pid=POTION_IDS[Math.floor(this.game.rng()*POTION_IDS.length)];
+              potDiv.classList.remove('hidden');
+              potDiv.innerHTML='<div class="reward-potion" id="reward-potion-pick">'+POTIONS[pid].icon+' '+POTIONS[pid].name+' — '+POTIONS[pid].desc+'</div>';
+              document.getElementById('reward-potion-pick').onclick=()=>{this.game.potions[emptySlot]={id:pid};potDiv.classList.add('hidden');};
+            }
+          }
+        }
+      }
+      proceedFromReward(){
+        this.game.saveRun();this.showMap();
+      }
+      showMap(){
+        if(!this.game.map)this.game.map=generateMap(this.game.act,this.game.rng);
+        this.el['map-title'].textContent='Act '+this.game.act+' — '+ACT_NAMES[this.game.act-1];
+        this.el['map-hp'].innerHTML='♥ '+this.game.player.hp+'/'+this.game.player.maxHp;
+        this.el['map-gold'].textContent='💰'+this.game.player.gold;
+        this.el['map-container'].innerHTML=renderMapSVG(this.game.map,this.game.mapRow,this.game.mapCol,this.game.visited);
+        this.showScreen('map');
+        // Wire map clicks
+        this.el['map-container'].querySelectorAll('.map-node-circle').forEach(circle=>{
+          circle.addEventListener('click',()=>{
+            const r=parseInt(circle.dataset.row),c=parseInt(circle.dataset.col);
+            if(r!==this.game.mapRow+1)return;
+            if(this.game.mapRow>=0&&this.game.map[this.game.mapRow]){
+              const currentNode=this.game.map[this.game.mapRow][this.game.mapCol];
+              if(!currentNode.edges.includes(c))return;
+            }
+            this.game.visited.add(`${r},${c}`);this.game.mapRow=r;this.game.mapCol=c;
+            this.enterNode(this.game.map[r][c]);
+          });
+        });
+      }
+      async enterNode(node){
+        this.game.saveRun();
+        if(node.type==='combat'){
+          const enc=this.game.generateCombatEnemies();
+          this.showScreen('combat');
+          const narr=ACT_NARRATIVES[this.game.act];
+          if(narr&&this.game.rng()<0.3){this.showNarrative(narr[Math.floor(this.game.rng()*narr.length)]);await this.game.wait(2000);this.hideNarrative();await this.game.wait(200);}
+          this.game.startEncounter(enc.types,enc.pos);await this.showBanner('Combat',600);this.render();
+        } else if(node.type==='elite'){
+          const enc=this.game.generateEliteEnemies();
+          this.showScreen('combat');this.game.startEncounter(enc.types,enc.pos);await this.showBanner('Elite!',800);this.render();
+        } else if(node.type==='boss'){
+          const enc=this.game.generateBossEnemies();
+          this.showScreen('combat');this.game.startEncounter(enc.types,enc.pos);await this.showBanner('BOSS',1000);this.render();
+        } else if(node.type==='rest'){
+          this.showScreen('rest');
+          document.getElementById('smith-cards').classList.add('hidden');
+          document.getElementById('meditate-cards').classList.add('hidden');
+        } else if(node.type==='shop'){
+          this.renderShop();this.showScreen('shop');
+        } else if(node.type==='event'){
+          this.renderEvent();this.showScreen('event');
+        }
+      }
+      renderShop(){
+        const g=this.game;
+        this.el['shop-gold'].textContent='💰'+g.player.gold;
+        // Cards
+        const sc=this.el['shop-cards'];sc.innerHTML='';
+        const pools=[{p:CARD_POOLS.common,price:50},{p:CARD_POOLS.uncommon,price:75},{p:CARD_POOLS.rare,price:150}];
+        pools.forEach(({p,price})=>{
+          const ids=shuffle(p,g.rng).slice(0,2);
+          ids.forEach(id=>{
+            const def=CARDS[id];if(!def)return;
+            const div=document.createElement('div');div.className='shop-item card';div.dataset.colony=def.colony;
+            div.innerHTML='<div class="card-inner"><div class="card-header"><div class="card-cost">'+def.cost+'</div></div><div class="card-name">'+def.name+'</div><div class="card-desc">'+def.desc+'</div><div class="card-colony-bar"></div></div><div class="shop-price">'+price+'g</div>';
+            div.onclick=()=>{if(g.player.gold>=price){g.player.gold-=price;g.deck.push(deckCard(id));div.classList.add('sold');this.el['shop-gold'].textContent='💰'+g.player.gold;}};
+            sc.appendChild(div);
+          });
+        });
+        // Relics
+        const sr=this.el['shop-relics'];sr.innerHTML='';
+        const relicPool=shuffle([...RELIC_POOLS.common,...RELIC_POOLS.uncommon],g.rng).filter(r=>!g.relics.includes(r)).slice(0,3);
+        relicPool.forEach(id=>{
+          const R=RELICS[id];const price=R.rarity==='uncommon'?250:150;
+          const div=document.createElement('div');div.className='shop-item';
+          div.innerHTML='<span class="relic-icon" style="width:48px;height:48px;font-size:1.5rem">'+R.icon+'</span><div class="shop-price">'+price+'g</div>';
+          div.title=R.name+': '+R.desc;
+          div.onclick=()=>{if(g.player.gold>=price){g.player.gold-=price;g.relics.push(id);if(R.onPickup)R.onPickup(g);div.classList.add('sold');this.el['shop-gold'].textContent='💰'+g.player.gold;}};
+          sr.appendChild(div);
+        });
+        // Potions
+        const sp=this.el['shop-potions'];sp.innerHTML='';
+        shuffle(POTION_IDS,g.rng).slice(0,2).forEach(id=>{
+          const P=POTIONS[id];const price=50;
+          const div=document.createElement('div');div.className='shop-item';
+          div.innerHTML='<span class="relic-icon" style="width:48px;height:48px;font-size:1.5rem">'+P.icon+'</span><div class="shop-price">'+price+'g</div>';
+          div.title=P.name+': '+P.desc;
+          div.onclick=()=>{const slot=g.potions.findIndex(p=>p===null);if(slot>=0&&g.player.gold>=price){g.player.gold-=price;g.potions[slot]={id};div.classList.add('sold');this.el['shop-gold'].textContent='💰'+g.player.gold;}};
+          sp.appendChild(div);
+        });
+        // Remove card
+        const removeBtn=document.getElementById('shop-remove-btn');
+        const removePrice=75+g.removals*25;
+        removeBtn.textContent='Remove Card ('+removePrice+'g)';
+        removeBtn.onclick=()=>{
+          if(g.player.gold<removePrice||g.deck.length<=5)return;
+          // Show deck for removal (simplified: remove random non-starter)
+          const removable=g.deck.filter(c=>!['strike','defend','advance'].includes(c.id)||g.deck.filter(x=>x.id===c.id).length>2);
+          if(removable.length){const idx=g.deck.indexOf(removable[Math.floor(g.rng()*removable.length)]);g.deck.splice(idx,1);g.player.gold-=removePrice;g.removals++;this.el['shop-gold'].textContent='💰'+g.player.gold;}
+        };
+      }
+      renderEvent(){
+        const ev=EVENTS[Math.floor(this.game.rng()*EVENTS.length)];
+        this.el['event-text'].textContent=ev.text;
+        const choices=this.el['event-choices'];choices.innerHTML='';
+        ev.choices.forEach(ch=>{
+          const btn=document.createElement('button');btn.className='btn';btn.textContent=ch.text;
+          btn.onclick=()=>{ch.effect(this.game);this.game.saveRun();this.showMap();};
+          choices.appendChild(btn);
+        });
+      }
+      renderResultStats(container){
+        if(!container)return;this.game.calculateScore();
+        container.innerHTML='<div style="text-align:center"><div class="result-stat-value">'+this.game.score+'</div><div>Score</div></div><div style="text-align:center"><div class="result-stat-value">'+this.game.totalDamageDealt+'</div><div>Damage</div></div><div style="text-align:center"><div class="result-stat-value">'+this.game.cardsPlayed+'</div><div>Cards</div></div><div style="text-align:center"><div class="result-stat-value">Act '+this.game.act+'</div><div>Reached</div></div>';
+      }
+      async startRun(options={}){
+        this.game.reset();
+        if(options.daily){this.game.isDaily=true;this.game.dailySeed=dateSeed();this.game.rng=mulberry32(this.game.dailySeed);}
+        else{this.game.rng=mulberry32(Date.now());}
+        this.game.ascension=this.game.loadMeta().ascension||0;
+        this.game.map=generateMap(1,this.game.rng);
+        this.game.mapRow=-1;this.game.mapCol=0;
+        this.showMap();
+      }
+      async startPuzzle(){
+        this.game.reset();this.game.isPuzzle=true;
+        const seed=dateSeed();this.game.rng=mulberry32(seed);
+        document.getElementById('puzzle-date').textContent='Puzzle #'+(seed%10000);
+        // Generate puzzle scenario
+        const puzzleEnemies=['shade','phantom','hollow'];
+        const types=shuffle(puzzleEnemies,this.game.rng).slice(0,2+Math.floor(this.game.rng()*2));
+        const positions=[{q:1,r:-1},{q:-1,r:1},{q:0,r:-2},{q:2,r:-1}];
+        // Give player specific cards
+        this.game.deck=[deckCard('strike'),deckCard('strike'),deckCard('ignite'),deckCard('defend'),deckCard('foresight')];
+        this.game.player.maxEnergy=3;this.game.player.hp=30;this.game.player.maxHp=30;
+        this.showScreen('puzzle');
+        // Reuse combat screen inside puzzle
+        this.showScreen('combat');
+        this.game.startEncounter(types,positions.slice(0,types.length));
+        await this.showBanner('Mirror Puzzle #'+(seed%10000),800);
+        this.render();
+      }
+      saveEpisode(type,data){try{const ep={'@type':'MemoryEpisode',content:'Game '+type,created:new Date().toISOString(),data};const ex=JSON.parse(localStorage.getItem(EP_KEY)||'[]');ex.push(ep);if(ex.length>50)ex.splice(0,ex.length-50);localStorage.setItem(EP_KEY,JSON.stringify(ex));}catch(e){}}
+    }
+
+    // ═══ SHARE GRID ════════════════════════════════════════════════════════
+    function generateShareGrid(game,type){
+      const colors=['🟩','🟨','🟧','🟥','⬛'];
+      if(type==='puzzle'){
+        const stars=Math.max(1,4-game.turnsPlayed);
+        let grid='🪞 Mirror Puzzle #'+(game.dailySeed||dateSeed())%10000+'\n';
+        for(let r=0;r<2;r++){for(let c=0;c<3;c++)grid+=game.turnsPlayed<=r*3+c+1?'🟩':'⬛';grid+='\n';}
+        grid+='⭐'.repeat(stars)+' | 🔥'+game.totalDamageDealt+'\n'+SITE_URL;
+        return grid;
+      }
+      // Daily run share
+      let grid='🪞 Mirror Run #'+(game.dailySeed||dateSeed())%10000+'\n';
+      for(let r=0;r<3;r++){for(let c=0;c<5;c++){const perf=game.rng?game.rng():Math.random();grid+=colors[Math.floor(perf*colors.length)];}grid+='\n';}
+      grid+='⚡'+game.score+' | 🔥A'+game.ascension+'\n'+SITE_URL;
+      return grid;
+    }
+
+    // ═══ ASCENSION MODIFIERS ═══════════════════════════════════════════════
+    const ASCENSION_MODS=[
+      'Baseline','Elites +HP','Enemies +10% HP','Lose 1 HP after elite','Less healing','Enemies +10% dmg',
+      'Start combat wounded','Bosses +HP','Less gold','Curses appear','Elites harder','Shop costs +10%',
+      'Start -1 Energy turn 1','Enemies faster AI','Mini-bosses in Act 1','Less potion drops',
+      'Draw 1 fewer card turn 1','Enemies have Block','Bosses have 2 phases','The Heart awaits'
+    ];
+
+    // ═══ DAILY RUN MODIFIERS ═══════════════════════════════════════════════
+    const DAILY_MODS=[
+      {name:'Glass Cannon',desc:'Double damage, half HP',apply:(g)=>{g.player.maxHp=30;g.player.hp=30;g.player.strength+=3;}},
+      {name:'Hoarder',desc:'Start with 300 gold',apply:(g)=>{g.player.gold=300;}},
+      {name:'Draft',desc:'Start with 5 random cards',apply:(g)=>{for(let i=0;i<5;i++)g.addRandomCard('uncommon');}},
+      {name:'Blessed',desc:'Start with 3 random relics',apply:(g)=>{for(let i=0;i<3;i++)g.grantRelic();}},
+      {name:'Terminal',desc:'Start with 1 HP',apply:(g)=>{g.player.hp=1;}},
+      {name:'Insanity',desc:'All cards cost random 0-3',apply:()=>{}},
+      {name:'Time Dilation',desc:'Draw 7 per turn',apply:(g)=>{g.addPower('focus',{extraDraw:2});}},
+      {name:'Night Terrors',desc:'+2 Curse cards',apply:(g)=>{g.deck.push(deckCard('doubt'));g.deck.push(deckCard('decay'));}},
+      {name:'Lethality',desc:'+3 Strength',apply:(g)=>{g.player.strength+=3;}},
+      {name:'Shiny',desc:'All cards upgraded',apply:(g)=>{g.deck.forEach(c=>{if(CARDS[c.id]&&CARDS[c.id].upgraded)c.upgraded=true;});}},
+      {name:'Chimera',desc:'Start with 3 fused cards',apply:(g)=>{const keys=Object.keys(FUSION_RECIPES);for(let i=0;i<3&&i<keys.length;i++){const f=FUSION_RECIPES[keys[i]];g.deck.push(deckCard(f.id||('fused_'+keys[i]),false,true,f));}}},
+      {name:'Poverty',desc:'No gold drops',apply:()=>{}},
+      {name:'Elite Gauntlet',desc:'Every other fight is elite',apply:()=>{}},
+      {name:'Sealed',desc:'Start with 0 cards, draft deck',apply:(g)=>{g.deck=[];for(let i=0;i<10;i++)g.addRandomCard(Math.random()<0.5?'common':'uncommon');}},
+      {name:'Big',desc:'+30 max HP',apply:(g)=>{g.player.maxHp+=30;g.player.hp+=30;}},
+      {name:'Diverse',desc:'One of each colony card',apply:(g)=>{['ignite','temper','mend','link','foresight','defend','reflect'].forEach(id=>g.deck.push(deckCard(id)));}}
+    ];
+
+    // ═══ WALLET SDK STUB ═══════════════════════════════════════════════════
+    class KagamiWallet {
+      constructor(){this.shards=0;this.cosmetics=[];this.loaded=false;}
+      async load(){try{const d=JSON.parse(localStorage.getItem('kagami:wallet')||'{}');this.shards=d.shards||0;this.cosmetics=d.cosmetics||[];this.loaded=true;}catch(e){}}
+      async save(){try{localStorage.setItem('kagami:wallet',JSON.stringify({shards:this.shards,cosmetics:this.cosmetics}));}catch(e){}}
+      async earnShards(n){this.shards+=n;await this.save();}
+      async spendShards(n){if(this.shards<n)return false;this.shards-=n;await this.save();return true;}
+      async purchaseCosmetic(id,cost){if(await this.spendShards(cost)){this.cosmetics.push(id);await this.save();return true;}return false;}
+    }
+    const wallet = new KagamiWallet();
+    wallet.load();
+
+    // ═══ PARTICLE SYSTEM ═══════════════════════════════════════════════════
+    (function particles(){
+      const canvas=document.getElementById('particle-canvas');if(!canvas)return;
+      const ctx=canvas.getContext('2d');
+      const toPixel=(q,r)=>({x:44*(Math.sqrt(3)*q+Math.sqrt(3)/2*r),y:44*(3/2*r)});
+      let w=canvas.width=window.innerWidth,h=canvas.height=window.innerHeight;
+      const ambient=[];for(let i=0;i<40;i++)ambient.push({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-0.5)*0.25,vy:(Math.random()-0.5)*0.25});
+      const bursts=[];const queue=[];
+      window.emitParticles=function(opt){queue.push(opt);};
+      function hexToScreen(q,r){const grid=document.getElementById('hex-grid');if(!grid)return{x:w/2,y:h/2};const rect=grid.getBoundingClientRect();return{x:rect.left+rect.width/2+toPixel(q,r).x,y:rect.top+rect.height/2+toPixel(q,r).y};}
+      function spawn(opt){
+        const{type,from,to,at,color}=opt;const colors={spark:[255,107,53],forge:[212,175,55],flow:[78,205,196],crystal:[103,212,228],nexus:[155,126,189],grove:[126,183,127]};
+        const[cr,cg,cb]=colors[color||'crystal']||colors.crystal;
+        if(type==='slash'&&from&&to){const A=hexToScreen(from.q,from.r),B=hexToScreen(to.q,to.r);for(let i=0;i<12;i++){const t=i/12;bursts.push({x:A.x+(B.x-A.x)*t+(Math.random()-0.5)*8,y:A.y+(B.y-A.y)*t+(Math.random()-0.5)*8,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:0,maxLife:18,r:cr,g:cg,b:cb,size:2});}}
+        else if(type==='block'&&at){const P=hexToScreen(at.q,at.r);for(let i=0;i<14;i++)bursts.push({x:P.x+(Math.random()-0.5)*24,y:P.y+(Math.random()-0.5)*24,vx:(Math.random()-0.5)*2,vy:-1.5-Math.random()*2,life:0,maxLife:22,r:78,g:205,b:196,size:2.5});}
+        else if(type==='deathShatter'&&at){const P=hexToScreen(at.q,at.r);for(let i=0;i<28;i++){const a=(i/28)*Math.PI*2+Math.random(),v=2+Math.random()*5;bursts.push({x:P.x,y:P.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:0,maxLife:35,r:180,g:180,b:200,size:2});}}
+        else if(type==='heal'&&at){const P=hexToScreen(at.q,at.r);for(let i=0;i<16;i++)bursts.push({x:P.x+(Math.random()-0.5)*20,y:P.y,vx:(Math.random()-0.5)*1.5,vy:-2-Math.random()*3,life:0,maxLife:30,r:0,g:204,b:119,size:2});}
+        else if(type==='playerHit'&&at){const P=hexToScreen(at.q,at.r);for(let i=0;i<10;i++)bursts.push({x:P.x+(Math.random()-0.5)*16,y:P.y+(Math.random()-0.5)*16,vx:(Math.random()-0.5)*3,vy:(Math.random()-0.5)*3,life:0,maxLife:15,r:232,g:85,b:85,size:2});}
+      }
+      function loop(){
+        while(queue.length)spawn(queue.shift());
+        ctx.clearRect(0,0,w,h);
+        ambient.forEach(p=>{p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>w)p.vx*=-1;if(p.y<0||p.y>h)p.vy*=-1;});
+        ambient.forEach((p,i)=>{if(i%3===0){ctx.strokeStyle='rgba(103,212,228,0.06)';ctx.lineWidth=1;ambient.forEach((q,j)=>{if(j>i&&Math.hypot(p.x-q.x,p.y-q.y)<90){ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.stroke();}});}});
+        ambient.forEach(p=>{ctx.fillStyle='rgba(103,212,228,0.14)';ctx.beginPath();ctx.arc(p.x,p.y,2,0,Math.PI*2);ctx.fill();});
+        ctx.globalCompositeOperation='lighter';
+        for(let i=bursts.length-1;i>=0;i--){const p=bursts[i];p.x+=p.vx;p.y+=p.vy;p.life++;const alpha=1-p.life/p.maxLife;ctx.fillStyle=`rgba(${p.r},${p.g},${p.b},${alpha*0.9})`;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();if(p.life>=p.maxLife)bursts.splice(i,1);}
+        ctx.globalCompositeOperation='source-over';
+        requestAnimationFrame(loop);
+      }
+      window.addEventListener('resize',()=>{w=canvas.width=window.innerWidth;h=canvas.height=window.innerHeight;});
+      requestAnimationFrame(loop);
+    })();
+
+    // ═══ INIT ══════════════════════════════════════════════════════════════
+    const game=new Game();
+    const renderer=new Renderer(game);
+    window.game=game;window.renderer=renderer;window.CARDS=CARDS;window.ENEMIES=ENEMIES;window.RELICS=RELICS;window.generateShareGrid=generateShareGrid;window.deckCard=deckCard;window.ACT_NARRATIVES=ACT_NARRATIVES;window.generateMap=generateMap;
+
+    // Title screen meta info
+    const meta=game.loadMeta();
+    document.getElementById('title-asc').textContent='Ascension: '+(meta.ascension||0);
+    document.getElementById('title-best').textContent='Best: '+(meta.bestScore||'—');
+    document.getElementById('title-streak').textContent='Streak: '+(meta.streak||0);
+
+    // Wire buttons
+    document.getElementById('start-btn').onclick=()=>{audio.init();renderer.startRun();};
+    document.getElementById('daily-puzzle-btn').onclick=()=>{audio.init();renderer.startPuzzle();};
+    document.getElementById('daily-run-btn').onclick=()=>{
+      audio.init();
+      const seed=dateSeed();const rng=mulberry32(seed);
+      const mods=shuffle(DAILY_MODS,rng).slice(0,3);
+      document.getElementById('daily-date').textContent='Daily Run #'+(seed%10000);
+      const modDiv=document.getElementById('daily-modifiers');modDiv.innerHTML='';
+      mods.forEach(m=>{const d=document.createElement('div');d.className='daily-modifier';d.innerHTML='<strong>'+m.name+'</strong>: '+m.desc;modDiv.appendChild(d);});
+      document.getElementById('daily-start-btn').onclick=()=>{renderer.startRun({daily:true});mods.forEach(m=>m.apply(game));};
+      renderer.showScreen('daily');
+    };
+    document.getElementById('end-turn-btn').onclick=()=>renderer.onEndTurn();
+    document.getElementById('skip-reward-btn').onclick=()=>renderer.proceedFromReward();
+    document.getElementById('retry-btn').onclick=()=>renderer.startRun();
+    document.getElementById('victory-btn').onclick=()=>{
+      // Advance ascension if won
+      const m=game.loadMeta();
+      game.saveMeta({ascension:Math.min(20,(m.ascension||0)+1),bestScore:Math.max(m.bestScore||0,game.score)});
+      renderer.startRun();
+    };
+    document.getElementById('share-victory-btn').onclick=()=>{
+      const text=generateShareGrid(game,'run');
+      document.getElementById('share-grid-text').textContent=text;
+      document.getElementById('share-modal').classList.add('active');
+    };
+    document.getElementById('share-copy-btn').onclick=()=>{
+      const text=document.getElementById('share-grid-text').textContent;
+      navigator.clipboard?.writeText(text).then(()=>document.getElementById('share-copy-btn').textContent='Copied!');
+    };
+    document.getElementById('share-close-btn').onclick=()=>document.getElementById('share-modal').classList.remove('active');
+    document.getElementById('shop-leave-btn').onclick=()=>renderer.showMap();
+    document.getElementById('map-deck-btn').onclick=()=>{
+      const dv=document.getElementById('deck-viewer');dv.classList.add('active');
+      const cards=document.getElementById('deck-viewer-cards');cards.innerHTML='';
+      game.deck.forEach(c=>{const def=game.getCardDef(c);if(!def)return;
+        const d=document.createElement('div');d.className='card'+(c.upgraded?' upgraded':'');d.dataset.colony=def.colony;d.style.cssText='width:96px;height:140px';
+        d.innerHTML='<div class="card-inner"><div class="card-header"><div class="card-cost">'+def.cost+'</div></div><div class="card-name">'+def.name+'</div><div class="card-desc">'+def.desc+'</div><div class="card-colony-bar"></div></div>';
+        cards.appendChild(d);
+      });
+    };
+    document.getElementById('deck-viewer-close').onclick=()=>document.getElementById('deck-viewer').classList.remove('active');
+
+    // Rest site wiring
+    document.querySelectorAll('#rest-actions .rest-action').forEach(el=>{
+      el.onclick=()=>{
+        const action=el.dataset.action;
+        if(action==='rest'){game.healPlayer(Math.ceil(game.player.maxHp*0.3));game.saveRun();renderer.showMap();return;}
+        if(action==='smith'){
+          const cont=document.getElementById('smith-cards');cont.classList.remove('hidden');document.getElementById('meditate-cards').classList.add('hidden');cont.innerHTML='';
+          game.deck.forEach((card,idx)=>{const def=game.getCardDef(card);if(!def||card.upgraded||!CARDS[card.id]?.upgraded)return;
+            const d=document.createElement('div');d.className='card';d.dataset.colony=def.colony;d.style.cssText='width:96px;height:140px';
+            d.innerHTML='<div class="card-inner"><div class="card-name">'+def.name+'</div><div class="card-desc">'+def.desc+'</div><div class="card-colony-bar"></div></div>';
+            d.onclick=()=>{game.deck[idx]=deckCard(card.id,true,card.fused,card.fusedData);cont.classList.add('hidden');game.saveRun();renderer.showMap();};
+            cont.appendChild(d);
+          });
+        }
+        if(action==='meditate'){
+          const cont=document.getElementById('meditate-cards');cont.classList.remove('hidden');document.getElementById('smith-cards').classList.add('hidden');cont.innerHTML='';
+          game.deck.forEach((card,idx)=>{const def=game.getCardDef(card);if(!def)return;
+            const d=document.createElement('div');d.className='card';d.dataset.colony=def.colony;d.style.cssText='width:96px;height:140px';
+            d.innerHTML='<div class="card-inner"><div class="card-name">'+def.name+'</div></div>';
+            d.onclick=()=>{game.deck.splice(idx,1);cont.classList.add('hidden');game.saveRun();renderer.showMap();};
+            cont.appendChild(d);
+          });
+        }
+      };
+    });
+
+    // Nexus wiring
+    let nexusSelected=[];
+    document.getElementById('nexus-cancel').onclick=()=>renderer.showMap();
+    document.getElementById('nexus-confirm').onclick=()=>{
+      if(nexusSelected.length!==2)return;
+      const[i,j]=nexusSelected.sort((a,b)=>b-a);
+      const fused=getFusedCard(game.deck[j].id,game.deck[i].id);if(!fused)return;
+      game.deck.splice(i,1);game.deck.splice(j,1,deckCard(fused.id,false,true,fused));
+      game.saveRun();renderer.showMap();
+    };
+
+    // Keyboard
+    document.addEventListener('keydown',e=>{
+      if(game.phase==='player'){
+        if(e.key==='e'||e.key==='E')renderer.onEndTurn();
+        if(e.key==='Escape'){game.selectedCard=null;game.validTargets=[];renderer.render();}
+        const n=parseInt(e.key);if(n>=1&&n<=9&&n<=game.hand.length)renderer.onCardClick(n-1);
+      }
+    });
+
+    // Touch: long-press for inspect
+    let longPressTimer=null;
+    document.addEventListener('touchstart',e=>{
+      longPressTimer=setTimeout(()=>{
+        const card=e.target.closest('.card');
+        if(card){
+          const overlay=document.getElementById('inspect-overlay');
+          const content=document.getElementById('inspect-content');
+          content.innerHTML='<div class="inspect-card">'+card.innerHTML+'</div>';
+          overlay.classList.add('active');
+        }
+      },500);
+    },{passive:true});
+    document.addEventListener('touchend',()=>{clearTimeout(longPressTimer);},{passive:true});
+    document.addEventListener('touchmove',()=>{clearTimeout(longPressTimer);},{passive:true});
+    document.getElementById('inspect-overlay').onclick=()=>document.getElementById('inspect-overlay').classList.remove('active');
+
+    // Deck viewer from combat (tap deck info)
+    document.getElementById('deck-info')?.addEventListener('click',()=>{
+      const dv=document.getElementById('deck-viewer');dv.classList.add('active');
+      const cards=document.getElementById('deck-viewer-cards');cards.innerHTML='';
+      [...game.drawPile,...game.discardPile,...game.hand].forEach(c=>{
+        const def=game.getCardDef(c);if(!def)return;
+        const d=document.createElement('div');d.className='card';d.dataset.colony=def.colony;d.style.cssText='width:80px;height:120px';
+        d.innerHTML='<div class="card-inner"><div class="card-name" style="font-size:8px">'+def.name+'</div><div class="card-colony-bar"></div></div>';
+        cards.appendChild(d);
+      });
+    });
+
+    // Boss victory -> next act
+    const origVictory=renderer.onCombatVictory.bind(renderer);
+    renderer.onCombatVictory=async function(){
+      const node=game.map&&game.map[game.mapRow]&&game.map[game.mapRow][game.mapCol];
+      if(node&&node.type==='boss'){
+        if(game.act<3){
+          game.act++;game.map=generateMap(game.act,game.rng);game.mapRow=-1;game.mapCol=0;
+          game.relics.push(RELIC_POOLS.boss[Math.floor(game.rng()*RELIC_POOLS.boss.length)]);// Boss relic
+          game.player.gold+=50;
+          await renderer.showBanner('Act '+game.act+' — '+ACT_NAMES[game.act-1],1200);
+          game.saveRun();renderer.showMap();
+        } else {
+          // Game won!
+          game.calculateScore();
+          const m=game.loadMeta();
+          game.saveMeta({bestScore:Math.max(m.bestScore||0,game.score),wins:(m.wins||0)+1});
+          renderer.renderResultStats(renderer.el['victory-stats']);
+          renderer.showScreen('victory');haptic('victory');audio.play('victory');
+          game.clearSave();renderer.saveEpisode('victory',{score:game.score,act:game.act});
+          // Award shards
+          wallet.earnShards(Math.floor(game.score/100));
+        }
+      } else if(node&&node.type==='elite'){
+        // Elite relic drop
+        if(game.relics.includes('black_star'))game.grantRelic('rare');
+        else game.grantRelic('uncommon');
+        await origVictory();
+      } else {
+        await origVictory();
+      }
+    };
+
+    // PWA registration
+    if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+
+    // Resume saved run
+    if(game.loadRun()){
+      document.getElementById('start-btn').textContent='Continue Run';
+    }
+  </script>
+</body>
+</html>
