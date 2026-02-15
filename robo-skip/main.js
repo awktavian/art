@@ -4891,11 +4891,88 @@ const PUZZLE_TEMPLATES = [
         desc: 'Draw to the button with last stone',
         build(rng) {
             const stones = [];
-            // Opponent has shot stone, we need to draw closer
             stones.push(new E.Stone((rng() - 0.5) * 0.6, -0.3 - rng() * 0.3, 'yellow', 1));
             if (rng() > 0.3) stones.push(new E.Stone((rng() - 0.5) * 1.2, 0.8, 'yellow', 2));
             stones.push(new E.Stone((rng() - 0.5) * 0.8, 0.5, 'red', 3));
             if (rng() > 0.4) stones.push(new E.Stone(0, 2.8, 'red', 4));
+            return stones;
+        }
+    },
+    {
+        name: 'Raise to Score',
+        desc: 'Promote your own stone to a scoring position',
+        build(rng) {
+            const stones = [];
+            const side = rng() > 0.5 ? 1 : -1;
+            // Our stone sitting in front of house
+            stones.push(new E.Stone(side * 0.3, 1.5 + rng() * 0.5, 'red', 1));
+            // Opponent stones inside
+            stones.push(new E.Stone(-side * 0.2, -0.1, 'yellow', 2));
+            stones.push(new E.Stone(side * 0.5, -0.5, 'yellow', 3));
+            if (rng() > 0.4) stones.push(new E.Stone(-side * 0.7, 0.6, 'red', 4));
+            return stones;
+        }
+    },
+    {
+        name: 'Tick Shot',
+        desc: 'Nudge a guard aside without removing it',
+        build(rng) {
+            const stones = [];
+            const gx = (rng() - 0.5) * 0.4;
+            // Opponent guard protecting the button
+            stones.push(new E.Stone(gx, 2.0 + rng() * 0.8, 'yellow', 1));
+            // Opponent on button behind the guard
+            stones.push(new E.Stone(gx + (rng() - 0.5) * 0.2, -0.1, 'yellow', 2));
+            // Our stone in 8-foot
+            stones.push(new E.Stone(-gx + (rng() - 0.5) * 0.3, 0.4, 'red', 3));
+            if (rng() > 0.5) stones.push(new E.Stone(gx * 2, 1.0, 'yellow', 4));
+            return stones;
+        }
+    },
+    {
+        name: 'Corner Freeze',
+        desc: 'Tight freeze on the edge of the house',
+        build(rng) {
+            const stones = [];
+            const side = rng() > 0.5 ? 1 : -1;
+            // Opponent stone on the wing
+            stones.push(new E.Stone(side * 1.2, 0.2 + rng() * 0.3, 'yellow', 1));
+            // Our stone near center
+            stones.push(new E.Stone(-side * 0.3, -0.4, 'red', 2));
+            // Guards
+            stones.push(new E.Stone(side * 0.4, 2.0, 'red', 3));
+            if (rng() > 0.3) stones.push(new E.Stone(side * 0.8, -0.6, 'yellow', 4));
+            return stones;
+        }
+    },
+    {
+        name: 'Steal Opportunity',
+        desc: 'Score without the hammer — aggressive play',
+        build(rng) {
+            const stones = [];
+            // We don't have hammer, but have a scoring chance
+            stones.push(new E.Stone((rng() - 0.5) * 0.4, -0.2, 'red', 1));  // our shot stone near button
+            stones.push(new E.Stone(0, 0.6, 'yellow', 2));                    // opponent counter
+            stones.push(new E.Stone((rng() - 0.5) * 0.8, 2.5, 'yellow', 3)); // opponent guard
+            if (rng() > 0.3) stones.push(new E.Stone(-0.8, -0.5, 'red', 4));
+            if (rng() > 0.5) stones.push(new E.Stone(0.7, 1.0, 'yellow', 5));
+            return stones;
+        },
+        hammerOverride: 'yellow'  // opponent has hammer — we're trying to steal
+    },
+    {
+        name: 'Runback',
+        desc: 'Hit your own stone into an opponent behind it',
+        build(rng) {
+            const stones = [];
+            const side = rng() > 0.5 ? 1 : -1;
+            // Our stone in front
+            stones.push(new E.Stone(side * 0.2, 1.2, 'red', 1));
+            // Opponent behind ours
+            stones.push(new E.Stone(side * 0.25, -0.3, 'yellow', 2));
+            // Additional stones
+            stones.push(new E.Stone(-side * 0.6, 0.5, 'red', 3));
+            if (rng() > 0.4) stones.push(new E.Stone(-side * 0.3, -0.8, 'yellow', 4));
             return stones;
         }
     },
@@ -4914,16 +4991,46 @@ function generatePuzzle(dateStr) {
     // Build stones from template
     const stones = template.build(rng);
     
-    // Game context — make it matter
-    const endNumber = 6 + Math.floor(rng() * 4);  // end 6-9 (late game, stakes are high)
-    const scoreDiff = Math.floor(rng() * 3) - 1;    // -1 to +1
-    const hammerTeam = rng() > 0.5 ? 'red' : 'yellow';
+    // Validate stones: ensure none overlap and all are in-bounds
+    for (let i = stones.length - 1; i >= 0; i--) {
+        const s = stones[i];
+        if (s.x < -C.SHEET_WIDTH / 2 + 0.1 || s.x > C.SHEET_WIDTH / 2 - 0.1 ||
+            s.y < C.BACK_LINE_Y + 0.1 || s.y > C.HOG_LINE_Y) {
+            stones.splice(i, 1);
+            continue;
+        }
+        for (let j = 0; j < i; j++) {
+            const dx = stones[j].x - s.x, dy = stones[j].y - s.y;
+            if (Math.sqrt(dx * dx + dy * dy) < C.STONE_RADIUS * 2.1) {
+                stones.splice(i, 1);
+                break;
+            }
+        }
+    }
+    
+    // Game context — vary the stakes for more interesting decisions
+    // Weighted toward later ends and close scores for drama
+    const scenarios = [
+        { end: 8, diff:  0, desc: 'Tied, 8th end' },
+        { end: 9, diff: -1, desc: 'Down 1, 9th end' },
+        { end: 10, diff: 0, desc: 'Tied, final end!' },
+        { end: 7, diff:  1, desc: 'Up 1, 7th end' },
+        { end: 8, diff: -2, desc: 'Down 2, 8th end' },
+        { end: 9, diff:  1, desc: 'Up 1, 9th end' },
+        { end: 6, diff:  0, desc: 'Tied, 6th end' },
+        { end: 10, diff: -1, desc: 'Down 1, final end!' },
+    ];
+    const scenario = scenarios[Math.floor(rng() * scenarios.length)];
+    const endNumber = scenario.end;
+    const scoreDiff = scenario.diff;
+    const hammerTeam = template.hammerOverride || (rng() > 0.5 ? 'red' : 'yellow');
     const activeTeam = 'red'; // always Red plays (consistency for sharing)
     const turnNumber = stones.length;
     
     return {
         dateStr, stones, activeTeam, hammerTeam, endNumber, scoreDiff, turnNumber,
         templateName: template.name, templateDesc: template.desc,
+        scenarioDesc: scenario.desc,
     };
 }
 
@@ -4967,11 +5074,11 @@ function initDailyPuzzle() {
     const textEl = document.getElementById('puzzle-text');
     const metaEl = document.getElementById('puzzle-meta');
     
-    if (textEl) textEl.textContent = `${puzzle.templateName}: Throw your best shot`;
+    if (textEl) textEl.textContent = `${puzzle.templateDesc || puzzle.templateName}`;
     if (metaEl) {
-        const scoreStr = puzzle.scoreDiff === 0 ? 'Tied' :
-            puzzle.scoreDiff > 0 ? `Red +${state.scoreRed}` : `Red -${state.scoreYellow}`;
-        metaEl.textContent = `End ${puzzle.endNumber} · ${scoreStr} · Hammer: ${puzzle.hammerTeam === 'red' ? 'Red' : 'Yellow'} · Drag from hack to throw`;
+        const hammerStr = puzzle.hammerTeam === 'red' ? '🔴 Hammer' : '🟡 Hammer';
+        const scenarioStr = puzzle.scenarioDesc || `End ${puzzle.endNumber}`;
+        metaEl.textContent = `${scenarioStr} · ${hammerStr} · Drag from hack to throw`;
     }
     
     drawMain();
@@ -5041,9 +5148,9 @@ function handlePuzzleShot(candidate) {
     const endsRemaining = C.ENDS_TOTAL - state.currentEnd + 1;
     const gameState = { scoreDiff, endsRemaining, hammerTeam: state.hammerTeam };
     
-    // Evaluate player's shot
+    // Evaluate player's shot with full MC for accurate rating
     const playerResult = E.ShotEvaluator.evaluateShot(
-        state.puzzle.stones, candidate, gameState, state.activeTeam, C.MC_QUICK_N
+        state.puzzle.stones, candidate, gameState, state.activeTeam, C.MC_FULL_N
     );
     
     state.puzzle.playerShot = { candidate, result: playerResult };
@@ -5102,34 +5209,60 @@ function showPuzzleResult(playerResult, stats, rating) {
     
     const pDelta = playerResult.wpDelta;
     const bDelta = state.puzzle.bestShot?.wpDelta || 0;
+    const puzzleNum = Math.floor((Date.now() - new Date('2025-01-01').getTime()) / 86400000);
     
-    // Rating display
-    const ratingNames = ['Miss', 'Okay', 'Decent', 'Good Shot', 'Great Shot!', 'Perfect!'];
+    // Rating tiers
+    const ratingNames = ['Wide Miss', 'Passable', 'Decent', 'Good Shot', 'Great Shot!', 'Perfect!'];
     const ratingEmoji = ['💨', '🪨', '🤔', '👍', '🥌', '🎯'];
+    const ratingColors = ['var(--negative)', 'var(--text-tertiary)', 'var(--warning)', 'var(--ice)', 'var(--positive)', 'var(--positive)'];
     const blocks = '🟩'.repeat(rating) + '⬜'.repeat(5 - rating);
     
     titleEl.textContent = `${ratingEmoji[rating]} ${ratingNames[rating]}`;
-    scoreEl.textContent = `${pDelta > 0 ? '+' : ''}${(pDelta * 100).toFixed(1)}% WP`;
-    scoreEl.style.color = pDelta >= 0 ? 'var(--ice)' : 'var(--stone-red)';
+    titleEl.style.color = ratingColors[rating];
     
-    // Details with share text preview
-    const puzzleNum = Math.floor((Date.now() - new Date('2025-01-01').getTime()) / 86400000);
-    let html = `<div style="margin-bottom:8px">${blocks}</div>`;
-    html += `Your throw: ${state.puzzle.playerShot?.candidate.name || 'Manual'}<br>`;
-    html += `Success: ${(playerResult.successRate * 100).toFixed(0)}% · `;
-    html += `Streak: ${stats.streak || 1} · Games: ${stats.played} · Perfect: ${stats.perfect}`;
+    // WP score with context
+    const wpPct = (pDelta * 100).toFixed(1);
+    const wpSign = pDelta > 0 ? '+' : '';
+    scoreEl.textContent = `${wpSign}${wpPct}% WP`;
+    scoreEl.style.color = pDelta >= 0 ? 'var(--positive)' : 'var(--negative)';
+    
+    // Detailed breakdown
+    let html = `<div class="puzzle-blocks">${blocks}</div>`;
+    html += `<div class="puzzle-stats-grid">`;
+    html += `<div class="puzzle-stat"><span class="puzzle-stat__val">#${puzzleNum}</span><span class="puzzle-stat__label">Puzzle</span></div>`;
+    html += `<div class="puzzle-stat"><span class="puzzle-stat__val">${stats.streak || 1}</span><span class="puzzle-stat__label">Streak</span></div>`;
+    html += `<div class="puzzle-stat"><span class="puzzle-stat__val">${stats.played || 1}</span><span class="puzzle-stat__label">Played</span></div>`;
+    html += `<div class="puzzle-stat"><span class="puzzle-stat__val">${stats.perfect || 0}</span><span class="puzzle-stat__label">Perfect</span></div>`;
+    html += `</div>`;
+    
+    // Player shot analysis
+    const playerShotName = state.puzzle.playerShot?.candidate.name || 'Manual Throw';
+    const successPct = (playerResult.successRate * 100).toFixed(0);
+    html += `<div class="puzzle-player-shot">`;
+    html += `Your shot: <strong>${playerShotName}</strong> · ${successPct}% success rate`;
+    html += `</div>`;
+    
     detailsEl.innerHTML = html;
     
-    // Best shot reveal
+    // Best shot reveal with alternatives
     if (state.puzzle.bestShot) {
         const b = state.puzzle.bestShot;
-        let bHtml = `<strong>Optimal: ${b.candidate.name}</strong><br>`;
-        bHtml += `WP: <strong>${b.wpDelta > 0 ? '+' : ''}${(b.wpDelta * 100).toFixed(1)}%</strong> · Success: ${(b.successRate * 100).toFixed(0)}%`;
+        const bWp = (b.wpDelta * 100).toFixed(1);
+        const bSign = b.wpDelta > 0 ? '+' : '';
+        let bHtml = `<div class="puzzle-optimal">`;
+        bHtml += `<div class="puzzle-optimal__label">Optimal Shot</div>`;
+        bHtml += `<div class="puzzle-optimal__name">${b.candidate.icon || ''} ${b.candidate.name}</div>`;
+        bHtml += `<div class="puzzle-optimal__wp">${bSign}${bWp}% WP · ${(b.successRate * 100).toFixed(0)}% success</div>`;
+        bHtml += `</div>`;
+        
         if (state.puzzle.allResults && state.puzzle.allResults.length > 1) {
-            bHtml += '<br><br>Top shots:';
-            state.puzzle.allResults.slice(0, 4).forEach((r, i) => {
-                bHtml += `<br>${i + 1}. ${r.candidate.name} (${r.wpDelta > 0 ? '+' : ''}${(r.wpDelta * 100).toFixed(1)}%)`;
+            bHtml += `<div class="puzzle-alternatives">`;
+            state.puzzle.allResults.slice(1, 4).forEach((r, i) => {
+                const rWp = (r.wpDelta * 100).toFixed(1);
+                const rSign = r.wpDelta > 0 ? '+' : '';
+                bHtml += `<div class="puzzle-alt">${i + 2}. ${r.candidate.name} <span>${rSign}${rWp}%</span></div>`;
             });
+            bHtml += `</div>`;
         }
         bestEl.innerHTML = bHtml;
     }
@@ -5152,28 +5285,64 @@ function getPuzzleShareText() {
     const blocks = '🟩'.repeat(data.rating) + '⬜'.repeat(5 - data.rating);
     const wpStr = `${data.playerWpDelta > 0 ? '+' : ''}${(data.playerWpDelta * 100).toFixed(1)}%`;
     
+    const ratingNames = ['Miss', 'Passable', 'Decent', 'Good Shot', 'Great!', 'Perfect!'];
+    const ratingEmoji = ['💨', '🪨', '🤔', '👍', '🥌', '🎯'];
+    const rating = data.rating || 0;
+    
     return [
         `🥌 Robo-Skip #${puzzleNum}`,
-        blocks,
-        `WP: ${wpStr} | Streak: ${stats.streak || 1}`,
+        `${blocks} ${ratingEmoji[rating]}`,
+        `WP: ${wpStr} | ${ratingNames[rating]}`,
+        stats.streak > 1 ? `🔥 ${stats.streak} day streak` : '',
+        ``,
         `awktavian.github.io/art/robo-skip`,
-    ].join('\n');
+    ].filter(Boolean).join('\n');
 }
 
 // Share puzzle result
-document.getElementById('puzzle-result-share')?.addEventListener('click', () => {
+document.getElementById('puzzle-result-share')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
     const shareText = getPuzzleShareText();
     if (!shareText) return;
     
+    // Visual feedback immediately
+    const origText = btn.textContent;
+    btn.style.transform = 'scale(0.95)';
+    
+    let shared = false;
     // Try native share first, fall back to clipboard
     if (navigator.share) {
-        navigator.share({ text: shareText }).catch(() => {
-            navigator.clipboard?.writeText(shareText);
-            showToast('Copied to clipboard!', 'positive');
-        });
+        try {
+            await navigator.share({ text: shareText });
+            shared = true;
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                // User didn't cancel — fallback to clipboard
+                await navigator.clipboard?.writeText(shareText);
+                shared = true;
+            }
+        }
     } else if (navigator.clipboard) {
-        navigator.clipboard.writeText(shareText);
-        showToast('Copied to clipboard!', 'positive');
+        await navigator.clipboard.writeText(shareText);
+        shared = true;
+    }
+    
+    if (shared) {
+        btn.textContent = 'Copied!';
+        btn.style.background = 'var(--positive-glow)';
+        btn.style.borderColor = 'var(--positive)';
+        btn.style.color = 'var(--positive)';
+        showToast('Result copied — paste in your group chat!', 'positive');
+        playSound('place');
+        setTimeout(() => {
+            btn.textContent = origText;
+            btn.style.transform = '';
+            btn.style.background = '';
+            btn.style.borderColor = '';
+            btn.style.color = '';
+        }, 2000);
+    } else {
+        btn.style.transform = '';
     }
 });
 

@@ -49,8 +49,8 @@ const CurlingConst = Object.freeze({
     SIM_MAX_TIME: 12,           // max seconds per simulation
     
     // Monte Carlo
-    MC_QUICK_N: 50,             // preview simulations
-    MC_FULL_N: 200,             // full evaluation simulations
+    MC_QUICK_N: 100,            // preview simulations (quick feedback)
+    MC_FULL_N: 400,             // full evaluation simulations (more stable convergence)
     NOISE_SPEED_SIGMA: 0.035,   // 3.5% of speed (elite-level execution noise)
     NOISE_ANGLE_SIGMA: 0.008,   // ~0.46 degrees (elite aim noise)
     
@@ -952,7 +952,9 @@ const ShotGenerator = {
             if (fgzActive && PositionEval._isInFGZ(opp)) continue;
             
             // Nose hit — needs enough speed to reach target AND remove it
-            const takeoutSpeed = 2.8 + opp.y * 0.04; // adjust for distance
+            // Higher speed for stones closer to hack (larger y = farther from button = less travel)
+            const distFromHog = CurlingConst.HOG_LINE_Y - opp.y;
+            const takeoutSpeed = 2.4 + distFromHog * 0.08; // ~2.4 for button, ~2.9 for hog
             candidates.push({
                 type: 'takeout',
                 name: `Takeout`,
@@ -1185,10 +1187,17 @@ const ShotEvaluator = {
             const resultActive = bestSim.filter(s => s.active);
             
             // Convert to WP (expectedEndScore already computed above)
+            // Hammer transition: if we score (>0), opponent gets hammer next.
+            // If blank (0), hammer stays. If opponent steals (<0), we get hammer.
             const newDiff = gameState.scoreDiff + expectedEndScore;
-            const hasHammerNext = expectedEndScore > 0 ? 
-                (gameState.hammerTeam !== team) :  // scored → opponent gets hammer
-                (gameState.hammerTeam === team);   // blank/steal → hammer stays
+            let hasHammerNext;
+            if (expectedEndScore > 0) {
+                hasHammerNext = gameState.hammerTeam !== team; // we scored → lose hammer
+            } else if (expectedEndScore < 0) {
+                hasHammerNext = gameState.hammerTeam === team; // opponent stole → they lose hammer, we get it
+            } else {
+                hasHammerNext = gameState.hammerTeam === team; // blank → hammer stays
+            }
             const newWP = WinProbability.get(
                 newDiff,
                 Math.max(0, gameState.endsRemaining - 1),
@@ -1199,24 +1208,44 @@ const ShotEvaluator = {
             wpSamples.push(newWP);
             
             // Success = shot achieved its primary goal (use bestSim which includes optimal sweep)
+            const deliveredStone = bestSim.find(s => s.id === `delivery_${i}` && s.active);
             if (candidate.type === 'takeout' || candidate.type === 'peel' || candidate.type === 'hit-and-roll') {
                 const targetGone = !bestSim.find(s => s.id === candidate.targetStone && s.active && s.isInHouse());
                 if (targetGone) successCount++;
-            } else if (candidate.type === 'draw' || candidate.type === 'guard') {
-                const deliveredStone = bestSim.find(s => s.id === `delivery_${i}` && s.active);
-                if (deliveredStone) {
-                    const distToTarget = dist(deliveredStone.x, deliveredStone.y, candidate.targetX, candidate.targetY);
-                    if (distToTarget < CurlingConst.STONE_RADIUS * 6) successCount++;
-                }
+            } else if (candidate.type === 'double') {
+                // Double takeout: both targets removed
+                const t1 = candidate.targetStone;
+                const t2 = candidate.targetStone2;
+                const gone1 = !bestSim.find(s => s.id === t1 && s.active && s.isInHouse());
+                const gone2 = !t2 || !bestSim.find(s => s.id === t2 && s.active && s.isInHouse());
+                if (gone1 && gone2) successCount++;
             } else if (candidate.type === 'freeze') {
-                const deliveredStone = bestSim.find(s => s.id === `delivery_${i}` && s.active);
                 const targetStone = bestSim.find(s => s.id === candidate.targetStone && s.active);
                 if (deliveredStone && targetStone) {
                     const d = dist(deliveredStone.x, deliveredStone.y, targetStone.x, targetStone.y);
                     if (d < CurlingConst.STONE_RADIUS * 3) successCount++;
                 }
+            } else if (candidate.type === 'raise' || candidate.type === 'tick' || candidate.type === 'runback') {
+                // Raise/tick/runback: target stone moved significantly from original position
+                const targetStone = bestSim.find(s => s.id === candidate.targetStone && s.active);
+                if (candidate.type === 'raise' && targetStone) {
+                    // Raise success: own stone moved closer to button
+                    if (targetStone.distToButton() < dist(candidate.targetX, candidate.targetY, 0, 0)) successCount++;
+                } else if (candidate.type === 'tick') {
+                    // Tick success: guard moved laterally
+                    if (!targetStone || dist(targetStone.x, targetStone.y, candidate.targetX, candidate.targetY) > CurlingConst.STONE_RADIUS * 2) successCount++;
+                } else {
+                    // Runback: opponent stone behind ours removed
+                    if (deliveredStone) successCount++;
+                }
+            } else if (candidate.type === 'draw' || candidate.type === 'guard' || candidate.type === 'come-around') {
+                if (deliveredStone) {
+                    const distToTarget = dist(deliveredStone.x, deliveredStone.y, candidate.targetX, candidate.targetY);
+                    if (distToTarget < CurlingConst.STONE_RADIUS * 5) successCount++;
+                }
             } else {
-                successCount++; // default success for other types
+                // Manual throws and unknown types — check if delivery stayed in play
+                if (deliveredStone) successCount++;
             }
         }
         
@@ -1460,7 +1489,8 @@ self.onmessage = function(e) {
             const bestSim = esSW>=esNS ? simSW : simNS;
             
             const nd = gameState.scoreDiff + es;
-            const nh = es>0?(gameState.hammerTeam!==team):(gameState.hammerTeam===team);
+            // Hammer transition: scored → lose hammer; stolen → gain hammer; blank → stays
+            const nh = es>0?(gameState.hammerTeam!==team):(es<0?(gameState.hammerTeam===team):(gameState.hammerTeam===team));
             
             // WP lookup from pre-computed table
             const di = clamp(Math.round(nd),-8,8)+8;
@@ -1471,14 +1501,20 @@ self.onmessage = function(e) {
             wpSamples.push(wp);
             
             // Success check (using optimal-sweep result)
+            const deliv = bestSim.find(s=>s.id==='d'+i&&s.a);
             if (cand.type==='takeout'||cand.type==='peel'||cand.type==='hit-and-roll') {
                 if (!bestSim.find(s=>s.id===cand.targetStone&&s.a&&Math.sqrt(s.x*s.x+s.y*s.y)<=C.HOUSE_RADIUS_12+C.STONE_RADIUS)) succCount++;
+            } else if (cand.type==='double') {
+                const g1=!bestSim.find(s=>s.id===cand.targetStone&&s.a&&Math.sqrt(s.x*s.x+s.y*s.y)<=C.HOUSE_RADIUS_12+C.STONE_RADIUS);
+                const g2=!cand.targetStone2||!bestSim.find(s=>s.id===cand.targetStone2&&s.a&&Math.sqrt(s.x*s.x+s.y*s.y)<=C.HOUSE_RADIUS_12+C.STONE_RADIUS);
+                if (g1&&g2) succCount++;
+            } else if (cand.type==='freeze') {
+                const ts=bestSim.find(s=>s.id===cand.targetStone&&s.a);
+                if (deliv&&ts) { const fd=dist(deliv.x,deliv.y,ts.x,ts.y); if(fd<C.STONE_RADIUS*3) succCount++; }
+            } else if (cand.type==='draw'||cand.type==='guard'||cand.type==='come-around') {
+                if (deliv) { const dt2=dist(deliv.x,deliv.y,cand.targetX,cand.targetY); if(dt2<C.STONE_RADIUS*5) succCount++; }
             } else {
-                const ds=bestSim.find(s=>s.id==='d'+i&&s.a);
-                if (ds) {
-                    const dt2=Math.sqrt((ds.x-cand.targetX)**2+(ds.y-cand.targetY)**2);
-                    if (dt2<C.STONE_RADIUS*6) succCount++;
-                }
+                if (deliv) succCount++;
             }
         }
         

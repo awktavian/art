@@ -5,7 +5,7 @@
  * Falls back to cache when offline.
  */
 
-const CACHE_NAME = 'roboskip-v9';
+const CACHE_NAME = 'roboskip-v10';
 const SHELL_ASSETS = [
     './',
     './index.html',
