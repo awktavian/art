@@ -987,10 +987,7 @@ body::after {
     animation: spin 610ms linear infinite;
 }
 
-/* Show mobile shots on small screens */
-@media (max-width: 768px) {
-    .mobile-shots { display: block; }
-}
+/* Mobile shots: shown via ≤768px media query in MOBILE section below */
 
 /* Action buttons on ice */
 .ice-actions {
@@ -1994,60 +1991,175 @@ body::after {
     .header__subtitle { display: none; }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE — Full-viewport layout with fixed bottom toolbar
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 @media (max-width: 768px) {
+    :root {
+        --mobile-header-h: 44px;
+        --mobile-toolbar-h: 56px;
+    }
+
+    /* ── Full-viewport flex column ────────────────────────────── */
     .app {
-        grid-template-columns: 1fr;
-        grid-template-rows: 60vh auto;
-        height: auto;
-        min-height: calc(100vh - 48px);
-        overflow: visible;
+        display: flex;
+        flex-direction: column;
+        height: calc(100dvh - var(--mobile-header-h));
+        overflow: hidden;
     }
 
+    /* ── Ice panel fills ALL remaining space ───────────────────── */
     .ice-panel {
-        min-height: 55vh;
+        flex: 1;
+        min-height: 0; /* allow flex shrink */
+        /* Leave room for the fixed toolbar at the bottom */
+        padding-bottom: var(--mobile-toolbar-h);
     }
 
+    /* ── Dashboard: HIDDEN on mobile (desktop only) ────────────── */
     .dashboard {
-        border-left: none;
-        border-top: 1px solid var(--glass-border);
-        max-height: none;
-        overflow-y: auto;
-        padding: var(--sp-3);
+        display: none;
     }
 
+    /* ── Header: compact ──────────────────────────────────────── */
     .header {
-        height: 48px;
-        padding: var(--sp-2) var(--sp-3);
+        height: var(--mobile-header-h);
+        padding: var(--sp-1) var(--sp-3);
     }
     .header__subtitle { display: none; }
-    .header__title { font-size: 1.05rem; }
+    .header__title { font-size: 0.95rem; }
     .header-action__label { display: none; }
-    
-    /* Mode toggle: icon-only on mobile */
-    .mode-toggle__btn span { display: none; }
-    .mode-toggle__btn { padding: 5px 10px; }
-    .mode-toggle { padding: 2px; }
+    .header__brand { gap: var(--sp-2); }
+    .header__logo svg { width: 24px; height: 24px; }
+    .header__controls { gap: 2px; }
+    .header-action { height: 36px; padding: var(--sp-1) var(--sp-2); }
+    .header-action--icon { width: 36px; }
 
-    /* Hide desktop-only elements */
+    /* Mode toggle: compact pill on mobile */
+    .mode-toggle { padding: 2px; }
+    .mode-toggle__btn { padding: 4px 8px; min-height: 32px; }
+    .mode-toggle__btn span { display: none; }
+
+    /* Hide desktop-only */
     .shortcuts-grid { grid-template-columns: 1fr; }
     #btn-shortcuts { display: none; }
     #btn-share { display: none; }
     .data-provenance { display: none; }
     .onboarding__remember { display: none; }
-    .ghost-confirm { bottom: calc(var(--sp-2) + 44px); }
-    .ghost-confirm__btn { min-height: 44px; padding: 10px 16px; }
 
+    /* ── Ice actions → fixed bottom toolbar ────────────────────── */
     .ice-actions {
-        bottom: var(--sp-2);
-        gap: var(--sp-1);
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        transform: none;
+        height: var(--mobile-toolbar-h);
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--sp-2);
+        padding: 0 var(--sp-3);
+        background: rgba(7, 6, 11, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-top: 1px solid rgba(103, 212, 228, 0.08);
     }
 
     .action-btn {
-        padding: var(--sp-2) var(--sp-4);
-        font-size: 0.78rem;
-        min-height: 44px;
+        flex: 1;
+        max-width: 120px;
+        padding: var(--sp-2) var(--sp-2);
+        font-size: 0.72rem;
+        min-height: 42px;
+        justify-content: center;
+        text-align: center;
+        border-radius: var(--r-md);
+    }
+    .action-btn:hover { transform: none; } /* no hover lift on touch */
+    .action-btn--team { flex: 0; min-width: 42px; max-width: 42px; padding: var(--sp-2); }
+    .action-btn--ai { flex: 1; }
+    .action-btn--ai svg { width: 12px; height: 12px; }
+
+    /* ── Mobile shots → bottom sheet above toolbar ─────────────── */
+    .mobile-shots {
+        display: block;
+        position: fixed;
+        bottom: var(--mobile-toolbar-h);
+        left: 0;
+        right: 0;
+        top: auto;
+        z-index: 45;
+        min-width: auto;
+        max-width: none;
+        width: 100%;
+        background: rgba(7, 6, 11, 0.96);
+        border: none;
+        border-top: 1px solid rgba(103, 212, 228, 0.12);
+        border-radius: var(--r-lg) var(--r-lg) 0 0;
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        max-height: 45vh;
+        overflow: hidden;
+        transform: translateY(100%);
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .mobile-shots.has-shots {
+        transform: translateY(0);
+        border-color: rgba(103, 212, 228, 0.2);
+    }
+    .mobile-shots.collapsed.has-shots {
+        transform: translateY(calc(100% - 32px)); /* just show the header */
     }
 
+    .mobile-shots__header {
+        padding: 8px 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .mobile-shots__title {
+        font-size: 0.7rem;
+    }
+    .mobile-shots__list {
+        padding: 4px 8px 8px;
+        max-height: 40vh;
+        gap: 4px;
+    }
+
+    .mobile-shot-item {
+        padding: 8px 12px;
+        min-height: 44px;
+        border-radius: var(--r-md);
+    }
+    .mobile-shot-item__tag { width: 32px; font-size: 0.6rem; }
+    .mobile-shot-item__name { font-size: 0.78rem; font-weight: 600; }
+    .mobile-shot-item__pct { font-size: 0.68rem; }
+    .mobile-shot-item__wp { font-size: 0.78rem; }
+
+    /* ── Ghost confirm → above toolbar ─────────────────────────── */
+    .ghost-confirm {
+        bottom: calc(var(--mobile-toolbar-h) + var(--sp-3));
+    }
+    .ghost-confirm__btn { min-height: 44px; padding: 10px 18px; }
+
+    /* ── Turn banner ───────────────────────────────────────────── */
+    .turn-banner {
+        font-size: 0.78rem;
+        padding: 6px 14px;
+    }
+
+    /* ── Puzzle prompt → thin top banner ───────────────────────── */
+    .puzzle-prompt {
+        top: var(--sp-2);
+        padding: 6px 14px;
+        max-width: 80%;
+    }
+    .puzzle-prompt__badge { font-size: 0.55rem; padding: 1px 6px; }
+    .puzzle-prompt__text { font-size: 0.78rem; }
+    .puzzle-prompt__meta { font-size: 0.6rem; }
+
+    /* ── Game browser ──────────────────────────────────────────── */
     .game-browser-overlay__panel {
         width: 96%;
         max-height: 90vh;
@@ -2055,29 +2167,24 @@ body::after {
         border-radius: var(--r-lg);
     }
 
-    /* Compact dashboard cards */
-    .dash-card { padding: var(--sp-3); }
-    .wp-gauge__svg { width: 160px; height: 100px; }
-    .wp-gauge__number { font-size: 2.2rem; }
+    /* ── Empty state → account for toolbar ─────────────────────── */
+    .empty-state {
+        padding-bottom: var(--mobile-toolbar-h);
+    }
 }
 
+/* ── Small phones (≤480px) ─────────────────────────────────────── */
 @media (max-width: 480px) {
-    .app {
-        grid-template-rows: 65vh auto;
-    }
-    .header { padding: var(--sp-1) var(--sp-2); height: 44px; gap: var(--sp-2); }
-    .header__title { font-size: 0.95rem; }
-    .header__logo svg { width: 24px; height: 24px; }
-    .header__brand { gap: var(--sp-2); }
-    .header__controls { gap: var(--sp-1); }
-    .header-action { height: 36px; padding: var(--sp-1) var(--sp-2); }
-    .header-action--icon { width: 36px; }
+    .header { padding: var(--sp-1) var(--sp-2); gap: var(--sp-1); }
+    .header__title { font-size: 0.88rem; }
+    .header__controls { gap: 1px; }
+    .header-action { height: 34px; padding: 4px 6px; }
+    .header-action--icon { width: 34px; }
+    .mode-toggle__btn { padding: 4px 6px; min-height: 30px; min-width: 30px; }
     
-    .dashboard { padding: var(--sp-2); gap: var(--sp-2); }
-    .game-state__score { gap: var(--sp-2); }
-    .score-team__value { font-size: 1.3rem; }
-    
-    .turn-banner { font-size: 0.78rem; padding: 6px 14px; }
+    .action-btn { font-size: 0.68rem; min-height: 40px; }
+    .mobile-shot-item__name { font-size: 0.75rem; }
+    .turn-banner { font-size: 0.72rem; padding: 5px 12px; }
 }
 
 /* Tablet landscape (768-1024px, landscape) */
@@ -2101,13 +2208,18 @@ body::after {
 
 /* Mobile landscape */
 @media (max-height: 500px) and (orientation: landscape) {
+    :root {
+        --mobile-header-h: 36px;
+        --mobile-toolbar-h: 44px;
+    }
     .app {
-        grid-template-columns: 1fr;
-        grid-template-rows: 1fr;
-        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        height: calc(100dvh - 36px);
         overflow: hidden;
     }
-    .ice-panel { min-height: 100vh; }
+    .ice-panel { flex: 1; min-height: 0; padding-bottom: 44px; }
+    .dashboard { display: none; }
     .header {
         height: 36px;
         padding: var(--sp-1) var(--sp-3);
@@ -2118,44 +2230,30 @@ body::after {
     .header-action { height: 32px; }
     .header-action--icon { width: 32px; }
     
-    /* Dashboard becomes a right-side drawer */
-    .dashboard {
-        position: fixed;
-        right: -320px;
-        top: 36px;
-        bottom: 0;
-        width: 300px;
-        max-height: calc(100vh - 36px);
-        overflow-y: auto;
-        transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        z-index: 900;
-        border-left: 1px solid var(--glass-border);
-        background: var(--void-warm);
-    }
-    .dashboard.drawer-open {
-        right: 0;
-    }
-    
     .turn-banner {
         font-size: 0.7rem;
         padding: 4px 10px;
-        top: 40px;
+        top: 4px;
     }
-    .ice-actions { bottom: var(--sp-1); }
-    .action-btn { padding: var(--sp-1) var(--sp-3); font-size: 0.72rem; }
-    .ghost-confirm { bottom: calc(var(--sp-1) + 36px); }
+    .ice-actions {
+        height: 44px;
+        padding: 0 var(--sp-2);
+    }
+    .action-btn { padding: var(--sp-1) var(--sp-3); font-size: 0.72rem; min-height: 36px; }
+    .ghost-confirm { bottom: calc(44px + var(--sp-2)); }
+    
+    .mobile-shots {
+        bottom: 44px;
+        max-height: 50vh;
+    }
 }
 
 /* Touch device optimizations — 44px minimum tap targets (Apple HIG) */
 @media (hover: none) and (pointer: coarse) {
-    .action-btn { min-height: 44px; padding: var(--sp-2) var(--sp-5); }
-    .header-action { height: 44px; min-width: 44px; }
-    .header-action--icon { width: 44px; height: 44px; }
     .shot-card { padding: var(--sp-3); min-height: 52px; }
     .tournament-card { padding: var(--sp-3) var(--sp-4); min-height: 48px; }
     .game-card { padding: var(--sp-3) var(--sp-4); min-height: 48px; }
     .hammer-btn { padding: var(--sp-1) var(--sp-3); min-height: 44px; }
-    .mode-toggle__btn { min-height: 44px; min-width: 44px; }
     .ghost-confirm__btn { min-height: 44px; min-width: 80px; }
     
     /* Score values — larger tap area for editing */
@@ -2168,20 +2266,11 @@ body::after {
     .replay-dot { min-width: 44px; min-height: 44px; }
     
     /* Team switch — bigger on touch */
-    .action-btn--team { min-height: 44px; padding: var(--sp-2) var(--sp-4); }
     .action-btn__dot { width: 12px; height: 12px; }
-    
-    /* Puzzle prompt — compact on touch */
-    .puzzle-prompt { padding: 8px 16px; top: var(--sp-2); }
-    .puzzle-prompt__text { font-size: 13px; }
-    .puzzle-prompt__meta { font-size: 9px; }
     
     /* Puzzle result — touch-friendly buttons */
     .puzzle-result__btn { min-height: 44px; padding: 12px 28px; }
     .puzzle-result__card { padding: var(--sp-4) var(--sp-5); }
-    
-    /* Ice actions — stack horizontally with breathing room */
-    .ice-actions { gap: var(--sp-2); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
