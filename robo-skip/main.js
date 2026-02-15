@@ -51,14 +51,14 @@ const T = { instant: 89, fast: 144, normal: 233, slow: 377, slower: 610, slowest
 
 const state = {
     // Mode: 'freeplay-ai' | 'freeplay-pvp' | 'replay' | 'capture'
-    //   freeplay-ai:  play vs smart AI — human is red, AI is yellow
+    //   freeplay-ai:  sandbox — place both colors, throw yourself or let AI throw on demand
     //   freeplay-pvp: pass-and-play — alternate turns, same device
     //   replay:       browsing historical game in archive
     //   capture:      loaded a position from archive, ready to analyze
     mode: 'freeplay-ai',
-    humanTeam: 'red',        // which team the human controls (AI mode)
-    aiTeam: 'yellow',        // which team the AI controls
-    aiThinking: false,       // true while AI is computing
+    humanTeam: 'red',        // cosmetic — which team the human started as
+    aiTeam: 'yellow',        // cosmetic — which team the AI throws for
+    aiThinking: false,       // true while AI is computing a throw
     turnNumber: 0,           // stones placed this end (0-15)
     
     stones: [],
@@ -2373,13 +2373,8 @@ function advanceTurn() {
     if (state.mode === 'freeplay-pvp') {
         haptic(HAPTIC.turn);
         flashTurnHandoff();
-        return;
     }
-    
-    // AI mode: trigger AI
-    if (state.mode === 'freeplay-ai' && state.activeTeam === state.aiTeam) {
-        setTimeout(() => aiTakeTurn(), 400);
-    }
+    // AI mode: do NOT auto-trigger — user chooses when to let AI throw
 }
 
 /**
@@ -2984,10 +2979,86 @@ function updateAnalysisDetail() {
     }
 }
 
+// ── Shot type visual identity ──
+const SHOT_TYPE_META = {
+    'draw':           { color: '#67D4E4', tag: 'DRAW' },
+    'guard':          { color: '#4ADE80', tag: 'GUARD' },
+    'takeout':        { color: '#F87171', tag: 'HIT' },
+    'peel':           { color: '#FB923C', tag: 'PEEL' },
+    'freeze':         { color: '#A78BFA', tag: 'FREEZE' },
+    'hit-and-roll':   { color: '#FBBF24', tag: 'H&R' },
+    'raise':          { color: '#38BDF8', tag: 'RAISE' },
+    'tick':           { color: '#E879F9', tag: 'TICK' },
+    'runback':        { color: '#FB7185', tag: 'RUN' },
+    'double-takeout': { color: '#F87171', tag: 'DBL' },
+    'come-around':    { color: '#2DD4BF', tag: 'C/A' },
+};
+
+/**
+ * Generate strategic insight text for a shot result.
+ * Returns a short phrase explaining WHY this shot matters.
+ */
+function shotInsight(result) {
+    const { candidate, wpDelta, successRate, avgCounting } = result;
+    const hasHammer = state.hammerTeam === state.activeTeam;
+    const scoreDiff = state.scoreRed - state.scoreYellow;
+    const teamSign = state.activeTeam === 'red' ? 1 : -1;
+    const relDiff = scoreDiff * teamSign;
+    
+    if (successRate > 0.90 && wpDelta > 0.01) return 'High confidence play';
+    if (successRate < 0.40) return 'High risk, high reward';
+    
+    if (candidate.type === 'draw' || candidate.type === 'come-around') {
+        if (avgCounting > 1.5) return `Likely score ${Math.round(avgCounting)}`;
+        if (hasHammer && relDiff >= 0) return 'Build pressure with hammer';
+        if (!hasHammer && avgCounting > 0) return 'Set up a steal';
+        if (hasHammer) return 'Draw for position';
+        return 'Put stone in play';
+    }
+    if (candidate.type === 'guard') {
+        if (hasHammer) return 'Protect scoring position';
+        return 'Defensive setup';
+    }
+    if (candidate.type === 'takeout' || candidate.type === 'peel' || candidate.type === 'double-takeout') {
+        if (relDiff > 0 && !hasHammer) return 'Simplify with the lead';
+        if (avgCounting < -0.5) return 'Clear the threat';
+        return 'Remove opponent stone';
+    }
+    if (candidate.type === 'freeze') return 'Freeze — hard to remove';
+    if (candidate.type === 'hit-and-roll') return 'Remove + reposition';
+    if (candidate.type === 'raise') return 'Promote closer to button';
+    if (candidate.type === 'tick') return 'Shift guard off-center';
+    if (candidate.type === 'runback') return 'Chain reaction hit';
+    
+    if (wpDelta > 0.03) return 'Strong winning play';
+    if (wpDelta > 0) return 'Slight improvement';
+    if (wpDelta > -0.01) return 'Maintains position';
+    return 'Defensive option';
+}
+
+/**
+ * SVG donut ring for success rate — compact, scannable.
+ */
+function successRingSVG(rate, color, size = 30) {
+    const r = (size - 4) / 2;
+    const circumference = 2 * Math.PI * r;
+    const filled = circumference * rate;
+    const gap = circumference - filled;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="success-ring">
+        <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="2.5"/>
+        <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="2.5"
+            stroke-dasharray="${filled} ${gap}" stroke-dashoffset="${circumference * 0.25}"
+            stroke-linecap="round" opacity="0.85"/>
+        <text x="${size/2}" y="${size/2}" text-anchor="middle" dominant-baseline="central"
+            fill="var(--text-secondary)" font-family="var(--font-mono)" font-size="8.5" font-weight="600">${Math.round(rate * 100)}</text>
+    </svg>`;
+}
+
 function updateShotsDisplay() {
     const listEl = document.getElementById('shots-list');
     const mobileListEl = document.getElementById('mobile-shots-list');
     const mobilePanel = document.getElementById('mobile-shots');
+    if (!listEl) return;
     
     if (!state.analysisResults || state.analysisResults.length === 0) {
         if (!state.analyzing) {
@@ -2996,7 +3067,7 @@ function updateShotsDisplay() {
                 listEl.innerHTML = '<div class="shots-empty"><p>Press <kbd>A</kbd> to analyze this position</p><p style="color:var(--text-tertiary);font-size:11px;margin-top:4px">See optimal shots ranked by win probability</p></div>';
                 if (mobileListEl) mobileListEl.innerHTML = '<div class="mobile-shots__empty">Tap Analyze to see shots</div>';
             } else {
-                listEl.innerHTML = '<div class="shots-empty"><p>Place stones on the ice to get started</p><p style="color:var(--text-tertiary);font-size:11px;margin-top:4px">Tap ice to place \u00b7 Drag from hack to throw</p></div>';
+                listEl.innerHTML = '<div class="shots-empty"><p>Place stones on the ice to get started</p><p style="color:var(--text-tertiary);font-size:11px;margin-top:4px">Tap ice to place · Drag from hack to throw</p></div>';
                 if (mobileListEl) mobileListEl.innerHTML = '<div class="mobile-shots__empty">Place stones first</div>';
             }
             if (mobilePanel) mobilePanel.classList.remove('has-shots');
@@ -3007,30 +3078,29 @@ function updateShotsDisplay() {
     const top5 = state.analysisResults.slice(0, 5);
     
     listEl.innerHTML = top5.map((result, i) => {
-        const { candidate, wpDelta, successRate, stdError } = result;
+        const { candidate, wpDelta, successRate, avgWP } = result;
+        const typeMeta = SHOT_TYPE_META[candidate.type] || { color: '#67D4E4', tag: '?' };
         const wpPct = (wpDelta * 100).toFixed(1);
         const wpSign = wpDelta > 0 ? '+' : '';
         const wpClass = wpDelta > 0.005 ? 'positive' : wpDelta < -0.005 ? 'negative' : 'neutral';
-        const successPct = Math.round(successRate * 100);
+        const insight = shotInsight(result);
+        const avgWpPct = Math.round(avgWP * 100);
         
-        const tip = SHOT_TIPS[candidate.type] || '';
-        return `<div class="shot-card" role="listitem" data-shot-idx="${i}" 
-                     tabindex="0" title="${tip}" aria-label="${candidate.name}: ${wpSign}${wpPct}% win probability">
-            <div class="shot-card__rank">${i + 1}</div>
-            <div class="shot-card__info">
-                <div class="shot-card__name">${candidate.icon || ''} ${candidate.name}</div>
-                <div class="shot-card__desc">${tip}</div>
-                <div class="shot-card__meta">
-                    <div class="shot-card__success">
-                        <div class="shot-card__success-bar">
-                            <div class="shot-card__success-fill" style="width:${successPct}%"></div>
-                        </div>
-                        <span>${successPct}%</span>
-                    </div>
-                    <span>\u00b1${(stdError * 100).toFixed(1)}%</span>
-                </div>
+        return `<div class="shot-card shot-card--type-${candidate.type}" role="listitem" data-shot-idx="${i}" 
+                     tabindex="0" aria-label="${candidate.name}: ${wpSign}${wpPct}% win probability"
+                     style="--type-color: ${typeMeta.color}">
+            <div class="shot-card__left">
+                <span class="shot-card__tag">${typeMeta.tag}</span>
+                ${successRingSVG(successRate, typeMeta.color)}
             </div>
-            <div class="shot-card__wp shot-card__wp--${wpClass}">${wpSign}${wpPct}%</div>
+            <div class="shot-card__info">
+                <div class="shot-card__name">${candidate.name}</div>
+                <div class="shot-card__insight">${insight}</div>
+            </div>
+            <div class="shot-card__right">
+                <div class="shot-card__wp shot-card__wp--${wpClass}">${wpSign}${wpPct}%</div>
+                <div class="shot-card__wp-after">${avgWpPct}% WP</div>
+            </div>
             <span class="shot-card__shortcut">${i + 1}</span>
         </div>`;
     }).join('');
@@ -3052,7 +3122,6 @@ function updateShotsDisplay() {
         card.addEventListener('click', () => {
             const result = state.analysisResults[idx];
             if (result) {
-                // Puzzle mode: show shot info but don't execute — must throw manually
                 if (state.mode === 'puzzle') {
                     showToast(`${result.candidate.name}: drag from hack to throw this shot`, 'info', 2500);
                     return;
@@ -3068,15 +3137,17 @@ function updateShotsDisplay() {
         const top3 = state.analysisResults.slice(0, 3);
         
         mobileListEl.innerHTML = top3.map((result, i) => {
-            const { candidate, wpDelta } = result;
+            const { candidate, wpDelta, successRate } = result;
+            const typeMeta = SHOT_TYPE_META[candidate.type] || { color: '#67D4E4', tag: '?' };
             const wpPct = (wpDelta * 100).toFixed(1);
             const wpSign = wpDelta > 0 ? '+' : '';
             const wpClass = wpDelta > 0.005 ? 'positive' : wpDelta < -0.005 ? 'negative' : 'neutral';
             
-            return `<div class="mobile-shot-item" data-shot-idx="${i}">
-                <span class="mobile-shot-item__rank">${i + 1}</span>
-                <span class="mobile-shot-item__name">${candidate.icon || ''} ${candidate.name}</span>
-                <span class="mobile-shot-item__wp mobile-shot-item__wp--${wpClass}">${wpSign}${wpPct}%</span>
+            return `<div class="mobile-shot-item" data-shot-idx="${i}" style="--type-color: ${typeMeta.color}">
+                <span class="mobile-shot-item__tag">${typeMeta.tag}</span>
+                <span class="mobile-shot-item__name">${candidate.name}</span>
+                <span class="mobile-shot-item__pct">${Math.round(successRate * 100)}%</span>
+                <span class="mobile-shot-item__wp mobile-shot-item__wp--${wpClass}">${wpSign}${wpPct}</span>
             </div>`;
         }).join('');
         
@@ -3264,6 +3335,9 @@ document.getElementById('btn-switch-team')?.addEventListener('click', () => {
 // Analyze button
 document.getElementById('btn-analyze').addEventListener('click', runAnalysis);
 
+// AI Throw button
+document.getElementById('btn-ai-throw')?.addEventListener('click', aiThrow);
+
 // Undo button
 document.getElementById('btn-undo').addEventListener('click', undo);
 
@@ -3423,6 +3497,13 @@ document.addEventListener('keydown', (e) => {
     if (key === 'a') {
         e.preventDefault();
         runAnalysis();
+        return;
+    }
+    
+    // AI Throw
+    if (key === 'i') {
+        e.preventDefault();
+        aiThrow();
         return;
     }
     
@@ -3812,6 +3893,12 @@ function updateModeUI() {
     if (mobileShots) {
         mobileShots.style.display = (state.mode === 'replay') ? 'none' : '';
     }
+    
+    // --- AI Throw button: visible in freeplay-ai, hidden otherwise ---
+    const aiThrowBtn = document.getElementById('btn-ai-throw');
+    if (aiThrowBtn) {
+        aiThrowBtn.style.display = (state.mode === 'freeplay-ai') ? '' : 'none';
+    }
 }
 
 /**
@@ -3854,11 +3941,7 @@ function showTurnBanner() {
         banner.classList.add('ai-thinking');
         text.textContent = 'AI thinking…';
     } else if (state.mode === 'freeplay-ai') {
-        if (state.activeTeam === state.humanTeam) {
-            text.textContent = `Your turn${countHint}`;
-        } else {
-            text.textContent = 'AI playing…';
-        }
+        text.textContent = `Placing ${isRed ? 'Red' : 'Yellow'}${countHint}`;
     } else if (state.mode === 'freeplay-pvp') {
         banner.classList.add(isRed ? 'pvp-red' : 'pvp-yellow');
         text.textContent = `${isRed ? 'Red' : 'Yellow'} to play${countHint}`;
@@ -4038,20 +4121,31 @@ document.getElementById('mode-toggle')?.querySelectorAll('.mode-toggle__btn').fo
 window.addEventListener('resize', () => positionModeSlider());
 
 // ═══════════════════════════════════════════════════════════════════════════
-// AI OPPONENT
+// AI THROW (ON DEMAND)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * After the human places a stone, the AI evaluates and plays the best shot.
- * Uses the ShotEvaluator engine — real physics, no faking.
+ * AI Throw — evaluates the current position for the active team,
+ * picks the best shot, and executes it with animation.
+ * Called explicitly by user via "AI Throw" button or 'I' key. Never auto-triggered.
  */
-async function aiTakeTurn() {
-    if (state.mode !== 'freeplay-ai') return;
-    if (state.activeTeam !== state.aiTeam) return;
+async function aiThrow() {
     if (state.aiThinking || state.animating) return;
+    if (state.stones.filter(s => s.active).length === 0) {
+        showToast('Place some stones first', 'info');
+        return;
+    }
     
     state.aiThinking = true;
-    showTurnBanner();
+    const throwTeam = state.activeTeam;
+    showToast(`AI thinking for ${throwTeam}...`, 'info');
+    
+    // Update turn banner if visible
+    const banner = document.getElementById('turn-banner');
+    if (banner?.classList.contains('visible')) {
+        banner.classList.add('ai-thinking');
+        document.getElementById('turn-text').textContent = `AI analyzing for ${throwTeam}...`;
+    }
     
     const scoreDiff = state.scoreRed - state.scoreYellow;
     const endsRemaining = C.ENDS_TOTAL - state.currentEnd + 1;
@@ -4062,35 +4156,46 @@ async function aiTakeTurn() {
     };
     
     try {
-        // Use quick evaluation for snappy response
-        const results = E.ShotEvaluator.evaluateAll(
-            state.stones,
-            gameState,
-            state.aiTeam,
-            Math.min(C.MC_QUICK_N, 30), // fast but smart
-            null,
-            { turnNumber: state.turnNumber }
-        );
+        // Try worker pool first for speed, fall back to sync
+        let results;
+        try {
+            results = await E.WorkerPool.evaluateParallel(
+                state.stones, gameState, throwTeam,
+                Math.min(C.MC_FULL_N || 100, 100),
+                null
+            );
+        } catch (_) {
+            results = E.ShotEvaluator.evaluateAll(
+                state.stones, gameState, throwTeam,
+                Math.min(C.MC_QUICK_N || 30, 30)
+            );
+        }
+        
+        state.aiThinking = false;
+        if (banner) banner.classList.remove('ai-thinking');
         
         if (results.length > 0) {
-            state.aiThinking = false;
-            haptic(HAPTIC.ai);
-            animateShot(results[0].candidate);
+            const best = results[0];
+            const wpPct = (best.wpDelta * 100).toFixed(1);
+            showToast(
+                `AI plays: ${best.candidate.name} (${best.wpDelta > 0 ? '+' : ''}${wpPct}%)`,
+                best.wpDelta > 0 ? 'positive' : 'info'
+            );
+            animateShot(best.candidate);
         } else {
-            // No shots — draw to button
-            state.aiThinking = false;
-            haptic(HAPTIC.ai);
+            // No shots available — place a draw to the button
+            showToast('No shots available — drawing to button', 'info');
             pushUndo();
-            state.stones.push(new E.Stone(0, 0, state.aiTeam, `s${state.nextStoneId++}`));
-            advanceTurn();
+            state.stones.push(new E.Stone(0, 0, throwTeam, `s${state.nextStoneId++}`));
+            drawMain();
+            updateDashboard();
+            saveGameState();
         }
     } catch (err) {
-        console.warn('AI fallback:', err);
+        console.warn('AI throw error:', err);
         state.aiThinking = false;
-        pushUndo();
-        const fx = (Math.random() - 0.5) * 0.3;
-        state.stones.push(new E.Stone(fx, fx, state.aiTeam, `s${state.nextStoneId++}`));
-        advanceTurn();
+        if (banner) banner.classList.remove('ai-thinking');
+        showToast('AI error — try again', 'info');
     }
 }
 

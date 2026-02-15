@@ -1122,12 +1122,20 @@ const ShotGenerator = {
 const ShotEvaluator = {
     /**
      * Evaluate a single candidate shot with Monte Carlo.
-     * @param {Stone[]} currentStones - Current position (will be cloned)
-     * @param {Object} candidate - Shot candidate from ShotGenerator
-     * @param {Object} gameState - { scoreDiff, endsRemaining, hammerTeam }
-     * @param {string} team - Team making the shot
-     * @param {number} numSims - Number of simulations
-     * @returns {{ wpDelta, avgWP, successRate, results }}
+     *
+     * Algorithm:
+     *   1. Compute baseline WP from Markov chain.
+     *   2. For each of N trials:
+     *      a. Add Gaussian execution noise (speed, lateral, depth).
+     *      b. Determine sweep upfront by shot type (draws/guards/freezes → sweep,
+     *         takeouts/peels → don't sweep). Single sim per trial.
+     *      c. Count stones → expected end score → new WP via Markov chain.
+     *      d. Check success criteria per shot type.
+     *      e. Collect first 24 trial endpoints inline (no extra sims).
+     *   3. Return: wpDelta, avgWP, successRate, stdError, countingDist, trialEndpoints.
+     *
+     * @returns {{ wpDelta, avgWP, baseWP, successRate, stdError, numSims,
+     *             trialEndpoints, countingDist, avgCounting, bestCaseWP, worstCaseWP }}
      */
     evaluateShot(currentStones, candidate, gameState, team, numSims) {
         const baseWP = WinProbability.get(
@@ -1136,67 +1144,76 @@ const ShotEvaluator = {
             gameState.hammerTeam === team
         );
         
+        // Sweep decision by shot type (single sim per trial instead of double)
+        const shouldSweep = candidate.type === 'draw' || candidate.type === 'guard' ||
+            candidate.type === 'freeze' || candidate.type === 'come-around' ||
+            candidate.type === 'hit-and-roll';
+        
+        // Shot-type-specific noise scaling (takeouts have tighter aim, draws have more depth variance)
+        const isWeight = candidate.type === 'takeout' || candidate.type === 'peel' ||
+            candidate.type === 'double-takeout' || candidate.type === 'runback';
+        const lateralSigma = isWeight ? 0.022 : 0.032;  // tighter aim on takeouts
+        const depthSigma = isWeight ? 0.015 : 0.025;     // less depth error on hard weight
+        const speedSigma = candidate.speed * CurlingConst.NOISE_SPEED_SIGMA;
+        
         let totalWP = 0;
         let successCount = 0;
         const wpSamples = [];
+        const trialEndpoints = [];
+        const VIZ_MAX = 24; // collect up to 24 endpoints inline
+        
+        // Counting distribution: track how many stones we end up counting
+        const countingHist = new Map(); // counting → frequency
+        
+        const activeBase = currentStones.filter(s => s.active);
         
         for (let i = 0; i < numSims; i++) {
-            // Clone stones
-            const simStones = currentStones.filter(s => s.active).map(s => s.clone());
+            const simStones = activeBase.map(s => s.clone());
             
-            // Create noisy delivery — zero-centered Gaussian perturbation
-            const noisySpeed = gaussRandom(candidate.speed, candidate.speed * CurlingConst.NOISE_SPEED_SIGMA);
-            // Lateral noise (perpendicular to aim line): ~3cm sigma at elite level
-            const lateralNoise = gaussRandom(0, 0.030);
-            // Depth noise (along aim line): ~2cm sigma
-            const depthNoise = gaussRandom(0, 0.020);
+            // Noisy delivery
+            const noisySpeed = gaussRandom(candidate.speed, speedSigma);
+            const latNoise = gaussRandom(0, lateralSigma);
+            const depNoise = gaussRandom(0, depthSigma);
+            const deliveryId = `d_${i}`;
             
             const delivery = Physics.createDelivery({
-                targetX: candidate.targetX + lateralNoise,
-                targetY: candidate.targetY + depthNoise,
+                targetX: candidate.targetX + latNoise,
+                targetY: candidate.targetY + depNoise,
                 speed: Math.max(noisySpeed, 0.5),
                 curl: candidate.curl,
                 team: team,
-                id: `delivery_${i}`,
+                id: deliveryId,
             });
-            
             simStones.push(delivery);
             
-            // Run simulation twice: once without sweep, once with sweep on delivery
-            // The team sweeps optimally (whichever result is better)
-            const simNoSweep = simStones.map(s => s.clone());
-            Physics.simulate(simNoSweep);
+            // Single simulation with correct sweep decision
+            const recordTraj = i < VIZ_MAX;
+            const simOpts = {};
+            if (shouldSweep) simOpts.sweepZone = (s) => s.id === deliveryId;
+            if (recordTraj) simOpts.recordTrajectory = true;
             
-            const simSwept = simStones.map(s => s.clone());
-            Physics.simulate(simSwept, { sweepZone: (s) => s.id === `delivery_${i}` });
+            const simResult = Physics.simulate(simStones, simOpts);
             
-            // Evaluate both and pick the better outcome for the team
-            function evalPos(stones) {
-                const active = stones.filter(s => s.active);
-                const c = PositionEval.countingStones(active);
-                if (c.team === team) return c.count;
-                if (c.team === null) return 0;
-                return -c.count;
-            }
-            const scoreNoSweep = evalPos(simNoSweep);
-            const scoreSwept = evalPos(simSwept);
-            const bestSim = scoreSwept >= scoreNoSweep ? simSwept : simNoSweep;
-            const expectedEndScore = Math.max(scoreSwept, scoreNoSweep);
+            // Evaluate position: direct stone counting (no heuristic indirection)
+            const active = simStones.filter(s => s.active);
+            const c = PositionEval.countingStones(active);
+            let expectedEndScore;
+            if (c.team === team) expectedEndScore = c.count;
+            else if (c.team === null) expectedEndScore = 0;
+            else expectedEndScore = -c.count;
             
-            // Use the best result
-            const resultActive = bestSim.filter(s => s.active);
+            // Track counting distribution
+            countingHist.set(expectedEndScore, (countingHist.get(expectedEndScore) || 0) + 1);
             
-            // Convert to WP (expectedEndScore already computed above)
-            // Hammer transition: if we score (>0), opponent gets hammer next.
-            // If blank (0), hammer stays. If opponent steals (<0), we get hammer.
+            // WP from end result via Markov chain
             const newDiff = gameState.scoreDiff + expectedEndScore;
             let hasHammerNext;
             if (expectedEndScore > 0) {
-                hasHammerNext = gameState.hammerTeam !== team; // we scored → lose hammer
+                hasHammerNext = gameState.hammerTeam !== team;
             } else if (expectedEndScore < 0) {
-                hasHammerNext = gameState.hammerTeam === team; // opponent stole → they lose hammer, we get it
+                hasHammerNext = gameState.hammerTeam === team;
             } else {
-                hasHammerNext = gameState.hammerTeam === team; // blank → hammer stays
+                hasHammerNext = gameState.hammerTeam === team;
             }
             const newWP = WinProbability.get(
                 newDiff,
@@ -1207,45 +1224,48 @@ const ShotEvaluator = {
             totalWP += newWP;
             wpSamples.push(newWP);
             
-            // Success = shot achieved its primary goal (use bestSim which includes optimal sweep)
-            const deliveredStone = bestSim.find(s => s.id === `delivery_${i}` && s.active);
+            // Success criteria per shot type
+            const deliveredStone = simStones.find(s => s.id === deliveryId && s.active);
+            let success = false;
+            
             if (candidate.type === 'takeout' || candidate.type === 'peel' || candidate.type === 'hit-and-roll') {
-                const targetGone = !bestSim.find(s => s.id === candidate.targetStone && s.active && s.isInHouse());
-                if (targetGone) successCount++;
-            } else if (candidate.type === 'double') {
-                // Double takeout: both targets removed
-                const t1 = candidate.targetStone;
-                const t2 = candidate.targetStone2;
-                const gone1 = !bestSim.find(s => s.id === t1 && s.active && s.isInHouse());
-                const gone2 = !t2 || !bestSim.find(s => s.id === t2 && s.active && s.isInHouse());
-                if (gone1 && gone2) successCount++;
+                success = !simStones.find(s => s.id === candidate.targetStone && s.active && s.isInHouse());
+            } else if (candidate.type === 'double-takeout') {
+                const t1 = candidate.targetStone, t2 = candidate.targetStone2;
+                const gone1 = !simStones.find(s => s.id === t1 && s.active && s.isInHouse());
+                const gone2 = !t2 || !simStones.find(s => s.id === t2 && s.active && s.isInHouse());
+                success = gone1 && gone2;
             } else if (candidate.type === 'freeze') {
-                const targetStone = bestSim.find(s => s.id === candidate.targetStone && s.active);
+                const targetStone = simStones.find(s => s.id === candidate.targetStone && s.active);
                 if (deliveredStone && targetStone) {
-                    const d = dist(deliveredStone.x, deliveredStone.y, targetStone.x, targetStone.y);
-                    if (d < CurlingConst.STONE_RADIUS * 3) successCount++;
+                    success = dist(deliveredStone.x, deliveredStone.y, targetStone.x, targetStone.y) < CurlingConst.STONE_RADIUS * 3;
                 }
-            } else if (candidate.type === 'raise' || candidate.type === 'tick' || candidate.type === 'runback') {
-                // Raise/tick/runback: target stone moved significantly from original position
-                const targetStone = bestSim.find(s => s.id === candidate.targetStone && s.active);
-                if (candidate.type === 'raise' && targetStone) {
-                    // Raise success: own stone moved closer to button
-                    if (targetStone.distToButton() < dist(candidate.targetX, candidate.targetY, 0, 0)) successCount++;
-                } else if (candidate.type === 'tick') {
-                    // Tick success: guard moved laterally
-                    if (!targetStone || dist(targetStone.x, targetStone.y, candidate.targetX, candidate.targetY) > CurlingConst.STONE_RADIUS * 2) successCount++;
-                } else {
-                    // Runback: opponent stone behind ours removed
-                    if (deliveredStone) successCount++;
-                }
+            } else if (candidate.type === 'raise') {
+                const targetStone = simStones.find(s => s.id === candidate.targetStone && s.active);
+                success = targetStone && targetStone.distToButton() < dist(candidate.targetX, candidate.targetY, 0, 0);
+            } else if (candidate.type === 'tick') {
+                const targetStone = simStones.find(s => s.id === candidate.targetStone && s.active);
+                success = !targetStone || dist(targetStone.x, targetStone.y, candidate.targetX, candidate.targetY) > CurlingConst.STONE_RADIUS * 2;
+            } else if (candidate.type === 'runback') {
+                success = !!deliveredStone;
             } else if (candidate.type === 'draw' || candidate.type === 'guard' || candidate.type === 'come-around') {
                 if (deliveredStone) {
-                    const distToTarget = dist(deliveredStone.x, deliveredStone.y, candidate.targetX, candidate.targetY);
-                    if (distToTarget < CurlingConst.STONE_RADIUS * 5) successCount++;
+                    success = dist(deliveredStone.x, deliveredStone.y, candidate.targetX, candidate.targetY) < CurlingConst.STONE_RADIUS * 4;
                 }
             } else {
-                // Manual throws and unknown types — check if delivery stayed in play
-                if (deliveredStone) successCount++;
+                success = !!deliveredStone;
+            }
+            if (success) successCount++;
+            
+            // Collect viz endpoints inline (first VIZ_MAX trials only)
+            if (i < VIZ_MAX) {
+                const traj = simResult?.trajectories?.get(deliveryId);
+                trialEndpoints.push({
+                    x: deliveredStone?.x ?? candidate.targetX,
+                    y: deliveredStone?.y ?? candidate.targetY,
+                    active: deliveredStone?.active ?? false,
+                    trajectory: traj ? traj.map(p => ({ x: p.x, y: p.y })) : [],
+                });
             }
         }
         
@@ -1255,44 +1275,24 @@ const ShotEvaluator = {
         
         // Standard error
         let variance = 0;
-        for (const wp of wpSamples) {
-            variance += (wp - avgWP) ** 2;
-        }
+        for (const wp of wpSamples) variance += (wp - avgWP) ** 2;
         variance /= numSims;
         const stdError = Math.sqrt(variance / numSims);
         
-        // Record trial endpoints for visualization (delivery final positions)
-        // Only record for display — keep last N trial positions
-        const trialEndpoints = [];
-        // Re-run a small batch to collect endpoints (if numSims was large, 
-        // we already ran them but didn't record positions — so collect a fast sample)
-        const vizSims = Math.min(numSims, 24);
-        for (let i = 0; i < vizSims; i++) {
-            const vizStones = currentStones.filter(s => s.active).map(s => s.clone());
-            const latN = gaussRandom(0, 0.030);
-            const depN = gaussRandom(0, 0.020);
-            const nSpeed = gaussRandom(candidate.speed, candidate.speed * CurlingConst.NOISE_SPEED_SIGMA);
-            const del = Physics.createDelivery({
-                targetX: candidate.targetX + latN,
-                targetY: candidate.targetY + depN,
-                speed: Math.max(nSpeed, 0.5),
-                curl: candidate.curl,
-                team: team,
-                id: `viz_${i}`,
-            });
-            vizStones.push(del);
-            const { trajectories } = Physics.simulate(vizStones, { recordTrajectory: true });
-            
-            // Record the delivery stone's trajectory and final position
-            const traj = trajectories?.get(`viz_${i}`);
-            const finalDel = vizStones.find(s => s.id === `viz_${i}`);
-            trialEndpoints.push({
-                x: finalDel?.x ?? candidate.targetX,
-                y: finalDel?.y ?? candidate.targetY,
-                active: finalDel?.active ?? false,
-                trajectory: traj ? traj.map(p => ({ x: p.x, y: p.y })) : [],
-            });
-        }
+        // Best/worst case (10th/90th percentile)
+        wpSamples.sort((a, b) => a - b);
+        const p10 = wpSamples[Math.floor(numSims * 0.1)] || avgWP;
+        const p90 = wpSamples[Math.floor(numSims * 0.9)] || avgWP;
+        
+        // Average counting stones
+        let totalCounting = 0;
+        for (const [score, freq] of countingHist) totalCounting += score * freq;
+        const avgCounting = totalCounting / numSims;
+        
+        // Convert counting dist to sorted array for display
+        const countingDist = [...countingHist.entries()]
+            .map(([score, freq]) => ({ score, prob: freq / numSims }))
+            .sort((a, b) => b.prob - a.prob);
         
         return {
             candidate,
@@ -1303,6 +1303,10 @@ const ShotEvaluator = {
             stdError,
             numSims,
             trialEndpoints,
+            countingDist,
+            avgCounting,
+            bestCaseWP: p90,
+            worstCaseWP: p10,
         };
     },
     
