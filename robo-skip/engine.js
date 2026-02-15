@@ -362,14 +362,12 @@ const Physics = {
                 anyMoving = true;
                 
                 const speed = s.speed();
-                if (speed < 0.0001) { s.vx = 0; s.vy = 0; s.omega = 0; continue; }
+                if (speed < 0.0001 || !isFinite(speed)) { s.vx = 0; s.vy = 0; s.omega = 0; continue; }
                 const ux = s.vx / speed;
                 const uy = s.vy / speed;
                 
                 // Friction deceleration (along velocity direction)
                 const frictionDecel = mu * g;
-                // Speed-dependent friction increase (higher at low speed — stone "digs in")
-                // Recalibrated for mu=0.012 to maintain ~0.20 m/s² at delivery speeds
                 const speedFactor = 1 + 0.8 / (1 + speed * 8);
                 const aFriction = frictionDecel * speedFactor;
                 
@@ -378,18 +376,18 @@ const Physics = {
                 const effectiveFriction = aFriction * sweepFactor;
                 
                 // Curl: lateral acceleration perpendicular to velocity
-                // Clockwise (omega > 0) curls RIGHT (Murata 2022, Springer 2022)
-                // Asymmetric friction from running band deviates stone toward slow side
-                const curlSign = s.omega > 0 ? 1 : -1; // clockwise → curls right
+                const curlSign = s.omega > 0 ? 1 : -1;
                 const aCurlMag = curlK * Math.abs(s.omega) / Math.max(speed, 0.1);
                 
-                // Perpendicular to velocity: (-uy, ux) is left, (uy, -ux) is right
                 const perpX = -uy * curlSign;
                 const perpY = ux * curlSign;
                 
                 // Apply accelerations (semi-implicit Euler)
                 s.vx += (-ux * effectiveFriction + perpX * aCurlMag) * dt;
                 s.vy += (-uy * effectiveFriction + perpY * aCurlMag) * dt;
+                
+                // NaN safety
+                if (!isFinite(s.vx) || !isFinite(s.vy)) { s.vx = 0; s.vy = 0; s.omega = 0; continue; }
                 
                 // Clamp to zero if deceleration overshoots
                 const newSpeed = s.speed();
@@ -413,12 +411,6 @@ const Physics = {
                     const traj = trajectories.get(s.id);
                     if (traj) traj.push({ x: s.x, y: s.y, t, theta: s.theta });
                 }
-                
-                // Out of bounds check
-                if (Math.abs(s.x) > halfW + R || s.y < backY - 0.5 || s.y > CurlingConst.HOG_LINE_Y + 5) {
-                    s.active = false;
-                    s.vx = 0; s.vy = 0;
-                }
             }
             
             // Collision detection and resolution (iterative for multi-stone pileups)
@@ -436,46 +428,57 @@ const Physics = {
                             const d = Math.sqrt(d2);
                             const nx = dx / d, ny = dy / d;
                             
-                            // Relative velocity along normal
-                            const dvx = a.vx - b.vx;
-                            const dvy = a.vy - b.vy;
-                            const dvn = dvx * nx + dvy * ny;
-                            
-                            // Only resolve impulse if approaching
-                            if (dvn > 0 && pass === 0) {
-                                const imp = dvn * (1 + cor) / 2;
-                                
-                                a.vx -= imp * nx;
-                                a.vy -= imp * ny;
-                                b.vx += imp * nx;
-                                b.vy += imp * ny;
-                                
-                                // Transfer some angular momentum
-                                const tangent = dvx * (-ny) + dvy * nx;
-                                a.omega += tangent * 0.1;
-                                b.omega -= tangent * 0.1;
-                                
-                                collisions.push({
-                                    x: (a.x + b.x) / 2,
-                                    y: (a.y + b.y) / 2,
-                                    t,
-                                    stoneA: a.id,
-                                    stoneB: b.id,
-                                    force: dvn,
-                                });
-                            }
-                            
-                            // Separate overlapping stones (every pass)
+                            // Separate overlapping stones FIRST (every pass)
                             const overlap = minDist - d;
                             if (overlap > 0) {
-                                const sep = overlap / 2 + 0.0001;
+                                const sep = overlap * 0.5 + 0.0002;
                                 a.x -= nx * sep;
                                 a.y -= ny * sep;
                                 b.x += nx * sep;
                                 b.y += ny * sep;
                             }
+                            
+                            // Only resolve impulse on first pass
+                            if (pass === 0) {
+                                const dvx = a.vx - b.vx;
+                                const dvy = a.vy - b.vy;
+                                const dvn = dvx * nx + dvy * ny;
+                                
+                                if (dvn > 0) {
+                                    const imp = dvn * (1 + cor) / 2;
+                                    
+                                    a.vx -= imp * nx;
+                                    a.vy -= imp * ny;
+                                    b.vx += imp * nx;
+                                    b.vy += imp * ny;
+                                    
+                                    // Transfer some angular momentum
+                                    const tangent = dvx * (-ny) + dvy * nx;
+                                    a.omega += tangent * 0.1;
+                                    b.omega -= tangent * 0.1;
+                                    
+                                    collisions.push({
+                                        x: (a.x + b.x) / 2,
+                                        y: (a.y + b.y) / 2,
+                                        t,
+                                        stoneA: a.id,
+                                        stoneB: b.id,
+                                        force: dvn,
+                                    });
+                                }
+                            }
                         }
                     }
+                }
+            }
+            
+            // Out-of-bounds check AFTER collision separation
+            for (const s of stones) {
+                if (!s.active) continue;
+                if (!isFinite(s.x) || !isFinite(s.y)) { s.active = false; s.vx = 0; s.vy = 0; continue; }
+                if (Math.abs(s.x) > halfW + R + 0.5 || s.y < backY - 1.0 || s.y > CurlingConst.HOG_LINE_Y + 5) {
+                    s.active = false;
+                    s.vx = 0; s.vy = 0;
                 }
             }
             
@@ -530,28 +533,21 @@ const Physics = {
                 }
                 moving = true;
                 const speed = s.speed();
-                if (speed < 0.0001) { s.vx = 0; s.vy = 0; s.omega = 0; continue; }
+                if (speed < 0.0001 || !isFinite(speed)) { s.vx = 0; s.vy = 0; s.omega = 0; continue; }
                 const ux = s.vx / speed, uy = s.vy / speed;
-                const frictionDecel = mu * g;
-                const speedFactor = 1 + 0.8 / (1 + speed * 8);
-                const aFriction = frictionDecel * speedFactor;
-                const sweepFactor = (opts.sweepZone && opts.sweepZone(s)) ? 0.70 : 1.0;
-                const effectiveFriction = aFriction * sweepFactor;
-                const curlSign = s.omega > 0 ? 1 : -1;
-                const aCurlMag = curlK * Math.abs(s.omega) / Math.max(speed, 0.1);
-                const perpX = -uy * curlSign, perpY = ux * curlSign;
-                s.vx += (-ux * effectiveFriction + perpX * aCurlMag) * dt;
-                s.vy += (-uy * effectiveFriction + perpY * aCurlMag) * dt;
-                const newSpeed = s.speed();
-                if (newSpeed < vThresh || (s.vx * ux + s.vy * uy) < 0) {
-                    s.vx = 0; s.vy = 0; s.omega = 0; continue;
-                }
+                const af = mu * g * (1 + 0.8 / (1 + speed * 8));
+                const sf = (opts.sweepZone && opts.sweepZone(s)) ? 0.70 : 1.0;
+                const ef = af * sf;
+                const cs = s.omega > 0 ? 1 : -1;
+                const ac = curlK * Math.abs(s.omega) / Math.max(speed, 0.1);
+                s.vx += (-ux * ef + (-uy * cs) * ac) * dt;
+                s.vy += (-uy * ef + (ux * cs) * ac) * dt;
+                if (!isFinite(s.vx) || !isFinite(s.vy)) { s.vx = 0; s.vy = 0; s.omega = 0; continue; }
+                const ns = s.speed();
+                if (ns < vThresh || (s.vx * ux + s.vy * uy) < 0) { s.vx = 0; s.vy = 0; s.omega = 0; continue; }
                 s.omega *= (1 - 0.02 * dt);
                 s.theta += s.omega * dt;
                 s.x += s.vx * dt; s.y += s.vy * dt;
-                if (Math.abs(s.x) > halfW + R || s.y < backY - 0.5 || s.y > CurlingConst.HOG_LINE_Y + 5) {
-                    s.active = false; s.vx = 0; s.vy = 0;
-                }
             }
             // Collision detection (iterative for multi-stone pileups)
             const active = stones.filter(s => s.active);
@@ -565,24 +561,36 @@ const Physics = {
                         if (d2 < minDist * minDist && d2 > 0.00000001) {
                             const d = Math.sqrt(d2);
                             const nx = dx / d, ny = dy / d;
-                            const dvx = a.vx - b.vx, dvy = a.vy - b.vy;
-                            const dvn = dvx * nx + dvy * ny;
-                            if (dvn > 0 && pass === 0) {
-                                const imp = dvn * (1 + cor) / 2;
-                                a.vx -= imp * nx; a.vy -= imp * ny;
-                                b.vx += imp * nx; b.vy += imp * ny;
-                                const tangent = dvx * (-ny) + dvy * nx;
-                                a.omega += tangent * 0.1; b.omega -= tangent * 0.1;
-                                collisions.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, stoneA: a.id, stoneB: b.id, force: dvn });
-                            }
-                            const overlap = minDist - d;
-                            if (overlap > 0) {
-                                const sep = overlap / 2 + 0.0001;
+                            // Separate FIRST
+                            const ol = minDist - d;
+                            if (ol > 0) {
+                                const sep = ol * 0.5 + 0.0002;
                                 a.x -= nx * sep; a.y -= ny * sep;
                                 b.x += nx * sep; b.y += ny * sep;
                             }
+                            // Impulse on first pass only
+                            if (pass === 0) {
+                                const dvx = a.vx - b.vx, dvy = a.vy - b.vy;
+                                const dvn = dvx * nx + dvy * ny;
+                                if (dvn > 0) {
+                                    const imp = dvn * (1 + cor) / 2;
+                                    a.vx -= imp * nx; a.vy -= imp * ny;
+                                    b.vx += imp * nx; b.vy += imp * ny;
+                                    const tangent = dvx * (-ny) + dvy * nx;
+                                    a.omega += tangent * 0.1; b.omega -= tangent * 0.1;
+                                    collisions.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, stoneA: a.id, stoneB: b.id, force: dvn });
+                                }
+                            }
                         }
                     }
+                }
+            }
+            // OOB check AFTER collision separation
+            for (const s of stones) {
+                if (!s.active) continue;
+                if (!isFinite(s.x) || !isFinite(s.y)) { s.active = false; s.vx = 0; s.vy = 0; continue; }
+                if (Math.abs(s.x) > halfW + R + 0.5 || s.y < backY - 1.0 || s.y > CurlingConst.HOG_LINE_Y + 5) {
+                    s.active = false; s.vx = 0; s.vy = 0;
                 }
             }
             anyMoving = anyMoving || moving;
@@ -1348,7 +1356,7 @@ function simulate(stones, sweepId) {
         for (const s of stones) {
             if (!s.a) continue;
             const spd = Math.sqrt(s.vx*s.vx+s.vy*s.vy);
-            if (spd < vThresh || spd < 0.0001) { s.vx=0; s.vy=0; s.w=0; continue; }
+            if (spd < vThresh || spd < 0.0001 || !isFinite(spd)) { s.vx=0; s.vy=0; s.w=0; continue; }
             anyMoving = true;
             const ux=s.vx/spd, uy=s.vy/spd;
             const af = mu*g*(1+0.8/(1+spd*8));
@@ -1357,13 +1365,13 @@ function simulate(stones, sweepId) {
             const ac = curlK*Math.abs(s.w)/Math.max(spd,0.1);
             s.vx += (-ux*af*sf + (-uy*cs)*ac)*dt;
             s.vy += (-uy*af*sf + (ux*cs)*ac)*dt;
+            if (!isFinite(s.vx)||!isFinite(s.vy)) { s.vx=0;s.vy=0;s.w=0;continue; }
             const ns = Math.sqrt(s.vx*s.vx+s.vy*s.vy);
             if (ns<vThresh||(s.vx*ux+s.vy*uy)<0) { s.vx=0;s.vy=0;s.w=0;continue; }
             s.w *= (1-0.02*dt);
             s.x += s.vx*dt; s.y += s.vy*dt;
-            if (Math.abs(s.x)>halfW+R||s.y<C.BACK_LINE_Y-R-0.5||s.y>C.HOG_LINE_Y+5) { s.a=false;s.vx=0;s.vy=0; }
         }
-        // Collisions (iterative for multi-stone pileups)
+        // Collisions (iterative — separate FIRST, then impulse)
         const act = stones.filter(s=>s.a);
         for (let pass=0;pass<3;pass++) {
             for (let i=0;i<act.length;i++) for (let j=i+1;j<act.length;j++) {
@@ -1372,23 +1380,25 @@ function simulate(stones, sweepId) {
                 if (d2<(2*R)*(2*R)&&d2>0.00000001) {
                     const d=Math.sqrt(d2);
                     const nx=dx/d,ny=dy/d;
-                    const dvn=(a.vx-b.vx)*nx+(a.vy-b.vy)*ny;
-                    if (dvn>0&&pass===0) {
-                        const imp=dvn*(1+cor)/2;
-                        a.vx-=imp*nx;a.vy-=imp*ny;b.vx+=imp*nx;b.vy+=imp*ny;
-                    }
                     const ol=2*R-d;
-                    if (ol>0) {
-                        const sep=ol/2+0.0001;
-                        a.x-=nx*sep;a.y-=ny*sep;b.x+=nx*sep;b.y+=ny*sep;
+                    if (ol>0) { const sep=ol*0.5+0.0002; a.x-=nx*sep;a.y-=ny*sep;b.x+=nx*sep;b.y+=ny*sep; }
+                    if (pass===0) {
+                        const dvn=(a.vx-b.vx)*nx+(a.vy-b.vy)*ny;
+                        if (dvn>0) {
+                            const imp=dvn*(1+cor)/2;
+                            a.vx-=imp*nx;a.vy-=imp*ny;b.vx+=imp*nx;b.vy+=imp*ny;
+                        }
                     }
                 }
             }
         }
+        // OOB after separation
+        for (const s of stones) {
+            if (!s.a) continue;
+            if (!isFinite(s.x)||!isFinite(s.y)) { s.a=false;s.vx=0;s.vy=0;continue; }
+            if (Math.abs(s.x)>halfW+R+0.5||s.y<C.BACK_LINE_Y-R-1.0||s.y>C.HOG_LINE_Y+5) { s.a=false;s.vx=0;s.vy=0; }
+        }
         if (!anyMoving) break;
-    }
-    for (const s of stones) {
-        if (s.a && (Math.abs(s.x)>halfW+R||s.y<C.BACK_LINE_Y-R-0.5)) s.a=false;
     }
 }
 

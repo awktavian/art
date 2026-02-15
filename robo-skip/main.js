@@ -354,11 +354,12 @@ function drawBackground() {
     
     ctx.clearRect(0, 0, w, h);
     
-    // Ice surface
+    // Ice surface — subtle cool-to-warm gradient for depth
     const iceGrad = ctx.createLinearGradient(0, 0, 0, h);
-    iceGrad.addColorStop(0, 'rgba(200, 218, 230, 0.88)');
-    iceGrad.addColorStop(0.5, 'rgba(215, 230, 240, 0.92)');
-    iceGrad.addColorStop(1, 'rgba(195, 215, 228, 0.88)');
+    iceGrad.addColorStop(0, 'rgba(195, 215, 230, 0.90)');
+    iceGrad.addColorStop(0.35, 'rgba(210, 228, 240, 0.94)');
+    iceGrad.addColorStop(0.65, 'rgba(215, 232, 242, 0.94)');
+    iceGrad.addColorStop(1, 'rgba(200, 220, 232, 0.90)');
     
     // Sheet area (clipped to sheet width)
     const sheetLeft = worldToCanvas(-C.SHEET_WIDTH / 2, 0).x;
@@ -477,11 +478,14 @@ function drawHouse(ctx) {
     const button = worldToCanvas(0, 0);
     ctx.save();
     
-    // 12-foot ring (outermost, red)
+    // 12-foot ring (outermost, red) — richer color
     const r12 = mToPx(C.HOUSE_RADIUS_12);
     ctx.beginPath();
     ctx.arc(button.x, button.y, r12, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(200, 60, 60, 0.12)';
+    const grad12 = ctx.createRadialGradient(button.x, button.y, r12 * 0.7, button.x, button.y, r12);
+    grad12.addColorStop(0, 'rgba(200, 60, 60, 0.06)');
+    grad12.addColorStop(1, 'rgba(200, 60, 60, 0.14)');
+    ctx.fillStyle = grad12;
     ctx.fill();
     ctx.strokeStyle = 'rgba(200, 60, 60, 0.35)';
     ctx.lineWidth = 1.5;
@@ -491,28 +495,37 @@ function drawHouse(ctx) {
     const r8 = mToPx(C.HOUSE_RADIUS_8);
     ctx.beginPath();
     ctx.arc(button.x, button.y, r8, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(240, 240, 245, 0.15)';
+    ctx.fillStyle = 'rgba(240, 240, 245, 0.12)';
     ctx.fill();
-    ctx.strokeStyle = 'rgba(240, 240, 245, 0.4)';
+    ctx.strokeStyle = 'rgba(240, 240, 245, 0.35)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
     
-    // 4-foot ring (blue)
+    // 4-foot ring (blue) — richer blue
     const r4 = mToPx(C.HOUSE_RADIUS_4);
     ctx.beginPath();
     ctx.arc(button.x, button.y, r4, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(60, 100, 200, 0.12)';
+    const grad4 = ctx.createRadialGradient(button.x, button.y, 0, button.x, button.y, r4);
+    grad4.addColorStop(0, 'rgba(60, 120, 220, 0.08)');
+    grad4.addColorStop(1, 'rgba(60, 100, 200, 0.15)');
+    ctx.fillStyle = grad4;
     ctx.fill();
     ctx.strokeStyle = 'rgba(60, 100, 200, 0.35)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
     
-    // Button (center)
+    // Button (center) — brighter, slight glow
     const rBtn = mToPx(C.BUTTON_RADIUS);
+    ctx.save();
+    ctx.shadowColor = 'rgba(240, 240, 250, 0.15)';
+    ctx.shadowBlur = 4;
     ctx.beginPath();
     ctx.arc(button.x, button.y, rBtn, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(240, 240, 245, 0.3)';
+    ctx.fillStyle = 'rgba(240, 240, 245, 0.35)';
     ctx.fill();
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(button.x, button.y, rBtn, 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(240, 240, 245, 0.5)';
     ctx.lineWidth = 1;
     ctx.stroke();
@@ -789,8 +802,8 @@ function startGhostPulse() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function isInHackZone(wy) {
-    // Slightly larger zone on touch devices
-    const threshold = IS_TOUCH ? 1.0 : 0.5;
+    // Larger zone on touch devices for easier interaction
+    const threshold = IS_TOUCH ? 1.5 : 0.8;
     return wy > C.HOG_LINE_Y - threshold;
 }
 
@@ -845,13 +858,14 @@ function drawThrowingGuide(ctx, throwing) {
     const teamFill = isRed ? '#E74C3C' : '#F1C40F';
     const teamFillAlpha = isRed ? 'rgba(231, 76, 60,' : 'rgba(241, 196, 15,';
     
-    // Compute throw parameters
+    // Compute throw parameters (match releaseThrow exactly)
     const dragDx = throwing.currentX - throwing.startX;
     const dragDy = throwing.currentY - throwing.startY;
     const dragDist = Math.sqrt(dragDx * dragDx + dragDy * dragDy);
-    const speed = E.clamp(dragDist * 0.5, 0.8, 3.5);
+    const speed = E.clamp(dragDist * 0.6, 0.8, 3.5);
     const lateralOffset = throwing.startX - throwing.currentX;
-    const curl = lateralOffset > 0.05 ? 1 : lateralOffset < -0.05 ? -1 : 0;
+    const curlThreshold = IS_TOUCH ? 0.12 : 0.05;
+    const curl = lateralOffset > curlThreshold ? 1 : lateralOffset < -curlThreshold ? -1 : 0;
     
     // Power classification
     let powerLabel, powerColor, powerGlow;
@@ -1791,8 +1805,19 @@ function animateShot(candidate) {
         // Camera shake
         mainCanvas.style.transform = (shakeX || shakeY) ? `translate(${shakeX}px,${shakeY}px)` : '';
         
+        // Safety: check for NaN in any stone position (physics blew up)
+        const hasNaN = simStones.some(s => s.active && (!isFinite(s.x) || !isFinite(s.y)));
+        if (hasNaN) {
+            // Kill bad stones silently
+            for (const s of simStones) {
+                if (s.active && (!isFinite(s.x) || !isFinite(s.y))) {
+                    s.active = false; s.vx = 0; s.vy = 0;
+                }
+            }
+        }
+        
         // Continue or finish
-        if (stepResult.anyMoving && totalPhysicsSteps < maxPhysicsSteps) {
+        if (stepResult.anyMoving && totalPhysicsSteps < maxPhysicsSteps && !hasNaN) {
             requestAnimationFrame(animFrame);
         } else {
             sweepBanner.remove();
@@ -2212,18 +2237,21 @@ function releaseThrow() {
     const dragDist = Math.sqrt(dragDx * dragDx + dragDy * dragDy);
     
     // Need minimum drag to throw (lower on touch for easier use)
-    const minDrag = IS_TOUCH ? 0.15 : 0.3;
+    const minDrag = IS_TOUCH ? 0.10 : 0.20;
     if (dragDist < minDrag) {
         state.throwing = null;
         mainCanvas.style.cursor = 'crosshair';
         drawMain();
+        showToast('Drag farther to throw', 'info', 1500);
         return;
     }
     
-    // Compute delivery parameters
-    const speed = E.clamp(dragDist * 0.5, 0.8, 3.5);
+    // Compute delivery parameters — more responsive mapping
+    const speed = E.clamp(dragDist * 0.6, 0.8, 3.5);
     const lateralOffset = t.startX - t.currentX;
-    const curl = lateralOffset > 0.05 ? 1 : lateralOffset < -0.05 ? -1 : 1;
+    // Wider curl deadzone on touch to avoid accidental curl
+    const curlThreshold = IS_TOUCH ? 0.12 : 0.05;
+    const curl = lateralOffset > curlThreshold ? 1 : lateralOffset < -curlThreshold ? -1 : 1;
     
     // Aim: use drag direction to determine target
     const aimAngle = Math.atan2(dragDy, dragDx);
