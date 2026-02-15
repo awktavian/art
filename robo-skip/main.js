@@ -50,12 +50,13 @@ const T = { instant: 89, fast: 144, normal: 233, slow: 377, slower: 610, slowest
 // ═══════════════════════════════════════════════════════════════════════════
 
 const state = {
-    // Mode: 'freeplay-ai' | 'freeplay-pvp' | 'replay' | 'capture'
+    // Mode: 'puzzle' | 'freeplay-ai' | 'freeplay-pvp' | 'replay' | 'capture'
+    //   puzzle:       daily puzzle — find the best shot (default landing experience)
     //   freeplay-ai:  sandbox — place both colors, throw yourself or let AI throw on demand
     //   freeplay-pvp: pass-and-play — alternate turns, same device
     //   replay:       browsing historical game in archive
     //   capture:      loaded a position from archive, ready to analyze
-    mode: 'freeplay-ai',
+    mode: 'puzzle',
     humanTeam: 'red',        // cosmetic — which team the human started as
     aiTeam: 'yellow',        // cosmetic — which team the AI throws for
     aiThinking: false,       // true while AI is computing a throw
@@ -3645,7 +3646,7 @@ document.getElementById('btn-onboarding-start')?.addEventListener('click', () =>
 });
 document.getElementById('btn-onboarding-archive')?.addEventListener('click', () => {
     hideOnboarding();
-    setTimeout(() => toggleGameBrowser(), 300);
+    setTimeout(() => setGameMode('freeplay-ai'), 200);
 });
 // Close onboarding on click anywhere on overlay background
 document.getElementById('onboarding-overlay')?.addEventListener('click', (e) => {
@@ -3730,19 +3731,24 @@ function init() {
     requestAnimationFrame(() => positionModeSlider());
 
     // Show appropriate welcome state
-    if (isFirstVisit() && !restoredFromHash) {
-        showOnboarding();
-        markVisited();
-    } else if (restoredFromStorage) {
-        showToast('Welcome back — restored your position', 'info');
-        if (state.stones.filter(s => s.active).length > 0) {
-            scheduleAutoAnalysis();
-        }
-    } else if (restoredFromHash) {
+    if (restoredFromHash) {
+        // Shared link takes priority — go to freeplay to analyze
+        state.mode = 'freeplay-ai';
+        updateModeUI();
+        requestAnimationFrame(() => positionModeSlider());
         showToast('Loaded shared position', 'info');
         if (state.stones.filter(s => s.active).length > 0) {
             scheduleAutoAnalysis();
         }
+    } else if (isFirstVisit()) {
+        // First visit: show onboarding, then puzzle starts
+        showOnboarding();
+        markVisited();
+        // Puzzle initializes after onboarding dismisses (or immediately if auto-dismissed)
+        setGameMode('puzzle');
+    } else {
+        // Returning user: go straight to daily puzzle
+        setGameMode('puzzle');
     }
 
     // Track visit
@@ -3852,6 +3858,7 @@ function updateModeUI() {
     if (modeToggle) {
         modeToggle.style.display = isFreeplay ? 'flex' : 'none';
         modeToggle.classList.toggle('pvp', state.mode === 'freeplay-pvp');
+        modeToggle.classList.toggle('puzzle', state.mode === 'puzzle');
         modeToggle.querySelectorAll('.mode-toggle__btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.mode === state.mode);
         });
@@ -3898,6 +3905,18 @@ function updateModeUI() {
     const aiThrowBtn = document.getElementById('btn-ai-throw');
     if (aiThrowBtn) {
         aiThrowBtn.style.display = (state.mode === 'freeplay-ai') ? '' : 'none';
+    }
+    
+    // --- Team switch: hidden in puzzle mode ---
+    const teamBtn = document.getElementById('btn-switch-team');
+    if (teamBtn) {
+        teamBtn.style.display = (state.mode === 'puzzle') ? 'none' : '';
+    }
+    
+    // --- Undo: hidden in puzzle mode ---
+    const undoBtn = document.getElementById('btn-undo');
+    if (undoBtn) {
+        undoBtn.style.display = (state.mode === 'puzzle') ? 'none' : '';
     }
 }
 
@@ -4057,7 +4076,7 @@ function goHome() {
     state.undoStack = [];
     state.redoStack = [];
     
-    setGameMode(state._prevMode || 'freeplay-ai');
+    setGameMode(state._prevMode || 'puzzle');
     
     drawMain();
     updateDashboard();
@@ -4098,7 +4117,7 @@ function newGame() {
             overlay.classList.remove('visible');
             overlay.setAttribute('aria-hidden', 'true');
         }
-        setGameMode(state._prevMode || 'freeplay-ai');
+        setGameMode(state._prevMode || 'puzzle');
     }
     
     haptic(HAPTIC.newGame);
@@ -4219,7 +4238,7 @@ function toggleGameBrowser() {
         state.mode = 'replay';
         loadTournamentList();
     } else {
-        state.mode = state.loadedGameContext ? 'capture' : state._prevMode || 'freeplay-ai';
+        state.mode = state.loadedGameContext ? 'capture' : state._prevMode || 'puzzle';
     }
     updateModeUI();
 }
@@ -4757,6 +4776,24 @@ function getStats() {
 document.getElementById('btn-new-game')?.addEventListener('click', newGame);
 document.getElementById('btn-share')?.addEventListener('click', sharePosition);
 
+// Mobile share button — context-aware
+document.getElementById('btn-share-mobile')?.addEventListener('click', async () => {
+    if (state.mode === 'puzzle' && state.puzzle?.solved) {
+        // Share puzzle result
+        const shareText = getPuzzleShareText();
+        if (!shareText) { sharePosition(); return; }
+        if (navigator.share) {
+            try { await navigator.share({ text: shareText }); showToast('Shared!', 'positive'); return; } catch (_) {}
+        }
+        if (navigator.clipboard) {
+            await navigator.clipboard.writeText(shareText);
+            showToast('Result copied!', 'positive');
+        }
+    } else {
+        sharePosition();
+    }
+});
+
 // Game browser event listeners
 document.getElementById('btn-browse-games')?.addEventListener('click', toggleGameBrowser);
 document.getElementById('btn-close-browser')?.addEventListener('click', toggleGameBrowser);
@@ -5178,7 +5215,14 @@ function initDailyPuzzle() {
     // Update prompt
     const textEl = document.getElementById('puzzle-text');
     const metaEl = document.getElementById('puzzle-meta');
+    const badgeEl = document.querySelector('.puzzle-prompt__badge');
+    const puzzleNum = Math.floor((Date.now() - new Date('2025-01-01').getTime()) / 86400000);
     
+    if (badgeEl) {
+        const pStats = JSON.parse(localStorage.getItem('roboskip_puzzle_stats') || '{}');
+        const streakStr = (pStats.streak > 1) ? ` · ${pStats.streak} 🔥` : '';
+        badgeEl.textContent = `Puzzle #${puzzleNum}${streakStr}`;
+    }
     if (textEl) textEl.textContent = `${puzzle.templateDesc || puzzle.templateName}`;
     if (metaEl) {
         const hammerStr = puzzle.hammerTeam === 'red' ? '🔴 Hammer' : '🟡 Hammer';
@@ -5193,7 +5237,20 @@ function initDailyPuzzle() {
     runPuzzleAnalysis();
     
     if (state.puzzle.solved) {
-        showToast('Already solved — try again tomorrow!', 'info');
+        // Show previous result so user can re-share
+        const savedStats = JSON.parse(localStorage.getItem('roboskip_puzzle_stats') || '{}');
+        const savedPuzzle = JSON.parse(localStorage.getItem('roboskip_puzzle') || '{}');
+        if (savedPuzzle.rating !== undefined) {
+            setTimeout(() => {
+                showPuzzleResult(
+                    { wpDelta: savedPuzzle.playerWpDelta || 0, successRate: 0 },
+                    savedStats,
+                    savedPuzzle.rating
+                );
+            }, 800);
+        } else {
+            showToast('Already solved — try again tomorrow!', 'info');
+        }
     }
 }
 
@@ -5261,6 +5318,12 @@ function handlePuzzleShot(candidate) {
     state.puzzle.playerShot = { candidate, result: playerResult };
     state.puzzle.solved = true;
     
+    // Update puzzle prompt to show solved state
+    const solvedText = document.getElementById('puzzle-text');
+    const solvedMeta = document.getElementById('puzzle-meta');
+    if (solvedText) solvedText.textContent = 'Solved!';
+    if (solvedMeta) solvedMeta.textContent = 'Tap share to send your result';
+    
     // Compute rating (0-5 blocks for sharing)
     const bDelta = state.puzzle.bestShot?.wpDelta || 0;
     const diff = bDelta - playerResult.wpDelta;
@@ -5283,11 +5346,12 @@ function handlePuzzleShot(candidate) {
     };
     localStorage.setItem('roboskip_puzzle', JSON.stringify(saveData));
     
-    // Update streak stats
-    const stats = JSON.parse(localStorage.getItem('roboskip_puzzle_stats') || '{"played":0,"perfect":0,"streak":0}');
-    stats.played++;
-    if (rating === 5) stats.perfect++;
+    // Update stats + skill rating
+    const stats = JSON.parse(localStorage.getItem('roboskip_puzzle_stats') || '{}');
+    stats.played = (stats.played || 0) + 1;
+    if (rating === 5) stats.perfect = (stats.perfect || 0) + 1;
     
+    // Streak tracking
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const ydStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
@@ -5296,7 +5360,30 @@ function handlePuzzleShot(candidate) {
     } else if (stats.lastDate !== state.puzzle.dateStr) {
         stats.streak = 1;
     }
+    stats.maxStreak = Math.max(stats.maxStreak || 0, stats.streak || 1);
     stats.lastDate = state.puzzle.dateStr;
+    
+    // Skill Rating (Elo-like): starts at 1000, adjusts ±K based on rating
+    // K = 32 for new players (<10 games), 20 for experienced
+    const K = stats.played < 10 ? 32 : 20;
+    const expected = 0.6; // baseline: average player gets rating ~3
+    const actual = rating / 5; // 0.0 to 1.0
+    stats.skill = Math.round((stats.skill || 1000) + K * (actual - expected));
+    stats.skill = Math.max(100, Math.min(2400, stats.skill)); // clamp
+    
+    // Rating distribution
+    stats.ratings = stats.ratings || [0, 0, 0, 0, 0, 0];
+    stats.ratings[rating] = (stats.ratings[rating] || 0) + 1;
+    
+    // Average rating (rolling)
+    stats.totalRating = (stats.totalRating || 0) + rating;
+    stats.avgRating = +(stats.totalRating / stats.played).toFixed(1);
+    
+    // Recent history (last 10)
+    stats.history = stats.history || [];
+    stats.history.unshift({ date: state.puzzle.dateStr, rating, wpDelta: playerResult.wpDelta });
+    if (stats.history.length > 30) stats.history = stats.history.slice(0, 30);
+    
     localStorage.setItem('roboskip_puzzle_stats', JSON.stringify(stats));
     
     // Show result after animation settles
@@ -5333,11 +5420,28 @@ function showPuzzleResult(playerResult, stats, rating) {
     
     // Detailed breakdown
     let html = `<div class="puzzle-blocks">${blocks}</div>`;
+    
+    // Skill rating display
+    const skill = stats.skill || 1000;
+    const skillTier = skill >= 2000 ? 'Master' : skill >= 1600 ? 'Expert' : skill >= 1200 ? 'Advanced' : skill >= 800 ? 'Intermediate' : 'Beginner';
+    const skillColor = skill >= 2000 ? 'var(--positive)' : skill >= 1600 ? 'var(--ice)' : skill >= 1200 ? 'var(--accent-purple)' : skill >= 800 ? 'var(--warning)' : 'var(--text-tertiary)';
+    
     html += `<div class="puzzle-stats-grid">`;
-    html += `<div class="puzzle-stat"><span class="puzzle-stat__val">#${puzzleNum}</span><span class="puzzle-stat__label">Puzzle</span></div>`;
-    html += `<div class="puzzle-stat"><span class="puzzle-stat__val">${stats.streak || 1}</span><span class="puzzle-stat__label">Streak</span></div>`;
+    html += `<div class="puzzle-stat"><span class="puzzle-stat__val" style="color:${skillColor}">${skill}</span><span class="puzzle-stat__label">${skillTier}</span></div>`;
+    html += `<div class="puzzle-stat"><span class="puzzle-stat__val">${stats.streak || 1}${stats.streak >= 3 ? ' 🔥' : ''}</span><span class="puzzle-stat__label">Streak</span></div>`;
     html += `<div class="puzzle-stat"><span class="puzzle-stat__val">${stats.played || 1}</span><span class="puzzle-stat__label">Played</span></div>`;
-    html += `<div class="puzzle-stat"><span class="puzzle-stat__val">${stats.perfect || 0}</span><span class="puzzle-stat__label">Perfect</span></div>`;
+    html += `<div class="puzzle-stat"><span class="puzzle-stat__val">${Math.round(((stats.perfect || 0) / (stats.played || 1)) * 100)}%</span><span class="puzzle-stat__label">Perfect</span></div>`;
+    html += `</div>`;
+    
+    // Mini rating distribution bar
+    const ratings = stats.ratings || [0, 0, 0, 0, 0, 0];
+    const maxRat = Math.max(1, ...ratings);
+    html += `<div class="puzzle-rating-dist">`;
+    for (let i = 0; i <= 5; i++) {
+        const pct = (ratings[i] || 0) / maxRat * 100;
+        const active = i === rating ? ' active' : '';
+        html += `<div class="puzzle-rating-bar${active}" style="--h:${Math.max(4, pct)}%"><span>${i}</span></div>`;
+    }
     html += `</div>`;
     
     // Player shot analysis
@@ -5394,11 +5498,13 @@ function getPuzzleShareText() {
     const ratingEmoji = ['💨', '🪨', '🤔', '👍', '🥌', '🎯'];
     const rating = data.rating || 0;
     
+    const skill = stats.skill || 1000;
     return [
         `🥌 Robo-Skip #${puzzleNum}`,
         `${blocks} ${ratingEmoji[rating]}`,
         `WP: ${wpStr} | ${ratingNames[rating]}`,
         stats.streak > 1 ? `🔥 ${stats.streak} day streak` : '',
+        `Rating: ${skill}`,
         ``,
         `awktavian.github.io/art/robo-skip`,
     ].filter(Boolean).join('\n');
