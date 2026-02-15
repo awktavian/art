@@ -17,6 +17,21 @@ const C = E.CurlingConst;
 const IS_TOUCH = 'ontouchstart' in window;
 const SCALE = 80; // pixels per meter
 
+// Coaching descriptions for shot types — helps players learn strategy
+const SHOT_TIPS = {
+    'draw':      'Place stone in scoring position',
+    'guard':     'Protect a stone in the house',
+    'takeout':   'Remove opponent stone from play',
+    'peel':      'Remove a guard stone',
+    'freeze':    'Park against opponent stone — hard to remove',
+    'hit-and-roll': 'Remove opponent + roll to a better spot',
+    'raise':     'Promote your own stone closer to the button',
+    'tick':      'Nudge a guard to the side',
+    'runback':   'Hit your stone into an opponent stone',
+    'double':    'Remove two opponent stones at once',
+    'come-around': 'Curl behind a guard into scoring position',
+};
+
 // Visible area in meters (origin = button)
 const VIEW = {
     xMin: -C.SHEET_WIDTH / 2 - 0.3,
@@ -2122,6 +2137,8 @@ function canPlace() {
  * Show a ghost stone at (wx, wy) — preview before confirming.
  */
 function showGhost(wx, wy) {
+    // Clear pending delete if any
+    if (state.pendingDelete && typeof cancelPendingDelete === 'function') cancelPendingDelete();
     state.ghost = { x: wx, y: wy, team: state.activeTeam };
     haptic(HAPTIC.place);
     playSound('preview');
@@ -2350,6 +2367,11 @@ function flashTurnHandoff() {
 // ── Core click handler ──
 function handleIceClick(e) {
     e.preventDefault();
+    
+    // Block interaction during puzzle result modal
+    const puzzleResultEl = document.getElementById('puzzle-result');
+    if (puzzleResultEl?.classList.contains('visible')) return;
+    
     const canvasRect = mainCanvas.getBoundingClientRect();
     const cp = { x: e.clientX - canvasRect.left, y: e.clientY - canvasRect.top };
     const wp = canvasToWorld(cp.x, cp.y);
@@ -2719,6 +2741,10 @@ function pushUndo() {
 }
 
 function undo() {
+    if (state.animating || state.aiThinking) {
+        showToast('Wait for the shot to finish', 'warning');
+        return;
+    }
     if (state.undoStack.length === 0) {
         showToast('Nothing to undo', 'info');
         return;
@@ -2937,8 +2963,14 @@ function updateShotsDisplay() {
     
     if (!state.analysisResults || state.analysisResults.length === 0) {
         if (!state.analyzing) {
-            listEl.innerHTML = '<div class="shots-empty"><p>Press <kbd>A</kbd> or click Analyze</p></div>';
-            if (mobileListEl) mobileListEl.innerHTML = '<div class="mobile-shots__empty">Tap Analyze</div>';
+            const hasStones = state.stones.some(s => s.active);
+            if (hasStones) {
+                listEl.innerHTML = '<div class="shots-empty"><p>Press <kbd>A</kbd> to analyze this position</p><p style="color:var(--text-tertiary);font-size:11px;margin-top:4px">See optimal shots ranked by win probability</p></div>';
+                if (mobileListEl) mobileListEl.innerHTML = '<div class="mobile-shots__empty">Tap Analyze to see shots</div>';
+            } else {
+                listEl.innerHTML = '<div class="shots-empty"><p>Place stones on the ice to get started</p><p style="color:var(--text-tertiary);font-size:11px;margin-top:4px">Tap ice to place \u00b7 Drag from hack to throw</p></div>';
+                if (mobileListEl) mobileListEl.innerHTML = '<div class="mobile-shots__empty">Place stones first</div>';
+            }
             if (mobilePanel) mobilePanel.classList.remove('has-shots');
         }
         return;
@@ -2953,11 +2985,13 @@ function updateShotsDisplay() {
         const wpClass = wpDelta > 0.005 ? 'positive' : wpDelta < -0.005 ? 'negative' : 'neutral';
         const successPct = Math.round(successRate * 100);
         
+        const tip = SHOT_TIPS[candidate.type] || '';
         return `<div class="shot-card" role="listitem" data-shot-idx="${i}" 
-                     tabindex="0" aria-label="${candidate.name}: ${wpSign}${wpPct}% win probability">
+                     tabindex="0" title="${tip}" aria-label="${candidate.name}: ${wpSign}${wpPct}% win probability">
             <div class="shot-card__rank">${i + 1}</div>
             <div class="shot-card__info">
                 <div class="shot-card__name">${candidate.icon || ''} ${candidate.name}</div>
+                <div class="shot-card__desc">${tip}</div>
                 <div class="shot-card__meta">
                     <div class="shot-card__success">
                         <div class="shot-card__success-bar">
@@ -3039,7 +3073,8 @@ function updateShotsDisplay() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function runAnalysis() {
-    if (state.analyzing || state.animating) return;
+    if (state.analyzing || state.animating || state.aiThinking) return;
+    if (state.ghost) { showToast('Confirm or cancel placement first', 'info'); return; }
     if (state.stones.filter(s => s.active).length === 0) {
         showToast('Place stones first', 'info');
         return;
@@ -3311,11 +3346,24 @@ document.addEventListener('keydown', (e) => {
             dismissGhost();
             return;
         }
-        // Cancel animation
+        // Cancel animation with full cleanup
         if (state.animating) {
             state.animating = false;
+            state.sweeping = false;
+            state._sweepPoint = null;
+            state.animationFinalStones = null;
+            state.animationCollisions = null;
             mainCanvas.style.transform = '';
+            mainCanvas.style.cursor = 'crosshair';
+            const sweepBanner = document.getElementById('sweep-banner');
+            if (sweepBanner) sweepBanner.classList.remove('visible');
             drawMain();
+            return;
+        }
+        // Close puzzle result modal
+        const puzzleResultEl = document.getElementById('puzzle-result');
+        if (puzzleResultEl?.classList.contains('visible')) {
+            puzzleResultEl.classList.remove('visible');
             return;
         }
         // Return home from replay/capture
@@ -3793,11 +3841,45 @@ function showTurnBanner() {
  * Switch to a game mode. Clears stones for a clean break.
  */
 function setGameMode(mode) {
+    // Guard: don't switch while animation or AI is running
+    if (state.animating) {
+        state.animating = false;
+        state.sweeping = false;
+        state._sweepPoint = null;
+        state.animationFinalStones = null;
+        state.animationCollisions = null;
+        mainCanvas.style.transform = '';
+    }
+    if (state.aiThinking) {
+        state.aiThinking = false;
+    }
+    
+    // Clean up any pending interaction state
     if (state.ghost) dismissGhost();
+    if (state.throwing) state.throwing = null;
+    if (typeof cancelPendingDelete === 'function' && state.pendingDelete) cancelPendingDelete();
+    state.analyzing = false;
+    
+    // Close puzzle result modal if open
+    const puzzleResultEl = document.getElementById('puzzle-result');
+    if (puzzleResultEl?.classList.contains('visible')) {
+        puzzleResultEl.classList.remove('visible');
+    }
+    
+    // Close sweep banner
+    const sweepBanner = document.getElementById('sweep-banner');
+    if (sweepBanner) sweepBanner.classList.remove('visible');
+    
     if (mode !== 'replay') state._prevMode = mode;
     
     const wasMode = state.mode;
     state.mode = mode;
+    
+    // Clean up replay state when leaving replay
+    if (wasMode === 'replay' && mode !== 'replay') {
+        state.replayEndIndex = -1;
+        stopAutoPlay();
+    }
     
     if (mode === 'freeplay-ai' || mode === 'freeplay-pvp') {
         state.loadedGameContext = null;
@@ -3876,8 +3958,14 @@ function goHome() {
  * New game — clears the board and resets turns, stays in current mode.
  */
 function newGame() {
+    if (state.animating || state.aiThinking) {
+        showToast('Wait for the shot to finish', 'warning');
+        return;
+    }
     pushUndo();
     cancelAutoAnalysis();
+    if (state.ghost) dismissGhost();
+    if (state.pendingDelete && typeof cancelPendingDelete === 'function') cancelPendingDelete();
     
     state.stones = [];
     state.nextStoneId = 1;
