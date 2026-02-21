@@ -181,11 +181,11 @@ export function createGradientEnvironmentMap(renderer) {
         side: THREE.BackSide,
         depthWrite: false,
         uniforms: {
-            topColor: { value: new THREE.Color(0x1A1525) },    // Dark purple-blue (ceiling)
-            horizonColor: { value: new THREE.Color(0x252030) }, // Slightly lighter (walls)
-            bottomColor: { value: new THREE.Color(0x12101A) },  // Darkest (floor reflections)
-            rimColor: { value: new THREE.Color(0x67D4E4) },     // Crystal cyan accents
-            rimIntensity: { value: 0.15 }
+            topColor: { value: new THREE.Color(0x2A2535) },
+            horizonColor: { value: new THREE.Color(0x3A3545) },
+            bottomColor: { value: new THREE.Color(0x1E1A28) },
+            rimColor: { value: new THREE.Color(0x67D4E4) },
+            rimIntensity: { value: 0.35 }
         },
         vertexShader: `
             varying vec3 vWorldPosition;
@@ -247,7 +247,7 @@ export function createGradientEnvironmentMap(renderer) {
             new THREE.MeshBasicMaterial({ 
                 color, 
                 transparent: true, 
-                opacity: 0.3 
+                opacity: 0.5 
             })
         );
         lightSphere.position.set(...pos);

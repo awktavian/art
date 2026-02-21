@@ -332,11 +332,9 @@ const TAAShader = {
     `
 };
 
-/**
- * SSAO Shader (Simplified Screen Space Ambient Occlusion)
- * For fallback when GTAOPass is not available
- */
-const SSAOShaderSimple = {
+// SSAOShaderSimple REMOVED — tDepth/tNormal never bound, produced broken output.
+// SSAO uses Three.js built-in SSAOPass only.
+const _REMOVED_SSAOShaderSimple = {
     uniforms: {
         tDiffuse: { value: null },
         tDepth: { value: null },
@@ -431,11 +429,8 @@ const SSAOShaderSimple = {
     `
 };
 
-/**
- * SSR Shader (Simplified Screen Space Reflections)
- * For fallback when SSRPass is not available
- */
-const SSRShaderSimple = {
+// SSRShaderSimple REMOVED — tDepth/tNormal never bound, corrupted frame buffer.
+const _REMOVED_SSRShaderSimple = {
     uniforms: {
         tDiffuse: { value: null },
         tDepth: { value: null },
@@ -809,15 +804,7 @@ export class PostProcessingManager {
                 this.composer.addPass(ssaoPass);
                 this.passes.ssao = ssaoPass;
             } catch (e) {
-                console.warn('SSAOPass not available, using shader fallback:', e);
-                // Fallback to our custom SSAO shader
-                const ssaoFallback = new ShaderPass(SSAOShaderSimple);
-                ssaoFallback.uniforms.resolution.value.set(width, height);
-                ssaoFallback.uniforms.radius.value = this.quality.ssaoRadius;
-                ssaoFallback.uniforms.intensity.value = 1.0;
-                ssaoFallback.enabled = true;
-                this.composer.addPass(ssaoFallback);
-                this.passes.ssao = ssaoFallback;
+                console.warn('SSAOPass not available, skipping SSAO:', e);
             }
         }
         
@@ -825,20 +812,8 @@ export class PostProcessingManager {
         // SSR (Screen Space Reflections) - Custom Implementation
         // SSRPass may not be available in all versions, so we use our custom shader
         // ─────────────────────────────────────────────────────────────────────
-        if (this.quality.ssr) {
-            // Use our custom SSR shader for reliability
-            const ssrPass = new ShaderPass(SSRShaderSimple);
-            ssrPass.uniforms.resolution.value.set(width, height);
-            ssrPass.uniforms.cameraProjectionMatrix.value.copy(this.camera.projectionMatrix);
-            ssrPass.uniforms.cameraInverseProjectionMatrix.value.copy(this.camera.projectionMatrixInverse);
-            ssrPass.uniforms.cameraNear.value = this.camera.near;
-            ssrPass.uniforms.cameraFar.value = this.camera.far;
-            ssrPass.uniforms.maxDistance.value = this.quality.ssrMaxDistance;
-            ssrPass.uniforms.intensity.value = 0.5;
-            ssrPass.enabled = true;
-            this.composer.addPass(ssrPass);
-            this.passes.ssr = ssrPass;
-        }
+        // SSR disabled — custom shader had unbound depth/normal textures.
+        // Re-enable when Three.js SSRPass is wired with proper render targets.
         
         // ─────────────────────────────────────────────────────────────────────
         // BLOOM
@@ -877,12 +852,14 @@ export class PostProcessingManager {
         }
         
         // ─────────────────────────────────────────────────────────────────────
-        // ACES TONE MAPPING
+        // ACES TONE MAPPING (high/ultra only — medium skips for perf)
         // ─────────────────────────────────────────────────────────────────────
-        const acesPass = new ShaderPass(ACESToneMappingShader);
-        acesPass.uniforms.exposure.value = 1.0;
-        this.composer.addPass(acesPass);
-        this.passes.aces = acesPass;
+        if (this.qualityLevel === 'high' || this.qualityLevel === 'ultra') {
+            const acesPass = new ShaderPass(ACESToneMappingShader);
+            acesPass.uniforms.exposure.value = 1.0;
+            this.composer.addPass(acesPass);
+            this.passes.aces = acesPass;
+        }
         
         // ─────────────────────────────────────────────────────────────────────
         // CHROMATIC ABERRATION
@@ -906,11 +883,13 @@ export class PostProcessingManager {
         }
         
         // ─────────────────────────────────────────────────────────────────────
-        // COLOR GRADING
+        // COLOR GRADING (high/ultra only)
         // ─────────────────────────────────────────────────────────────────────
-        const colorGradingPass = new ShaderPass(ColorGradingShader);
-        this.composer.addPass(colorGradingPass);
-        this.passes.colorGrading = colorGradingPass;
+        if (this.qualityLevel === 'high' || this.qualityLevel === 'ultra') {
+            const colorGradingPass = new ShaderPass(ColorGradingShader);
+            this.composer.addPass(colorGradingPass);
+            this.passes.colorGrading = colorGradingPass;
+        }
         
         // ─────────────────────────────────────────────────────────────────────
         // FILM GRAIN
@@ -947,32 +926,8 @@ export class PostProcessingManager {
      * Setup render targets for deferred effects
      */
     setupRenderTargets(width, height) {
-        // Depth render target
-        this.depthRenderTarget = new THREE.WebGLRenderTarget(width, height, {
-            minFilter: THREE.NearestFilter,
-            magFilter: THREE.NearestFilter,
-            format: THREE.RGBAFormat,
-            type: THREE.FloatType
-        });
-        this.depthRenderTarget.depthTexture = new THREE.DepthTexture(width, height);
-        this.depthRenderTarget.depthTexture.type = THREE.UnsignedIntType;
-        
-        // Normal render target
-        this.normalRenderTarget = new THREE.WebGLRenderTarget(width, height, {
-            minFilter: THREE.NearestFilter,
-            magFilter: THREE.NearestFilter,
-            format: THREE.RGBAFormat,
-            type: THREE.HalfFloatType
-        });
-        
-        // History buffer for TAA
-        if (this.quality.taa) {
-            this.historyBuffer = new THREE.WebGLRenderTarget(width, height, {
-                minFilter: THREE.LinearFilter,
-                magFilter: THREE.LinearFilter,
-                format: THREE.RGBAFormat
-            });
-        }
+        // Render targets removed — depth/normal/history were never bound to any
+        // shader uniform. SSAOPass creates its own internal targets.
     }
     
     // ═══════════════════════════════════════════════════════════════════════
@@ -1451,8 +1406,6 @@ export {
     ACESToneMappingShader,
     DepthOfFieldShader,
     TAAShader,
-    SSAOShaderSimple,
-    SSRShaderSimple,
     FilmGrainShader,
     ChromaticAberrationShader,
     VignetteShader,

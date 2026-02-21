@@ -54,11 +54,13 @@ export class TurrellLighting {
         this.lightLeaks = [];
         this._time = 0;
 
-        // Cached colors for smooth lerping
+        // Cached colors for smooth lerping (reused every frame — zero allocs in update)
         this._currentFogColor = new THREE.Color(0x0A0912);
         this._targetFogColor = new THREE.Color(0x0A0912);
         this._currentHemiColor = new THREE.Color(kelvinToHex(3400));
         this._targetHemiColor = new THREE.Color(kelvinToHex(3400));
+        this._tmpColor = new THREE.Color();
+        this._tmpColor2 = new THREE.Color();
 
         this.init();
     }
@@ -88,16 +90,7 @@ export class TurrellLighting {
             rotH + 6,
             DIMENSIONS.rotunda.apertureOffset * 0.5
         );
-        this.sunlight.castShadow = true;
-        this.sunlight.shadow.mapSize.set(2048, 2048);
-        this.sunlight.shadow.camera.near = 1;
-        this.sunlight.shadow.camera.far = 100;
-        this.sunlight.shadow.camera.left = -50;
-        this.sunlight.shadow.camera.right = 50;
-        this.sunlight.shadow.camera.top = 50;
-        this.sunlight.shadow.camera.bottom = -50;
-        this.sunlight.shadow.bias = -0.0001;
-        this.sunlight.shadow.radius = 2;
+        this.sunlight.castShadow = false;
         this.scene.add(this.sunlight);
         this.lights.push(this.sunlight);
 
@@ -149,9 +142,7 @@ export class TurrellLighting {
             );
             wingLight.position.set(centerX, wingH - 0.5, centerZ);
             wingLight.target.position.set(centerX, 0, centerZ);
-            wingLight.castShadow = true;
-            wingLight.shadow.mapSize.set(512, 512);
-            wingLight.shadow.bias = -0.0005;
+            wingLight.castShadow = false;
             this.scene.add(wingLight.target);
             this.scene.add(wingLight);
             this.wingLights[colony] = { spotlight: wingLight, hemi: wingHemi, profile };
@@ -167,40 +158,7 @@ export class TurrellLighting {
             this.scene.add(accentLight);
             this.lights.push(accentLight);
 
-            // Artwork approach spotlights (3 per wing, initially dim)
-            for (let s = 0; s < 3; s++) {
-                const along = rotR + 15 + s * 12;
-                const spotX = cos * along;
-                const spotZ = sin * along;
-                const spot = new THREE.SpotLight(
-                    profile.color, 0.0, 10, Math.PI / 10, 0.7, 2
-                );
-                spot.position.set(spotX, wingH - 0.5, spotZ);
-                spot.target.position.set(spotX, 0, spotZ);
-                spot.userData.isArtworkSpot = true;
-                spot.userData.baseIntensity = 0.8;
-                spot.userData.approachRadius = 8;
-                spot.userData.fullRadius = 3;
-                this.scene.add(spot.target);
-                this.scene.add(spot);
-                this.artworkSpots.push(spot);
-                this.lights.push(spot);
-            }
-
-            // ─── LAYER 4: ATMOSPHERIC ───
-            // Light leak slits along corridor
-            for (let s = 0; s < 2; s++) {
-                const along = rotR + 12 + s * 18;
-                const slit = new THREE.SpotLight(
-                    profile.color, 0.5, 25, Math.PI / 24, 0.2, 2
-                );
-                slit.position.set(cos * along, wingH - 1.5, sin * along);
-                slit.target.position.set(cos * (along + 10), 0, sin * (along + 10));
-                this.scene.add(slit.target);
-                this.scene.add(slit);
-                this.lightLeaks.push(slit);
-                this.lights.push(slit);
-            }
+            // Artwork approach and light leaks handled via emissive materials only
 
             // Corridor strip lighting (wayfinding + atmosphere)
             const stripMat = new THREE.MeshBasicMaterial({
@@ -222,10 +180,11 @@ export class TurrellLighting {
             }
         });
 
-        // Volumetric fog
-        this._currentFogColor.setHex(0x0A0912);
-        this._targetFogColor.setHex(0x0A0912);
-        this.scene.fog = new THREE.FogExp2(0x0A0912, 0.006);
+        // Sync with existing fog (created by initScene)
+        if (this.scene.fog) {
+            this._currentFogColor.copy(this.scene.fog.color);
+            this._targetFogColor.copy(this.scene.fog.color);
+        }
     }
 
     setZone(zone) {
@@ -242,11 +201,9 @@ export class TurrellLighting {
         } else if (isColony) {
             const profile = WING_PROFILES[zone];
             this._targetFogColor.setHex(profile.color);
-            this._targetHemiColor.lerpColors(
-                new THREE.Color(kelvinToHex(profile.kelvin)),
-                new THREE.Color(profile.color),
-                0.12
-            );
+            this._tmpColor.setHex(kelvinToHex(profile.kelvin));
+            this._tmpColor2.setHex(profile.color);
+            this._targetHemiColor.lerpColors(this._tmpColor, this._tmpColor2, 0.12);
         } else {
             this._targetFogColor.setHex(kelvinToHex(5600));
             this._targetHemiColor.setHex(kelvinToHex(5000));
@@ -295,8 +252,6 @@ export class TurrellLighting {
 
         this.updateGanzfeldEffect(playerPosition);
         this.updateGodRays();
-        this.updateArtworkSpots(playerPosition);
-        this.updateStripLights();
     }
 
     updateGanzfeldEffect(playerPosition) {
@@ -308,8 +263,8 @@ export class TurrellLighting {
         if (isColony) {
             const colonyHex = COLONY_COLORS[this._targetZone];
             if (colonyHex) {
-                const target = new THREE.Color(colonyHex);
-                this._currentFogColor.lerp(target, 0.005);
+                this._tmpColor.setHex(colonyHex);
+                this._currentFogColor.lerp(this._tmpColor, 0.005);
                 this.scene.fog.color.copy(this._currentFogColor);
             }
         }
@@ -323,49 +278,19 @@ export class TurrellLighting {
         this.sunlight.position.x = DIMENSIONS.rotunda.apertureOffset + drift;
     }
 
-    /**
-     * Approach-triggered artwork spotlights.
-     * Fade in when visitor enters radius, full brightness at close range.
-     */
-    updateArtworkSpots(playerPosition) {
-        if (!playerPosition) return;
-        this.artworkSpots.forEach(spot => {
-            const dist = playerPosition.distanceTo(spot.position);
-            const approachR = spot.userData.approachRadius;
-            const fullR = spot.userData.fullRadius;
-            const baseI = spot.userData.baseIntensity;
-
-            let targetIntensity = 0;
-            if (dist < fullR) {
-                targetIntensity = baseI;
-            } else if (dist < approachR) {
-                targetIntensity = baseI * (1 - (dist - fullR) / (approachR - fullR));
-            }
-            spot.intensity += (targetIntensity - spot.intensity) * 0.05;
-        });
-
-        // Gallery accent lights proximity effect
-        this.lights.forEach(light => {
-            if (!light.userData?.isAccentLight) return;
-            const dist = playerPosition.distanceTo(light.position);
-            const proximityFactor = Math.max(0, 1 - dist / 15);
-            const baseIntensity = light.userData.baseIntensity;
-            const target = baseIntensity * (0.3 + 0.7 * proximityFactor);
-            light.intensity += (target - light.intensity) * 0.05;
-        });
-    }
-
-    /**
-     * Corridor strip lights pulse gently in current wing
-     */
-    updateStripLights() {
-        this.stripLights.forEach(strip => {
-            if (!strip.material) return;
-            const colonyMatch = strip.name.split('-')[1];
-            const isActive = colonyMatch === this._targetZone;
-            const targetOpacity = isActive ? 0.25 + Math.sin(this._time * 0.8) * 0.05 : 0.1;
-            strip.material.opacity += (targetOpacity - strip.material.opacity) * 0.05;
-        });
+    enableShadows(mapSize = 1024) {
+        if (this.sunlight) {
+            this.sunlight.castShadow = true;
+            this.sunlight.shadow.mapSize.set(mapSize, mapSize);
+            this.sunlight.shadow.camera.near = 1;
+            this.sunlight.shadow.camera.far = 100;
+            this.sunlight.shadow.camera.left = -50;
+            this.sunlight.shadow.camera.right = 50;
+            this.sunlight.shadow.camera.top = 50;
+            this.sunlight.shadow.camera.bottom = -50;
+            this.sunlight.shadow.bias = -0.0001;
+            this.sunlight.shadow.radius = 2;
+        }
     }
 
     dispose() {

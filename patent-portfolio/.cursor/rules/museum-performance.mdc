@@ -1,0 +1,44 @@
+# Museum Performance Rules
+
+Hard limits. Violations cause black screens and 3 FPS. Enforced by code review.
+
+## Lights
+
+- Max **15 lights** in scene at default quality. Wing enhancements use emissive materials, not PointLights.
+- Max **1 shadow map** (directional only), disabled below 'high' quality.
+- Never add `castShadow = true` without checking `PerformanceManager.preset.shadowsEnabled`.
+
+## Allocations
+
+- **Zero `new THREE.Color/Vector3/Matrix4/Quaternion`** in any `update()` or `render()` method.
+- Cache at construction time. Reuse with `.set()` / `.copy()` / `.setHex()`.
+- `traverse()` and `getObjectByName()` forbidden in hot paths — cache refs at init.
+
+## Post-Processing
+
+- Pass count by quality level:
+  - `medium`: RenderPass + Bloom + OutputPass (3 passes max)
+  - `high`: + SSAOPass + ACES + ColorGrading + SMAA (7 passes max)
+  - `ultra`: same as high (SSR disabled until proper depth/normal binding)
+- `setupRenderTargets()` must not create targets that aren't bound to shader uniforms.
+- Custom ShaderPass uniforms (tDepth, tNormal) require explicit texture binding or the pass is removed.
+
+## Draw Calls
+
+- Plaque: max 2 meshes per plaque (1 panel + 1 glow). Border/badge/accent baked into canvas.
+- Canvas textures: 512x300 at 1x DPI. No 3x scaling.
+- Static architecture meshes: `matrixAutoUpdate = false` after positioning.
+- Prefer `MeshBasicMaterial` over `MeshPhysicalMaterial` for non-hero geometry.
+
+## Adaptive Quality
+
+- `PerformanceManager.adaptiveEnabled` must be `true` by default.
+- FPS < 10 for 2 seconds triggers emergency mode (no post-processing, no wing enhancements, pixel ratio 1.0).
+- FPS < 20 for 2 seconds steps down one quality level.
+- Quality changes propagate to: renderer, post-processing, lighting, wing enhancements.
+- `PostProcessingManager` constructor must receive `{ quality: presetName }` from `PerformanceManager`.
+
+## Testing
+
+- FPS benchmark tests must pass 20 FPS minimum at rotunda, spark, nexus, crystal positions.
+- `renderer.info.render.calls` should stay below 500 in the rotunda.

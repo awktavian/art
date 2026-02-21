@@ -117,6 +117,19 @@ export class GalleryLoader {
         /** @type {Array<{ patent: object, colony: string, position: THREE.Vector3, rotationY: number, placeholder: THREE.Group }>} */
         this.pendingArtworks = [];
         this.loadedColonies = new Set();
+
+        // Precomputed wing centers — avoids 7x new Vector3() per frame
+        this._wingCenters = {};
+        const midRadius = DIMENSIONS.rotunda.radius + DIMENSIONS.wing.length * 0.4;
+        COLONY_ORDER.forEach(colony => {
+            const data = COLONY_DATA[colony];
+            if (data) {
+                this._wingCenters[colony] = new THREE.Vector3(
+                    Math.cos(data.wingAngle) * midRadius, 0,
+                    Math.sin(data.wingAngle) * midRadius
+                );
+            }
+        });
         
         // Listen for patent selection events (bound for cleanup)
         this._onPatentSelect = (e) => {
@@ -307,14 +320,7 @@ export class GalleryLoader {
      * Wing center in world XZ (for distance check)
      */
     getWingCenter(colony) {
-        const data = COLONY_DATA[colony];
-        if (!data) return null;
-        const midRadius = DIMENSIONS.rotunda.radius + DIMENSIONS.wing.length * 0.4;
-        return new THREE.Vector3(
-            Math.cos(data.wingAngle) * midRadius,
-            0,
-            Math.sin(data.wingAngle) * midRadius
-        );
+        return this._wingCenters[colony] || null;
     }
     
     /**

@@ -147,7 +147,7 @@ class PatentMuseum {
     // ═══════════════════════════════════════════════════════════════════════
     
     _initVitalsDisplay() {
-        this.vitalsDisplay = new VitalsDisplay(this.renderer);
+        this.vitalsDisplay = new VitalsDisplay(this.renderer, this.performanceManager);
         
         // Activate on mouse movement
         document.addEventListener('mousemove', () => {
@@ -639,8 +639,8 @@ class PatentMuseum {
     
     initScene() {
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x0A0A12);  // Slightly lighter
-        this.scene.fog = new THREE.FogExp2(0x0A0A12, 0.008);  // Reduced density (was 0.015)
+        this.scene.background = new THREE.Color(0x12101A);
+        this.scene.fog = new THREE.FogExp2(0x12101A, 0.006);
     }
     
     initRenderer() {
@@ -839,10 +839,12 @@ class PatentMuseum {
         // - Chromatic aberration at edges
         // - Vignette for focus
         // - Colony-specific color grading
+        const ppQuality = this.performanceManager?.getPresetName() || 'medium';
         this.postProcessing = new PostProcessingManager(
             this.renderer,
             this.scene,
-            this.camera
+            this.camera,
+            { quality: ppQuality }
         );
         
         // Store reference for legacy code
@@ -851,6 +853,7 @@ class PatentMuseum {
         // Register with performance manager
         if (this.performanceManager) {
             this.performanceManager.setPostProcessing(this.postProcessing);
+            this.performanceManager.lighting = this.turrellLighting;
         }
     }
     
@@ -858,6 +861,14 @@ class PatentMuseum {
         // Create entire museum structure
         this.museum = createMuseum();
         this.scene.add(this.museum);
+
+        // Mark all static meshes — saves per-frame matrix recomputation
+        this.museum.traverse(child => {
+            if (child.isMesh && !child.userData?.animated) {
+                child.matrixAutoUpdate = false;
+                child.updateMatrix();
+            }
+        });
         
         // Get references to animated elements
         const rotunda = this.museum.userData.rotunda;
@@ -872,6 +883,9 @@ class PatentMuseum {
         // Initialize wing visual enhancements (colony-specific atmospheres)
         this.wingEnhancements = new WingEnhancementManager(this.scene);
         this.wingEnhancements.init();
+        if (this.performanceManager) {
+            this.performanceManager.wingEnhancements = this.wingEnhancements;
+        }
         
         // Initialize wayfinding system (minimap, signage, kiosk)
         this.wayfinding = new WayfindingManager(this.scene);
@@ -2207,14 +2221,22 @@ class PatentMuseum {
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // RENDER
+        // RENDER (with error boundary — falls back to raw render on failure)
         // ─────────────────────────────────────────────────────────────────────
         
-        if (this.xrSession) {
-            this.renderer.render(this.scene, this.camera);
-        } else if (this.postProcessing && this.debug.systems.postProcessing.enabled) {
-            this.postProcessing.render();
-        } else {
+        try {
+            if (this.xrSession) {
+                this.renderer.render(this.scene, this.camera);
+            } else if (this.postProcessing?.enabled && this.debug?.systems?.postProcessing?.enabled !== false) {
+                this.postProcessing.render();
+            } else {
+                this.renderer.render(this.scene, this.camera);
+            }
+        } catch (renderError) {
+            if (!this._renderErrorLogged) {
+                console.error('Post-processing render failed, falling back to direct render:', renderError);
+                this._renderErrorLogged = true;
+            }
             this.renderer.render(this.scene, this.camera);
         }
     }

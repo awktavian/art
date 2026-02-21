@@ -247,13 +247,14 @@ export class PerformanceManager {
         this.lastTime = performance.now();
         this.fps = 60;
         this.fpsHistory = [];
-        this.adaptiveEnabled = false;
-        
+        this.adaptiveEnabled = true;
+
         // References to managed objects
         this.renderer = null;
         this.scene = null;
         this.postProcessing = null;
         this.lighting = null;
+        this.wingEnhancements = null;
         
         // Auto-detect best preset
         this.autoDetectPreset();
@@ -327,15 +328,33 @@ export class PerformanceManager {
             console.warn(`Unknown preset: ${presetName}`);
             return;
         }
-        
+
         this.currentPreset = presetName;
         this.preset = QUALITY_PRESETS[presetName];
-        
+
         console.log(`Applying quality preset: ${presetName}`);
-        
+
         this.applyRendererSettings();
         this.applyPostProcessingSettings();
         this.applySceneSettings();
+
+        // Propagate to lighting
+        if (this.lighting) {
+            if (this.preset.shadowsEnabled) {
+                this.lighting.enableShadows?.(this.preset.shadowMapSize);
+            } else if (this.lighting.sunlight) {
+                this.lighting.sunlight.castShadow = false;
+            }
+        }
+
+        // Propagate to wing enhancements
+        if (this.wingEnhancements) {
+            if (this.preset.disableWingEnhancements) {
+                this.wingEnhancements.enhancements?.forEach(e => { e.group.visible = false; });
+            } else {
+                this.wingEnhancements.enhancements?.forEach(e => { e.group.visible = true; });
+            }
+        }
     }
     
     applyRendererSettings() {
@@ -472,21 +491,23 @@ export class PerformanceManager {
     
     adaptQuality() {
         const avgFPS = this.getAverageFPS();
-        const presets = ['low', 'medium', 'high', 'ultra'];
+        const presets = ['emergency', 'low', 'medium', 'high', 'ultra'];
         const currentIndex = presets.indexOf(this.currentPreset);
-        
-        // If FPS is too low, reduce quality
-        if (avgFPS < 25 && currentIndex > 0) {
-            console.log(`Low FPS (${avgFPS}), reducing quality`);
+
+        if (avgFPS < 10 && currentIndex > 0) {
+            console.warn(`Critical FPS (${avgFPS}), jumping to emergency`);
+            this.applyPreset('emergency');
+            this.fpsHistory = [];
+        } else if (avgFPS < 20 && currentIndex > 0) {
+            console.warn(`Low FPS (${avgFPS}), reducing quality from ${this.currentPreset}`);
             this.applyPreset(presets[currentIndex - 1]);
-        }
-        // If FPS is consistently high, increase quality
-        else if (avgFPS > 55 && currentIndex < presets.length - 1 && this.fpsHistory.length >= 10) {
+            this.fpsHistory = [];
+        } else if (avgFPS > 55 && currentIndex < presets.length - 1 && this.fpsHistory.length >= 8) {
             const allHigh = this.fpsHistory.every(fps => fps > 50);
             if (allHigh) {
-                console.log(`Stable high FPS (${avgFPS}), increasing quality`);
+                console.log(`Stable high FPS (${avgFPS}), upgrading quality`);
                 this.applyPreset(presets[currentIndex + 1]);
-                this.fpsHistory = []; // Reset history
+                this.fpsHistory = [];
             }
         }
     }

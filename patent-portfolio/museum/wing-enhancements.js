@@ -322,21 +322,32 @@ export class WingEnhancementManager {
                 gridFloor.name = 'nexus-grid-floor';
                 group.add(gridFloor);
 
-                // Constellation ceiling (small point lights as network nodes)
+                // Constellation ceiling (emissive dots instead of PointLights)
+                const nodeMat = new THREE.MeshBasicMaterial({
+                    color: 0x9B7EBD, transparent: true, opacity: 0.6
+                });
+                const nodeGeo = new THREE.SphereGeometry(0.08, 6, 4);
                 for (let i = 0; i < 20; i++) {
-                    const nodeLight = new THREE.PointLight(0x9B7EBD, 0.05, 4, 2);
                     const ox = (Math.random() - 0.5) * galleryW * 0.7;
                     const oz = (Math.random() - 0.5) * galleryDepth * 0.6;
-                    nodeLight.position.set(
+                    const node = new THREE.Mesh(nodeGeo, nodeMat);
+                    node.position.set(
                         galleryCX - sin * ox + cos * oz,
                         galleryH - 0.3,
                         galleryCZ + cos * ox + sin * oz
                     );
-                    nodeLight.name = `nexus-ceiling-node-${i}`;
-                    group.add(nodeLight);
+                    node.name = `nexus-ceiling-node-${i}`;
+                    group.add(node);
                 }
 
-                return { group, type: 'nexus' };
+                // Cache refs for update loop — avoids traverse()/getObjectByName() per frame
+                const nexusChannels = [];
+                const nexusCeilingNodes = [];
+                group.traverse(child => {
+                    if (child.name.startsWith('nexus-channel-')) nexusChannels.push(child);
+                    if (child.name.startsWith('nexus-ceiling-node-')) nexusCeilingNodes.push(child);
+                });
+                return { group, type: 'nexus', nexusChannels, nexusCeilingNodes, gridFloor };
             }
 
             case 'beacon': {
@@ -498,7 +509,13 @@ export class WingEnhancementManager {
                     group.add(mossLine);
                 }
 
-                return { group, type: 'grove' };
+                // Cache vine refs for update loop
+                const groveVines = [];
+                for (let v = 0; v < 8; v++) {
+                    const vine = group.getObjectByName(`grove-vine-${v}`);
+                    if (vine) groveVines.push(vine);
+                }
+                return { group, type: 'grove', groveVines };
             }
         }
         return null;
@@ -553,21 +570,21 @@ export class WingEnhancementManager {
                     break;
                 }
                 case 'nexus': {
-                    // Network channel pulse
-                    enhancement.group.traverse(child => {
-                        if (child.name.startsWith('nexus-channel-') && child.material) {
-                            const idx = parseInt(child.name.split('-').pop());
-                            child.material.opacity = 0.2 + Math.sin(t * 2 + idx * 0.8) * 0.15;
+                    // Cached refs — no traverse() or getObjectByName() per frame
+                    if (enhancement.nexusChannels) {
+                        for (let i = 0; i < enhancement.nexusChannels.length; i++) {
+                            const ch = enhancement.nexusChannels[i];
+                            if (ch.material) ch.material.opacity = 0.2 + Math.sin(t * 2 + i * 0.8) * 0.15;
                         }
-                        if (child.name.startsWith('nexus-ceiling-node-')) {
-                            const idx = parseInt(child.name.split('-').pop());
-                            child.intensity = 0.03 + Math.sin(t * 1.5 + idx * 0.5) * 0.03;
+                    }
+                    if (enhancement.nexusCeilingNodes) {
+                        for (let i = 0; i < enhancement.nexusCeilingNodes.length; i++) {
+                            const nd = enhancement.nexusCeilingNodes[i];
+                            if (nd.material) nd.material.opacity = 0.4 + Math.sin(t * 1.5 + i * 0.5) * 0.2;
                         }
-                    });
-                    // Grid floor pulse
-                    const grid = enhancement.group.getObjectByName('nexus-grid-floor');
-                    if (grid?.material) {
-                        grid.material.opacity = 0.08 + Math.sin(t * 0.5) * 0.04;
+                    }
+                    if (enhancement.gridFloor?.material) {
+                        enhancement.gridFloor.material.opacity = 0.08 + Math.sin(t * 0.5) * 0.04;
                     }
                     break;
                 }
@@ -590,10 +607,10 @@ export class WingEnhancementManager {
                     break;
                 }
                 case 'grove': {
-                    // Vine sway via group transform
-                    for (let v = 0; v < 8; v++) {
-                        const vine = enhancement.group.getObjectByName(`grove-vine-${v}`);
-                        if (vine) {
+                    // Cached vine refs — no getObjectByName() per frame
+                    if (enhancement.groveVines) {
+                        for (let v = 0; v < enhancement.groveVines.length; v++) {
+                            const vine = enhancement.groveVines[v];
                             const baseX = vine.userData._baseX ?? 0;
                             vine.position.x = baseX + Math.sin(t * 0.5 + v * 1.2) * 0.08;
                         }

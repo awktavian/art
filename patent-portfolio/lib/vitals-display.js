@@ -8,9 +8,10 @@
  */
 
 export class VitalsDisplay {
-    constructor(renderer) {
+    constructor(renderer, performanceManager) {
         this.renderer = renderer;
-        this.history = new Array(60).fill(60);  // 60-frame history
+        this.performanceManager = performanceManager;
+        this.history = new Array(60).fill(60);
         this.historyIndex = 0;
         this.currentFps = 60;
         this.frameCount = 0;
@@ -19,7 +20,7 @@ export class VitalsDisplay {
         this.activeOpacity = 0.9;
         this.currentOpacity = this.idleOpacity;
         this.isLowFps = false;
-        
+
         this.createElement();
     }
     
@@ -45,6 +46,11 @@ export class VitalsDisplay {
                     <circle class="vitals-dot" r="3" fill="#67D4E4"/>
                 </svg>
                 <span class="vitals-value">60</span>
+            </div>
+            <div class="vitals-stats">
+                <span class="vitals-stat" data-stat="draws">0 draws</span>
+                <span class="vitals-stat" data-stat="tris">0K tris</span>
+                <span class="vitals-stat" data-stat="preset">—</span>
             </div>
             <div class="vitals-gpu">
                 <div class="vitals-gpu-bar"></div>
@@ -130,6 +136,14 @@ export class VitalsDisplay {
                 50% { opacity: 0.5; }
             }
             
+            .vitals-stats {
+                display: flex;
+                gap: 8px;
+                padding: 2px 10px;
+                font-size: 9px;
+                color: rgba(103, 212, 228, 0.6);
+            }
+
             .vitals-gpu {
                 display: flex;
                 align-items: center;
@@ -182,6 +196,9 @@ export class VitalsDisplay {
         this.dot = this.container.querySelector('.vitals-dot');
         this.valueEl = this.container.querySelector('.vitals-value');
         this.gpuBar = this.container.querySelector('.vitals-gpu-bar');
+        this.drawsStat = this.container.querySelector('[data-stat="draws"]');
+        this.trisStat = this.container.querySelector('[data-stat="tris"]');
+        this.presetStat = this.container.querySelector('[data-stat="preset"]');
     }
     
     update() {
@@ -256,15 +273,23 @@ export class VitalsDisplay {
             this.container.classList.add('warning');
         }
         
-        // Update GPU load estimate (based on draw calls)
+        // Update stats + GPU load estimate
         if (this.renderer?.info?.render) {
             const drawCalls = this.renderer.info.render.calls || 0;
             const triangles = this.renderer.info.render.triangles || 0;
-            // Rough estimate: 1000 draw calls or 1M triangles = 100% load
-            const loadEstimate = Math.min(100, Math.max(5, 
+            const textures = this.renderer.info.memory?.textures || 0;
+
+            this.drawsStat.textContent = `${drawCalls} draws`;
+            this.trisStat.textContent = `${Math.round(triangles / 1000)}K tris`;
+
+            const loadEstimate = Math.min(100, Math.max(5,
                 (drawCalls / 500) * 50 + (triangles / 500000) * 50
             ));
             this.gpuBar.style.setProperty('--gpu-load', `${loadEstimate}%`);
+        }
+
+        if (this.performanceManager) {
+            this.presetStat.textContent = this.performanceManager.getPresetName?.() || '—';
         }
     }
     
