@@ -75,7 +75,7 @@ export const POST_PROCESSING_QUALITY = {
         taa: true,             // Anti-aliasing for crisp edges
         bloom: true,
         bloomStrength: 0.45,
-        bloomThreshold: 0.7,
+        bloomThreshold: 0.6,
         bloomRadius: 0.3,
         grain: 0,              // NO grain
         chromatic: 0,          // NO chromatic aberration
@@ -1230,16 +1230,22 @@ export class PostProcessingManager {
      */
     triggerDiscoveryBloom(peakStrength = 0.8) {
         if (!this.passes.bloom) return;
+        if (this._discoveryAnimId) cancelAnimationFrame(this._discoveryAnimId);
         const base = this.quality.bloomStrength;
         this.passes.bloom.strength = peakStrength;
         const start = performance.now();
         const duration = 1000;
         const tick = () => {
+            if (!this.passes.bloom) return;
             const t = Math.min(1, (performance.now() - start) / duration);
             this.passes.bloom.strength = base + (peakStrength - base) * (1 - t) * (1 - t);
-            if (t < 1) requestAnimationFrame(tick);
+            if (t < 1) {
+                this._discoveryAnimId = requestAnimationFrame(tick);
+            } else {
+                this._discoveryAnimId = null;
+            }
         };
-        requestAnimationFrame(tick);
+        this._discoveryAnimId = requestAnimationFrame(tick);
     }
     
     setBloomIntensity(intensity) {

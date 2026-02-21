@@ -53,7 +53,7 @@ export const QUALITY_PRESETS = {
     medium: {
         name: 'Medium',
         shadowMapSize: 1024,
-        shadowsEnabled: true,
+        shadowsEnabled: false,
         particleCount: 100,
         dustParticles: 50,
         postProcessing: true,

@@ -19,11 +19,11 @@ function kelvinToHex(k) {
     let r, g, b;
     if (t <= 66) {
         r = 255;
-        g = Math.min(255, 99.4708025861 * Math.log(t) - 161.1195681661);
-        b = t <= 19 ? 0 : Math.min(255, 138.5177312231 * Math.log(t - 10) - 305.0447927307);
+        g = Math.max(0, Math.min(255, 99.4708025861 * Math.log(t) - 161.1195681661));
+        b = t <= 19 ? 0 : Math.max(0, Math.min(255, 138.5177312231 * Math.log(t - 10) - 305.0447927307));
     } else {
-        r = Math.min(255, 329.698727446 * Math.pow(t - 60, -0.1332047592));
-        g = Math.min(255, 288.1221695283 * Math.pow(t - 60, -0.0755148492));
+        r = Math.max(0, Math.min(255, 329.698727446 * Math.pow(t - 60, -0.1332047592)));
+        g = Math.max(0, Math.min(255, 288.1221695283 * Math.pow(t - 60, -0.0755148492)));
         b = 255;
     }
     return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
@@ -273,7 +273,7 @@ export class TurrellLighting {
     updateGodRays() {
         if (!this.sunlight) return;
         const breathe = 1 + Math.sin(this._time * 0.14) * 0.06;
-        this.sunlight.intensity = 1.0 * breathe;
+        this.sunlight.intensity = 2.2 * breathe;
         const drift = Math.sin(this._time * 0.02) * 2;
         this.sunlight.position.x = DIMENSIONS.rotunda.apertureOffset + drift;
     }
@@ -295,6 +295,7 @@ export class TurrellLighting {
 
     dispose() {
         this.lights.forEach(light => {
+            if (light.target) this.scene.remove(light.target);
             this.scene.remove(light);
             if (light.dispose) light.dispose();
         });

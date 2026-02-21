@@ -2363,7 +2363,6 @@ function advanceTurn() {
     if (state.turnNumber >= 16) {
         haptic(HAPTIC.newGame);
         playSound('endComplete');
-        showToast('End complete — score and clear to continue', 'info');
         return;
     }
     
@@ -3254,13 +3253,7 @@ async function runAnalysis() {
     // Track progression
     bumpStat('positionsAnalyzed');
     
-    // Toast with top result
-    if (state.analysisResults.length > 0) {
-        const top = state.analysisResults[0];
-        const wpPct = (top.wpDelta * 100).toFixed(1);
-        showToast(`Best: ${top.candidate.name} (${top.wpDelta > 0 ? '+' : ''}${wpPct}%)`, 
-                  top.wpDelta > 0 ? 'positive' : 'info');
-    }
+    // Results displayed in shots list — no toast needed
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3289,18 +3282,20 @@ function animateNumber(el, from, to, duration) {
 // TOAST NOTIFICATIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
-function showToast(message, type = 'info') {
+function showToast(message, type = 'info', duration = 2500) {
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile && type === 'info') return;
+    
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
     toast.className = `toast toast--${type}`;
     toast.textContent = message;
     container.appendChild(toast);
     
-    // Auto dismiss
     setTimeout(() => {
         toast.classList.add('dismissing');
         setTimeout(() => toast.remove(), T.slow);
-    }, 3000);
+    }, duration);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3489,7 +3484,6 @@ document.addEventListener('keydown', (e) => {
         if (isFreeplay) {
             e.preventDefault();
             setGameMode(state.mode === 'freeplay-ai' ? 'freeplay-pvp' : 'freeplay-ai');
-            showToast(state.mode === 'freeplay-ai' ? 'vs AI' : '2 Player', 'info');
             return;
         }
     }
@@ -3736,7 +3730,6 @@ function init() {
         state.mode = 'freeplay-ai';
         updateModeUI();
         requestAnimationFrame(() => positionModeSlider());
-        showToast('Loaded shared position', 'info');
         if (state.stones.filter(s => s.active).length > 0) {
             scheduleAutoAnalysis();
         }
@@ -3824,11 +3817,7 @@ async function initLiveData() {
                 : 'Model';
         }
 
-        if (result.sampleSize > 0) {
-            showToast(`Live data: ${result.source}`, 'positive');
-        } else {
-            showToast('Using Fry et al. (2024) model', 'info');
-        }
+        // Data source shown in provenance indicator, no toast needed
     } catch (err) {
         console.error('Live data pipeline failed:', err);
         if (provDot) provDot.classList.add('model');
@@ -4081,7 +4070,6 @@ function goHome() {
     drawMain();
     updateDashboard();
     saveGameState();
-    showToast('Fresh sheet', 'info');
 }
 
 /**
@@ -4125,7 +4113,6 @@ function newGame() {
     updateDashboard();
     saveGameState();
     updateModeUI();
-    showToast('New game', 'info');
 }
 
 // Mode toggle click handlers
@@ -4157,7 +4144,6 @@ async function aiThrow() {
     
     state.aiThinking = true;
     const throwTeam = state.activeTeam;
-    showToast(`AI thinking for ${throwTeam}...`, 'info');
     
     // Update turn banner if visible
     const banner = document.getElementById('turn-banner');
@@ -4194,16 +4180,8 @@ async function aiThrow() {
         if (banner) banner.classList.remove('ai-thinking');
         
         if (results.length > 0) {
-            const best = results[0];
-            const wpPct = (best.wpDelta * 100).toFixed(1);
-            showToast(
-                `AI plays: ${best.candidate.name} (${best.wpDelta > 0 ? '+' : ''}${wpPct}%)`,
-                best.wpDelta > 0 ? 'positive' : 'info'
-            );
-            animateShot(best.candidate);
+            animateShot(results[0].candidate);
         } else {
-            // No shots available — place a draw to the button
-            showToast('No shots available — drawing to button', 'info');
             pushUndo();
             state.stones.push(new E.Stone(0, 0, throwTeam, `s${state.nextStoneId++}`));
             drawMain();
@@ -4214,7 +4192,7 @@ async function aiThrow() {
         console.warn('AI throw error:', err);
         state.aiThinking = false;
         if (banner) banner.classList.remove('ai-thinking');
-        showToast('AI error — try again', 'info');
+        showToast('AI error — try again', 'warning');
     }
 }
 
@@ -4727,7 +4705,7 @@ function loadGameFromBrowser() {
 
     // Close browser
     toggleGameBrowser();
-    showToast(`Loaded End ${targetEnd.end}: ${game.team1.name} ${state.scoreRed}–${state.scoreYellow} ${game.team2.name}`, 'positive');
+    showToast(`End ${targetEnd.end} loaded`, 'positive', 1500);
 
     // Update URL hash
     if (window.RoboSkipData) {
@@ -4873,10 +4851,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredInstallPrompt = e;
     
-    // Show install button after short delay
-    setTimeout(() => {
-        showToast('Install Robo-Skip for offline use', 'info', 8000);
-    }, 5000);
+    // Install prompt available but no toast — let the browser handle it
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -5249,7 +5224,7 @@ function initDailyPuzzle() {
                 );
             }, 800);
         } else {
-            showToast('Already solved — try again tomorrow!', 'info');
+            showToast('Already solved — try again tomorrow!', 'warning');
         }
     }
 }
@@ -5266,7 +5241,7 @@ async function runPuzzleAnalysis() {
     const endsRemaining = C.ENDS_TOTAL - state.currentEnd + 1;
     const gameState = { scoreDiff, endsRemaining, hammerTeam: state.hammerTeam };
     
-    showToast('Analyzing position...', 'info', 2000);
+    // Analysis progress shown via button shimmer
     
     try {
         const results = await E.WorkerPool.evaluateParallel(
@@ -5280,7 +5255,6 @@ async function runPuzzleAnalysis() {
             state.analysisResults = results; // show in shot panel
             state.puzzle.analyzing = false;
             updateShotsDisplay();
-            showToast('Position analyzed — drag from the hack to throw!', 'positive', 3000);
         }
     } catch {
         if (state.mode !== puzzleMode || !state.puzzle) return;

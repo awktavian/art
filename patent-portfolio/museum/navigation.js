@@ -436,18 +436,7 @@ export class MuseumNavigation {
         this.teleportMarker.visible = false;
         this.scene.add(this.teleportMarker);
         
-        // Define teleport points for each area
-        this.teleportPoints = [
-            { name: 'Vestibule', position: new THREE.Vector3(0, 0, -20) },
-            { name: 'Rotunda Center', position: new THREE.Vector3(0, 0, 0) },
-            { name: 'Spark Wing', position: new THREE.Vector3(0, 0, 35) },
-            { name: 'Forge Wing', position: new THREE.Vector3(28, 0, 17) },
-            { name: 'Flow Wing', position: new THREE.Vector3(28, 0, -17) },
-            { name: 'Nexus Wing', position: new THREE.Vector3(-17, 0, 28) },
-            { name: 'Beacon Wing', position: new THREE.Vector3(-28, 0, 0) },
-            { name: 'Grove Wing', position: new THREE.Vector3(-17, 0, -28) },
-            { name: 'Crystal Wing', position: new THREE.Vector3(0, 0, -20) }
-        ];
+        this.teleportPoints = [];
     }
     
     teleportToWing(index) {
@@ -763,10 +752,14 @@ export class MuseumNavigation {
         // Gravity (gentle)
         this.velocity.y -= 20 * deltaTime;
         
-        // Clamp velocity to prevent crazy speeds
-        const maxVel = 15;
-        this.velocity.x = Math.max(-maxVel, Math.min(maxVel, this.velocity.x));
-        this.velocity.z = Math.max(-maxVel, Math.min(maxVel, this.velocity.z));
+        // Clamp velocity magnitude (not per-axis — prevents diagonal speed exploit)
+        const maxVel = this.isSprinting ? 25 : 15;
+        const velMag = Math.sqrt(this.velocity.x ** 2 + this.velocity.z ** 2);
+        if (velMag > maxVel) {
+            const scale = maxVel / velMag;
+            this.velocity.x *= scale;
+            this.velocity.z *= scale;
+        }
         
         // ─────────────────────────────────────────────────────────────────────
         // MOVEMENT APPLICATION
@@ -845,24 +838,27 @@ export class MuseumNavigation {
         // SAFETY: Never let Y go negative (absolute floor)
         const floorTargetY = Math.max(targetY, this.playerHeight);
         
-        // Smooth camera Y (lerp instead of snap — removes stair-stepping)
-        this.camera.position.y += (floorTargetY - this.camera.position.y) * 0.15;
-        if (Math.abs(this.camera.position.y - floorTargetY) < 0.01) {
-            this.camera.position.y = floorTargetY;
+        // Smooth camera Y (delta-time corrected lerp — frame-rate independent)
+        const smoothFactor = 1 - Math.pow(0.001, deltaTime);
+        let smoothedY = this.camera.position.y + (floorTargetY - this.camera.position.y) * smoothFactor;
+        if (Math.abs(smoothedY - floorTargetY) < 0.01) {
+            smoothedY = floorTargetY;
         }
         
-        // Head bob (only when walking on ground)
+        // Head bob (applied AFTER smoothing to avoid the smoother killing bob amplitude)
         const horizontalSpeed = Math.sqrt(this.velocity.x ** 2 + this.velocity.z ** 2);
         const isWalking = horizontalSpeed > 1.0 && this.canJump;
         const targetBobSmooth = isWalking ? 1.0 : 0.0;
         this._headBobSmooth += (targetBobSmooth - this._headBobSmooth) * 0.1;
         
+        let bobOffset = 0;
         if (this._headBobSmooth > 0.01) {
             const bobFreq = this.isSprinting ? horizontalSpeed * 1.2 : horizontalSpeed * 0.8;
             this._headBobPhase += deltaTime * bobFreq;
-            this._headBobOffset = Math.sin(this._headBobPhase) * this._headBobAmplitude * this._headBobSmooth;
-            this.camera.position.y += this._headBobOffset;
+            bobOffset = Math.sin(this._headBobPhase) * this._headBobAmplitude * this._headBobSmooth;
         }
+        
+        this.camera.position.y = smoothedY + bobOffset;
         
         // Ceiling collision
         if (this.camera.position.y > 20) {
@@ -897,6 +893,8 @@ export class MuseumNavigation {
                 <div class="controls-grid">
                     <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
                     <div><kbd>Mouse</kbd> Look around</div>
+                    <div><kbd>Shift</kbd> Sprint</div>
+                    <div><kbd>Space</kbd> Jump</div>
                     <div><kbd>1</kbd>-<kbd>7</kbd> Teleport to wings</div>
                     <div><kbd>0</kbd> Return to rotunda</div>
                     <div><kbd>Tab</kbd> Gallery menu</div>

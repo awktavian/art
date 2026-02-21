@@ -191,11 +191,9 @@ export function createGradientEnvironmentMap(renderer) {
         },
         vertexShader: `
             varying vec3 vWorldPosition;
-            varying vec3 vNormal;
             void main() {
                 vec4 worldPosition = modelMatrix * vec4(position, 1.0);
                 vWorldPosition = worldPosition.xyz;
-                vNormal = normalize(normalMatrix * normal);
                 gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
             }
         `,
@@ -209,7 +207,6 @@ export function createGradientEnvironmentMap(renderer) {
             uniform float warmIntensity;
             
             varying vec3 vWorldPosition;
-            varying vec3 vNormal;
             
             void main() {
                 float y = normalize(vWorldPosition).y;
@@ -343,7 +340,7 @@ export function updateEnvironmentMapIntensity(scene, intensity) {
 function hash2(x, y) {
     const k = 0.3183099;
     const u = x * k + y * (1 - k);
-    return (Math.sin(u * 12.9898 + 78.233) * 43758.5453) % 1;
+    return ((Math.sin(u * 12.9898 + 78.233) * 43758.5453) % 1 + 1) % 1;
 }
 
 function noise2D(x, y) {
@@ -985,7 +982,7 @@ export function disposeMaterial(material) {
     if (!material) return;
     
     // Dispose textures
-    const textureProps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'envMap'];
+    const textureProps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap'];
     textureProps.forEach(prop => {
         if (material[prop]) {
             material[prop].dispose();

@@ -240,50 +240,10 @@ export function createRotunda(materials) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function createGehryDome(group, materials, radius, height, apertureRadius, apertureOffset) {
-    // Custom dome geometry - asymmetric curve
     const segments = 48;
     const rings = 24;
-    const positions = [];
-    const indices = [];
-    const uvs = [];
-    
     const domeStart = DIMENSIONS.rotunda.domeStart;
     
-    for (let ring = 0; ring <= rings; ring++) {
-        const v = ring / rings;
-        
-        for (let seg = 0; seg <= segments; seg++) {
-            const u = seg / segments;
-            const theta = u * Math.PI * 2;
-            
-            // Asymmetric radius (Gehry effect)
-            const asymmetry = 1 + 0.08 * Math.sin(theta * 2);
-            const ringRadius = radius * (1 - v * 0.7) * asymmetry;
-            
-            // Height curve (steeper on one side)
-            const heightCurve = Math.pow(v, 1.5 + 0.3 * Math.cos(theta));
-            const y = domeStart + (height - domeStart) * heightCurve;
-            
-            // Check if inside aperture (off-center)
-            const distFromAperture = Math.sqrt(
-                Math.pow(ringRadius * Math.cos(theta) - apertureOffset, 2) +
-                Math.pow(ringRadius * Math.sin(theta), 2)
-            );
-            
-            if (v > 0.85 && distFromAperture < apertureRadius) {
-                continue; // Skip aperture area
-            }
-            
-            positions.push(
-                ringRadius * Math.cos(theta),
-                y,
-                ringRadius * Math.sin(theta)
-            );
-            uvs.push(u, v);
-        }
-    }
-    
-    // Create indices (simplified for now - use sphere as base)
     const domeGeo = new THREE.SphereGeometry(radius, segments, rings, 0, Math.PI * 2, 0, Math.PI * 0.5);
     
     // Apply asymmetric deformation to sphere
@@ -529,6 +489,8 @@ function createFanoConstellation(steelMaterial) {
         blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
     }));
     dust.name = 'constellation-dust';
+    dust.userData.originalPositions = new Float32Array(dustPositions);
+    dust.userData.originalColors = new Float32Array(dustColors);
     group.add(dust);
     
     // === FLOOR PROJECTION (Fano plane diagram beneath sculpture) ===
@@ -1425,22 +1387,24 @@ export class FanoConstellationAnimator {
         if (!dust?.geometry) return;
         
         const positions = dust.geometry.attributes.position;
-        if (!positions) return;
+        const origPositions = dust.userData.originalPositions;
+        if (!positions || !origPositions) return;
+        
+        const swirlAngle = time * 0.01;
+        const cos = Math.cos(swirlAngle);
+        const sin = Math.sin(swirlAngle);
         
         for (let i = 0; i < positions.count; i++) {
-            const x = positions.getX(i);
-            const y = positions.getY(i);
-            const z = positions.getZ(i);
+            const ox = origPositions[i * 3];
+            const oy = origPositions[i * 3 + 1];
+            const oz = origPositions[i * 3 + 2];
             
-            // Slow swirl
-            const angle = dt * 0.01;
-            const cos = Math.cos(angle);
-            const sin = Math.sin(angle);
-            positions.setX(i, x * cos - z * sin);
-            positions.setZ(i, x * sin + z * cos);
+            // Slow swirl around Y axis (from original positions — no drift)
+            positions.setX(i, ox * cos - oz * sin);
+            positions.setZ(i, ox * sin + oz * cos);
             
-            // Gentle vertical bob
-            positions.setY(i, y + Math.sin(time * 0.2 + i * 0.1) * 0.001);
+            // Gentle vertical bob (from original Y — no accumulation)
+            positions.setY(i, oy + Math.sin(time * 0.2 + i * 0.1) * 0.05);
         }
         positions.needsUpdate = true;
     }
@@ -1542,8 +1506,8 @@ export class FanoConstellationAnimator {
             
             const line = this.fanoLines[lineIdx];
             const segIdx = Math.floor(parseInt(obj.name.split('-')[2]) % 3);
-            const fromIdx = line[Math.min(segIdx, line.length - 1)];
-            const toIdx = line[Math.min(segIdx + 1, line.length - 1)];
+            const fromIdx = line[segIdx % line.length];
+            const toIdx = line[(segIdx + 1) % line.length];
             
             const from = this.vertexPositions[fromIdx];
             const to = this.vertexPositions[toIdx] || this.vertexPositions[fromIdx];
@@ -1630,26 +1594,34 @@ export class FanoConstellationAnimator {
         
         if (this.data.auroraPhase > 0) {
             this.data.auroraPhase -= dt * 0.15; // Fades over ~7 seconds
+            if (this.data.auroraPhase < 0) this.data.auroraPhase = 0;
             
             const dust = this.sculpture.getObjectByName('constellation-dust');
-            if (dust?.geometry?.attributes?.color) {
+            const origColors = dust?.userData?.originalColors;
+            if (dust?.geometry?.attributes?.color && origColors) {
                 const colors = dust.geometry.attributes.color;
+                const phase = this.data.auroraPhase;
                 for (let i = 0; i < colors.count; i++) {
-                    const phase = this.data.auroraPhase;
-                    const wave = Math.sin(i * 0.03 + time * 2) * 0.5 + 0.5;
-                    // Cascade rainbow through the dust
-                    const hue = (i / colors.count + time * 0.1) % 1;
-                    const col = new THREE.Color().setHSL(hue, 0.8, 0.5 + wave * 0.3);
-                    colors.setXYZ(i, 
-                        colors.getX(i) * (1 - phase * 0.5) + col.r * phase * 0.5,
-                        colors.getY(i) * (1 - phase * 0.5) + col.g * phase * 0.5,
-                        colors.getZ(i) * (1 - phase * 0.5) + col.b * phase * 0.5
-                    );
+                    const or = origColors[i * 3];
+                    const og = origColors[i * 3 + 1];
+                    const ob = origColors[i * 3 + 2];
+                    
+                    if (phase > 0.001) {
+                        const wave = Math.sin(i * 0.03 + time * 2) * 0.5 + 0.5;
+                        const hue = (i / colors.count + time * 0.1) % 1;
+                        const col = new THREE.Color().setHSL(hue, 0.8, 0.5 + wave * 0.3);
+                        // Blend from original colors (not current — prevents drift)
+                        colors.setXYZ(i,
+                            or * (1 - phase * 0.5) + col.r * phase * 0.5,
+                            og * (1 - phase * 0.5) + col.g * phase * 0.5,
+                            ob * (1 - phase * 0.5) + col.b * phase * 0.5
+                        );
+                    } else {
+                        colors.setXYZ(i, or, og, ob);
+                    }
                 }
                 colors.needsUpdate = true;
             }
-            
-            if (this.data.auroraPhase <= 0) this.data.auroraPhase = 0;
         }
     }
     
