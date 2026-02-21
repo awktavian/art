@@ -466,9 +466,50 @@ export class InteractionEffects {
         } = options;
         
         // Background panel
+        const canvas = document.createElement('canvas');
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.round(width * 256 * dpr);
+        canvas.height = Math.round(height * 256 * dpr);
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+        const cw = width * 256, ch = height * 256;
+
+        const bgHex = '#' + bgColor.toString(16).padStart(6, '0');
+        ctx.fillStyle = bgHex;
+        ctx.fillRect(0, 0, cw, ch);
+
+        ctx.fillStyle = '#' + textColor.toString(16).padStart(6, '0');
+        ctx.font = `${Math.round(ch * 0.06)}px 'IBM Plex Sans', sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        const maxLineWidth = cw * 0.85;
+        const words = text.split(' ');
+        const lines = [];
+        let currentLine = '';
+        for (const word of words) {
+            const test = currentLine ? currentLine + ' ' + word : word;
+            if (ctx.measureText(test).width > maxLineWidth && currentLine) {
+                lines.push(currentLine);
+                currentLine = word;
+            } else {
+                currentLine = test;
+            }
+        }
+        if (currentLine) lines.push(currentLine);
+
+        const lineHeight = ch * 0.08;
+        const startY = ch / 2 - ((lines.length - 1) * lineHeight) / 2;
+        lines.forEach((line, i) => {
+            ctx.fillText(line, cw / 2, startY + i * lineHeight);
+        });
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.minFilter = THREE.LinearFilter;
+
         const panelGeo = new THREE.PlaneGeometry(width, height);
         const panelMat = new THREE.MeshBasicMaterial({
-            color: bgColor,
+            map: tex,
             transparent: true,
             opacity: 0,
             side: THREE.DoubleSide
@@ -478,9 +519,6 @@ export class InteractionEffects {
         panel.lookAt(this.camera.position);
         
         this.scene.add(panel);
-        
-        // Text would need a separate canvas texture in production
-        // For now, just show the panel
         
         this.activeEffects.push({
             type: 'infoReveal',

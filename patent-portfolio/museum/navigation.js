@@ -92,8 +92,15 @@ export class MuseumNavigation {
         // Initialize collision detection
         this.initCollisionSystem();
         
-        // Rebuild collision objects after a short delay to ensure scene is loaded
-        setTimeout(() => this.rebuildCollisionObjects(), 500);
+        // Listen for galleries-loaded event instead of racing with setTimeout
+        this._onGalleriesLoaded = () => this.rebuildCollisionObjects();
+        window.addEventListener('galleries-loaded', this._onGalleriesLoaded);
+        // Fallback: rebuild after 2s if event never fires
+        this._collisionFallbackTimer = setTimeout(() => {
+            if (this.collisionObjects.length === 0) {
+                this.rebuildCollisionObjects();
+            }
+        }, 2000);
         
         // Create instructions overlay
         this.createInstructions();
@@ -640,39 +647,43 @@ export class MuseumNavigation {
     }
     
     /**
-     * Find ground height at a given XZ position using raycasting
-     * Returns 0 if no ground found (default floor level)
+     * Find ground height at a given XZ position.
+     * Uses a zone-based cache to avoid raycasting every frame.
+     * Only raycasts on zone change or when cache is stale.
      */
     findGroundHeight(x, z) {
-        // Use cached raycaster or create one
         if (!this._groundRaycaster) {
             this._groundRaycaster = new THREE.Raycaster();
             this._groundOrigin = new THREE.Vector3();
-            this._groundDir = new THREE.Vector3(0, -1, 0);  // Straight down
+            this._groundDir = new THREE.Vector3(0, -1, 0);
+            this._groundCache = { x: NaN, z: NaN, y: 0 };
         }
 
-        // Cache floor objects (only rebuild when explicitly requested)
+        // Return cached result if position hasn't changed much (within 1m cell)
+        const cellX = Math.round(x);
+        const cellZ = Math.round(z);
+        if (cellX === this._groundCache.x && cellZ === this._groundCache.z) {
+            return this._groundCache.y;
+        }
+
         if (!this._floorObjects) {
             this._rebuildFloorObjects();
         }
 
-        // Cast ray from high above downward
-        this._groundOrigin.set(x, 20, z);  // Start from ceiling
+        this._groundOrigin.set(x, 20, z);
         this._groundRaycaster.set(this._groundOrigin, this._groundDir);
-        this._groundRaycaster.far = 25;  // Max fall distance
+        this._groundRaycaster.far = 25;
 
         if (this._floorObjects.length === 0) {
-            return 0;  // Default floor at Y=0
+            this._groundCache = { x: cellX, z: cellZ, y: 0 };
+            return 0;
         }
 
         const intersections = this._groundRaycaster.intersectObjects(this._floorObjects, false);
+        const groundY = intersections.length > 0 ? intersections[0].point.y : 0;
 
-        if (intersections.length > 0) {
-            // Return the Y position of the highest floor below us
-            return intersections[0].point.y;
-        }
-
-        return 0;  // Default floor at Y=0
+        this._groundCache = { x: cellX, z: cellZ, y: groundY };
+        return groundY;
     }
 
     /**
@@ -1126,6 +1137,13 @@ export class MuseumNavigation {
     dispose() {
         if (this.controls) {
             this.controls.dispose();
+        }
+        
+        if (this._onGalleriesLoaded) {
+            window.removeEventListener('galleries-loaded', this._onGalleriesLoaded);
+        }
+        if (this._collisionFallbackTimer) {
+            clearTimeout(this._collisionFallbackTimer);
         }
         
         const instructions = document.getElementById('navigation-instructions');

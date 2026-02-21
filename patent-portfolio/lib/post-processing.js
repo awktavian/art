@@ -1266,6 +1266,24 @@ export class PostProcessingManager {
         }
     }
     
+    /**
+     * Temporary bloom pulse for artwork discovery moments.
+     * Ramps bloom up then back to baseline over ~1s.
+     */
+    triggerDiscoveryBloom(peakStrength = 0.8) {
+        if (!this.passes.bloom) return;
+        const base = this.quality.bloomStrength;
+        this.passes.bloom.strength = peakStrength;
+        const start = performance.now();
+        const duration = 1000;
+        const tick = () => {
+            const t = Math.min(1, (performance.now() - start) / duration);
+            this.passes.bloom.strength = base + (peakStrength - base) * (1 - t) * (1 - t);
+            if (t < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+    }
+    
     setBloomIntensity(intensity) {
         if (this.passes.bloom) {
             this.passes.bloom.strength = intensity;

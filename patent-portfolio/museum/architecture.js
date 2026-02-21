@@ -148,11 +148,6 @@ export function createMuseumMaterials() {
             side: THREE.DoubleSide
         }),
 
-        // Legacy compatibility
-        wall: null,
-        wallAccent: null,
-        rib: null,
-        floorReflective: null
     };
 }
 

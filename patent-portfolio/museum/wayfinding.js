@@ -141,8 +141,11 @@ export class Minimap {
         const scale = this.options.scale * 2;
         
         // Convert minimap coords back to world coords
-        const worldX = ((cx - center) / (55 * scale)) * 100;
-        const worldZ = ((cy - center) / (55 * scale)) * 100;
+        // Museum spans ~100m; map factor = 55 * scale per 100 world units
+        const MAP_FACTOR = 55;
+        const WORLD_EXTENT = 100;
+        const worldX = ((cx - center) / (MAP_FACTOR * scale)) * WORLD_EXTENT;
+        const worldZ = ((cy - center) / (MAP_FACTOR * scale)) * WORLD_EXTENT;
         
         // Check if click is near a wing endpoint for smarter teleport
         let targetColony = null;

@@ -684,6 +684,10 @@ export class InfoPanel {
                     <h3>Key Features</h3>
                     <ul class="features-list"></ul>
                 </div>
+                <div class="cross-references" style="display:none">
+                    <h3>Related Patents</h3>
+                    <div class="cross-ref-list"></div>
+                </div>
                 <div class="patent-actions">
                     <button class="action-btn" data-action="code">View Code</button>
                     <button class="action-btn" data-action="prior-art">Prior Art</button>
@@ -1067,6 +1071,46 @@ export class InfoPanel {
                 border-radius: 2px;
             }
             
+            .cross-references {
+                margin-bottom: 24px;
+                padding: 16px;
+                background: rgba(18, 16, 26, 0.4);
+                border-radius: 8px;
+                border: 1px solid rgba(103, 212, 228, 0.1);
+            }
+            .cross-references h3 {
+                font-size: 12px;
+                color: #67D4E4;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                margin-bottom: 12px;
+            }
+            .cross-ref-item {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 0;
+                border-bottom: 1px solid rgba(103, 212, 228, 0.05);
+                cursor: pointer;
+                transition: opacity 0.15s;
+            }
+            .cross-ref-item:hover { opacity: 0.8; }
+            .cross-ref-colony {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                flex-shrink: 0;
+            }
+            .cross-ref-name {
+                color: #C4BFBA;
+                font-size: 13px;
+                flex: 1;
+            }
+            .cross-ref-wing {
+                color: #8A8580;
+                font-size: 11px;
+                font-family: 'IBM Plex Mono', monospace;
+            }
             .action-btn-secondary {
                 background: rgba(158, 153, 148, 0.1);
                 border-color: rgba(158, 153, 148, 0.3);
@@ -1226,6 +1270,32 @@ export class InfoPanel {
             eduSection.style.display = 'none';
         }
         
+        // Cross-references: find patents in the same category but different wings
+        const crossRefSection = el.querySelector('.cross-references');
+        const crossRefList = el.querySelector('.cross-ref-list');
+        const related = PATENTS.filter(p =>
+            p.id !== patent.id &&
+            (p.category === patent.category || p.colony === patent.colony)
+        ).slice(0, 5);
+        if (related.length > 0) {
+            crossRefSection.style.display = 'block';
+            crossRefList.innerHTML = '';
+            const colonyHexMap = { spark: '#FF6B35', forge: '#D4AF37', flow: '#4ECDC4', nexus: '#9B7EBD', beacon: '#F59E0B', grove: '#7EB77F', crystal: '#67D4E4' };
+            for (const rel of related) {
+                const item = document.createElement('div');
+                item.className = 'cross-ref-item';
+                item.innerHTML = `
+                    <span class="cross-ref-colony" style="background:${colonyHexMap[rel.colony] || '#67D4E4'}"></span>
+                    <span class="cross-ref-name">${rel.name}</span>
+                    <span class="cross-ref-wing">${rel.colony}</span>
+                `;
+                item.addEventListener('click', () => this.show(rel.id));
+                crossRefList.appendChild(item);
+            }
+        } else {
+            crossRefSection.style.display = 'none';
+        }
+
         // Apply detail level
         this._updateDetailLevel();
         

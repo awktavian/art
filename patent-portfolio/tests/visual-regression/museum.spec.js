@@ -163,6 +163,95 @@ test.describe('Gallery Menu Visuals', () => {
     
 });
 
+test.describe('FPS Benchmarks', () => {
+    
+    test.beforeEach(async ({ page }) => {
+        await page.goto('/');
+        
+        await Promise.race([
+            page.waitForSelector('#loading-screen.hidden', { timeout: 60000 }),
+            page.waitForFunction(() => !document.getElementById('loading-screen'), { timeout: 60000 })
+        ]).catch(() => page.waitForSelector('canvas', { timeout: 60000 }));
+        
+        await page.waitForTimeout(2000);
+        
+        const instructions = page.locator('#navigation-instructions');
+        if (await instructions.isVisible()) {
+            await instructions.click();
+        }
+        await page.waitForTimeout(500);
+    });
+    
+    const positions = [
+        { key: 'Digit0', name: 'rotunda', minFPS: 20 },
+        { key: 'Digit1', name: 'spark', minFPS: 20 },
+        { key: 'Digit4', name: 'nexus', minFPS: 20 },
+        { key: 'Digit7', name: 'crystal', minFPS: 20 }
+    ];
+    
+    for (const pos of positions) {
+        test(`FPS in ${pos.name} meets ${pos.minFPS}fps minimum`, async ({ page }) => {
+            await page.keyboard.press(pos.key);
+            await page.waitForTimeout(1500);
+            
+            const fps = await page.evaluate(() => {
+                return new Promise(resolve => {
+                    let frames = 0;
+                    const start = performance.now();
+                    function count() {
+                        frames++;
+                        if (performance.now() - start < 2000) {
+                            requestAnimationFrame(count);
+                        } else {
+                            resolve(Math.round(frames / ((performance.now() - start) / 1000)));
+                        }
+                    }
+                    requestAnimationFrame(count);
+                });
+            });
+            
+            expect(fps).toBeGreaterThanOrEqual(pos.minFPS);
+        });
+    }
+});
+
+test.describe('Accessibility Audit', () => {
+    
+    test('axe-core finds no critical violations', async ({ page }) => {
+        let AxeBuilder;
+        try {
+            const axeModule = await import('@axe-core/playwright');
+            AxeBuilder = axeModule.default || axeModule.AxeBuilder;
+        } catch {
+            test.skip(true, 'axe-core not installed');
+            return;
+        }
+        
+        await page.goto('/');
+        
+        await Promise.race([
+            page.waitForSelector('#loading-screen.hidden', { timeout: 60000 }),
+            page.waitForFunction(() => !document.getElementById('loading-screen'), { timeout: 60000 })
+        ]).catch(() => page.waitForSelector('canvas', { timeout: 60000 }));
+        
+        await page.waitForTimeout(3000);
+        
+        const results = await new AxeBuilder({ page })
+            .exclude('canvas')
+            .analyze();
+        
+        const critical = results.violations.filter(v =>
+            v.impact === 'critical' || v.impact === 'serious'
+        );
+        
+        if (critical.length > 0) {
+            console.log('Critical a11y violations:', critical.map(v => `${v.id}: ${v.description}`));
+        }
+        
+        expect(critical.length).toBe(0);
+    });
+});
+
 test.describe('Mobile Viewport', () => {
     
     test.use({ viewport: { width: 375, height: 667 } }); // iPhone SE

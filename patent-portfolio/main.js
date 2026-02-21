@@ -962,8 +962,9 @@ class PatentMuseum {
     loadGalleries() {
         this.galleryLoader = new GalleryLoader(this.scene);
         this.galleryLoader.loadAllGalleries();
-        // Gallery loading is synchronous — _rebuildInteractables() in finally block
-        // will capture all gallery objects since it runs after this returns.
+        
+        // Signal collision system and other listeners that galleries are ready
+        window.dispatchEvent(new CustomEvent('galleries-loaded'));
         
         // Feed artwork positions to minimap for markers
         if (this.wayfinding?.minimap && this.galleryLoader.loadedArtworks?.size) {
@@ -1796,12 +1797,12 @@ class PatentMuseum {
         if (artworkId && !this._discoveredArtworks.has(artworkId)) {
             this._discoveredArtworks.add(artworkId);
             // Achievement check: first wing complete, all P1s, all exhibits
-            if (this._discoveredArtworks.size === 6) {
-                // All P1s discovered
+            const P1_COUNT = 6;
+            const TOTAL_PATENTS = 54;
+            if (this._discoveredArtworks.size === P1_COUNT) {
                 if (this.soundDesign) this.soundDesign.playInteraction('consensus');
             }
-            if (this._discoveredArtworks.size === 54) {
-                // All exhibits discovered (6 P1 + 18 P2 + 30 P3)
+            if (this._discoveredArtworks.size === TOTAL_PATENTS) {
                 if (this.soundDesign) this.soundDesign.playInteraction('consensus');
                 if (this.fanoSculpture?.userData?._animator) {
                     this.fanoSculpture.userData._animator.triggerCelebration();

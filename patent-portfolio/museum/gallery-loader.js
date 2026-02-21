@@ -36,58 +36,70 @@ import { getVisitorIdentity } from '../lib/visitor-identity.js';
 // ARTWORK PLACEMENT CONFIG
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Compute hero positions for P1 artworks: center of each wing's gallery, 360-degree viewing space
+function wingGalleryCenter(colony) {
+    const data = COLONY_DATA[colony];
+    const rotR = DIMENSIONS.rotunda.radius;
+    const wingLen = DIMENSIONS.wing.length;
+    const vestD = DIMENSIONS.wing.vestibuleDepth ?? 6;
+    const galD = DIMENSIONS.gallery.depth;
+    const dist = rotR + wingLen + vestD + galD / 2;
+    return {
+        x: Math.cos(data.wingAngle) * dist,
+        y: 0,
+        z: Math.sin(data.wingAngle) * dist
+    };
+}
+
+function wingGalleryOffset(colony, lateralFraction, depthFraction) {
+    const center = wingGalleryCenter(colony);
+    const data = COLONY_DATA[colony];
+    const angle = data.wingAngle;
+    const galW = DIMENSIONS.gallery.width;
+    const galD = DIMENSIONS.gallery.depth;
+    return {
+        x: center.x - Math.sin(angle) * lateralFraction * galW / 2 + Math.cos(angle) * depthFraction * galD / 2,
+        y: 0,
+        z: center.z + Math.cos(angle) * lateralFraction * galW / 2 + Math.sin(angle) * depthFraction * galD / 2
+    };
+}
+
 const GALLERY_PLACEMENTS = {
-    // Crystal Wing - Math (A) + Safety (B)
     crystal: {
         categories: ['A', 'B'],
         artworks: [
-            { id: 'P1-001', factory: createEFECBFArtwork, position: { x: 0, y: 0, z: 20 }, scale: 1 },
-            { id: 'P1-003', factory: createE8LatticeArtwork, position: { x: -8, y: 0, z: 25 }, scale: 1 },
-            { id: 'P1-004', factory: createS15HopfArtwork, position: { x: 8, y: 0, z: 25 }, scale: 1 }
+            // P1 hero: EFE-CBF at dead center (Turrell dome — needs maximum space)
+            { id: 'P1-001', factory: createEFECBFArtwork, get position() { return wingGalleryCenter('crystal'); }, scale: 1.2 },
+            // P1: E8 Lattice — offset left, large scale, walk-beneath
+            { id: 'P1-003', factory: createE8LatticeArtwork, get position() { return wingGalleryOffset('crystal', -0.5, -0.3); }, scale: 1.1 },
+            // P1: S15 Hopf — offset right, suspended from ceiling
+            { id: 'P1-004', factory: createS15HopfArtwork, get position() { return wingGalleryOffset('crystal', 0.5, -0.3); }, scale: 1.1 }
         ]
     },
-    
-    // Nexus Wing - Consensus (C) + Reasoning (J)
     nexus: {
         categories: ['C', 'J'],
         artworks: [
-            { id: 'P1-002', factory: createFanoConsensusArtwork, position: { x: -15, y: 0, z: 15 }, scale: 1 }
+            // P1 hero: Fano Consensus at center — visitors trigger consensus rounds
+            { id: 'P1-002', factory: createFanoConsensusArtwork, get position() { return wingGalleryCenter('nexus'); }, scale: 1.2 }
         ]
     },
-    
-    // Grove Wing - World Models (D)
     grove: {
         categories: ['D'],
         artworks: [
-            { id: 'P1-005', factory: createOrganismRSSMArtwork, position: { x: 15, y: 0, z: -15 }, scale: 1 }
+            // P1 hero: OrganismRSSM at center — living system that breathes
+            { id: 'P1-005', factory: createOrganismRSSMArtwork, get position() { return wingGalleryCenter('grove'); }, scale: 1.2 }
         ]
     },
-    
-    // Forge Wing - Crypto (E) + Platform (I)
     forge: {
         categories: ['E', 'I'],
         artworks: [
-            { id: 'P1-006', factory: createQuantumSafeArtwork, position: { x: -15, y: 0, z: -15 }, scale: 1 }
+            // P1 hero: Quantum-Safe Crypto at center — lattice structure
+            { id: 'P1-006', factory: createQuantumSafeArtwork, get position() { return wingGalleryCenter('forge'); }, scale: 1.2 }
         ]
     },
-    
-    // Flow Wing - Smart Home (F)
-    flow: {
-        categories: ['F'],
-        artworks: []
-    },
-    
-    // Beacon Wing - Economic (H)
-    beacon: {
-        categories: ['H'],
-        artworks: []
-    },
-    
-    // Spark Wing - Voice (G) + Visual (K)
-    spark: {
-        categories: ['G', 'K'],
-        artworks: []
-    }
+    flow: { categories: ['F'], artworks: [] },
+    beacon: { categories: ['H'], artworks: [] },
+    spark: { categories: ['G', 'K'], artworks: [] }
 };
 
 // Distance within which a wing's P2/P3 artworks are loaded
@@ -252,16 +264,22 @@ export class GalleryLoader {
             let artwork = null;
             try {
                 artwork = createP2Artwork(patent.id);
-            } catch (_) {}
+            } catch (err) {
+                console.warn(`P2 artwork ${patent.id} failed:`, err.message);
+            }
             if (!artwork && patent.priority === 'P3') {
                 try {
                     artwork = createP3Artwork(patent);
-                } catch (_) {}
+                } catch (err) {
+                    console.warn(`P3 artwork ${patent.id} failed:`, err.message);
+                }
             }
             if (!artwork) {
                 try {
                     artwork = createTemplateArtwork(patent);
-                } catch (_) {}
+                } catch (err) {
+                    console.warn(`Template artwork ${patent.id} failed:`, err.message);
+                }
             }
             if (!artwork) return;
             
@@ -396,26 +414,23 @@ export class GalleryLoader {
         }
         // LOD: only update artworks based on distance to camera
         const camPos = camera?.position;
+        this._lodFrame = ((this._lodFrame || 0) + 1) % 1000;
         this.loadedArtworks.forEach(artwork => {
             if (!artwork.update) return;
             
             if (camPos && artwork.position) {
                 const dist = camPos.distanceTo(artwork.position);
                 
-                // Far artworks: reduce update frequency
                 if (dist > 60) {
-                    // Very far: skip entirely (frozen)
                     artwork.visible = false;
                     return;
                 }
+                
                 artwork.visible = true;
                 
                 if (dist > 30) {
-                    // Medium distance: update every 4th frame
-                    this._lodFrame = (this._lodFrame || 0) + 1;
                     if (this._lodFrame % 4 !== 0) return;
                 }
-                // Close: update every frame
             }
             
             artwork.update(deltaTime, camera);

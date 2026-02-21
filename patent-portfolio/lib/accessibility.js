@@ -194,6 +194,26 @@ export class AccessibilityManager {
         `.replace(/\s+/g, ' ').trim();
         
         this.announce(message);
+        
+        if (this.settings.screenReaderMode) {
+            this.speakTTS(message);
+        }
+    }
+    
+    /**
+     * Speak text aloud using Web Speech Synthesis API.
+     * Falls back silently if unsupported.
+     */
+    speakTTS(text) {
+        if (!('speechSynthesis' in window)) return;
+        
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        utterance.volume = 0.8;
+        utterance.lang = 'en-US';
+        window.speechSynthesis.speak(utterance);
     }
     
     // ═══════════════════════════════════════════════════════════════════════

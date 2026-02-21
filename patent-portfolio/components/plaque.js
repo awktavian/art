@@ -96,6 +96,18 @@ export class Plaque extends THREE.Group {
         const badge = new THREE.Mesh(badgeGeo, badgeMat);
         badge.position.set(width/2 - badgeSize/2 - 0.05, height/2 - badgeSize/2 - 0.05, depth/2 + 0.01);
         this.add(badge);
+
+        // Colony accent bar (left edge, full height)
+        const accentBar = new THREE.Mesh(
+            new THREE.BoxGeometry(0.04, height * 0.9, depth + 0.02),
+            new THREE.MeshBasicMaterial({
+                color: colonyColor,
+                transparent: true,
+                opacity: 0.85
+            })
+        );
+        accentBar.position.set(-width / 2 - 0.01, 0, 0);
+        this.add(accentBar);
         
         // Create text texture
         this.createTextTexture();

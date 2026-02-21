@@ -722,6 +722,100 @@ export class SoundDesignManager {
     }
     
     // ═══════════════════════════════════════════════════════════════════════
+    // FOOTSTEP SOUNDS (material-dependent)
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    _footstepCooldown = 0;
+    
+    playFootstep(zone = 'rotunda') {
+        if (!this.isInitialized || this.isMuted) return;
+        const now = this.audioContext.currentTime;
+        if (now - this._footstepCooldown < 0.35) return;
+        this._footstepCooldown = now;
+
+        const profiles = {
+            crystal:  { freq: 1800, decay: 0.06, filter: 6000, vol: 0.04 },
+            forge:    { freq: 800,  decay: 0.08, filter: 2000, vol: 0.05 },
+            spark:    { freq: 600,  decay: 0.05, filter: 1500, vol: 0.03 },
+            flow:     { freq: 300,  decay: 0.1,  filter: 800,  vol: 0.06 },
+            nexus:    { freq: 1200, decay: 0.04, filter: 3000, vol: 0.04 },
+            beacon:   { freq: 400,  decay: 0.12, filter: 1000, vol: 0.05 },
+            grove:    { freq: 250,  decay: 0.15, filter: 600,  vol: 0.04 },
+            rotunda:  { freq: 500,  decay: 0.08, filter: 1200, vol: 0.05 }
+        };
+        const p = profiles[zone] || profiles.rotunda;
+
+        const buf = this.audioContext.createBuffer(1, this.audioContext.sampleRate * p.decay, this.audioContext.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < data.length; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (data.length * 0.3));
+        }
+        const noise = this.audioContext.createBufferSource();
+        noise.buffer = buf;
+
+        const bandpass = this.audioContext.createBiquadFilter();
+        bandpass.type = 'bandpass';
+        bandpass.frequency.value = p.freq;
+        bandpass.Q.value = 1.5;
+
+        const lpf = this.audioContext.createBiquadFilter();
+        lpf.type = 'lowpass';
+        lpf.frequency.value = p.filter;
+
+        const gain = this.audioContext.createGain();
+        gain.gain.setValueAtTime(p.vol, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + p.decay);
+
+        noise.connect(bandpass);
+        bandpass.connect(lpf);
+        lpf.connect(gain);
+        gain.connect(this.compressor);
+        if (this.reverb?.convolver) gain.connect(this.reverb.convolver);
+
+        noise.start(now);
+        noise.stop(now + p.decay + 0.05);
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // WING ENTRANCE SOUNDS
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    playWingEntrance(colonyName) {
+        if (!this.isInitialized || this.isMuted) return;
+        const profile = COLONY_AUDIO[colonyName];
+        if (!profile) return;
+
+        const now = this.audioContext.currentTime;
+        const baseFreq = profile.baseFreq;
+
+        const intervals = [1, 1.5, 2];
+        intervals.forEach((mult, i) => {
+            const osc = this.audioContext.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.value = baseFreq * mult;
+
+            const g = this.audioContext.createGain();
+            const onset = now + i * 0.08;
+            g.gain.setValueAtTime(0, onset);
+            g.gain.linearRampToValueAtTime(0.08 / (i + 1), onset + 0.05);
+            g.gain.exponentialRampToValueAtTime(0.001, onset + 1.2);
+
+            const filt = this.audioContext.createBiquadFilter();
+            filt.type = 'lowpass';
+            filt.frequency.setValueAtTime(400, onset);
+            filt.frequency.linearRampToValueAtTime(profile.filterFreq, onset + 0.6);
+
+            osc.connect(filt);
+            filt.connect(g);
+            g.connect(this.compressor);
+            if (this.reverb?.convolver) g.connect(this.reverb.convolver);
+
+            osc.start(onset);
+            osc.stop(onset + 1.5);
+        });
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
     // CONTROLS
     // ═══════════════════════════════════════════════════════════════════════
     
@@ -831,6 +925,14 @@ class CompleteSoundManager {
     
     playColonyNote(colonyName, volume) {
         this.soundDesign.playColonyNote(colonyName, volume);
+    }
+    
+    playFootstep(zone) {
+        this.soundDesign.playFootstep(zone);
+    }
+    
+    playWingEntrance(colonyName) {
+        this.soundDesign.playWingEntrance(colonyName);
     }
     
     updateListenerPosition(position, forward, up) {

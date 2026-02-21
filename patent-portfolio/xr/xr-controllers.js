@@ -152,6 +152,22 @@ export class XRControllers {
         this.interactiveObjects = [];
         this.hoveredObject = null;
         
+        // Comfort settings
+        this.comfort = {
+            snapTurnAngle: Math.PI / 6,       // 30-degree snap turn
+            snapTurnCooldown: 0,
+            movementVignette: true,            // Darken edges during locomotion
+            seatedMode: false,                 // Use seated-height offset
+            seatedHeightOffset: 0.4            // Meters above reference floor
+        };
+        
+        // Gesture callbacks
+        this.onPointStart = null;
+        this.onPointEnd = null;
+        this.onGrabStart = null;
+        this.onGrabEnd = null;
+        this.onSwipe = null;
+        
         this.init();
     }
     
@@ -1044,6 +1060,40 @@ export class XRControllers {
     
     isOpenPalm(hand) {
         return this.handState[hand]?.gestures?.openPalm || false;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // COMFORT SETTINGS
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    setComfort(opts) {
+        Object.assign(this.comfort, opts);
+    }
+    
+    /**
+     * Process right thumbstick for snap-turn rotation.
+     * Returns rotation delta in radians (0 if no snap this frame).
+     */
+    getSnapTurnDelta(time) {
+        const stick = this.state.right?.thumbstick;
+        if (!stick || Math.abs(stick.x) < 0.6) {
+            this.comfort.snapTurnCooldown = 0;
+            return 0;
+        }
+        if (time - this.comfort.snapTurnCooldown < 300) return 0;
+        this.comfort.snapTurnCooldown = time;
+        return stick.x > 0 ? -this.comfort.snapTurnAngle : this.comfort.snapTurnAngle;
+    }
+    
+    /**
+     * Returns [0,1] movement vignette intensity for the current frame.
+     * Driven by left thumbstick magnitude — 0 at rest, 1 at full tilt.
+     */
+    getMovementVignetteStrength() {
+        if (!this.comfort.movementVignette) return 0;
+        const stick = this.state.left?.thumbstick;
+        if (!stick) return 0;
+        return Math.min(1, Math.sqrt(stick.x * stick.x + stick.y * stick.y));
     }
     
     // ═══════════════════════════════════════════════════════════════════════
