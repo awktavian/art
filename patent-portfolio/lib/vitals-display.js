@@ -64,15 +64,15 @@ export class VitalsDisplay {
             #vitals-display {
                 position: fixed;
                 bottom: 20px;
-                left: 72px;
+                left: 80px;
                 display: flex;
                 flex-direction: column;
                 gap: 4px;
                 font-family: 'IBM Plex Mono', monospace;
                 font-size: 11px;
-                z-index: 100;
+                z-index: 500;
                 pointer-events: none;
-                opacity: 0.25;
+                opacity: 0.15;
                 transition: opacity 0.5s ease;
             }
             

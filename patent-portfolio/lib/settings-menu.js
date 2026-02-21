@@ -559,8 +559,8 @@ export class SettingsManager {
         style.textContent = `
             #settings-button {
                 position: fixed;
-                top: 15px;
-                right: 15px;
+                top: 20px;
+                right: 20px;
                 width: 44px;
                 height: 44px;
                 border-radius: 50%;
@@ -569,7 +569,7 @@ export class SettingsManager {
                 color: #67d4e4;
                 font-size: 20px;
                 cursor: pointer;
-                z-index: 9000;
+                z-index: 8000;
                 transition: all 0.2s;
             }
             

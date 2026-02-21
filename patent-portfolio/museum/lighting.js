@@ -71,20 +71,20 @@ export class TurrellLighting {
 
         // ─── LAYER 1: BASE AMBIENT ───
         // Ultra-low warm ambient prevents pure black anywhere
-        this.baseAmbient = new THREE.AmbientLight(kelvinToHex(3200), 0.05);
+        this.baseAmbient = new THREE.AmbientLight(kelvinToHex(3200), 0.35);
         this.scene.add(this.baseAmbient);
         this.lights.push(this.baseAmbient);
 
         // ─── LAYER 2: ARCHITECTURAL (hemisphere + directional) ───
         this.hemisphere = new THREE.HemisphereLight(
-            kelvinToHex(3400), 0x060508, 0.3
+            kelvinToHex(3400), 0x2A2530, 0.8
         );
         this.hemisphere.position.set(0, 50, 0);
         this.scene.add(this.hemisphere);
         this.lights.push(this.hemisphere);
 
         // Main directional (sun through aperture)
-        this.sunlight = new THREE.DirectionalLight(kelvinToHex(3500), 1.2);
+        this.sunlight = new THREE.DirectionalLight(kelvinToHex(3500), 2.2);
         this.sunlight.position.set(
             DIMENSIONS.rotunda.apertureOffset,
             rotH + 6,
@@ -95,7 +95,7 @@ export class TurrellLighting {
         this.lights.push(this.sunlight);
 
         // Center fill for Fano sculpture
-        this.centerLight = new THREE.PointLight(0xF5F0E8, 0.25, 20, 2);
+        this.centerLight = new THREE.PointLight(0xF5F0E8, 0.9, 40, 2);
         this.centerLight.position.set(0, rotH * 0.45, 0);
         this.scene.add(this.centerLight);
         this.lights.push(this.centerLight);
@@ -104,7 +104,7 @@ export class TurrellLighting {
         for (let i = 0; i < 4; i++) {
             const angle = (i / 4) * Math.PI * 2 + Math.PI / 8;
             const r = 6;
-            const uplight = new THREE.SpotLight(0xF5E6D3, 0.4, 22, Math.PI / 8, 0.6, 2);
+            const uplight = new THREE.SpotLight(0xF5E6D3, 0.8, 30, Math.PI / 8, 0.6, 2);
             uplight.position.set(Math.cos(angle) * r, 0.2, Math.sin(angle) * r);
             uplight.target.position.set(Math.cos(angle) * r * 0.5, rotH / 2, Math.sin(angle) * r * 0.5);
             this.scene.add(uplight.target);
@@ -130,7 +130,7 @@ export class TurrellLighting {
 
             // Per-wing hemisphere light for architectural bounce
             const wingHemi = new THREE.HemisphereLight(
-                profile.color, 0x050508, 0.15
+                profile.color, 0x151018, 0.35
             );
             wingHemi.position.set(centerX, wingH, centerZ);
             this.scene.add(wingHemi);
@@ -138,7 +138,7 @@ export class TurrellLighting {
 
             // Wing corridor spotlight
             const wingLight = new THREE.SpotLight(
-                profile.color, 1.0, wingLen, Math.PI / 6, 0.5, 1.5
+                profile.color, 1.5, wingLen, Math.PI / 6, 0.5, 1.5
             );
             wingLight.position.set(centerX, wingH - 0.5, centerZ);
             wingLight.target.position.set(centerX, 0, centerZ);
@@ -151,7 +151,7 @@ export class TurrellLighting {
             // Gallery accent light with proper userData
             const galleryX = cos * (rotR + galleryCenterOffset);
             const galleryZ = sin * (rotR + galleryCenterOffset);
-            const accentLight = new THREE.PointLight(profile.color, 0.6, 22, 2);
+            const accentLight = new THREE.PointLight(profile.color, 1.0, 28, 2);
             accentLight.position.set(galleryX, DIMENSIONS.gallery.height * 0.6, galleryZ);
             accentLight.userData.isAccentLight = true;
             accentLight.userData.baseIntensity = 0.6;
@@ -219,8 +219,8 @@ export class TurrellLighting {
             const t = this._zoneTransition;
             const eased = t * t * (3 - 2 * t); // smoothstep
 
-            this._currentFogColor.lerp(this._targetFogColor, eased * 0.1);
-            this._currentHemiColor.lerp(this._targetHemiColor, eased * 0.1);
+            this._currentFogColor.lerp(this._targetFogColor, eased * 0.15);
+            this._currentHemiColor.lerp(this._targetHemiColor, eased * 0.15);
 
             this.scene.fog.color.copy(this._currentFogColor);
             this.hemisphere.color.copy(this._currentHemiColor);
@@ -257,7 +257,7 @@ export class TurrellLighting {
     updateGanzfeldEffect(playerPosition) {
         if (!playerPosition || !this.scene.fog) return;
         const isColony = COLONY_ORDER.includes(this._targetZone);
-        const targetDensity = isColony ? 0.009 : 0.006;
+        const targetDensity = isColony ? 0.006 : 0.004;
         this.scene.fog.density += (targetDensity - this.scene.fog.density) * 0.02;
 
         if (isColony) {

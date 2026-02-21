@@ -39,7 +39,15 @@ export class MuseumNavigation {
         this.direction = new THREE.Vector3();
         this.playerHeight = 1.7; // meters
         this.moveSpeed = 100;
-        this.friction = 10;
+        this.friction = 8;
+        this.isSprinting = false;
+        this.sprintMultiplier = 1.8;
+        
+        // Head bob
+        this._headBobPhase = 0;
+        this._headBobAmplitude = 0.04;
+        this._headBobOffset = 0;
+        this._headBobSmooth = 0;
         
         // Cached vectors for performance (avoid allocations in update loop)
         this._forward = new THREE.Vector3();
@@ -356,6 +364,8 @@ export class MuseumNavigation {
                 case 'ShiftRight':
                     if (this.noclipEnabled) {
                         this.moveDown = true;
+                    } else {
+                        this.isSprinting = true;
                     }
                     break;
                 case 'Tab':
@@ -402,6 +412,7 @@ export class MuseumNavigation {
                 case 'ShiftLeft':
                 case 'ShiftRight':
                     this.moveDown = false;
+                    this.isSprinting = false;
                     break;
             }
         });
@@ -740,12 +751,13 @@ export class MuseumNavigation {
         const inputZ = Number(this.moveForward) - Number(this.moveBackward);
         const inputX = Number(this.moveRight) - Number(this.moveLeft);
         
-        // Apply movement from keyboard input
+        // Apply movement from keyboard input (with sprint)
+        const speedMult = this.isSprinting ? this.sprintMultiplier : 1.0;
         if (this.moveForward || this.moveBackward) {
-            this.velocity.z -= inputZ * this.moveSpeed * deltaTime;
+            this.velocity.z -= inputZ * this.moveSpeed * speedMult * deltaTime;
         }
         if (this.moveLeft || this.moveRight) {
-            this.velocity.x -= inputX * this.moveSpeed * deltaTime;
+            this.velocity.x -= inputX * this.moveSpeed * speedMult * deltaTime;
         }
         
         // Gravity (gentle)
@@ -827,15 +839,29 @@ export class MuseumNavigation {
         // Floor collision - ALWAYS keep player above ground
         if (this.camera.position.y < targetY) {
             this.velocity.y = 0;
-            this.camera.position.y = targetY;
             this.canJump = true;
         }
         
         // SAFETY: Never let Y go negative (absolute floor)
-        if (this.camera.position.y < this.playerHeight) {
-            this.velocity.y = 0;
-            this.camera.position.y = this.playerHeight;
-            this.canJump = true;
+        const floorTargetY = Math.max(targetY, this.playerHeight);
+        
+        // Smooth camera Y (lerp instead of snap — removes stair-stepping)
+        this.camera.position.y += (floorTargetY - this.camera.position.y) * 0.15;
+        if (Math.abs(this.camera.position.y - floorTargetY) < 0.01) {
+            this.camera.position.y = floorTargetY;
+        }
+        
+        // Head bob (only when walking on ground)
+        const horizontalSpeed = Math.sqrt(this.velocity.x ** 2 + this.velocity.z ** 2);
+        const isWalking = horizontalSpeed > 1.0 && this.canJump;
+        const targetBobSmooth = isWalking ? 1.0 : 0.0;
+        this._headBobSmooth += (targetBobSmooth - this._headBobSmooth) * 0.1;
+        
+        if (this._headBobSmooth > 0.01) {
+            const bobFreq = this.isSprinting ? horizontalSpeed * 1.2 : horizontalSpeed * 0.8;
+            this._headBobPhase += deltaTime * bobFreq;
+            this._headBobOffset = Math.sin(this._headBobPhase) * this._headBobAmplitude * this._headBobSmooth;
+            this.camera.position.y += this._headBobOffset;
         }
         
         // Ceiling collision

@@ -74,9 +74,9 @@ export const POST_PROCESSING_QUALITY = {
         dof: false,
         taa: true,             // Anti-aliasing for crisp edges
         bloom: true,
-        bloomStrength: 0.4,    // Moderate — lets emissive materials glow without over-brightening
-        bloomThreshold: 0.7,   // Low enough to catch emissive materials (MeshStandardMaterial emissiveIntensity > 0)
-        bloomRadius: 0.3,      // Slightly wider for softer falloff
+        bloomStrength: 0.45,
+        bloomThreshold: 0.7,
+        bloomRadius: 0.3,
         grain: 0,              // NO grain
         chromatic: 0,          // NO chromatic aberration
         vignette: 0,           // NO vignette
@@ -92,8 +92,8 @@ export const POST_PROCESSING_QUALITY = {
         dof: false,
         taa: true,
         bloom: true,
-        bloomStrength: 0.3,
-        bloomThreshold: 0.92,
+        bloomStrength: 0.35,
+        bloomThreshold: 0.65,
         bloomRadius: 0.25,
         grain: 0,
         chromatic: 0,
@@ -110,7 +110,7 @@ export const POST_PROCESSING_QUALITY = {
         taa: false,
         bloom: true,
         bloomStrength: 0.25,
-        bloomThreshold: 0.92,
+        bloomThreshold: 0.7,
         bloomRadius: 0.25,
         grain: 0,
         chromatic: 0,
@@ -655,8 +655,8 @@ const ColorGradingShader = {
     uniforms: {
         tDiffuse: { value: null },
         brightness: { value: 0.0 },
-        contrast: { value: 1.05 },
-        saturation: { value: 1.1 },
+        contrast: { value: 1.08 },
+        saturation: { value: 1.15 },
         warmth: { value: 0.05 },
         tint: { value: new THREE.Color(0xFFFFFF) },
         tintStrength: { value: 0.0 }
@@ -852,13 +852,16 @@ export class PostProcessingManager {
         }
         
         // ─────────────────────────────────────────────────────────────────────
-        // ACES TONE MAPPING (high/ultra only — medium skips for perf)
+        // ACES TONE MAPPING (all presets — 1 draw call, critical for correct output)
         // ─────────────────────────────────────────────────────────────────────
-        if (this.qualityLevel === 'high' || this.qualityLevel === 'ultra') {
+        {
             const acesPass = new ShaderPass(ACESToneMappingShader);
             acesPass.uniforms.exposure.value = 1.0;
             this.composer.addPass(acesPass);
             this.passes.aces = acesPass;
+            if (this.renderer) {
+                this.renderer.toneMapping = THREE.NoToneMapping;
+            }
         }
         
         // ─────────────────────────────────────────────────────────────────────

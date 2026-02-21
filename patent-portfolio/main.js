@@ -639,8 +639,8 @@ class PatentMuseum {
     
     initScene() {
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x12101A);
-        this.scene.fog = new THREE.FogExp2(0x12101A, 0.006);
+        this.scene.background = new THREE.Color(0x1E1A30);
+        this.scene.fog = new THREE.FogExp2(0x1E1A30, 0.004);
     }
     
     initRenderer() {
@@ -678,8 +678,8 @@ class PatentMuseum {
         const pixelRatio = preset.pixelRatio || Math.min(window.devicePixelRatio, 2);
         this.renderer.setPixelRatio(pixelRatio);
         
-        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.0;
+        this.renderer.toneMapping = THREE.LinearToneMapping;
+        this.renderer.toneMappingExposure = 1.2;
         
         // Configure shadows based on preset
         this.renderer.shadowMap.enabled = preset.shadowsEnabled;
@@ -771,18 +771,10 @@ class PatentMuseum {
         this.turrellLighting = new TurrellLighting(this.scene, this.camera);
         this.atmosphere = new AtmosphereManager(this.scene);
         
-        // Main directional for shadows (kept minimal to let zone lights dominate)
-        const mainLight = new THREE.DirectionalLight(0xF5F0E8, 0.3);
+        // Fill directional (no shadow — shadow budget managed by TurrellLighting)
+        const mainLight = new THREE.DirectionalLight(0xF5F0E8, 0.6);
         mainLight.position.set(0, 50, 0);
-        mainLight.castShadow = true;
-        mainLight.shadow.mapSize.width = 2048;
-        mainLight.shadow.mapSize.height = 2048;
-        mainLight.shadow.camera.near = 1;
-        mainLight.shadow.camera.far = 100;
-        mainLight.shadow.camera.left = -50;
-        mainLight.shadow.camera.right = 50;
-        mainLight.shadow.camera.top = 50;
-        mainLight.shadow.camera.bottom = -50;
+        mainLight.castShadow = false;
         this.scene.add(mainLight);
     }
     
@@ -1084,11 +1076,11 @@ class PatentMuseum {
         container.style.cssText = `
             position: fixed;
             top: 20px;
-            right: 20px;
+            right: 60px;
             display: flex;
             align-items: center;
             gap: 10px;
-            z-index: 1000;
+            z-index: 500;
             background: rgba(7, 6, 11, 0.88);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
@@ -2230,6 +2222,8 @@ class PatentMuseum {
             } else if (this.postProcessing?.enabled && this.debug?.systems?.postProcessing?.enabled !== false) {
                 this.postProcessing.render();
             } else {
+                this.renderer.toneMapping = THREE.LinearToneMapping;
+                this.renderer.toneMappingExposure = 1.2;
                 this.renderer.render(this.scene, this.camera);
             }
         } catch (renderError) {
@@ -2237,6 +2231,8 @@ class PatentMuseum {
                 console.error('Post-processing render failed, falling back to direct render:', renderError);
                 this._renderErrorLogged = true;
             }
+            this.renderer.toneMapping = THREE.LinearToneMapping;
+            this.renderer.toneMappingExposure = 1.2;
             this.renderer.render(this.scene, this.camera);
         }
     }

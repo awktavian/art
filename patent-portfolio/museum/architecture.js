@@ -364,9 +364,9 @@ function createFanoConstellation(steelMaterial) {
     ];
     
     // === CENTRAL NEXUS SPHERE — Kagami's core ===
-    const nexusGeo = new THREE.IcosahedronGeometry(0.35, 2);
+    const nexusGeo = new THREE.IcosahedronGeometry(0.55, 2);
     const nexusMat = new THREE.MeshPhysicalMaterial({
-        color: 0xFFFFFF, emissive: 0x67D4E4, emissiveIntensity: 0.6,
+        color: 0xFFFFFF, emissive: 0x67D4E4, emissiveIntensity: 1.0,
         metalness: 0.3, roughness: 0.1, transmission: 0.3,
         thickness: 0.5, clearcoat: 1.0
     });
@@ -398,11 +398,11 @@ function createFanoConstellation(steelMaterial) {
         const color = data.hex;
         colonyColors.push(color);
         
-        const crystalGeo = new THREE.IcosahedronGeometry(0.25, 1);
+        const crystalGeo = new THREE.IcosahedronGeometry(0.4, 2);
         const crystalMat = new THREE.MeshPhysicalMaterial({
-            color: color, emissive: color, emissiveIntensity: 0.4,
+            color: color, emissive: color, emissiveIntensity: 0.8,
             metalness: 0.5, roughness: 0.15, clearcoat: 0.8,
-            transmission: 0.2, thickness: 0.3
+            transmission: 0.4, thickness: 0.3
         });
         const crystal = new THREE.Mesh(crystalGeo, crystalMat);
         crystal.position.copy(vertexPositions[i]);
@@ -458,7 +458,7 @@ function createFanoConstellation(steelMaterial) {
             mid.y += 0.3;
             
             const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
-            const tubeGeo = new THREE.TubeGeometry(curve, 24, 0.02, 8, false);
+            const tubeGeo = new THREE.TubeGeometry(curve, 24, 0.035, 8, false);
             
             // Blend colors of the two endpoint colonies
             const colorA = colonyColors[line[seg]];
@@ -466,8 +466,8 @@ function createFanoConstellation(steelMaterial) {
             const blendColor = new THREE.Color(colorA).lerp(new THREE.Color(colorB), 0.5);
             
             const tubeMat = new THREE.MeshPhysicalMaterial({
-                color: blendColor, emissive: blendColor, emissiveIntensity: 0.25,
-                transparent: true, opacity: 0.6, metalness: 0.7, roughness: 0.2
+                color: blendColor, emissive: blendColor, emissiveIntensity: 0.5,
+                transparent: true, opacity: 0.85, metalness: 0.7, roughness: 0.2
             });
             const tube = new THREE.Mesh(tubeGeo, tubeMat);
             tube.name = `bridge-${lineIdx}-${seg}`;
@@ -482,8 +482,9 @@ function createFanoConstellation(steelMaterial) {
         const data = COLONY_DATA[colony];
         const ringRadius = 2.8 + i * 0.25;
         const ringGeo = new THREE.TorusGeometry(ringRadius, 0.012, 8, 96);
-        const ringMat = new THREE.MeshBasicMaterial({
-            color: data.hex, transparent: true, opacity: 0.18
+        const ringMat = new THREE.MeshStandardMaterial({
+            color: data.hex, emissive: data.hex, emissiveIntensity: 0.3,
+            transparent: true, opacity: 0.4
         });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         ring.rotation.x = fibonacciAngles[i] * 0.4;
@@ -524,7 +525,7 @@ function createFanoConstellation(steelMaterial) {
     dustGeo.setAttribute('size', new THREE.BufferAttribute(dustSizes, 1));
     
     const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({
-        size: 0.04, vertexColors: true, transparent: true, opacity: 0.4,
+        size: 0.06, vertexColors: true, transparent: true, opacity: 0.6,
         blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
     }));
     dust.name = 'constellation-dust';
@@ -626,7 +627,7 @@ function createFanoConstellation(steelMaterial) {
     group.userData.colonyColors = colonyColors;
     group.userData.constellationData = {
         lastConsensusTime: 0,
-        consensusInterval: 7, // every 7 seconds
+        consensusInterval: 5, // every 5 seconds
         auroraPhase: 0,
         lastAuroraTime: 0,
         auroraInterval: 300, // every 5 minutes
@@ -1388,11 +1389,12 @@ export class FanoConstellationAnimator {
             if (!crystal) return;
             
             const breathPhase = Math.sin(time / fibRhythms[i] * Math.PI * 2);
-            const breathScale = 1 + breathPhase * 0.08;
+            const breathScale = 1 + breathPhase * 0.12;
             crystal.scale.setScalar(breathScale);
+            crystal.rotation.y += dt * 0.1 * (i + 1);
             
             if (crystal.material) {
-                crystal.material.emissiveIntensity = 0.3 + breathPhase * 0.2;
+                crystal.material.emissiveIntensity = 0.5 + breathPhase * 0.3;
             }
             
             if (shell) {
@@ -1403,7 +1405,8 @@ export class FanoConstellationAnimator {
             }
             
             // Gentle hover
-            crystal.position.y = this.vertexPositions[i].y + Math.sin(time * 0.5 + i * 0.9) * 0.05;
+            const baseY = this.vertexPositions[i]?.y ?? 0;
+            crystal.position.y = baseY + Math.sin(time * 0.5 + i * 0.9) * 0.05;
         });
     }
     
@@ -1450,9 +1453,9 @@ export class FanoConstellationAnimator {
         if (nexus) {
             nexus.rotation.y += dt * 0.2;
             nexus.rotation.x = Math.sin(time * 0.3) * 0.1;
-            const pulse = 0.8 + Math.sin(time * 1.5) * 0.15;
+            const pulse = 0.85 + Math.sin(time * 1.5) * 0.25;
             nexus.scale.setScalar(pulse);
-            if (nexus.material) nexus.material.emissiveIntensity = 0.4 + Math.sin(time * 2) * 0.2;
+            if (nexus.material) nexus.material.emissiveIntensity = 0.5 + Math.sin(time * 2) * 0.5;
         }
         if (glow) {
             glow.rotation.y -= dt * 0.4;
@@ -1591,10 +1594,10 @@ export class FanoConstellationAnimator {
                 nearestColony = colony;
             }
             
-            // Proximity brightness
+            // Proximity brightness (stronger response)
             const brightness = Math.max(0, 1 - dist / 15);
             if (crystal.material) {
-                crystal.material.emissiveIntensity = Math.max(crystal.material.emissiveIntensity, 0.3 + brightness * 0.5);
+                crystal.material.emissiveIntensity = Math.max(crystal.material.emissiveIntensity, 0.5 + brightness * 0.8);
             }
             
             // Widen orbital ring on proximity
@@ -1605,12 +1608,12 @@ export class FanoConstellationAnimator {
             }
         });
         
-        // Subtle tilt toward visitor
+        // Tilt toward visitor (stronger acknowledgment)
         if (minDist < 20) {
             const dx = playerPosition.x - sculptureWorldPos.x;
             const dz = playerPosition.z - sculptureWorldPos.z;
-            const targetTiltX = Math.atan2(dz, Math.sqrt(dx * dx + dz * dz)) * 0.03;
-            const targetTiltZ = Math.atan2(-dx, Math.sqrt(dx * dx + dz * dz)) * 0.03;
+            const targetTiltX = Math.atan2(dz, Math.sqrt(dx * dx + dz * dz)) * 0.06;
+            const targetTiltZ = Math.atan2(-dx, Math.sqrt(dx * dx + dz * dz)) * 0.06;
             this.sculpture.rotation.x += (targetTiltX - this.sculpture.rotation.x) * 0.02;
             this.sculpture.rotation.z += (targetTiltZ - this.sculpture.rotation.z) * 0.02;
         }

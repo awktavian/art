@@ -23,7 +23,7 @@ export const MATERIAL_QUALITY = {
     ultra: {
         anisotropy: 16,
         normalMapType: THREE.TangentSpaceNormalMap,
-        envMapIntensity: 1.0,
+        envMapIntensity: 1.5,
         clearcoat: true,
         iridescence: true,
         sheen: true,
@@ -33,7 +33,7 @@ export const MATERIAL_QUALITY = {
     high: {
         anisotropy: 8,
         normalMapType: THREE.TangentSpaceNormalMap,
-        envMapIntensity: 0.8,
+        envMapIntensity: 1.2,
         clearcoat: true,
         iridescence: true,
         sheen: true,
@@ -43,7 +43,7 @@ export const MATERIAL_QUALITY = {
     medium: {
         anisotropy: 4,
         normalMapType: THREE.TangentSpaceNormalMap,
-        envMapIntensity: 0.6,
+        envMapIntensity: 0.9,
         clearcoat: true,
         iridescence: false,
         sheen: false,
@@ -53,7 +53,7 @@ export const MATERIAL_QUALITY = {
     low: {
         anisotropy: 1,
         normalMapType: THREE.ObjectSpaceNormalMap,
-        envMapIntensity: 0.4,
+        envMapIntensity: 0.6,
         clearcoat: false,
         iridescence: false,
         sheen: false,
@@ -181,11 +181,13 @@ export function createGradientEnvironmentMap(renderer) {
         side: THREE.BackSide,
         depthWrite: false,
         uniforms: {
-            topColor: { value: new THREE.Color(0x2A2535) },
-            horizonColor: { value: new THREE.Color(0x3A3545) },
-            bottomColor: { value: new THREE.Color(0x1E1A28) },
+            topColor: { value: new THREE.Color(0x8882A0) },
+            horizonColor: { value: new THREE.Color(0xA09AB0) },
+            bottomColor: { value: new THREE.Color(0x706880) },
             rimColor: { value: new THREE.Color(0x67D4E4) },
-            rimIntensity: { value: 0.35 }
+            rimIntensity: { value: 1.0 },
+            warmColor: { value: new THREE.Color(0xFFE4C4) },
+            warmIntensity: { value: 0.15 }
         },
         vertexShader: `
             varying vec3 vWorldPosition;
@@ -203,6 +205,8 @@ export function createGradientEnvironmentMap(renderer) {
             uniform vec3 bottomColor;
             uniform vec3 rimColor;
             uniform float rimIntensity;
+            uniform vec3 warmColor;
+            uniform float warmIntensity;
             
             varying vec3 vWorldPosition;
             varying vec3 vNormal;
@@ -210,7 +214,6 @@ export function createGradientEnvironmentMap(renderer) {
             void main() {
                 float y = normalize(vWorldPosition).y;
                 
-                // Smooth gradient from bottom to top
                 vec3 color;
                 if (y > 0.0) {
                     color = mix(horizonColor, topColor, pow(y, 0.8));
@@ -218,9 +221,9 @@ export function createGradientEnvironmentMap(renderer) {
                     color = mix(horizonColor, bottomColor, pow(-y, 0.5));
                 }
                 
-                // Add subtle rim lighting effect for reflective surfaces
                 float rim = 1.0 - abs(y);
                 color += rimColor * rimIntensity * pow(rim, 3.0);
+                color += warmColor * warmIntensity * pow(rim, 2.0);
                 
                 gl_FragColor = vec4(color, 1.0);
             }
@@ -243,11 +246,11 @@ export function createGradientEnvironmentMap(renderer) {
     
     accentColors.forEach(({ color, pos }) => {
         const lightSphere = new THREE.Mesh(
-            new THREE.SphereGeometry(15, 16, 16),
+            new THREE.SphereGeometry(30, 16, 16),
             new THREE.MeshBasicMaterial({ 
                 color, 
                 transparent: true, 
-                opacity: 0.5 
+                opacity: 0.7 
             })
         );
         lightSphere.position.set(...pos);
@@ -634,8 +637,8 @@ export function createFloorMaterial(options = {}) {
     
     const material = new THREE.MeshPhysicalMaterial({
         color,
-        metalness: 0.9,
-        roughness: 0.1,
+        metalness: 0.6,
+        roughness: 0.25,
         clearcoat: currentQuality.clearcoat ? 1.0 : 0,
         clearcoatRoughness: 0.05,
         reflectivity,
