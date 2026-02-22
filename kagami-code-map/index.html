@@ -4880,14 +4880,12 @@
             if (state.semantic.dragging) {
                 state.semantic.rotX = state.semantic.targetRotX;
                 state.semantic.rotY = state.semantic.targetRotY;
-                state.semantic._dragReleaseT = 0;
             } else {
-                const releaseT = state.semantic._dragReleaseT || 1;
-                if (releaseT < 1) {
-                    state.semantic._dragReleaseT = Math.min(1, releaseT + 0.08);
-                }
+                const releaseT = state.semantic._dragReleaseT ?? 1;
+                const t = releaseT < 1 ? Math.min(1, releaseT + 0.06) : 1;
+                state.semantic._dragReleaseT = t;
                 const baseLerp = quality === 'low' ? 0.25 : 0.14;
-                const smooth = baseLerp * Math.max(0.3, releaseT);
+                const smooth = baseLerp * (0.3 + 0.7 * t);
                 state.semantic.rotX += (state.semantic.targetRotX - state.semantic.rotX) * smooth;
                 state.semantic.rotY += (state.semantic.targetRotY - state.semantic.rotY) * smooth;
             }
@@ -5177,13 +5175,13 @@
             if (state.semantic.selected && state.semantic.related.length) {
                 const selP = projByPath.get(state.semantic.selected.path);
                 if (selP) {
+                    ctx.lineWidth = 2;
+                    ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
+                    ctx.shadowBlur = 8;
+                    
                     for (const relFile of state.semantic.related) {
                         const relP = projByPath.get(relFile.path);
                         if (relP) {
-                            // Gradient line with glow
-                            ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
-                            ctx.shadowBlur = 8;
-                            
                             const grad = ctx.createLinearGradient(selP.sx, selP.sy, relP.sx, relP.sy);
                             grad.addColorStop(0, 'rgba(255, 215, 0, 0.9)');
                             grad.addColorStop(0.3, 'rgba(255, 180, 0, 0.6)');
@@ -5194,12 +5192,11 @@
                             ctx.moveTo(selP.sx, selP.sy);
                             ctx.lineTo(relP.sx, relP.sy);
                             ctx.strokeStyle = grad;
-                            ctx.lineWidth = 2;
                             ctx.stroke();
-                            
-                            ctx.shadowBlur = 0;
                         }
                     }
+                    
+                    ctx.shadowBlur = 0;
                 }
             }
             
@@ -5781,13 +5778,15 @@
             semanticCanvas.addEventListener('mouseup', () => {
                 if (state.semantic.dragging) {
                     state.semantic.dragging = false;
+                    state.semantic._dragReleaseT = 0;
                     semanticCanvas.style.cursor = 'grab';
-                    saveStateDebounced(); // Save camera state after drag
+                    saveStateDebounced();
                 }
             });
             semanticCanvas.addEventListener('mouseleave', () => {
                 if (state.semantic.dragging) {
                     state.semantic.dragging = false;
+                    state.semantic._dragReleaseT = 0;
                     saveStateDebounced();
                 }
                 state.semantic.hovered = null;
@@ -6016,21 +6015,25 @@
                 if (!query || query.length < CONFIG.ui.searchMinLength) {
                     searchResults.classList.remove('active');
                     state._searchMatchPaths = new Set();
+                    updateStats();
                     return;
                 }
                 
                 const tokens = tokenize(query);
-                const scored = state.files.map(f => ({
-                    file: f,
-                    score: scoreFile(f, tokens),
-                    matches: findMatches(f, tokens)
-                })).filter(r => r.score > 0)
-                  .sort((a, b) => b.score - a.score)
-                  .slice(0, CONFIG.ui.searchMaxResults);
+                const allScored = [];
+                for (const f of state.files) {
+                    const score = scoreFile(f, tokens);
+                    if (score > 0) allScored.push({ file: f, score });
+                }
+                allScored.sort((a, b) => b.score - a.score);
                 
-                // Cache matching paths for the render loop — must match scoreFile signals
-                const matchSet = new Set(scored.map(r => r.file.path));
+                const matchSet = new Set(allScored.map(r => r.file.path));
                 state._searchMatchPaths = matchSet;
+                
+                const scored = allScored.slice(0, CONFIG.ui.searchMaxResults);
+                for (const r of scored) {
+                    r.matches = findMatches(r.file, tokens);
+                }
                 
                 if (!scored.length) {
                     searchResults.innerHTML = '<div class="search-empty">No results for "' + escapeHtml(query) + '"</div>';
@@ -6056,6 +6059,7 @@
                 
                 searchSelectedIdx = -1;
                 searchResults.classList.add('active');
+                updateStats();
             }
             
             function tokenize(query) {
@@ -6561,34 +6565,25 @@
         }
         
         function findNodeAt(mx, my) {
-            // Search from front to back (reverse of draw order)
             const projected = state.semantic.projected;
+            if (!projected) return null;
             const hasSearch = state.query && state.query.length >= CONFIG.ui.searchMinLength;
+            const relSet = new Set(state.semantic.related);
             
             for (let i = projected.length - 1; i >= 0; i--) {
                 const p = projected[i];
+                const dx = p.sx - mx, dy = p.sy - my;
+                const distSq = dx * dx + dy * dy;
+                
                 const baseSize = CONFIG.render.nodeBaseSize + Math.sqrt(p.file.lines || 1) * CONFIG.render.nodeSizeScale + (p.file.importance || 0) * CONFIG.render.importanceScale;
                 const depthScale = CONFIG.render.depthScaleMin + p.depth * CONFIG.render.depthScaleMax;
-                const size = baseSize * depthScale;
-                let hitRadius = Math.max(CONFIG.render.hitRadiusMin, size * CONFIG.render.hitRadiusScale);
+                let hitRadius = Math.max(CONFIG.render.hitRadiusMin, baseSize * depthScale * CONFIG.render.hitRadiusScale);
                 
-                // Increase hit radius for search matches - easier to click
-                if (hasSearch && p.matchesSearch) {
-                    hitRadius *= 2.0;
-                }
+                if (hasSearch && p.matchesSearch) hitRadius *= 2.0;
+                if (state.semantic.selected === p.file || relSet.has(p.file)) hitRadius *= 1.5;
+                if (state.semantic.panelHoverTarget === p.file) hitRadius *= 1.8;
                 
-                // Increase hit radius for related/selected files
-                if (state.semantic.selected === p.file || state.semantic.related.includes(p.file)) {
-                    hitRadius *= 1.5;
-                }
-                
-                // Increase hit radius for panel hover target
-                if (state.semantic.panelHoverTarget === p.file) {
-                    hitRadius *= 1.8;
-                }
-                
-                const dist = Math.hypot(p.sx - mx, p.sy - my);
-                if (dist < hitRadius) {
+                if (distSq < hitRadius * hitRadius) {
                     return p.file;
                 }
             }
