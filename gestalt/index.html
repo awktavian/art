@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gestalt</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#050508;--fg:#e8e4df;--accent:#7eb8da;--gold:#c4a882;
+  --dim:#888;--glass:rgba(255,255,255,0.04);--glow:rgba(126,184,218,0.15);
+}
+html{scroll-behavior:smooth;overflow-x:hidden;scroll-snap-type:y proximity}
+body{background:var(--bg);color:var(--fg);font:16px/1.6 'Georgia','Times New Roman',serif;overflow-x:hidden}
+canvas#bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.cursor-glow{position:fixed;width:300px;height:300px;border-radius:50%;pointer-events:none;z-index:1;
+  background:radial-gradient(circle,rgba(126,184,218,0.06) 0%,transparent 70%);
+  transform:translate(-50%,-50%);transition:opacity 0.3s}
+
+section{position:relative;z-index:2;min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:clamp(2rem,8vh,6rem) clamp(1.5rem,5vw,4rem);
+  scroll-snap-align:start}
+
+h1{font-size:clamp(2.5rem,7vw,5rem);font-weight:400;letter-spacing:-0.02em;line-height:1.1;text-align:center}
+h2{font-size:clamp(1.5rem,4vw,2.5rem);font-weight:400;letter-spacing:-0.015em;line-height:1.2;text-align:center;
+  color:var(--accent);margin-bottom:1.5rem;transition:color 0.4s}
+h2:hover{color:var(--gold)}
+h3{font-size:clamp(0.9rem,2vw,1.1rem);font-weight:400;letter-spacing:0.15em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:2rem;text-align:center}
+p{max-width:38em;text-align:center;font-size:clamp(1rem,2.2vw,1.25rem);line-height:1.7;color:var(--fg);opacity:0.85}
+p+p{margin-top:1.2em}
+@keyframes eq-breathe{0%,100%{border-color:rgba(126,184,218,0.15)}50%{border-color:rgba(126,184,218,0.25)}}
+.eq{font-family:'SF Mono','Fira Code','Consolas',monospace;font-size:clamp(0.85rem,2vw,1.15rem);
+  color:var(--accent);padding:1.5rem 2.5rem;border:1px solid rgba(126,184,218,0.15);border-radius:8px;
+  background:var(--glass);backdrop-filter:blur(8px);margin:2rem 0;letter-spacing:0.03em;text-align:center;
+  animation:eq-breathe 6s ease-in-out infinite}
+.spacer{height:15vh}
+.fade{opacity:0;transform:translateY(30px);transition:opacity 0.8s ease,transform 0.8s ease}
+.fade.visible{opacity:1;transform:translateY(0)}
+.stagger>*{opacity:0;transform:translateY(20px);transition:opacity 0.6s ease,transform 0.6s ease}
+.stagger.visible>*:nth-child(1){opacity:1;transform:translateY(0);transition-delay:0s}
+.stagger.visible>*:nth-child(2){opacity:1;transform:translateY(0);transition-delay:0.15s}
+.stagger.visible>*:nth-child(3){opacity:1;transform:translateY(0);transition-delay:0.3s}
+.stagger.visible>*:nth-child(4){opacity:1;transform:translateY(0);transition-delay:0.45s}
+.stagger.visible>*:nth-child(5){opacity:1;transform:translateY(0);transition-delay:0.6s}
+.stagger.visible>*:nth-child(6){opacity:1;transform:translateY(0);transition-delay:0.75s}
+
+/* --- Kanizsa --- */
+.kanizsa{width:clamp(220px,40vw,340px);margin:2rem auto}
+.kanizsa svg{width:100%;height:auto}
+.kanizsa .ghost{opacity:0;transition:opacity 1.2s ease}
+.kanizsa:hover .ghost{opacity:1}
+
+/* --- Rubin --- */
+.rubin{position:relative;width:clamp(160px,25vw,240px);margin:2rem auto;cursor:pointer}
+.rubin svg{width:100%;height:auto;display:block}
+.rubin .vase{fill:var(--accent);transition:opacity 0.8s ease}
+.rubin .faces{fill:var(--fg);opacity:0;transition:opacity 0.8s ease}
+.rubin.flipped .vase{opacity:0.06}
+.rubin.flipped .faces{opacity:0.85}
+.rubin-hint{text-align:center;font-size:0.8rem;color:var(--dim);margin-top:0.8rem;opacity:0.5;transition:opacity 0.3s}
+.rubin:hover .rubin-hint{opacity:0.8}
+
+/* --- Similarity Demo --- */
+.sim-field{position:relative;width:min(90vw,600px);height:clamp(160px,28vw,280px);margin:2rem auto}
+.sim-field canvas{width:100%;height:100%;border-radius:12px;border:1px solid rgba(255,255,255,0.04);transition:border-color 0.4s}
+
+/* --- Proximity Demo --- */
+.prox-field{position:relative;width:clamp(280px,60vw,500px);height:clamp(280px,60vw,500px);margin:2rem auto}
+.prox-field canvas{width:100%;height:100%;border-radius:12px;border:1px solid rgba(255,255,255,0.04);transition:border-color 0.4s}
+
+/* --- Common Fate --- */
+.fate-field{position:relative;width:min(90vw,700px);height:clamp(200px,40vw,350px);margin:2rem auto}
+.fate-field canvas{width:100%;height:100%;border-radius:12px;border:1px solid rgba(255,255,255,0.04);transition:border-color 0.4s}
+.sim-field canvas:hover,.prox-field canvas:hover,.fate-field canvas:hover{border-color:rgba(126,184,218,0.15)}
+
+/* --- Continuity --- */
+.continuity-wrap{position:relative;width:min(90vw,600px);height:clamp(150px,25vw,250px);margin:2rem auto}
+.continuity-wrap svg{width:100%;height:100%}
+
+/* --- Final mirror --- */
+.mirror-glass{padding:3rem;border-radius:16px;background:linear-gradient(135deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01));
+  border:1px solid rgba(255,255,255,0.06);backdrop-filter:blur(20px);max-width:42em;text-align:center;
+  box-shadow:0 0 80px rgba(126,184,218,0.04);transition:border-color 0.5s,box-shadow 0.5s}
+.mirror-glass:hover{border-color:rgba(126,184,218,0.12);box-shadow:0 0 120px rgba(126,184,218,0.06)}
+.mirror-glass p{color:var(--fg);opacity:0.9}
+
+.loop-link{display:inline-block;margin-top:2rem;color:var(--accent);text-decoration:none;
+  font-size:1.1rem;letter-spacing:0.1em;transition:color 0.3s,letter-spacing 0.3s,transform 0.3s}
+.loop-link:hover{color:var(--gold);letter-spacing:0.2em;transform:translateX(4px)}
+.hint{text-align:center;font-size:0.75rem;color:var(--dim);opacity:0.4;margin-top:0.5rem;transition:opacity 0.5s}
+.kanizsa.revealed .ghost{opacity:1}
+
+@media(max-width:600px){
+  section{padding:3rem 1.5rem}
+  .kanizsa{width:80vw}
+  .prox-field{width:80vw;height:80vw}
+}
+</style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+<div class="cursor-glow" id="glow"></div>
+
+<!-- §1 PRÄGNANZ -->
+<section id="s1">
+  <div class="fade">
+    <h3>I</h3>
+    <h1>The whole exceeds<br>the sum of its parts</h1>
+    <div class="spacer"></div>
+    <p>One hundred years of Gestalt psychology, reduced to a single truth: perception is not assembly. You do not build the world from fragments. You grasp it whole. The Gestalt psychologists called this <em>Pr&auml;gnanz</em> &mdash; the mind's drive toward the simplest, most complete structure.</p>
+  </div>
+</section>
+
+<!-- §2 CLOSURE -->
+<section id="s2">
+  <div class="fade stagger">
+    <h3>II &mdash; Closure</h3>
+    <h2>You see what isn't there</h2>
+    <div class="kanizsa" id="kanizsa" role="img" aria-label="Kanizsa triangle illusion: three pac-man shapes create the perception of a triangle that doesn't exist">
+      <svg viewBox="0 0 300 290">
+        <polygon class="ghost" points="150,110 91,201 209,201" fill="rgba(126,184,218,0.04)" stroke="rgba(126,184,218,0.08)" stroke-width="1.5"/>
+        <path d="M150,60 L175,103.3 A50,50 0 1,0 125,103.3 Z" fill="var(--fg)"/>
+        <path d="M55,235 L69.2,187.1 A50,50 0 1,0 103.6,223.3 Z" fill="var(--fg)"/>
+        <path d="M245,235 L196.4,223.3 A50,50 0 1,0 230.8,187.1 Z" fill="var(--fg)"/>
+      </svg>
+    </div>
+    <p>Three fragments. Your mind generates the triangle &mdash; its edges, its brightness, its form. Closure is not just filling gaps. It is <em>generative compression</em> &mdash; your brain prefers one complete triangle to three unrelated shapes.</p>
+  </div>
+</section>
+
+<!-- §3 PROXIMITY -->
+<section id="s3">
+  <div class="fade stagger">
+    <h3>III &mdash; Proximity</h3>
+    <h2>Nearness creates belonging</h2>
+    <div class="prox-field"><canvas id="proxCanvas" role="img" aria-label="Interactive particle field: move your cursor to attract nearby particles, demonstrating proximity-based grouping"></canvas></div>
+    <div class="hint" id="proxHint">move your cursor through the field</div>
+    <p>Move through the field. Things that are close together appear to belong together &mdash; no shared color, no shared shape, just distance. Your brain groups them before you decide to.</p>
+  </div>
+</section>
+
+<!-- §4 SIMILARITY -->
+<section id="s4">
+  <div class="fade stagger">
+    <h3>IV &mdash; Similarity</h3>
+    <h2>Likeness reveals pattern</h2>
+    <div class="sim-field"><canvas id="simCanvas" role="img" aria-label="Dots alternating between two colors in waves, demonstrating similarity-based grouping"></canvas></div>
+    <p>Same positions. Different colors. The grouping shifts &mdash; not in the world, but in your perception. You organize by resemblance before you organize by thought.</p>
+    <p>Color is one cue. Shape, size, texture, and orientation all trigger the same grouping.</p>
+  </div>
+</section>
+
+<!-- §5 FIGURE-GROUND -->
+<section id="s5">
+  <div class="fade stagger">
+    <h3>V &mdash; Figure &amp; Ground</h3>
+    <h2>What you don't see shapes what you do</h2>
+    <div class="rubin" id="rubin" role="img" aria-label="Rubin's vase illusion — click to toggle between seeing a vase or two face profiles">
+      <svg viewBox="0 0 174 211">
+        <path class="faces" d="M0,0 l17.536,3 3.982,2.637
+          C33.433,13.528 40.57,23.741 46.579,41.5
+          c3.686,10.891 3.013,16.99-3.363,30.482
+          -1.424,3.015-2.779,7.767-3.011,10.56
+          -.357,4.306 .115,6.143 3.103,12.076
+          1.938,3.848 4.307,7.646 5.265,8.44
+          2.504,2.074 14.876,17.026 16.304,19.704
+          1.58,2.963-.38,7.211-6.397,13.861
+          -4.542,5.02-5.519,8.27-3.091,10.285
+          3.438,2.853 2.307,12.055-2.15,17.504
+          -2.039,2.493-2.289,3.588-1.737,7.601
+          .606,4.41 .427,4.92-3.015,8.569
+          -3.524,3.737-3.635,4.077-3,9.162
+          .747,5.976-.566,11.112-3.525,13.79
+          -2.459,2.226-2.903,4.466-2.903,4.466
+          L0,211Z"/>
+        <path class="faces" d="M174,0 l-17.536,3-3.982,2.637
+          C140.567,13.528 133.43,23.741 127.421,41.5
+          c-3.686,10.891-3.013,16.99 3.363,30.482
+          1.424,3.015 2.779,7.767 3.011,10.56
+          .357,4.306-.115,6.143-3.103,12.076
+          -1.938,3.848-4.307,7.646-5.265,8.44
+          -2.504,2.074-14.876,17.026-16.304,19.704
+          -1.58,2.963 .38,7.211 6.397,13.861
+          4.542,5.02 5.519,8.27 3.091,10.285
+          -3.438,2.853-2.307,12.055 2.15,17.504
+          2.039,2.493 2.289,3.588 1.737,7.601
+          -.606,4.41-.427,4.92 3.015,8.569
+          3.524,3.737 3.635,4.077 3,9.162
+          -.747,5.976 .566,11.112 3.525,13.79
+          2.459,2.226 2.903,4.466 2.903,4.466
+          L174,211Z"/>
+        <path class="vase" d="M0,0 L17.536,3 21.518,5.637
+          C33.433,13.528 40.57,23.741 46.579,41.5
+          C50.265,52.391 49.592,58.49 43.216,71.982
+          C41.792,74.997 40.437,79.749 40.205,82.542
+          C39.848,86.848 40.32,88.685 43.308,94.618
+          C45.246,98.466 47.615,102.264 48.573,103.058
+          C51.077,105.132 63.449,120.084 64.877,122.762
+          C66.457,125.725 64.497,129.973 58.48,136.623
+          C53.938,141.643 52.961,144.893 55.389,146.908
+          C58.827,149.761 57.696,158.963 53.239,164.412
+          C51.2,166.905 50.95,168 51.502,172.013
+          C52.108,176.423 51.929,176.933 48.487,180.582
+          C44.963,184.319 44.852,184.659 45.487,189.744
+          C46.234,195.72 44.921,200.856 41.962,203.534
+          C39.503,205.76 39.059,208 39.059,208
+          L134.941,208
+          C134.941,208 134.497,205.76 132.038,203.534
+          C129.079,200.856 127.766,195.72 128.513,189.744
+          C129.148,184.659 129.037,184.319 125.513,180.582
+          C122.071,176.933 121.892,176.423 122.498,172.013
+          C123.05,168 122.8,166.905 120.761,164.412
+          C116.304,158.963 115.173,149.761 118.611,146.908
+          C121.039,144.893 120.062,141.643 115.52,136.623
+          C109.503,129.973 107.543,125.725 109.123,122.762
+          C110.551,120.084 122.923,105.132 125.427,103.058
+          C126.385,102.264 128.754,98.466 130.692,94.618
+          C133.68,88.685 134.152,86.848 133.795,82.542
+          C133.563,79.749 132.208,74.997 130.784,71.982
+          C124.408,58.49 123.735,52.391 127.421,41.5
+          C133.43,23.741 140.567,13.528 152.482,5.637
+          L156.464,3 174,0Z"/>
+      </svg>
+      <div class="rubin-hint">click to shift</div>
+    </div>
+    <p>Vase or faces? You cannot see both simultaneously. The fundamental act of perception is choosing what is figure and what is ground. Designers use this constantly &mdash; white space isn't empty; it's active ground shaping everything around it.</p>
+  </div>
+</section>
+
+<!-- §6 COMMON FATE -->
+<section id="s6">
+  <div class="fade stagger">
+    <h3>VI &mdash; Common Fate</h3>
+    <h2>What moves together belongs together</h2>
+    <div class="fate-field"><canvas id="fateCanvas" role="img" aria-label="Three flocks of particles moving in coordinated groups, demonstrating common fate grouping"></canvas></div>
+    <div class="hint" id="fateHint">hover to scatter</div>
+    <p>Hover over the field. A flock of birds, a stream of traffic, a school of fish &mdash; you group them because they move together, not because they look alike. Shared motion creates shared identity.</p>
+  </div>
+</section>
+
+<!-- §7 CONTINUITY -->
+<section id="s7">
+  <div class="fade stagger">
+    <h3>VII &mdash; Continuity</h3>
+    <h2>The eye completes the arc</h2>
+    <div class="continuity-wrap">
+      <svg viewBox="0 0 600 200" id="contSvg">
+        <path d="M50,150 C150,150 200,50 300,50 C400,50 450,150 550,150"
+              fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="8,16" opacity="0.3"/>
+        <path d="M50,150 C150,150 200,50 300,50 C400,50 450,150 550,150"
+              fill="none" stroke="var(--accent)" stroke-width="2.5" id="contLine"
+              stroke-dasharray="1000" stroke-dashoffset="1000" style="transition:stroke-dashoffset 2s ease"/>
+        <path d="M50,50 C150,50 200,150 300,150 C400,150 450,50 550,50"
+              fill="none" stroke="var(--gold)" stroke-width="2" stroke-dasharray="8,16" opacity="0.3"/>
+        <path d="M50,50 C150,50 200,150 300,150 C400,150 450,50 550,50"
+              fill="none" stroke="var(--gold)" stroke-width="2.5" id="contLine2"
+              stroke-dasharray="1000" stroke-dashoffset="1000" style="transition:stroke-dashoffset 2s ease"/>
+      </svg>
+    </div>
+    <p>Two curves cross. You perceive two smooth paths, not four broken segments. Continuity is the brain's preference for the simplest trajectory &mdash; the one that minimizes surprise.</p>
+  </div>
+</section>
+
+<!-- §8 THE EQUATION -->
+<section id="s8">
+  <div class="fade stagger">
+    <h3>VIII &mdash; The Unification</h3>
+    <h2>Five formalisms. One operation.</h2>
+    <div class="eq">gestalt(x) = argmin[F(x)] = argmin[K(x)] = argmax[P(x)]</div>
+    <p>Each is a different way of saying the same thing: the best explanation is the shortest one.</p>
+    <p>Gestalt Pr&auml;gnanz. Shannon entropy. Kolmogorov complexity. Minimum description length. Free energy.</p>
+    <p>Five frameworks discovered independently across a century. All converge on the same truth: perception finds the simplest model that explains the world. The whole is not a metaphor. It is a mathematical optimum.</p>
+    <p style="color:var(--dim);font-style:italic;margin-top:2em;font-size:0.95rem">Chater &amp; Vit&aacute;nyi (2003) proved simplicity and likelihood are identical.<br>Friston showed free energy minimization subsumes both.<br>The Gestalt psychologists intuited this seventy years before the proof.</p>
+  </div>
+</section>
+
+<!-- §9 THE MIRROR -->
+<section id="s9" style="min-height:70vh">
+  <div class="fade">
+    <h3>IX &mdash; The Whole</h3>
+    <div class="mirror-glass stagger">
+      <h2 style="margin-bottom:1rem">You Already Knew This</h2>
+      <p>A logo, a skyline, a flock of birds, a melody &mdash; your brain has been applying these laws your entire life. You always perceived wholes before parts. Now you can see it happening.</p>
+      <p>The whole exceeds the sum of its parts. That is all Gestalt ever meant.</p>
+      <a href="#s1" class="loop-link">&rarr; Return to &sect;1. You'll see it differently now.</a>
+    </div>
+  </div>
+</section>
+
+<script>
+// --- Background particle field ---
+const bgCanvas = document.getElementById('bg');
+const bgCtx = bgCanvas.getContext('2d');
+let W, H, mouse = {x: -1000, y: -1000};
+const stars = [];
+const STAR_COUNT = 150;
+
+function resize() {
+  W = bgCanvas.width = window.innerWidth;
+  H = bgCanvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+for (let i = 0; i < STAR_COUNT; i++) {
+  stars.push({
+    x: Math.random() * 4000 - 500,
+    y: Math.random() * 20000,
+    r: Math.random() * 1.2 + 0.3,
+    a: Math.random() * 0.4 + 0.1,
+    phase: Math.random() * Math.PI * 2,
+    speed: Math.random() * 0.003 + 0.001
+  });
+}
+
+function drawBg(t) {
+  bgCtx.clearRect(0, 0, W, H);
+  const scrollY = window.scrollY;
+  for (const s of stars) {
+    const sy = s.y - scrollY * 0.15;
+    const screenY = ((sy % (H * 1.2)) + H * 1.2) % (H * 1.2) - H * 0.1;
+    const screenX = ((s.x % (W * 1.1)) + W * 1.1) % (W * 1.1) - W * 0.05;
+    const pulse = Math.sin(t * s.speed + s.phase) * 0.3 + 0.7;
+    const dist = Math.hypot(screenX - mouse.x, screenY - mouse.y);
+    const glow = dist < 200 ? (1 - dist / 200) * 0.5 : 0;
+    bgCtx.beginPath();
+    bgCtx.arc(screenX, screenY, s.r * (1 + glow), 0, Math.PI * 2);
+    bgCtx.fillStyle = `rgba(${126 + glow * 80},${184 + glow * 40},${218},${(s.a * pulse + glow) * 0.7})`;
+    bgCtx.fill();
+  }
+  requestAnimationFrame(drawBg);
+}
+requestAnimationFrame(drawBg);
+
+// --- Cursor glow ---
+const glow = document.getElementById('glow');
+document.addEventListener('mousemove', e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+  glow.style.left = e.clientX + 'px';
+  glow.style.top = e.clientY + 'px';
+  glow.style.opacity = '1';
+});
+document.addEventListener('mouseleave', () => { glow.style.opacity = '0'; mouse.x = -1000; });
+
+// --- Intersection Observer for fade-in ---
+const obs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) e.target.classList.add('visible');
+  });
+}, {threshold: 0.15});
+document.querySelectorAll('.fade,.stagger').forEach(el => obs.observe(el));
+
+// --- Rubin vase toggle ---
+document.getElementById('rubin').addEventListener('click', function() {
+  this.classList.toggle('flipped');
+});
+
+// --- Proximity canvas ---
+const proxCanvas = document.getElementById('proxCanvas');
+const proxCtx = proxCanvas.getContext('2d');
+const proxDots = [];
+const PROX_COUNT = 120;
+let proxMouse = {x: -1000, y: -1000};
+
+function initProx() {
+  const rect = proxCanvas.parentElement.getBoundingClientRect();
+  const s = Math.min(rect.width, rect.height);
+  proxCanvas.width = s * 2;
+  proxCanvas.height = s * 2;
+  proxCanvas.style.width = s + 'px';
+  proxCanvas.style.height = s + 'px';
+  proxDots.length = 0;
+  for (let i = 0; i < PROX_COUNT; i++) {
+    proxDots.push({
+      hx: Math.random() * proxCanvas.width,
+      hy: Math.random() * proxCanvas.height,
+      x: Math.random() * proxCanvas.width,
+      y: Math.random() * proxCanvas.height,
+      vx: 0, vy: 0,
+      r: Math.random() * 2.5 + 1.5
+    });
+  }
+}
+
+function drawProx() {
+  if (!proxCanvas.width) return;
+  proxCtx.clearRect(0, 0, proxCanvas.width, proxCanvas.height);
+  const mx = proxMouse.x * 2, my = proxMouse.y * 2;
+  for (const d of proxDots) {
+    // Attract to mouse
+    const dist = Math.hypot(d.x - mx, d.y - my);
+    if (dist < 300 && dist > 1) {
+      const force = (300 - dist) / 300 * 0.08;
+      d.vx += (mx - d.x) / dist * force;
+      d.vy += (my - d.y) / dist * force;
+    }
+    // Spring back to home
+    d.vx += (d.hx - d.x) * 0.005;
+    d.vy += (d.hy - d.y) * 0.005;
+    d.vx *= 0.92; d.vy *= 0.92;
+    d.x += d.vx; d.y += d.vy;
+
+    const brightness = dist < 300 ? 0.8 : 0.25;
+    proxCtx.beginPath();
+    proxCtx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+    proxCtx.fillStyle = `rgba(126,184,218,${brightness})`;
+    proxCtx.fill();
+  }
+  // Draw connections between nearby dots
+  for (let i = 0; i < proxDots.length; i++) {
+    for (let j = i + 1; j < proxDots.length; j++) {
+      const dx = proxDots[i].x - proxDots[j].x;
+      const dy = proxDots[i].y - proxDots[j].y;
+      const d = Math.sqrt(dx*dx + dy*dy);
+      if (d < 60) {
+        proxCtx.beginPath();
+        proxCtx.moveTo(proxDots[i].x, proxDots[i].y);
+        proxCtx.lineTo(proxDots[j].x, proxDots[j].y);
+        proxCtx.strokeStyle = `rgba(126,184,218,${(1 - d/60) * 0.15})`;
+        proxCtx.lineWidth = 1;
+        proxCtx.stroke();
+      }
+    }
+  }
+  requestAnimationFrame(drawProx);
+}
+
+proxCanvas.parentElement.addEventListener('mousemove', e => {
+  const rect = proxCanvas.getBoundingClientRect();
+  proxMouse.x = e.clientX - rect.left;
+  proxMouse.y = e.clientY - rect.top;
+  const h = document.getElementById('proxHint');
+  if (h) h.style.opacity = '0';
+});
+proxCanvas.parentElement.addEventListener('mouseleave', () => { proxMouse.x = -1000; });
+proxCanvas.parentElement.addEventListener('touchmove', e => {
+  const rect = proxCanvas.getBoundingClientRect();
+  proxMouse.x = e.touches[0].clientX - rect.left;
+  proxMouse.y = e.touches[0].clientY - rect.top;
+  const h = document.getElementById('proxHint');
+  if (h) h.style.opacity = '0';
+  e.preventDefault();
+}, {passive: false});
+
+// --- Similarity canvas ---
+const simCanvas = document.getElementById('simCanvas');
+const simCtx = simCanvas.getContext('2d');
+const SIM_COLS = 14, SIM_ROWS = 7;
+let simPhase = 0;
+
+function initSim() {
+  const rect = simCanvas.parentElement.getBoundingClientRect();
+  simCanvas.width = rect.width * 2;
+  simCanvas.height = rect.height * 2;
+  simCanvas.style.width = rect.width + 'px';
+  simCanvas.style.height = rect.height + 'px';
+}
+
+function drawSim() {
+  const w = simCanvas.width, h = simCanvas.height;
+  if (!w) return;
+  simCtx.clearRect(0, 0, w, h);
+  const cw = w / (SIM_COLS + 1), ch = h / (SIM_ROWS + 1);
+  const dotR = Math.max(8, w / 55);
+  simPhase += 0.01;
+  for (let r = 0; r < SIM_ROWS; r++) {
+    for (let c = 0; c < SIM_COLS; c++) {
+      const x = cw * (c + 1), y = ch * (r + 1);
+      const wave = Math.sin(simPhase + c * 0.6 + r * 0.4);
+      const t = (wave + 1) / 2;
+      const rb = Math.round(126 + t * 70);
+      const gb = Math.round(184 - t * 16);
+      const bb = Math.round(218 - t * 88);
+      simCtx.beginPath();
+      simCtx.arc(x, y, dotR, 0, Math.PI * 2);
+      simCtx.fillStyle = `rgba(${rb},${gb},${bb},0.9)`;
+      simCtx.fill();
+    }
+  }
+  requestAnimationFrame(drawSim);
+}
+
+// --- Common Fate canvas ---
+const fateCanvas = document.getElementById('fateCanvas');
+const fateCtx = fateCanvas.getContext('2d');
+const flocks = [];
+const FLOCK_COUNT = 3;
+const BIRDS_PER = 25;
+let fateMouse = {x: -1000, y: -1000};
+
+function initFate() {
+  const rect = fateCanvas.parentElement.getBoundingClientRect();
+  fateCanvas.width = rect.width * 2;
+  fateCanvas.height = rect.height * 2;
+  fateCanvas.style.width = rect.width + 'px';
+  fateCanvas.style.height = rect.height + 'px';
+  flocks.length = 0;
+  const colors = ['rgba(126,184,218,', 'rgba(196,168,130,', 'rgba(180,140,180,'];
+  for (let f = 0; f < FLOCK_COUNT; f++) {
+    const cx = (f + 1) * fateCanvas.width / (FLOCK_COUNT + 1);
+    const cy = fateCanvas.height / 2;
+    const angle = (f * 2.1) + 0.5;
+    const speed = 0.8 + f * 0.3;
+    const birds = [];
+    for (let b = 0; b < BIRDS_PER; b++) {
+      birds.push({
+        x: cx + (Math.random() - 0.5) * 80,
+        y: cy + (Math.random() - 0.5) * 80,
+        vx: Math.cos(angle) * speed + (Math.random() - 0.5) * 0.3,
+        vy: Math.sin(angle) * speed + (Math.random() - 0.5) * 0.3,
+        r: Math.random() * 2 + 1.5
+      });
+    }
+    flocks.push({birds, color: colors[f], baseAngle: angle, speed});
+  }
+}
+
+function drawFate(t) {
+  if (!fateCanvas.width) return;
+  fateCtx.clearRect(0, 0, fateCanvas.width, fateCanvas.height);
+  const mx = fateMouse.x * 2, my = fateMouse.y * 2;
+  for (const flock of flocks) {
+    const angle = flock.baseAngle + Math.sin(t * 0.0005 + flock.baseAngle) * 1.5;
+    const tvx = Math.cos(angle) * flock.speed;
+    const tvy = Math.sin(angle) * flock.speed;
+    // Find center
+    let fcx = 0, fcy = 0;
+    for (const b of flock.birds) { fcx += b.x; fcy += b.y; }
+    fcx /= flock.birds.length; fcy /= flock.birds.length;
+
+    for (const b of flock.birds) {
+      // Align with flock direction
+      b.vx += (tvx - b.vx) * 0.02;
+      b.vy += (tvy - b.vy) * 0.02;
+      // Cohesion to flock center
+      b.vx += (fcx - b.x) * 0.001;
+      b.vy += (fcy - b.y) * 0.001;
+      // Avoid mouse
+      const md = Math.hypot(b.x - mx, b.y - my);
+      if (md < 200 && md > 1) {
+        b.vx += (b.x - mx) / md * 2;
+        b.vy += (b.y - my) / md * 2;
+      }
+      b.vx *= 0.98; b.vy *= 0.98;
+      b.x += b.vx; b.y += b.vy;
+      // Wrap
+      if (b.x < -20) b.x += fateCanvas.width + 40;
+      if (b.x > fateCanvas.width + 20) b.x -= fateCanvas.width + 40;
+      if (b.y < -20) b.y += fateCanvas.height + 40;
+      if (b.y > fateCanvas.height + 20) b.y -= fateCanvas.height + 40;
+
+      fateCtx.beginPath();
+      fateCtx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      fateCtx.fillStyle = flock.color + '0.7)';
+      fateCtx.fill();
+    }
+    // Draw flock connections
+    for (let i = 0; i < flock.birds.length; i++) {
+      for (let j = i + 1; j < flock.birds.length; j++) {
+        const d = Math.hypot(flock.birds[i].x - flock.birds[j].x, flock.birds[i].y - flock.birds[j].y);
+        if (d < 70) {
+          fateCtx.beginPath();
+          fateCtx.moveTo(flock.birds[i].x, flock.birds[i].y);
+          fateCtx.lineTo(flock.birds[j].x, flock.birds[j].y);
+          fateCtx.strokeStyle = flock.color + `${(1 - d/70) * 0.1})`;
+          fateCtx.lineWidth = 0.8;
+          fateCtx.stroke();
+        }
+      }
+    }
+  }
+  requestAnimationFrame(drawFate);
+}
+
+fateCanvas.parentElement.addEventListener('mousemove', e => {
+  const rect = fateCanvas.getBoundingClientRect();
+  fateMouse.x = e.clientX - rect.left;
+  fateMouse.y = e.clientY - rect.top;
+  const h = document.getElementById('fateHint');
+  if (h) h.style.opacity = '0';
+});
+fateCanvas.parentElement.addEventListener('mouseleave', () => { fateMouse.x = -1000; });
+fateCanvas.parentElement.addEventListener('touchmove', e => {
+  const rect = fateCanvas.getBoundingClientRect();
+  fateMouse.x = e.touches[0].clientX - rect.left;
+  fateMouse.y = e.touches[0].clientY - rect.top;
+  const h = document.getElementById('fateHint');
+  if (h) h.style.opacity = '0';
+  e.preventDefault();
+}, {passive: false});
+
+// --- Continuity line draw on scroll (resets on scroll-away) ---
+const contObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      document.getElementById('contLine').style.strokeDashoffset = '0';
+      document.getElementById('contLine2').style.strokeDashoffset = '0';
+    } else {
+      document.getElementById('contLine').style.strokeDashoffset = '1000';
+      document.getElementById('contLine2').style.strokeDashoffset = '1000';
+    }
+  });
+}, {threshold: 0.4});
+contObs.observe(document.getElementById('contSvg'));
+
+// --- Kanizsa auto-reveal on scroll (for mobile/non-hover) ---
+const kanizsaEl = document.getElementById('kanizsa');
+const kanizsaObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      setTimeout(() => { if (kanizsaEl) kanizsaEl.classList.add('revealed'); }, 1500);
+    } else {
+      if (kanizsaEl) kanizsaEl.classList.remove('revealed');
+    }
+  });
+}, {threshold: 0.5});
+if (kanizsaEl) kanizsaObs.observe(kanizsaEl);
+
+// --- Init on load ---
+function initAll() {
+  initProx();
+  requestAnimationFrame(drawProx);
+  initSim();
+  requestAnimationFrame(drawSim);
+  initFate();
+  requestAnimationFrame(drawFate);
+}
+
+if (document.readyState === 'complete') initAll();
+else window.addEventListener('load', initAll);
+window.addEventListener('resize', () => { initProx(); initSim(); initFate(); });
+</script>
+
+</body>
+</html>
