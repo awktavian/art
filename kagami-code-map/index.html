@@ -4355,10 +4355,8 @@
         // RENDER LOOP
         // ═══════════════════════════════════════════════════════════════════════════════
         
-        // Frame timing for adaptive quality
         let lastFrameTime = 0;
-        let frameTimeAvg = 16.67; // Target 60fps
-        let framesSkipped = 0;
+        let frameTimeAvg = 16.67;
         let lastRenderState = null;
         
         function render(timestamp = performance.now()) {
@@ -4381,23 +4379,14 @@
                 }
             }
             
-            // Render appropriate view
             if (state.view === 'treemap') {
-                // Treemap only needs to re-render on changes
-                const treemapState = JSON.stringify({
-                    path: state.treemap.path,
-                    filter: state.filter,
-                    hovered: state.treemap.hovered?.path,
-                    selected: state.treemap.selected?.path,
-                    size: treemapCanvas.width + ',' + treemapCanvas.height
-                });
+                const treemapHash = state.treemap.path.join('/') + '|' + (state.filter || '') + '|' +
+                    (state.treemap.hovered?.path || '') + '|' + (state.treemap.selected?.path || '') + '|' +
+                    treemapCanvas.width + ',' + treemapCanvas.height;
                 
-                if (treemapState !== lastRenderState || framesSkipped > 5) {
+                if (treemapHash !== lastRenderState) {
                     renderTreemap();
-                    lastRenderState = treemapState;
-                    framesSkipped = 0;
-                } else {
-                    framesSkipped++;
+                    lastRenderState = treemapHash;
                 }
             } else {
                 // Semantic view always renders (3D needs continuous animation)
@@ -4891,8 +4880,14 @@
             if (state.semantic.dragging) {
                 state.semantic.rotX = state.semantic.targetRotX;
                 state.semantic.rotY = state.semantic.targetRotY;
+                state.semantic._dragReleaseT = 0;
             } else {
-                const smooth = quality === 'low' ? 0.25 : 0.14;
+                const releaseT = state.semantic._dragReleaseT || 1;
+                if (releaseT < 1) {
+                    state.semantic._dragReleaseT = Math.min(1, releaseT + 0.08);
+                }
+                const baseLerp = quality === 'low' ? 0.25 : 0.14;
+                const smooth = baseLerp * Math.max(0.3, releaseT);
                 state.semantic.rotX += (state.semantic.targetRotX - state.semantic.rotX) * smooth;
                 state.semantic.rotY += (state.semantic.targetRotY - state.semantic.rotY) * smooth;
             }
@@ -5038,18 +5033,11 @@
                 projected = projected.slice(0, maxNodes);
             }
             
-            // Stable depth sort with secondary key to prevent z-fighting flickering
-            // Uses epsilon comparison for near-equal depths, then falls back to path for consistency
-            const DEPTH_EPSILON = 0.001;
             projected.sort((a, b) => {
                 const dz = a.sz - b.sz;
-                // If depths are essentially equal, use stable secondary sort
-                if (Math.abs(dz) < DEPTH_EPSILON) {
-                    // Sort by importance (more important in front at same depth)
+                if (Math.abs(dz) < 0.002) {
                     const impDiff = (b.file.importance || 0) - (a.file.importance || 0);
-                    if (Math.abs(impDiff) > 0.01) return impDiff;
-                    // Final tiebreaker: path for deterministic order
-                    return (a.file.path || '').localeCompare(b.file.path || '');
+                    return impDiff !== 0 ? impDiff : (a.file.path < b.file.path ? -1 : 1);
                 }
                 return dz;
             });
@@ -5147,32 +5135,37 @@
             // LAYER: IMPORTS — Connection lines
             // ═══════════════════════════════════════════════════════════════════════════
             if (layers.imports && quality !== 'low') {
-                ctx.globalAlpha = 0.4;
+                ctx.lineWidth = 0.5;
+                ctx.globalAlpha = 0.35;
                 
-                // Draw all import connections (subtle)
+                const edgesByCat = new Map();
                 for (const p of projected) {
                     const imports = p.file.imports || [];
+                    if (!imports.length) continue;
+                    const cat = p.file.category || 'Other';
                     for (const imp of imports) {
-                        // Try to find the imported file
                         let targetP = projByPath.get(imp);
                         if (!targetP) {
                             const moduleName = imp.split('/').pop().replace(/\.(py|js|ts|tsx|jsx|rs|swift|kt)$/, '');
                             const candidates = projByName.get(moduleName) || [];
                             targetP = candidates[0];
                         }
-                        
                         if (targetP && targetP !== p) {
-                            const cat = p.file.category || 'Other';
-                            const c = COLORS[cat] || COLORS.Other;
-                            
-                            ctx.beginPath();
-                            ctx.moveTo(p.sx, p.sy);
-                            ctx.lineTo(targetP.sx, targetP.sy);
-                            ctx.strokeStyle = c.hex + '30';
-                            ctx.lineWidth = 0.5;
-                            ctx.stroke();
+                            if (!edgesByCat.has(cat)) edgesByCat.set(cat, []);
+                            edgesByCat.get(cat).push(p.sx, p.sy, targetP.sx, targetP.sy);
                         }
                     }
+                }
+                
+                for (const [cat, coords] of edgesByCat) {
+                    const c = COLORS[cat] || COLORS.Other;
+                    ctx.strokeStyle = c.hex + '30';
+                    ctx.beginPath();
+                    for (let i = 0; i < coords.length; i += 4) {
+                        ctx.moveTo(coords[i], coords[i + 1]);
+                        ctx.lineTo(coords[i + 2], coords[i + 3]);
+                    }
+                    ctx.stroke();
                 }
                 
                 ctx.globalAlpha = 1;
@@ -5263,8 +5256,9 @@
             // ═══════════════════════════════════════════════════════════════════════════
             // DRAW NODES
             // ═══════════════════════════════════════════════════════════════════════════
+            const _relatedSet = new Set(state.semantic.related);
             for (const p of projected) {
-                drawNode(ctx, p, layers);
+                drawNode(ctx, p, layers, _relatedSet);
             }
             
             // ═══════════════════════════════════════════════════════════════════════════
@@ -5273,22 +5267,23 @@
             if (layers.labels) {
                 ctx.textAlign = 'center';
                 
-                // Prioritize: 1) search matches, 2) important files, 3) large files
                 let labelCandidates;
+                const maxLabels = quality === 'high' ? CONFIG.render.maxLabelsHigh :
+                    quality === 'med' ? CONFIG.render.maxLabelsMed : CONFIG.render.maxLabelsLow;
                 
                 if (hasSearch && matchingPaths.size > 0) {
-                    // During search, show labels for all matching files
                     labelCandidates = projected
                         .filter(p => p.matchesSearch)
                         .sort((a, b) => (b.file.importance || 0) - (a.file.importance || 0))
-                        .slice(0, quality === 'high' ? 50 : quality === 'med' ? 30 : 15);
+                        .slice(0, Math.min(50, maxLabels * 2));
                 } else {
-                    // Normal mode: label important files
                     labelCandidates = projected
-                        .filter(p => (p.file.importance || 0) > 0.3 || (p.file.lines || 0) > 500)
-                        .sort((a, b) => b.depth - a.depth)
-                        .slice(0, quality === 'high' ? CONFIG.render.maxLabelsHigh :
-                            quality === 'med' ? CONFIG.render.maxLabelsMed : CONFIG.render.maxLabelsLow);
+                        .sort((a, b) => {
+                            const scoreA = (a.file.importance || 0) * 1.5 + Math.log10(Math.max(1, a.file.lines || 1)) * 0.2 + a.depth * 0.3;
+                            const scoreB = (b.file.importance || 0) * 1.5 + Math.log10(Math.max(1, b.file.lines || 1)) * 0.2 + b.depth * 0.3;
+                            return scoreB - scoreA;
+                        })
+                        .slice(0, maxLabels);
                 }
                 
                 for (const p of labelCandidates) {
@@ -5358,10 +5353,10 @@
             updateQuality(performance.now() - t0);
         }
         
-        function drawNode(ctx, { file, sx, sy, sz, depth, matchesSearch = true }, layers = {}) {
+        function drawNode(ctx, { file, sx, sy, sz, depth, matchesSearch = true }, layers = {}, relatedSet) {
             const hov = state.semantic.hovered === file;
             const sel = state.semantic.selected === file;
-            const rel = state.semantic.related.includes(file);
+            const rel = relatedSet ? relatedSet.has(file) : state.semantic.related.includes(file);
             const panelHover = state.semantic.panelHoverTarget === file;
             const quality = state.semantic.quality;
             const focusOn = state.semantic.layers.focus && state.semantic.focusClusterId !== null;
@@ -6033,17 +6028,8 @@
                   .sort((a, b) => b.score - a.score)
                   .slice(0, CONFIG.ui.searchMaxResults);
                 
-                // Cache matching paths for the render loop (avoids per-frame string scanning)
-                const qLower = query.toLowerCase();
-                const matchSet = new Set();
-                for (const f of state.files) {
-                    if ((f.path && f.path.toLowerCase().includes(qLower)) ||
-                        (f.name && f.name.toLowerCase().includes(qLower)) ||
-                        (f.keywords && f.keywords.some(k => k.toLowerCase().includes(qLower))) ||
-                        (f.summary && f.summary.toLowerCase().includes(qLower))) {
-                        matchSet.add(f.path);
-                    }
-                }
+                // Cache matching paths for the render loop — must match scoreFile signals
+                const matchSet = new Set(scored.map(r => r.file.path));
                 state._searchMatchPaths = matchSet;
                 
                 if (!scored.length) {
@@ -6205,14 +6191,13 @@
             // Panel close
             document.getElementById('panel-close').addEventListener('click', closePanel);
             
-            // Prevent panel scroll from affecting 3D view (fixes flicker)
             const panelContent = document.getElementById('panel-content');
             panelContent.addEventListener('wheel', e => {
                 e.stopPropagation();
-            }, { passive: true });
-            panelContent.addEventListener('scroll', e => {
+            }, { passive: false });
+            document.getElementById('panel')?.addEventListener('wheel', e => {
                 e.stopPropagation();
-            }, { passive: true });
+            }, { passive: false });
             
             // Keyboard
             document.addEventListener('keydown', e => {
@@ -6276,8 +6261,9 @@
             treemapView.style.transition = transitionStyle;
             semanticView.style.transition = transitionStyle;
             
+            const TRANSITION_MS = 700;
+
             if (toView === 'semantic') {
-                // Treemap → 3D: Immersive zoom-in like entering a 3D space
                 treemapView.style.opacity = '1';
                 treemapView.style.transform = 'scale(1) perspective(1000px) rotateX(0deg)';
                 treemapView.style.filter = 'blur(0)';
@@ -6286,7 +6272,6 @@
                 semanticView.style.transform = 'scale(0.85) perspective(1000px) rotateX(-5deg)';
                 semanticView.style.filter = 'blur(8px)';
                 
-                // If we have a target file, center the 3D view on it
                 if (targetFile && targetFile.x !== undefined) {
                     const px = (targetFile.x - 0.5) * 2;
                     const pz = (targetFile.z - 0.5) * 2;
@@ -6296,11 +6281,9 @@
                 
                 requestAnimationFrame(() => {
                     resize();
-                    // Outgoing view zooms forward and blurs
                     treemapView.style.opacity = '0';
                     treemapView.style.transform = 'scale(1.3) perspective(1000px) rotateX(10deg)';
                     treemapView.style.filter = 'blur(12px)';
-                    // Incoming view scales up and sharpens
                     semanticView.style.opacity = '1';
                     semanticView.style.transform = 'scale(1) perspective(1000px) rotateX(0deg)';
                     semanticView.style.filter = 'blur(0)';
@@ -6311,10 +6294,9 @@
                     treemapView.style.cssText = '';
                     semanticView.style.cssText = '';
                     completeTransition(toView);
-                }, 650);
+                }, TRANSITION_MS + 16);
                 
             } else {
-                // 3D → Treemap: Pull back like exiting immersive mode
                 semanticView.style.opacity = '1';
                 semanticView.style.transform = 'scale(1) perspective(1000px) rotateX(0deg)';
                 semanticView.style.filter = 'blur(0)';
@@ -6325,11 +6307,9 @@
                 
                 requestAnimationFrame(() => {
                     resize();
-                    // Outgoing view shrinks back and blurs
                     semanticView.style.opacity = '0';
                     semanticView.style.transform = 'scale(0.85) perspective(1000px) rotateX(-5deg)';
                     semanticView.style.filter = 'blur(8px)';
-                    // Incoming view scales to normal
                     treemapView.style.opacity = '1';
                     treemapView.style.transform = 'scale(1) perspective(1000px) rotateX(0deg)';
                     treemapView.style.filter = 'blur(0)';
@@ -6340,7 +6320,7 @@
                     semanticView.style.cssText = '';
                     treemapView.style.cssText = '';
                     completeTransition(toView);
-                }, 650);
+                }, TRANSITION_MS + 16);
             }
         }
         
@@ -6622,20 +6602,12 @@
         function getVisibleFiles() {
             let files = state.files;
             
-            // Apply filter
             if (state.filter) {
                 files = files.filter(f => f.category === state.filter);
             }
             
-            // Apply search query
-            if (state.query && state.query.length >= CONFIG.ui.searchMinLength) {
-                const q = state.query.toLowerCase();
-                files = files.filter(f => 
-                    (f.path && f.path.toLowerCase().includes(q)) ||
-                    (f.name && f.name.toLowerCase().includes(q)) ||
-                    (f.functions && f.functions.some(fn => fn.toLowerCase().includes(q))) ||
-                    (f.classes && f.classes.some(c => c.toLowerCase().includes(q)))
-                );
+            if (state.query && state.query.length >= CONFIG.ui.searchMinLength && state._searchMatchPaths.size > 0) {
+                files = files.filter(f => state._searchMatchPaths.has(f.path));
             }
             
             return files;
@@ -6713,31 +6685,24 @@
         function animateNumber(el, targetValue) {
             if (!el) return;
             
-            const currentText = el.textContent.replace(/,/g, '');
+            const currentText = el.textContent.replace(/[^0-9]/g, '');
             const currentValue = parseInt(currentText) || 0;
-            
             if (currentValue === targetValue) return;
             
-            // Quick animation
+            if (el._animRaf) cancelAnimationFrame(el._animRaf);
+            
             const duration = CONFIG.ui.durationNormal;
-            const steps = 12;
-            const stepTime = duration / steps;
             const diff = targetValue - currentValue;
-            let step = 0;
+            const start = performance.now();
             
-            const animate = () => {
-                step++;
-                const progress = step / steps;
-                const eased = 1 - Math.pow(1 - progress, 3); // Ease out cubic
-                const value = Math.round(currentValue + diff * eased);
-                el.textContent = formatNum(value);
-                
-                if (step < steps) {
-                    setTimeout(animate, stepTime);
-                }
+            const tick = (now) => {
+                const t = Math.min(1, (now - start) / duration);
+                const eased = 1 - Math.pow(1 - t, 3);
+                el.textContent = formatNum(Math.round(currentValue + diff * eased));
+                if (t < 1) el._animRaf = requestAnimationFrame(tick);
+                else el._animRaf = null;
             };
-            
-            animate();
+            el._animRaf = requestAnimationFrame(tick);
         }
         
         function buildLegend() {
