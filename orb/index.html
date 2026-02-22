@@ -278,5 +278,174 @@
             navigator.serviceWorker.register('sw.js').catch(() => {});
         }
     </script>
+
+    <script src="../lib/realtime-voice.js"></script>
+    <script src="../lib/kagami-voices.js"></script>
+    <script src="../lib/voice-overlay.js"></script>
+    <script>
+        VoiceOverlay.init({
+            project: 'orb',
+            tools: [
+                // ─── PERCEPTION ────────────────────────────────────────────
+                {
+                    name: 'observe_page',
+                    description: 'Perceive the full state of the Orb page: which section is visible (hero or specs), scroll position, orb animation state, number of spec cards visible.',
+                    parameters: { type: 'object', properties: {}, required: [] },
+                },
+                {
+                    name: 'read_specs',
+                    description: 'Read all specification cards from the page, including their titles, descriptions, and values.',
+                    parameters: { type: 'object', properties: {}, required: [] },
+                },
+                {
+                    name: 'sense_visitor',
+                    description: 'Sense where the visitor\'s mouse cursor is relative to the Orb, and whether they are hovering over the orb, the CTA button, or a spec card.',
+                    parameters: { type: 'object', properties: {}, required: [] },
+                },
+                // ─── ACTION ────────────────────────────────────────────────
+                {
+                    name: 'move_eye',
+                    description: 'Move the Orb\'s eye to look in a direction. The eye pupil shifts to track the given direction.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            x: { type: 'number', description: 'Horizontal offset in pixels (-30 to 30). Negative=left, positive=right.' },
+                            y: { type: 'number', description: 'Vertical offset in pixels (-30 to 30). Negative=up, positive=down.' },
+                        },
+                        required: ['x', 'y'],
+                    },
+                },
+                {
+                    name: 'pulse_orb',
+                    description: 'Trigger a dramatic glow pulse on the Orb sphere to express emotion or draw attention.',
+                    parameters: {
+                        type: 'object',
+                        properties: { color: { type: 'string', description: 'CSS color for the pulse glow. Default: #a855f7 (purple).' } },
+                        required: [],
+                    },
+                },
+                {
+                    name: 'scroll_to',
+                    description: 'Scroll the page to a specific section.',
+                    parameters: {
+                        type: 'object',
+                        properties: { target: { type: 'string', enum: ['hero', 'specs', 'footer'], description: 'Which section to scroll to' } },
+                        required: ['target'],
+                    },
+                },
+                {
+                    name: 'highlight_spec',
+                    description: 'Visually highlight a specific spec card by its title to draw the visitor\'s attention to it.',
+                    parameters: {
+                        type: 'object',
+                        properties: { title: { type: 'string', description: 'The spec card title to highlight (e.g. "Living Eye Display", "AI Compute", "Magnetic Levitation")' } },
+                        required: ['title'],
+                    },
+                },
+            ],
+            onFunctionCall: (name, args) => {
+                // ─── PERCEPTION ────────────────────────────────────────
+                if (name === 'observe_page') {
+                    const heroRect = document.querySelector('.hero')?.getBoundingClientRect();
+                    const specsRect = document.querySelector('.specs')?.getBoundingClientRect();
+                    const viewMid = window.innerHeight / 2;
+
+                    let visibleSection = 'hero';
+                    if (specsRect && specsRect.top <= viewMid) visibleSection = 'specs';
+                    const footerEl = document.querySelector('footer');
+                    if (footerEl && footerEl.getBoundingClientRect().top <= viewMid) visibleSection = 'footer';
+
+                    const orbEl = document.querySelector('.orb');
+                    const orbRect = orbEl?.getBoundingClientRect();
+                    const orbInView = orbRect ? orbRect.bottom > 0 && orbRect.top < window.innerHeight : false;
+
+                    return {
+                        visible_section: visibleSection,
+                        scroll_y: Math.round(window.scrollY),
+                        scroll_percent: Math.round((window.scrollY / Math.max(1, document.body.scrollHeight - window.innerHeight)) * 100),
+                        orb_in_view: orbInView,
+                        orb_floating: orbEl ? getComputedStyle(orbEl).animationName !== 'none' : false,
+                        spec_cards_total: document.querySelectorAll('.spec-card').length,
+                        page_title: document.title,
+                    };
+                }
+
+                if (name === 'read_specs') {
+                    const cards = [];
+                    document.querySelectorAll('.spec-card').forEach(card => {
+                        cards.push({
+                            icon: card.querySelector('.icon')?.textContent.trim(),
+                            title: card.querySelector('h3')?.textContent.trim(),
+                            description: card.querySelector('p')?.textContent.trim(),
+                            value: card.querySelector('.value')?.textContent.trim(),
+                        });
+                    });
+                    return { specs: cards, total: cards.length };
+                }
+
+                if (name === 'sense_visitor') {
+                    // We can't read real mouse position without a stored variable,
+                    // but we can detect hover state via :hover
+                    const orbHover = document.querySelector('.orb:hover') !== null;
+                    const ctaHover = document.querySelector('.cta:hover') !== null;
+                    const specHover = document.querySelector('.spec-card:hover');
+                    return {
+                        hovering_orb: orbHover,
+                        hovering_cta: ctaHover,
+                        hovering_spec: specHover ? specHover.querySelector('h3')?.textContent.trim() : null,
+                    };
+                }
+
+                // ─── ACTION ───────────────────────────────────────────
+                if (name === 'move_eye') {
+                    const eye = document.querySelector('.eye');
+                    if (!eye) return { error: 'Eye element not found' };
+                    const x = Math.max(-30, Math.min(30, args.x || 0));
+                    const y = Math.max(-30, Math.min(30, args.y || 0));
+                    eye.style.transition = 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+                    eye.style.transform = `translate(${x}px, ${y}px)`;
+                    // Reset after 3 seconds
+                    setTimeout(() => { eye.style.transform = ''; }, 3000);
+                    return { status: 'tracking', direction: { x, y } };
+                }
+
+                if (name === 'pulse_orb') {
+                    const orb = document.querySelector('.orb');
+                    if (!orb) return { error: 'Orb element not found' };
+                    const color = args.color || '#a855f7';
+                    orb.style.transition = 'box-shadow 0.3s ease';
+                    orb.style.boxShadow = `0 0 100px ${color}, 0 0 200px ${color}80, inset 0 -20px 40px rgba(0,0,0,0.3), inset 0 20px 40px rgba(255,255,255,0.1)`;
+                    setTimeout(() => { orb.style.boxShadow = ''; }, 2000);
+                    return { status: 'pulsed', color };
+                }
+
+                if (name === 'scroll_to') {
+                    const targets = { hero: '.hero', specs: '.specs', footer: 'footer' };
+                    const el = document.querySelector(targets[args.target]);
+                    if (!el) return { error: `Target "${args.target}" not found` };
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    return { status: 'scrolling', target: args.target };
+                }
+
+                if (name === 'highlight_spec') {
+                    let found = null;
+                    document.querySelectorAll('.spec-card').forEach(card => {
+                        const h3 = card.querySelector('h3');
+                        if (h3 && h3.textContent.trim().toLowerCase().includes(args.title.toLowerCase())) {
+                            found = h3.textContent.trim();
+                            card.style.transition = 'all 0.3s ease';
+                            card.style.border = '1px solid #a855f7';
+                            card.style.boxShadow = '0 0 30px rgba(168,85,247,0.3)';
+                            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            setTimeout(() => { card.style.border = ''; card.style.boxShadow = ''; }, 4000);
+                        }
+                    });
+                    return found ? { status: 'highlighted', spec: found } : { error: `Spec "${args.title}" not found` };
+                }
+
+                return { ok: true };
+            },
+        });
+    </script>
 </body>
 </html>

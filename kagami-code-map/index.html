@@ -3717,6 +3717,7 @@
             files: [],
             tree: null,
             isOnline: navigator.onLine,
+            _searchMatchPaths: new Set(),
             
             treemap: {
                 path: [],
@@ -4864,10 +4865,15 @@
         // 3D SEMANTIC EXPLORER — Immersive Perspective
         // ═══════════════════════════════════════════════════════════════════════════════
         
+        // Offscreen nebula/star background cache
+        let _bgCache = null;
+        let _bgCacheKey = '';
+        let _bgCacheTime = 0;
+        const BG_CACHE_INTERVAL = 2000; // Redraw background every 2s (nebula drifts very slowly)
+        
         function renderSemantic() {
             if (!semanticCtx || !state.files.length) return;
             
-            // Auto-resize if canvas has no dimensions
             if (semanticCanvas.width === 0 || semanticCanvas.height === 0) {
                 resize();
                 if (semanticCanvas.width === 0) return;
@@ -4892,148 +4898,81 @@
             }
             
             // ═══════════════════════════════════════════════════════════════════════════
-            // BACKGROUND — Deep space with nebula effect
+            // BACKGROUND — Cached nebula + stars (redrawn every 2s, blitted each frame)
             // ═══════════════════════════════════════════════════════════════════════════
-            const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.hypot(w, h) * 0.75);
-            bgGrad.addColorStop(0, '#0a0a16');
-            bgGrad.addColorStop(0.15, '#080812');
-            bgGrad.addColorStop(0.4, '#050510');
-            bgGrad.addColorStop(0.7, '#030308');
-            bgGrad.addColorStop(1, '#010103');
-            ctx.fillStyle = bgGrad;
-            ctx.fillRect(0, 0, w, h);
+            const bgKey = `${w}x${h}`;
+            const now = performance.now();
+            const time = now * 0.001;
             
-            // Animated nebula time offset
-            const nebulaTime = performance.now() * 0.00005;
-            const nebulaOffset = Math.sin(nebulaTime) * 0.1;
-            
-            // Purple nebula (upper left)
-            const nebulaNexus = ctx.createRadialGradient(
-                cx * (0.3 + nebulaOffset), cy * 0.4, 0, 
-                cx * (0.3 + nebulaOffset), cy * 0.4, Math.min(w, h) * 0.5
-            );
-            nebulaNexus.addColorStop(0, 'rgba(168, 85, 247, 0.06)');
-            nebulaNexus.addColorStop(0.3, 'rgba(139, 92, 246, 0.04)');
-            nebulaNexus.addColorStop(0.6, 'rgba(99, 102, 241, 0.02)');
-            nebulaNexus.addColorStop(1, 'transparent');
-            ctx.fillStyle = nebulaNexus;
-            ctx.fillRect(0, 0, w, h);
-            
-            // Cyan nebula (upper right)
-            const nebulaFlow = ctx.createRadialGradient(
-                cx * (1.6 - nebulaOffset * 0.5), cy * 0.35, 0,
-                cx * (1.6 - nebulaOffset * 0.5), cy * 0.35, Math.min(w, h) * 0.45
-            );
-            nebulaFlow.addColorStop(0, 'rgba(56, 189, 248, 0.05)');
-            nebulaFlow.addColorStop(0.4, 'rgba(34, 211, 238, 0.03)');
-            nebulaFlow.addColorStop(0.7, 'rgba(20, 184, 166, 0.02)');
-            nebulaFlow.addColorStop(1, 'transparent');
-            ctx.fillStyle = nebulaFlow;
-            ctx.fillRect(0, 0, w, h);
-            
-            // Warm nebula (center-bottom)
-            const nebulaForge = ctx.createRadialGradient(
-                cx * (1.0 + nebulaOffset * 0.3), cy * 1.4, 0,
-                cx * (1.0 + nebulaOffset * 0.3), cy * 1.4, Math.min(w, h) * 0.5
-            );
-            nebulaForge.addColorStop(0, 'rgba(249, 115, 22, 0.04)');
-            nebulaForge.addColorStop(0.3, 'rgba(245, 158, 11, 0.03)');
-            nebulaForge.addColorStop(0.6, 'rgba(234, 179, 8, 0.02)');
-            nebulaForge.addColorStop(1, 'transparent');
-            ctx.fillStyle = nebulaForge;
-            ctx.fillRect(0, 0, w, h);
-            
-            // Green nebula (lower left)
-            const nebulaGrove = ctx.createRadialGradient(
-                cx * 0.2, cy * 1.3, 0,
-                cx * 0.2, cy * 1.3, Math.min(w, h) * 0.35
-            );
-            nebulaGrove.addColorStop(0, 'rgba(34, 197, 94, 0.03)');
-            nebulaGrove.addColorStop(0.5, 'rgba(22, 163, 74, 0.02)');
-            nebulaGrove.addColorStop(1, 'transparent');
-            ctx.fillStyle = nebulaGrove;
-            ctx.fillRect(0, 0, w, h);
-            
-            // Gold center glow
-            const nebulaBeacon = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * 0.3);
-            nebulaBeacon.addColorStop(0, 'rgba(255, 216, 120, 0.04)');
-            nebulaBeacon.addColorStop(0.5, 'rgba(240, 200, 96, 0.02)');
-            nebulaBeacon.addColorStop(1, 'transparent');
-            ctx.fillStyle = nebulaBeacon;
-            ctx.fillRect(0, 0, w, h);
-            
-            // Subtle vignette for depth
-            const vignette = ctx.createRadialGradient(cx, cy, Math.min(w, h) * 0.3, cx, cy, Math.hypot(w, h) * 0.7);
-            vignette.addColorStop(0, 'transparent');
-            vignette.addColorStop(0.7, 'rgba(0, 0, 0, 0.1)');
-            vignette.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
-            ctx.fillStyle = vignette;
-            ctx.fillRect(0, 0, w, h);
-            
-            // Enhanced star field with depth, twinkling, and color variation
-            const time = performance.now() * 0.001;
-            const starLayers = [
-                { count: 80, maxSize: 0.5, alpha: 0.03, parallax: 0.1, twinkleSpeed: 0.5 },   // Distant, dim
-                { count: 100, maxSize: 0.8, alpha: 0.06, parallax: 0.2, twinkleSpeed: 0.8 },  // Mid-distance
-                { count: 40, maxSize: 1.5, alpha: 0.12, parallax: 0.4, twinkleSpeed: 1.2 },   // Close, bright
-            ];
-            
-            let starIndex = 0;
-            for (const layer of starLayers) {
-                for (let i = 0; i < layer.count; i++) {
-                    const seed = starIndex * 17 + 5000;
-                    starIndex++;
-                    
-                    // Base position
-                    let sx = seededRandom(seed) * w;
-                    let sy = seededRandom(seed + 1000) * h;
-                    
-                    // Parallax based on rotation
-                    sx += state.semantic.rotY * layer.parallax * 50;
-                    sy += state.semantic.rotX * layer.parallax * 30;
-                    
-                    // Wrap around screen
-                    sx = ((sx % w) + w) % w;
-                    sy = ((sy % h) + h) % h;
-                    
-                    // Size with slight variation
-                    const baseSize = 0.3 + seededRandom(seed + 2000) * layer.maxSize;
-                    
-                    // Twinkling effect
-                    const twinklePhase = seededRandom(seed + 3000) * Math.PI * 2;
-                    const twinkle = 0.7 + 0.3 * Math.sin(time * layer.twinkleSpeed + twinklePhase);
-                    const size = baseSize * twinkle;
-                    
-                    // Color temperature variation (warm to cool)
-                    const temp = seededRandom(seed + 4000);
-                    let r = 255, g = 255, b = 255;
-                    if (temp < 0.3) {
-                        // Warm (gold/orange)
-                        r = 255; g = 220 + temp * 35; b = 180 + temp * 50;
-                    } else if (temp > 0.7) {
-                        // Cool (blue/white)
-                        r = 200 + (1 - temp) * 55; g = 220 + (1 - temp) * 35; b = 255;
-                    }
-                    
-                    const alpha = layer.alpha * twinkle;
-                    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
-                    
-                    ctx.beginPath();
-                    ctx.arc(sx, sy, size, 0, Math.PI * 2);
-                    ctx.fill();
-                    
-                    // Add subtle glow for brighter stars
-                    if (layer.maxSize > 1 && twinkle > 0.85) {
-                        const glowGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, size * 3);
-                        glowGrad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${alpha * 0.4})`);
-                        glowGrad.addColorStop(1, 'transparent');
-                        ctx.fillStyle = glowGrad;
-                        ctx.beginPath();
-                        ctx.arc(sx, sy, size * 3, 0, Math.PI * 2);
-                        ctx.fill();
+            if (!_bgCache || _bgCacheKey !== bgKey || now - _bgCacheTime > BG_CACHE_INTERVAL) {
+                if (!_bgCache || _bgCacheKey !== bgKey) {
+                    _bgCache = document.createElement('canvas');
+                    _bgCache.width = w; _bgCache.height = h;
+                }
+                _bgCacheKey = bgKey;
+                _bgCacheTime = now;
+                
+                const bg = _bgCache.getContext('2d');
+                const nebulaTime = now * 0.00005;
+                const nebulaOffset = Math.sin(nebulaTime) * 0.1;
+                
+                const bgGrad = bg.createRadialGradient(cx, cy, 0, cx, cy, Math.hypot(w, h) * 0.75);
+                bgGrad.addColorStop(0, '#0a0a16');
+                bgGrad.addColorStop(0.15, '#080812');
+                bgGrad.addColorStop(0.4, '#050510');
+                bgGrad.addColorStop(0.7, '#030308');
+                bgGrad.addColorStop(1, '#010103');
+                bg.fillStyle = bgGrad;
+                bg.fillRect(0, 0, w, h);
+                
+                const nebulae = [
+                    { cx: cx * (0.3 + nebulaOffset), cy: cy * 0.4, r: Math.min(w, h) * 0.5,
+                      stops: [[0,'rgba(168,85,247,0.06)'],[0.3,'rgba(139,92,246,0.04)'],[0.6,'rgba(99,102,241,0.02)'],[1,'transparent']] },
+                    { cx: cx * (1.6 - nebulaOffset * 0.5), cy: cy * 0.35, r: Math.min(w, h) * 0.45,
+                      stops: [[0,'rgba(56,189,248,0.05)'],[0.4,'rgba(34,211,238,0.03)'],[0.7,'rgba(20,184,166,0.02)'],[1,'transparent']] },
+                    { cx: cx * (1.0 + nebulaOffset * 0.3), cy: cy * 1.4, r: Math.min(w, h) * 0.5,
+                      stops: [[0,'rgba(249,115,22,0.04)'],[0.3,'rgba(245,158,11,0.03)'],[0.6,'rgba(234,179,8,0.02)'],[1,'transparent']] },
+                    { cx: cx * 0.2, cy: cy * 1.3, r: Math.min(w, h) * 0.35,
+                      stops: [[0,'rgba(34,197,94,0.03)'],[0.5,'rgba(22,163,74,0.02)'],[1,'transparent']] },
+                    { cx: cx, cy: cy, r: Math.min(w, h) * 0.3,
+                      stops: [[0,'rgba(255,216,120,0.04)'],[0.5,'rgba(240,200,96,0.02)'],[1,'transparent']] },
+                ];
+                for (const n of nebulae) {
+                    const g = bg.createRadialGradient(n.cx, n.cy, 0, n.cx, n.cy, n.r);
+                    for (const [off, col] of n.stops) g.addColorStop(off, col);
+                    bg.fillStyle = g; bg.fillRect(0, 0, w, h);
+                }
+                
+                const vignette = bg.createRadialGradient(cx, cy, Math.min(w, h) * 0.3, cx, cy, Math.hypot(w, h) * 0.7);
+                vignette.addColorStop(0, 'transparent');
+                vignette.addColorStop(0.7, 'rgba(0,0,0,0.1)');
+                vignette.addColorStop(1, 'rgba(0,0,0,0.3)');
+                bg.fillStyle = vignette; bg.fillRect(0, 0, w, h);
+                
+                // Static stars (only position-dependent, no parallax - that's per-frame below)
+                const starLayers = [
+                    { count: 80, maxSize: 0.5, alpha: 0.03 },
+                    { count: 100, maxSize: 0.8, alpha: 0.06 },
+                    { count: 40, maxSize: 1.5, alpha: 0.12 },
+                ];
+                let starIdx = 0;
+                for (const layer of starLayers) {
+                    for (let i = 0; i < layer.count; i++) {
+                        const seed = starIdx * 17 + 5000; starIdx++;
+                        const sx = seededRandom(seed) * w;
+                        const sy = seededRandom(seed + 1000) * h;
+                        const sz = 0.3 + seededRandom(seed + 2000) * layer.maxSize;
+                        const temp = seededRandom(seed + 4000);
+                        let r = 255, g = 255, b = 255;
+                        if (temp < 0.3) { r = 255; g = 230; b = 190; }
+                        else if (temp > 0.7) { r = 210; g = 230; b = 255; }
+                        bg.fillStyle = `rgba(${r},${g},${b},${layer.alpha})`;
+                        bg.beginPath(); bg.arc(sx, sy, sz, 0, Math.PI * 2); bg.fill();
                     }
                 }
             }
+            
+            ctx.drawImage(_bgCache, 0, 0);
             
             // ═══════════════════════════════════════════════════════════════════════════
             // FILTER & PROJECT FILES — Keep all, fade non-matching during search
@@ -5048,23 +4987,10 @@
                 files = files.filter(f => f.category === state.filter);
             }
             
-            // Search: Build set of matching files (for fade logic), but keep all visible
+            // Search: use pre-computed match set (built in performSearch), avoid per-frame scan
             const searchQuery = state.query?.toLowerCase() || '';
             const hasSearch = searchQuery.length >= CONFIG.ui.searchMinLength;
-            const matchingPaths = new Set();
-            
-            if (hasSearch) {
-                for (const f of files) {
-                    const matches = 
-                        (f.path && f.path.toLowerCase().includes(searchQuery)) || 
-                        (f.name && f.name.toLowerCase().includes(searchQuery)) ||
-                        (f.keywords && f.keywords.some(k => k.toLowerCase().includes(searchQuery))) ||
-                        (f.summary && f.summary.toLowerCase().includes(searchQuery));
-                    if (matches) {
-                        matchingPaths.add(f.path);
-                    }
-                }
-            }
+            const matchingPaths = state._searchMatchPaths || new Set();
             
             const fov = CONFIG.render.fov;
             const cameraZ = CONFIG.render.cameraZ;
@@ -6094,6 +6020,7 @@
             function performSearch(query) {
                 if (!query || query.length < CONFIG.ui.searchMinLength) {
                     searchResults.classList.remove('active');
+                    state._searchMatchPaths = new Set();
                     return;
                 }
                 
@@ -6105,6 +6032,19 @@
                 })).filter(r => r.score > 0)
                   .sort((a, b) => b.score - a.score)
                   .slice(0, CONFIG.ui.searchMaxResults);
+                
+                // Cache matching paths for the render loop (avoids per-frame string scanning)
+                const qLower = query.toLowerCase();
+                const matchSet = new Set();
+                for (const f of state.files) {
+                    if ((f.path && f.path.toLowerCase().includes(qLower)) ||
+                        (f.name && f.name.toLowerCase().includes(qLower)) ||
+                        (f.keywords && f.keywords.some(k => k.toLowerCase().includes(qLower))) ||
+                        (f.summary && f.summary.toLowerCase().includes(qLower))) {
+                        matchSet.add(f.path);
+                    }
+                }
+                state._searchMatchPaths = matchSet;
                 
                 if (!scored.length) {
                     searchResults.innerHTML = '<div class="search-empty">No results for "' + escapeHtml(query) + '"</div>';
@@ -6409,6 +6349,10 @@
             state.transition.active = false;
             
             const is3D = view === 'semantic';
+            
+            // Pause background starfield when 3D view renders its own; resume for treemap
+            if (is3D) { window._starfieldPause?.(); }
+            else { window._starfieldResume?.(); }
             
             // Update UI visibility
             const controls = document.getElementById('controls');
@@ -7996,6 +7940,7 @@
             const stars = [];
             const STAR_COUNT = 200;
             const TWINKLE_SPEED = 0.008;
+            let rafId = null;
             
             function resize() {
                 canvas.width = window.innerWidth;
@@ -8012,14 +7957,13 @@
                         brightness: Math.random(),
                         twinklePhase: Math.random() * Math.PI * 2,
                         twinkleSpeed: TWINKLE_SPEED + Math.random() * 0.005,
-                        // Some stars have subtle color tints
                         hue: Math.random() < 0.3 ? (Math.random() < 0.5 ? 45 : 200) : 0,
                         saturation: Math.random() < 0.3 ? 30 : 0
                     });
                 }
             }
             
-            function render() {
+            function renderFrame() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
                 for (const star of stars) {
@@ -8037,7 +7981,6 @@
                     ctx.arc(star.x, star.y, star.size * (0.8 + twinkle * 0.4), 0, Math.PI * 2);
                     ctx.fill();
                     
-                    // Subtle glow for brighter stars
                     if (star.brightness > 0.7 && twinkle > 0.6) {
                         ctx.fillStyle = star.hue 
                             ? `hsla(${star.hue}, ${star.saturation}%, 85%, ${alpha * 0.15})`
@@ -8048,12 +7991,16 @@
                     }
                 }
                 
-                requestAnimationFrame(render);
+                rafId = requestAnimationFrame(renderFrame);
             }
+            
+            // Pause when semantic view is active (it renders its own stars)
+            window._starfieldPause = () => { if (rafId) { cancelAnimationFrame(rafId); rafId = null; } };
+            window._starfieldResume = () => { if (!rafId) rafId = requestAnimationFrame(renderFrame); };
             
             resize();
             createStars();
-            render();
+            renderFrame();
             
             window.addEventListener('resize', () => {
                 resize();
@@ -8064,5 +8011,18 @@
         // Start
         init();
     </script>
+
+    <!-- Voice exploration overlay -->
+    <div id="voice-overlay" class="voice-overlay" style="position:fixed;bottom:24px;right:24px;z-index:10000;display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none;">
+        <button id="voice-toggle" style="pointer-events:auto;display:flex;align-items:center;gap:8px;padding:8px 14px;background:rgba(2,2,4,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:999px;color:var(--text-400);cursor:pointer;font-family:inherit;font-size:12px;transition:all 233ms;" aria-label="Toggle voice exploration (V)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg>
+            <span id="voice-status">Voice</span>
+        </button>
+        <div id="voice-transcript" style="pointer-events:auto;max-width:340px;max-height:180px;overflow-y:auto;background:rgba(2,2,4,0.9);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px;display:none;font-size:11px;line-height:1.4;color:var(--text-400);"></div>
+    </div>
+
+    <script src="../lib/realtime-voice.js"></script>
+    <script src="../lib/kagami-voices.js"></script>
+    <script src="voice-explore.js"></script>
 </body>
 </html>

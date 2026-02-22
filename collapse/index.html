@@ -1170,5 +1170,230 @@
         });
     </script>
 
+    <script src="../lib/realtime-voice.js"></script>
+    <script src="../lib/kagami-voices.js"></script>
+    <script src="../lib/voice-overlay.js"></script>
+    <script>
+        VoiceOverlay.init({
+            project: 'collapse',
+            tools: [
+                // ─── PERCEPTION ────────────────────────────────────────────
+                {
+                    name: 'observe_gallery',
+                    description: 'Perceive the full state of the gallery page: which section is visible, video playback state, scroll position, nav active link, which images/cards have been revealed by scroll animation.',
+                    parameters: { type: 'object', properties: {}, required: [] },
+                },
+                {
+                    name: 'read_section_content',
+                    description: 'Read the text content of a specific section including analysis text, callouts, captions, and shot descriptions.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            section_index: { type: 'number', description: 'Section index (0-based). 0=hero, 1=film video, 2=opening analysis, 3=reflections, 4=cascade, 5=refraction, 6=parallax, 7=camera shots, 8=final state, 9=CTA, 10=footer.' },
+                        },
+                        required: ['section_index'],
+                    },
+                },
+                {
+                    name: 'read_camera_shots',
+                    description: 'Read all five camera technique cards (Act I through V and Resolution) with their titles and descriptions.',
+                    parameters: { type: 'object', properties: {}, required: [] },
+                },
+                {
+                    name: 'read_video_state',
+                    description: 'Read the video element state: current time, duration, paused, muted, and whether the video is in the viewport.',
+                    parameters: { type: 'object', properties: {}, required: [] },
+                },
+                // ─── ACTION ────────────────────────────────────────────────
+                {
+                    name: 'play_video',
+                    description: 'Start or pause the film video.',
+                    parameters: {
+                        type: 'object',
+                        properties: { action: { type: 'string', enum: ['play', 'pause', 'toggle'], description: 'Play, pause, or toggle the video' } },
+                        required: ['action'],
+                    },
+                },
+                {
+                    name: 'seek_video',
+                    description: 'Seek the video to a specific time in seconds.',
+                    parameters: {
+                        type: 'object',
+                        properties: { time: { type: 'number', description: 'Time in seconds to seek to' } },
+                        required: ['time'],
+                    },
+                },
+                {
+                    name: 'scroll_to_section',
+                    description: 'Scroll smoothly to a specific section of the gallery.',
+                    parameters: {
+                        type: 'object',
+                        properties: { target: { type: 'string', enum: ['hero', 'film', 'opening', 'reflections', 'cascade', 'refraction', 'parallax', 'shots', 'final', 'cta', 'footer'], description: 'Section to scroll to' } },
+                        required: ['target'],
+                    },
+                },
+                {
+                    name: 'navigate_page',
+                    description: 'Navigate to the Technical deep dive page or back to Gallery.',
+                    parameters: {
+                        type: 'object',
+                        properties: { page: { type: 'string', enum: ['technical', 'gallery'], description: 'Which page to navigate to' } },
+                        required: ['page'],
+                    },
+                },
+                {
+                    name: 'highlight_image',
+                    description: 'Visually highlight a specific image by triggering its hover effect and scrolling to it.',
+                    parameters: {
+                        type: 'object',
+                        properties: { image_alt: { type: 'string', description: 'The alt text or partial match of the image to highlight' } },
+                        required: ['image_alt'],
+                    },
+                },
+            ],
+            onFunctionCall: (name, args) => {
+                // ─── PERCEPTION ────────────────────────────────────────
+                if (name === 'observe_gallery') {
+                    const video = document.querySelector('video');
+                    const sections = document.querySelectorAll('.section, .video-section, .hero, .parallax-frame, .cta-section, .footer');
+                    const viewMid = window.innerHeight / 2;
+
+                    let visibleSection = 'hero';
+                    const sectionMap = ['hero', 'film', 'opening', 'reflections', 'cascade', 'refraction', 'parallax', 'shots', 'final', 'cta', 'footer'];
+                    sections.forEach((s, i) => {
+                        const r = s.getBoundingClientRect();
+                        if (r.top <= viewMid && r.bottom >= viewMid) visibleSection = sectionMap[i] || `section-${i}`;
+                    });
+
+                    // Count revealed elements
+                    const revealed = document.querySelectorAll('.reveal.visible, .reveal-left.visible, .reveal-right.visible').length;
+                    const totalReveal = document.querySelectorAll('.reveal, .reveal-left, .reveal-right').length;
+
+                    // Active nav link
+                    const activeNav = document.querySelector('.nav-links a.active')?.textContent.trim() || 'Gallery';
+
+                    return {
+                        visible_section: visibleSection,
+                        scroll_y: Math.round(window.scrollY),
+                        scroll_percent: Math.round((window.scrollY / Math.max(1, document.body.scrollHeight - window.innerHeight)) * 100),
+                        video: video ? {
+                            current_time: Math.round(video.currentTime * 10) / 10,
+                            duration: Math.round(video.duration * 10) / 10 || 'unknown',
+                            paused: video.paused,
+                            muted: video.muted,
+                            in_viewport: video.getBoundingClientRect().top < window.innerHeight && video.getBoundingClientRect().bottom > 0,
+                        } : null,
+                        elements_revealed: `${revealed}/${totalReveal}`,
+                        active_nav: activeNav,
+                        images_total: document.querySelectorAll('.image-reveal img').length,
+                        shot_cards_total: document.querySelectorAll('.shot-card').length,
+                    };
+                }
+
+                if (name === 'read_section_content') {
+                    const sections = document.querySelectorAll('.section, .video-section, .hero, .parallax-frame, .cta-section, .footer');
+                    const idx = args.section_index;
+                    if (idx < 0 || idx >= sections.length) return { error: `Section index ${idx} out of range (0-${sections.length - 1})` };
+
+                    const section = sections[idx];
+                    const texts = [];
+                    section.querySelectorAll('h1, h2, h3, h4, p, blockquote, span, li, .callout-label, .image-caption').forEach(el => {
+                        const text = el.textContent.trim();
+                        if (text && text.length > 1) {
+                            texts.push({ tag: el.tagName.toLowerCase(), class: el.className || undefined, text });
+                        }
+                    });
+                    // Get images in section
+                    const images = [];
+                    section.querySelectorAll('img').forEach(img => {
+                        images.push({ alt: img.alt, src: img.src.split('/').pop() });
+                    });
+                    return { section_index: idx, content: texts, images };
+                }
+
+                if (name === 'read_camera_shots') {
+                    const cards = [];
+                    document.querySelectorAll('.shot-card').forEach(card => {
+                        cards.push({
+                            title: card.querySelector('h4')?.textContent.trim(),
+                            description: card.querySelector('p')?.textContent.trim(),
+                            image: card.querySelector('img')?.alt || null,
+                        });
+                    });
+                    return { shots: cards, total: cards.length };
+                }
+
+                if (name === 'read_video_state') {
+                    const video = document.querySelector('video');
+                    if (!video) return { error: 'No video element found' };
+                    const rect = video.getBoundingClientRect();
+                    return {
+                        current_time: Math.round(video.currentTime * 100) / 100,
+                        duration: Math.round(video.duration * 100) / 100 || null,
+                        paused: video.paused,
+                        muted: video.muted,
+                        loop: video.loop,
+                        in_viewport: rect.top < window.innerHeight && rect.bottom > 0,
+                        poster: video.poster?.split('/').pop() || null,
+                    };
+                }
+
+                // ─── ACTION ───────────────────────────────────────────
+                if (name === 'play_video') {
+                    const video = document.querySelector('video');
+                    if (!video) return { error: 'No video element found' };
+                    if (args.action === 'play') { video.play(); return { status: 'playing' }; }
+                    if (args.action === 'pause') { video.pause(); return { status: 'paused' }; }
+                    if (args.action === 'toggle') {
+                        if (video.paused) { video.play(); return { status: 'playing' }; }
+                        else { video.pause(); return { status: 'paused' }; }
+                    }
+                    return { error: 'Unknown action' };
+                }
+
+                if (name === 'seek_video') {
+                    const video = document.querySelector('video');
+                    if (!video) return { error: 'No video element found' };
+                    video.currentTime = Math.max(0, Math.min(args.time, video.duration || 15));
+                    return { status: 'seeked', time: video.currentTime };
+                }
+
+                if (name === 'scroll_to_section') {
+                    const sections = document.querySelectorAll('.section, .video-section, .hero, .parallax-frame, .cta-section, .footer');
+                    const sectionMap = { hero: 0, film: 1, opening: 2, reflections: 3, cascade: 4, refraction: 5, parallax: 6, shots: 7, final: 8, cta: 9, footer: 10 };
+                    const idx = sectionMap[args.target];
+                    if (idx === undefined || idx >= sections.length) return { error: `Section "${args.target}" not found` };
+                    sections[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    return { status: 'scrolling', target: args.target };
+                }
+
+                if (name === 'navigate_page') {
+                    if (args.page === 'technical') { window.location.href = 'technical.html'; return { status: 'navigating', page: 'technical.html' }; }
+                    if (args.page === 'gallery') { window.location.href = 'index.html'; return { status: 'navigating', page: 'index.html' }; }
+                    return { error: 'Unknown page' };
+                }
+
+                if (name === 'highlight_image') {
+                    let found = null;
+                    document.querySelectorAll('.image-reveal img').forEach(img => {
+                        if (img.alt && img.alt.toLowerCase().includes(args.image_alt.toLowerCase())) {
+                            found = img.alt;
+                            const container = img.closest('.image-reveal') || img.closest('.shot-card');
+                            if (container) {
+                                container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                container.style.transition = 'box-shadow 0.3s ease';
+                                container.style.boxShadow = '0 0 40px rgba(0, 255, 255, 0.4), 0 0 80px rgba(0, 255, 255, 0.2)';
+                                setTimeout(() => { container.style.boxShadow = ''; }, 4000);
+                            }
+                        }
+                    });
+                    return found ? { status: 'highlighted', image: found } : { error: `Image matching "${args.image_alt}" not found` };
+                }
+
+                return { ok: true };
+            },
+        });
+    </script>
+
 </body>
 </html>

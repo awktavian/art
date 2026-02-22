@@ -999,5 +999,171 @@
         document.getElementById('rant-modal').addEventListener('click', e => { if (e.target.id === 'rant-modal') document.getElementById('rant-modal').classList.remove('active'); });
         document.addEventListener('click', () => initAudio(), { once: true });
     </script>
+
+    <script src="../lib/realtime-voice.js"></script>
+    <script src="../lib/kagami-voices.js"></script>
+    <script src="../lib/voice-overlay.js"></script>
+    <script>
+        VoiceOverlay.init({
+            project: 'skippy',
+            tools: [
+                // ─── PERCEPTION ────────────────────────────────────────────
+                {
+                    name: 'observe_page',
+                    description: 'Perceive the full state of the Skippy page: which section is visible, cover screen state, scroll position, sound status, modal state, can animation state.',
+                    parameters: { type: 'object', properties: {}, required: [] },
+                },
+                {
+                    name: 'read_section',
+                    description: 'Read the text content of a specific section to understand what the visitor is looking at.',
+                    parameters: {
+                        type: 'object',
+                        properties: { section: { type: 'string', enum: ['cover', 'funeral', 'specs', 'nazeeh', 'cta', 'footer'], description: 'Section ID to read' } },
+                        required: ['section'],
+                    },
+                },
+                {
+                    name: 'read_spec_cards',
+                    description: 'Read all technical specification cards with their values, descriptions, and file paths.',
+                    parameters: { type: 'object', properties: {}, required: [] },
+                },
+                // ─── ACTION ────────────────────────────────────────────────
+                {
+                    name: 'pop_the_can',
+                    description: 'Pop the beer can tab to dismiss the cover screen and reveal the main content. Only works if the cover is still showing.',
+                    parameters: { type: 'object', properties: {}, required: [] },
+                },
+                {
+                    name: 'scroll_to_section',
+                    description: 'Scroll smoothly to a specific section of the page.',
+                    parameters: {
+                        type: 'object',
+                        properties: { section: { type: 'string', enum: ['funeral', 'specs', 'nazeeh', 'cta', 'footer'], description: 'Section to scroll to' } },
+                        required: ['section'],
+                    },
+                },
+                {
+                    name: 'toggle_sound',
+                    description: 'Toggle the sound on or off.',
+                    parameters: { type: 'object', properties: {}, required: [] },
+                },
+                {
+                    name: 'open_rant_modal',
+                    description: 'Open the full unfiltered rant modal (the secret easter egg triggered by typing SKIPPY).',
+                    parameters: { type: 'object', properties: {}, required: [] },
+                },
+                {
+                    name: 'close_rant_modal',
+                    description: 'Close the rant modal if it is open.',
+                    parameters: { type: 'object', properties: {}, required: [] },
+                },
+            ],
+            onFunctionCall: (name, args) => {
+                // ─── PERCEPTION ────────────────────────────────────────
+                if (name === 'observe_page') {
+                    const cover = document.getElementById('cover');
+                    const coverVisible = cover && !cover.classList.contains('hidden');
+                    const canPopped = document.getElementById('can-stage')?.classList.contains('popped') || false;
+                    const modalOpen = document.getElementById('rant-modal')?.classList.contains('active') || false;
+                    const soundBtn = document.getElementById('sound-toggle');
+                    const soundOn = soundBtn && !soundBtn.classList.contains('muted');
+
+                    // Find which section is most visible
+                    let visibleSection = coverVisible ? 'cover' : 'unknown';
+                    if (!coverVisible) {
+                        const sections = ['funeral', 'specs', 'nazeeh', 'cta', 'footer'];
+                        const viewMid = window.innerHeight / 2;
+                        for (const id of sections) {
+                            const el = document.getElementById(id);
+                            if (el) {
+                                const r = el.getBoundingClientRect();
+                                if (r.top <= viewMid && r.bottom >= viewMid) { visibleSection = id; break; }
+                            }
+                        }
+                    }
+
+                    // Count revealed elements
+                    const revealed = document.querySelectorAll('.reveal.visible').length;
+                    const totalReveal = document.querySelectorAll('.reveal').length;
+
+                    return {
+                        cover_visible: coverVisible,
+                        can_popped: canPopped,
+                        body_unlocked: document.body.classList.contains('unlocked'),
+                        visible_section: visibleSection,
+                        scroll_y: Math.round(window.scrollY),
+                        scroll_percent: Math.round((window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100),
+                        sound_on: soundOn,
+                        rant_modal_open: modalOpen,
+                        elements_revealed: `${revealed}/${totalReveal}`,
+                    };
+                }
+
+                if (name === 'read_section') {
+                    const el = document.getElementById(args.section);
+                    if (!el) return { error: `Section "${args.section}" not found` };
+                    // Extract structured text content
+                    const texts = [];
+                    el.querySelectorAll('h2, h3, p, blockquote, .item-label, .item-value, .spec-name, .spec-value, .spec-desc').forEach(n => {
+                        const tag = n.tagName.toLowerCase();
+                        const cls = n.className;
+                        texts.push({ tag, class: cls, text: n.textContent.trim() });
+                    });
+                    return { section: args.section, content: texts };
+                }
+
+                if (name === 'read_spec_cards') {
+                    const cards = [];
+                    document.querySelectorAll('.spec-card').forEach(card => {
+                        cards.push({
+                            name: card.querySelector('.spec-name')?.textContent.trim(),
+                            value: card.querySelector('.spec-value')?.textContent.trim(),
+                            description: card.querySelector('.spec-desc')?.textContent.trim(),
+                            code_path: card.querySelector('.spec-path')?.textContent.trim(),
+                            revealed: card.classList.contains('visible'),
+                        });
+                    });
+                    return { specs: cards, total: cards.length };
+                }
+
+                // ─── ACTION ───────────────────────────────────────────
+                if (name === 'pop_the_can') {
+                    const stage = document.getElementById('can-stage');
+                    if (!stage || stage.classList.contains('popped')) {
+                        return { status: 'already_popped', message: 'Cover already dismissed' };
+                    }
+                    stage.click();
+                    return { status: 'popped', message: 'Can popped! Fizz! Content revealing...' };
+                }
+
+                if (name === 'scroll_to_section') {
+                    const el = document.getElementById(args.section);
+                    if (!el) return { error: `Section "${args.section}" not found` };
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    return { status: 'scrolling', target: args.section };
+                }
+
+                if (name === 'toggle_sound') {
+                    const btn = document.getElementById('sound-toggle');
+                    if (btn) btn.click();
+                    return { sound_on: btn && !btn.classList.contains('muted') };
+                }
+
+                if (name === 'open_rant_modal') {
+                    const modal = document.getElementById('rant-modal');
+                    if (modal) { modal.classList.add('active'); playTone(440, 0.3, 'square', 0.15); }
+                    return { status: 'opened', message: 'Rant modal opened — Skippy\'s unfiltered thoughts' };
+                }
+
+                if (name === 'close_rant_modal') {
+                    const modal = document.getElementById('rant-modal');
+                    if (modal) modal.classList.remove('active');
+                    return { status: 'closed' };
+                }
+
+                return { ok: true };
+            },
+        });
+    </script>
 </body>
 </html>

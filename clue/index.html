@@ -472,5 +472,308 @@
 
     <script src="characters.js"></script>
     <script src="mansion.js"></script>
+
+    <script src="../lib/realtime-voice.js"></script>
+    <script src="../lib/kagami-voices.js"></script>
+    <script src="../lib/voice-overlay.js"></script>
+    <script>
+        VoiceOverlay.init({
+            project: 'clue',
+            tools: [
+                // ─── PERCEPTION ────────────────────────────────────────────
+                {
+                    name: 'observe_mansion',
+                    description: 'Perceive the full state of the mansion page: loading state, which section is visible, current ending selected, modal state, visit count, secrets found, scroll position.',
+                    parameters: { type: 'object', properties: {}, required: [] },
+                },
+                {
+                    name: 'read_character',
+                    description: 'Read the full details of a Clue character including their Kagami colony mapping, catastrophe type, octonion basis, role, room, essence, code path, full description, and movie quotes.',
+                    parameters: {
+                        type: 'object',
+                        properties: { key: { type: 'string', description: 'Character key: scarlet, mustard, white, green, plum, peacock, motorist, wadsworth' } },
+                        required: ['key'],
+                    },
+                },
+                {
+                    name: 'read_room',
+                    description: 'Read the full details of a mansion room including its Kagami module mapping, colony, icon, floor, character association, function, and code path.',
+                    parameters: {
+                        type: 'object',
+                        properties: { key: { type: 'string', description: 'Room key: conservatory, billiard, kitchen, dining, ballroom, study, library, lounge, hall, attic, basement, walls' } },
+                        required: ['key'],
+                    },
+                },
+                {
+                    name: 'read_secret_passages',
+                    description: 'Read all secret passages (Fano plane lines) showing how colony pairs compose to produce a third colony.',
+                    parameters: { type: 'object', properties: {}, required: [] },
+                },
+                {
+                    name: 'read_ending',
+                    description: 'Read the content of a specific ending (A, B, or C) without triggering the UI reveal.',
+                    parameters: {
+                        type: 'object',
+                        properties: { ending: { type: 'string', enum: ['A', 'B', 'C'], description: 'Ending letter' } },
+                        required: ['ending'],
+                    },
+                },
+                {
+                    name: 'survey_all_characters',
+                    description: 'Get a compact overview of all 8 characters with their colony, catastrophe, room, and role mappings.',
+                    parameters: { type: 'object', properties: {}, required: [] },
+                },
+                // ─── ACTION ────────────────────────────────────────────────
+                {
+                    name: 'scroll_to_section',
+                    description: 'Scroll smoothly to a section of the mansion page.',
+                    parameters: {
+                        type: 'object',
+                        properties: { section: { type: 'string', enum: ['investigation', 'lifecycle', 'walls', 'endings', 'reveal'], description: 'Section ID to scroll to' } },
+                        required: ['section'],
+                    },
+                },
+                {
+                    name: 'show_room_modal',
+                    description: 'Open the room detail modal for a specific room, showing its character, colony, description, and a random quote.',
+                    parameters: {
+                        type: 'object',
+                        properties: { room: { type: 'string', description: 'Room key (e.g. study, library, hall, conservatory)' } },
+                        required: ['room'],
+                    },
+                },
+                {
+                    name: 'show_character_modal',
+                    description: 'Open the character detail modal for a specific character, showing their full description, colony mapping, and quotes.',
+                    parameters: {
+                        type: 'object',
+                        properties: { character: { type: 'string', description: 'Character key (e.g. scarlet, wadsworth, plum)' } },
+                        required: ['character'],
+                    },
+                },
+                {
+                    name: 'reveal_ending',
+                    description: 'Trigger one of the three endings (A: Mathematical, B: Safety, C: Full Picture) in the Endings section.',
+                    parameters: {
+                        type: 'object',
+                        properties: { ending: { type: 'string', enum: ['A', 'B', 'C'], description: 'Which ending to reveal' } },
+                        required: ['ending'],
+                    },
+                },
+                {
+                    name: 'activate_secret',
+                    description: 'Trigger one of the hidden easter egg sequences: flames (Mrs. White\'s meltdown), wadsworth (the butler explains), passages (reveal Fano connections).',
+                    parameters: {
+                        type: 'object',
+                        properties: { secret: { type: 'string', enum: ['flames', 'wadsworth', 'passages'], description: 'Which secret to activate' } },
+                        required: ['secret'],
+                    },
+                },
+                {
+                    name: 'close_modal',
+                    description: 'Close any open modal dialog.',
+                    parameters: { type: 'object', properties: {}, required: [] },
+                },
+            ],
+            onFunctionCall: (name, args) => {
+                // ─── PERCEPTION ────────────────────────────────────────
+                if (name === 'observe_mansion') {
+                    const loadingEl = document.getElementById('loading');
+                    const loading = loadingEl && !loadingEl.classList.contains('hidden');
+                    const modalEl = document.querySelector('.modal');
+                    const modalOpen = modalEl && modalEl.classList.contains('active');
+                    const endingContent = document.getElementById('ending-content');
+                    const currentEnding = document.documentElement.dataset.ending || 'none';
+
+                    // Determine visible section
+                    const viewMid = window.innerHeight / 2;
+                    let visibleSection = 'top';
+                    const sectionIds = ['investigation', 'lifecycle', 'walls', 'endings', 'reveal'];
+                    for (const id of sectionIds) {
+                        const el = document.getElementById(id);
+                        if (el) {
+                            const r = el.getBoundingClientRect();
+                            if (r.top <= viewMid && r.bottom >= viewMid) { visibleSection = id; break; }
+                        }
+                    }
+
+                    // Read visit count from DOM
+                    const visitEl = document.getElementById('visit-count');
+                    const visits = visitEl ? visitEl.textContent : '?';
+
+                    // Get secrets from localStorage
+                    const secrets = JSON.parse(localStorage.getItem('mansion_secrets') || '[]');
+
+                    return {
+                        loading,
+                        visible_section: visibleSection,
+                        current_ending: currentEnding,
+                        modal_open: modalOpen,
+                        visit_count: visits,
+                        secrets_found: secrets,
+                        scroll_y: Math.round(window.scrollY),
+                        scroll_percent: Math.round((window.scrollY / Math.max(1, document.body.scrollHeight - window.innerHeight)) * 100),
+                        total_characters: typeof CHARACTERS !== 'undefined' ? Object.keys(CHARACTERS).length : 0,
+                        total_rooms: typeof ROOMS !== 'undefined' ? Object.keys(ROOMS).length : 0,
+                        total_passages: typeof SECRET_PASSAGES !== 'undefined' ? SECRET_PASSAGES.length : 0,
+                    };
+                }
+
+                if (name === 'read_character') {
+                    if (typeof CHARACTERS === 'undefined') return { error: 'Characters not loaded yet' };
+                    const c = CHARACTERS[args.key];
+                    if (!c) return { error: `Character "${args.key}" not found. Keys: ${Object.keys(CHARACTERS).join(', ')}` };
+                    return {
+                        key: args.key,
+                        name: c.name,
+                        colony: c.colony,
+                        basis: c.basis,
+                        catastrophe: c.catastrophe,
+                        role: c.role,
+                        room: c.room,
+                        color: c.color,
+                        essence: c.essence,
+                        code_path: c.code,
+                        description: c.description,
+                        quotes: c.quotes,
+                    };
+                }
+
+                if (name === 'read_room') {
+                    if (typeof ROOMS === 'undefined') return { error: 'Rooms not loaded yet' };
+                    const r = ROOMS[args.key];
+                    if (!r) return { error: `Room "${args.key}" not found. Keys: ${Object.keys(ROOMS).join(', ')}` };
+                    const character = r.character && CHARACTERS ? CHARACTERS[r.character] : null;
+                    return {
+                        key: args.key,
+                        name: r.name,
+                        colony: r.colony,
+                        icon: r.icon,
+                        floor: r.floor,
+                        description: r.description,
+                        function: r.function,
+                        code_path: r.codePath,
+                        character: character ? { name: character.name, colony: character.colony, catastrophe: character.catastrophe } : null,
+                    };
+                }
+
+                if (name === 'read_secret_passages') {
+                    if (typeof SECRET_PASSAGES === 'undefined') return { error: 'Passages not loaded' };
+                    return {
+                        passages: SECRET_PASSAGES.map(p => ({
+                            from: p.from,
+                            to: p.to,
+                            colonies: p.colonies,
+                            result: p.result,
+                            fano_line: p.fanoLine,
+                            description: p.description,
+                        })),
+                        note: 'Each passage represents a Fano plane line: colony_a × colony_b = colony_c (octonion multiplication)',
+                    };
+                }
+
+                if (name === 'read_ending') {
+                    if (typeof ENDINGS === 'undefined') return { error: 'Endings not loaded' };
+                    const e = ENDINGS[args.ending];
+                    if (!e) return { error: 'Ending not found' };
+                    // Strip HTML tags for text content
+                    const div = document.createElement('div');
+                    div.innerHTML = e.content;
+                    return { letter: args.ending, title: e.title, tagline: e.tagline, focus: e.focus, content_text: div.textContent.trim() };
+                }
+
+                if (name === 'survey_all_characters') {
+                    if (typeof CHARACTERS === 'undefined') return { error: 'Characters not loaded' };
+                    return {
+                        characters: Object.entries(CHARACTERS).map(([key, c]) => ({
+                            key,
+                            name: c.name,
+                            colony: c.colony,
+                            basis: c.basis,
+                            catastrophe: c.catastrophe,
+                            role: c.role,
+                            room: c.room,
+                        })),
+                    };
+                }
+
+                // ─── ACTION ───────────────────────────────────────────
+                if (name === 'scroll_to_section') {
+                    const el = document.getElementById(args.section);
+                    if (!el) return { error: `Section "${args.section}" not found` };
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    return { status: 'scrolling', target: args.section };
+                }
+
+                if (name === 'show_room_modal') {
+                    if (typeof window.mansion !== 'undefined' && window.mansion.investigate) {
+                        window.mansion.investigate(args.room);
+                        return { status: 'opened', room: args.room };
+                    }
+                    return { error: 'Mansion not initialized' };
+                }
+
+                if (name === 'show_character_modal') {
+                    if (typeof window.mansion !== 'undefined' && window.mansion.suspect) {
+                        window.mansion.suspect(args.character);
+                        // Also programmatically open the modal
+                        const modalBody = document.getElementById('modal-body');
+                        const modal = document.querySelector('.modal');
+                        if (typeof CHARACTERS !== 'undefined' && CHARACTERS[args.character] && modalBody && modal) {
+                            const c = CHARACTERS[args.character];
+                            const quote = c.quotes[Math.floor(Math.random() * c.quotes.length)];
+                            const icons = { Spark: '🔥', Forge: '⚒️', Flow: '🌊', Nexus: '🔗', Beacon: '🗼', Grove: '🌿', Crystal: '💎', Kagami: '🏛️' };
+                            modalBody.innerHTML = `<div style="border-left:3px solid ${c.color};padding-left:1rem;"><div style="font-size:3rem;text-align:center;margin-bottom:1rem;">${icons[c.colony]||'✧'}</div><h3>${c.name}</h3><p style="opacity:0.6;">${c.colony} · ${c.basis} · ${c.catastrophe}</p><p><strong>Room:</strong> ${c.room}</p><p><strong>Role:</strong> ${c.role}</p><blockquote>"${quote}"</blockquote><p>${c.description}</p><p><code>${c.code}</code></p></div>`;
+                            modal.classList.add('active');
+                        }
+                        return { status: 'opened', character: args.character };
+                    }
+                    return { error: 'Mansion not initialized' };
+                }
+
+                if (name === 'reveal_ending') {
+                    if (typeof window.mansion !== 'undefined' && window.mansion.ending) {
+                        window.mansion.ending(args.ending);
+                    } else {
+                        // Fallback: directly set
+                        if (typeof ENDINGS !== 'undefined' && ENDINGS[args.ending]) {
+                            const ec = document.getElementById('ending-content');
+                            if (ec) { ec.innerHTML = ENDINGS[args.ending].content; ec.classList.add('visible'); }
+                            document.documentElement.dataset.ending = args.ending;
+                        }
+                    }
+                    // Also scroll to endings
+                    const endingsEl = document.getElementById('endings');
+                    if (endingsEl) endingsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    // Highlight the active button
+                    document.querySelectorAll('.ending-btn').forEach(b => {
+                        b.classList.toggle('active', b.dataset.ending === args.ending);
+                    });
+                    return { status: 'revealed', ending: args.ending, tagline: typeof ENDINGS !== 'undefined' ? ENDINGS[args.ending]?.tagline : '' };
+                }
+
+                if (name === 'activate_secret') {
+                    if (typeof window.mansion !== 'undefined') {
+                        if (args.secret === 'flames' && window.mansion.flames) { window.mansion.flames(); return { status: 'activated', secret: 'flames', quote: 'Flames... flames on the side of my face...' }; }
+                        if (args.secret === 'wadsworth' && window.mansion.wadsworth) { window.mansion.wadsworth(); return { status: 'activated', secret: 'wadsworth', quote: 'Let me explain...' }; }
+                        if (args.secret === 'passages') {
+                            document.body.classList.add('passage-reveal');
+                            setTimeout(() => document.body.classList.remove('passage-reveal'), 5000);
+                            return { status: 'activated', secret: 'passages', note: 'Secret passages revealed for 5 seconds' };
+                        }
+                    }
+                    return { error: 'Mansion not initialized or secret not recognized' };
+                }
+
+                if (name === 'close_modal') {
+                    const modal = document.querySelector('.modal');
+                    if (modal) modal.classList.remove('active');
+                    return { status: 'closed' };
+                }
+
+                return { ok: true };
+            },
+        });
+    </script>
 </body>
 </html>
