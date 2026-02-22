@@ -19,8 +19,6 @@
  * h(x) ≥ 0 always
  */
 
-import { AmbientPlayer } from './ambient-player.js';
-
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIO CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -303,6 +301,7 @@ export class SoundDesignManager {
         // Crossfade from current to new zone
         this.crossfadeToZone(zoneName, profile);
         this.currentZone = zoneName;
+        this.switchReverb(zoneName === 'rotunda' ? 'rotunda' : 'wing');
     }
     
     crossfadeToZone(zoneName, profile) {
@@ -348,16 +347,14 @@ export class SoundDesignManager {
         // Heavy low-pass filter for warm, gentle sound
         const filter = this.audioContext.createBiquadFilter();
         filter.type = 'lowpass';
-        filter.frequency.value = Math.min(profile.filterFreq, 400);  // Aggressive filtering
+        filter.frequency.value = profile.filterFreq;
         filter.Q.value = 0.3;  // Low resonance
         
-        // Only use first 2 harmonics max for gentler sound
-        const limitedHarmonics = profile.harmonics.slice(0, 2);
+        const limitedHarmonics = profile.harmonics;
         
-        // Create oscillators - always use sine for gentlest sound
         limitedHarmonics.forEach((harmonic, i) => {
             const osc = this.audioContext.createOscillator();
-            osc.type = 'sine';  // Always sine for ambient - gentler
+            osc.type = profile.waveform;
             osc.frequency.value = profile.baseFreq * harmonic;
             
             // Very quiet harmonics
@@ -885,88 +882,7 @@ export class SoundDesignManager {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// COMPLETE SOUND MANAGER (combines all audio systems)
-// ═══════════════════════════════════════════════════════════════════════════
-
-class CompleteSoundManager {
-    /**
-     * Unified sound manager that combines:
-     * - SoundDesignManager (interaction sounds, colony notes)
-     * - AmbientPlayer (background ambient music)
-     */
-    constructor() {
-        this.soundDesign = new SoundDesignManager();
-        this.ambientPlayer = new AmbientPlayer();
-        this.isInitialized = false;
-        this.masterVolume = 0.5;
-    }
-    
-    async init() {
-        if (this.isInitialized) return;
-        
-        await this.soundDesign.init();
-        
-        // Share audio context with ambient player
-        this.ambientPlayer.audioContext = this.soundDesign.audioContext;
-        await this.ambientPlayer.init();
-        
-        this.isInitialized = true;
-        console.log('🔊 Complete Sound Manager initialized');
-    }
-    
-    setZone(zoneName) {
-        this.soundDesign.setZone(zoneName);
-        this.ambientPlayer.setZone(zoneName);
-    }
-    
-    playInteraction(type) {
-        this.soundDesign.playInteraction(type);
-    }
-    
-    playColonyNote(colonyName, volume) {
-        this.soundDesign.playColonyNote(colonyName, volume);
-    }
-    
-    playFootstep(zone) {
-        this.soundDesign.playFootstep(zone);
-    }
-    
-    playWingEntrance(colonyName) {
-        this.soundDesign.playWingEntrance(colonyName);
-    }
-    
-    updateListenerPosition(position, forward, up) {
-        this.soundDesign.updateListenerPosition(position, forward, up);
-    }
-    
-    setVolume(volume) {
-        this.masterVolume = volume;
-        this.soundDesign.setVolume(volume);
-        this.ambientPlayer.setVolume(volume * 0.6);  // Ambient slightly quieter
-    }
-    
-    toggle() {
-        const enabled = this.soundDesign.toggle();
-        if (enabled) {
-            this.ambientPlayer.unmute();
-        } else {
-            this.ambientPlayer.mute();
-        }
-        return enabled;
-    }
-    
-    get isMuted() {
-        return this.soundDesign.isMuted;
-    }
-    
-    dispose() {
-        this.soundDesign.dispose();
-        this.ambientPlayer.dispose();
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-export { COLONY_AUDIO, INTERACTION_SOUNDS, CompleteSoundManager };
+export { COLONY_AUDIO, INTERACTION_SOUNDS, SoundDesignManager };

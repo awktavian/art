@@ -13,7 +13,11 @@ import * as THREE from 'three';
 import { getCanvasFont, SIZES } from '../lib/typography.js';
 import { DIMENSIONS } from './architecture.js';
 import { isInLineOfSight } from '../lib/culling-system.js';
-import { shouldShowReturnToRotunda } from '../lib/guest-experience.js';
+function shouldShowReturnToRotunda(journeyTracker) {
+    if (!journeyTracker) return false;
+    const zone = journeyTracker.currentZone || 'rotunda';
+    return zone !== 'rotunda';
+}
 
 // Colony colors for consistent wayfinding
 const COLONY_COLORS = {
@@ -147,9 +151,11 @@ export class Minimap {
         const worldX = ((cx - center) / (MAP_FACTOR * scale)) * WORLD_EXTENT;
         const worldZ = ((cy - center) / (MAP_FACTOR * scale)) * WORLD_EXTENT;
         
-        // Check if click is near a wing endpoint for smarter teleport
+        // Check if click is near a wing endpoint for smarter teleport.
+        // Full wing extent from rotunda edge: corridor (45) + vestibule (6) + gallery (30) = 81 world units.
+        // Minimap scale factor: rotunda radius 20 world → 22 minimap units → factor = 22/20 = 1.1
         let targetColony = null;
-        const wingLength = 42 * scale;
+        const wingLength = 89 * scale;  // 81 world units * 1.1 map factor ≈ 89
         COLONY_ORDER.forEach((colony, i) => {
             const angle = (i / 7) * Math.PI * 2 - Math.PI / 2;
             const endDist = 22 * scale + wingLength - 5;
@@ -213,8 +219,10 @@ export class Minimap {
         ctx.lineWidth = rotundaVisited ? 2 : 1;
         ctx.stroke();
         
-        // Draw wings (radiating from center)
-        const wingLength = 42 * scale;
+        // Draw wings (radiating from center).
+        // Full wing extent: corridor (45) + vestibule (6) + gallery (30) = 81 world units.
+        // Minimap map factor: rotunda 20 world → 22 minimap units → 1.1 per world unit.
+        const wingLength = 89 * scale;  // 81 * 1.1 ≈ 89
         const wingWidth = 10 * scale;
         
         COLONY_ORDER.forEach((colony, i) => {
@@ -1258,7 +1266,15 @@ export class WayfindingManager {
             size: 160,
             position: { right: 20, bottom: 20 }
         });
+        // Start hidden; auto-show once galleries are loaded (loading screen lifts).
         this.minimap.hide();
+        this._galleriesLoadedHandler = () => {
+            // Small delay lets the loading screen fade complete before minimap appears.
+            setTimeout(() => {
+                if (this.minimap) this.minimap.show();
+            }, 800);
+        };
+        window.addEventListener('galleries-loaded', this._galleriesLoadedHandler, { once: true });
         this.createArchitecturalCue();
         this.signage = new SignageSystem(this.scene);
         this.signage.createAllWingSigns();
@@ -1324,6 +1340,10 @@ export class WayfindingManager {
         if (this._keyHandler) {
             document.removeEventListener('keydown', this._keyHandler);
             this._keyHandler = null;
+        }
+        if (this._galleriesLoadedHandler) {
+            window.removeEventListener('galleries-loaded', this._galleriesLoadedHandler);
+            this._galleriesLoadedHandler = null;
         }
         if (this.architecturalCue && this.architecturalCue.parentNode) this.architecturalCue.remove();
         if (this.minimap) this.minimap.dispose();

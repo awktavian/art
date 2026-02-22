@@ -223,7 +223,7 @@ export class AccessibilityManager {
     createSkipLink() {
         this.skipLinkElement = document.createElement('a');
         this.skipLinkElement.id = 'skip-link';
-        this.skipLinkElement.href = '#museum-content';
+        this.skipLinkElement.href = '#canvas-container';
         this.skipLinkElement.textContent = 'Skip to museum content';
         this.skipLinkElement.style.cssText = `
             position: absolute;
@@ -491,8 +491,8 @@ export class AccessibilityManager {
     updateFocusableElements() {
         // Query all focusable elements in the museum
         this.focusableElements = Array.from(document.querySelectorAll(
-            '#museum-content button, #museum-content [tabindex="0"], ' +
-            '#museum-content a[href], #museum-content input, ' +
+            '#canvas-container button, #canvas-container [tabindex="0"], ' +
+            '#canvas-container a[href], #canvas-container input, ' +
             '.artwork-interactive, .wing-sign, .info-kiosk'
         ));
     }

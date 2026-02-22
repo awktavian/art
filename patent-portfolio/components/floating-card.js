@@ -96,7 +96,12 @@ export function createFloatingCard() {
         if (fadeTimer) clearTimeout(fadeTimer);
         el.style.opacity = '0';
         fadeTimer = setTimeout(() => {
-            if (el) el.style.display = 'none';
+            // Keep the element in the DOM so re-hover can reuse it without recreation.
+            // Hide it visually and remove from pointer-event hit testing.
+            if (el) {
+                el.style.opacity = '0';
+                el.style.pointerEvents = 'none';
+            }
             fadeTimer = null;
         }, FADE_MS);
     }

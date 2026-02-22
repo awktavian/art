@@ -255,12 +255,12 @@ export function createGradientEnvironmentMap(renderer) {
     });
     
     // Render to cube map
-    const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(256, {
+    const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(512, {
         format: THREE.RGBAFormat,
         generateMipmaps: true,
         minFilter: THREE.LinearMipmapLinearFilter
     });
-    
+
     const cubeCamera = new THREE.CubeCamera(0.1, 1000, cubeRenderTarget);
     cubeCamera.update(renderer, envScene);
     
@@ -665,9 +665,10 @@ export function createWallMaterial(options = {}) {
     const material = new THREE.MeshStandardMaterial({
         color,
         metalness: 0.1,
-        roughness: 0.8
+        roughness: 0.8,
+        envMapIntensity: 0
     });
-    
+
     if (roughnessMap) material.roughnessMap = roughnessMap;
     if (normalMap) {
         material.normalMap = normalMap;

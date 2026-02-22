@@ -957,13 +957,13 @@ export class S15HopfArtwork extends THREE.Group {
         ctx.fillText('= e₁ × e₅', 220, 145);
         ctx.fillStyle = '#FF6B35';
         ctx.font = 'bold 16px "IBM Plex Mono", monospace';
-        ctx.fillText('= +e₃', 220, 170);
+        ctx.fillText('= +e₆', 220, 170);
         
         // Conclusion
         ctx.fillStyle = '#FF4444';
         ctx.font = 'bold 16px "IBM Plex Mono", monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('−e₆ ≠ +e₃  ✗', 200, 210);
+        ctx.fillText('−e₆ ≠ +e₆  ✗', 200, 210);
         
         // Why it matters
         ctx.fillStyle = '#9E9994';

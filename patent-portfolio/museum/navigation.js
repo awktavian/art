@@ -10,6 +10,7 @@
 
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+import { DIMENSIONS } from './architecture.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // NAVIGATION CONTROLLER
@@ -38,7 +39,7 @@ export class MuseumNavigation {
         this.velocity = new THREE.Vector3();
         this.direction = new THREE.Vector3();
         this.playerHeight = 1.7; // meters
-        this.moveSpeed = 100;
+        this.moveSpeed = 15;
         this.friction = 8;
         this.isSprinting = false;
         this.sprintMultiplier = 1.8;
@@ -58,6 +59,8 @@ export class MuseumNavigation {
         this._leftSlide = new THREE.Vector3();
         this._collisionOrigin = new THREE.Vector3();
         this._collisionDir = new THREE.Vector3();
+        this._slideVec = new THREE.Vector3();   // Pre-allocated for calculateSlideMovement
+        this._slideBlocked = new THREE.Vector3(); // Pre-allocated for blocked direction accumulation
         
         // Collision
         this.raycaster = new THREE.Raycaster();
@@ -84,8 +87,12 @@ export class MuseumNavigation {
     }
     
     init() {
-        // Set initial position (closer to rotunda for better visibility)
-        this.camera.position.set(0, this.playerHeight, -20);  // was -35, now -20
+        // Spawn outside the vestibule, facing the entrance.
+        // rotundaRadius (20) + vestibule.depth (15) + 4m clearance = -39
+        // Negative Z because the vestibule extends behind the rotunda (entrance faces +Z direction).
+        const rotundaRadius = 20;
+        const vestibuleDepth = 15;
+        this.camera.position.set(0, this.playerHeight, -(rotundaRadius + vestibuleDepth + 4));
         this.camera.lookAt(0, this.playerHeight, 0);
         
         if (this.isMobile) {
@@ -442,14 +449,15 @@ export class MuseumNavigation {
     teleportToWing(index) {
         const colonies = ['spark', 'forge', 'flow', 'nexus', 'beacon', 'grove', 'crystal'];
         const wingNames = ['Spark Wing', 'Forge Wing', 'Flow Wing', 'Nexus Wing', 'Beacon Wing', 'Grove Wing', 'Crystal Wing'];
-        
+
         if (index >= 0 && index < colonies.length) {
-            // Calculate wing entrance position
+            // Place player just inside the corridor entrance, past the rotunda wall.
+            // DIMENSIONS.rotunda.radius (20) + 5m = 25 — corridor entrance, not inside the wall.
             const angle = (index / 7) * Math.PI * 2;
-            const distance = 25;
+            const distance = DIMENSIONS.rotunda.radius + 5;
             const x = Math.cos(angle) * distance;
             const z = Math.sin(angle) * distance;
-            
+
             this.teleportTo(new THREE.Vector3(x, this.playerHeight, z), wingNames[index]);
         }
     }
@@ -596,54 +604,118 @@ export class MuseumNavigation {
     }
     
     /**
-     * Check for collision in movement direction
-     * Returns true if movement is blocked
+     * Check for collision in a single direction.
+     * Returns true if movement is blocked within (distance + margin).
      */
     checkCollision(moveDirection, distance) {
         if (!this.collisionObjects || this.collisionObjects.length === 0) return false;
         if (!moveDirection || distance <= 0) return false;
-        
-        // Set up raycaster at player position (reuse cached vector)
+
+        // Set up raycaster at body center (reuse cached origin vector)
         this._collisionOrigin.copy(this.camera.position);
-        this._collisionOrigin.y -= 0.5; // Cast from body center, not eyes
-        
-        // Normalize direction (reuse cached vector)
+        this._collisionOrigin.y -= 0.5;
+
+        // Normalize direction into cached vector
         this._collisionDir.copy(moveDirection).normalize();
-        
-        // Validate direction isn't NaN
-        if (isNaN(this._collisionDir.x) || isNaN(this._collisionDir.z)) {
-            return false;
-        }
-        
+
+        if (isNaN(this._collisionDir.x) || isNaN(this._collisionDir.z)) return false;
+
         this.raycaster.set(this._collisionOrigin, this._collisionDir);
         this.raycaster.far = distance + this.collisionMargin;
-        
-        // Check for intersections
+
         const intersections = this.raycaster.intersectObjects(this.collisionObjects, false);
-        
         if (intersections.length > 0) {
-            const closest = intersections[0];
-            return closest.distance < (distance + this.collisionMargin);
+            return intersections[0].distance < (distance + this.collisionMargin);
         }
-        
         return false;
+    }
+
+    /**
+     * 8-ray collision system.
+     * Casts rays at [0, 45, -45, 90, -90, 135, -135, 180] degrees relative to
+     * the intended movement direction. For each ray that hits within collision
+     * distance, its direction is added to a "blocked" accumulator.
+     * Returns the slide movement after removing all blocked components.
+     *
+     * @param {THREE.Vector3} moveVec  - World-space intended movement (will not be mutated)
+     * @returns {THREE.Vector3|null}   - Adjusted move vector (pre-allocated _slideVec), or null if fully blocked
+     */
+    checkCollisionMultiRay(moveVec) {
+        if (!this.collisionObjects || this.collisionObjects.length === 0) return moveVec;
+
+        const moveDistance = moveVec.length();
+        if (moveDistance < 0.0001) return moveVec;
+
+        // Ray fan angles relative to movement direction (degrees → radians)
+        const RAY_ANGLES_DEG = [0, 45, -45, 90, -90, 135, -135, 180];
+        const RAD = Math.PI / 180;
+
+        // Movement direction (yaw only, horizontal)
+        const yaw = Math.atan2(moveVec.x, moveVec.z);
+
+        this._collisionOrigin.copy(this.camera.position);
+        this._collisionOrigin.y -= 0.5; // body center
+
+        // Accumulate blocked normal — reuse pre-allocated vector
+        this._slideBlocked.set(0, 0, 0);
+        let hitCount = 0;
+
+        for (let i = 0; i < RAY_ANGLES_DEG.length; i++) {
+            const rayYaw = yaw + RAY_ANGLES_DEG[i] * RAD;
+            this._collisionDir.set(Math.sin(rayYaw), 0, Math.cos(rayYaw));
+
+            if (isNaN(this._collisionDir.x)) continue;
+
+            this.raycaster.set(this._collisionOrigin, this._collisionDir);
+            this.raycaster.far = this.collisionDistance + this.collisionMargin;
+
+            const hits = this.raycaster.intersectObjects(this.collisionObjects, false);
+            if (hits.length > 0 && hits[0].distance < (this.collisionDistance + this.collisionMargin)) {
+                // Accumulate the ray direction as a blocked axis
+                this._slideBlocked.addScaledVector(this._collisionDir, 1);
+                hitCount++;
+            }
+        }
+
+        if (hitCount === 0) return moveVec;
+
+        // Normalize accumulated blocked direction to get the dominant wall normal
+        this._slideBlocked.normalize();
+
+        // Slide: remove blocked component from move vector
+        const dot = moveVec.dot(this._slideBlocked);
+        this._slideVec.copy(this._slideBlocked).multiplyScalar(dot);
+        this._slideVec.subVectors(moveVec, this._slideVec);
+        this._slideVec.multiplyScalar(0.8);
+
+        // If resulting slide is tiny, fully block
+        if (this._slideVec.length() < 0.001) return null;
+
+        // Verify slide direction is clear before returning
+        const slideDir = this._slideVec.clone().normalize();
+        if (this.checkCollision(slideDir, this._slideVec.length())) {
+            return null;
+        }
+
+        return this._slideVec;
     }
     
     /**
      * Calculate slide direction along wall
-     * Returns adjusted movement vector that slides along obstacles
+     * Returns adjusted movement vector that slides along obstacles.
+     * Uses pre-allocated this._slideVec to avoid GC allocations in the hot path.
      */
     calculateSlideMovement(originalMove, blockedDirection) {
         // Project movement onto the plane perpendicular to blocked direction
+        // slideMove = originalMove - dot(originalMove, blocked) * blocked
         const dot = originalMove.dot(blockedDirection);
-        const slideMove = originalMove.clone().sub(
-            blockedDirection.clone().multiplyScalar(dot)
-        );
-        
+        this._slideVec.copy(blockedDirection).multiplyScalar(dot);
+        this._slideVec.subVectors(originalMove, this._slideVec);
+
         // Reduce slide speed slightly for more realistic feel
-        slideMove.multiplyScalar(0.8);
-        
-        return slideMove;
+        this._slideVec.multiplyScalar(0.8);
+
+        return this._slideVec;
     }
     
     /**
@@ -753,7 +825,8 @@ export class MuseumNavigation {
         this.velocity.y -= 20 * deltaTime;
         
         // Clamp velocity magnitude (not per-axis — prevents diagonal speed exploit)
-        const maxVel = this.isSprinting ? 25 : 15;
+        // Walk: 5, Sprint: 9 (same 1.8x multiplier)
+        const maxVel = this.isSprinting ? 9 : 5;
         const velMag = Math.sqrt(this.velocity.x ** 2 + this.velocity.z ** 2);
         if (velMag > maxVel) {
             const scale = maxVel / velMag;
@@ -788,35 +861,21 @@ export class MuseumNavigation {
         
         const moveDistance = this._moveVector.length();
         
-        // Apply movement - ALWAYS use direct position updates for reliability
+        // Apply movement - 8-ray collision with wall sliding
         if (moveDistance > 0.001) {
-            // Skip collision if disabled or no objects
-            const collisionEnabled = this.collisionObjects && 
-                                    this.collisionObjects.length > 0 &&
-                                    this._collisionEnabled !== false;
-            
+            const collisionEnabled = this.collisionObjects &&
+                                     this.collisionObjects.length > 0 &&
+                                     this._collisionEnabled !== false;
+
             if (collisionEnabled) {
-                this._collisionDir.copy(this._moveVector).normalize();
-                const hasCollision = this.checkCollision(this._collisionDir, moveDistance);
-                
-                if (!hasCollision) {
-                    // No collision - direct position update
-                    this.camera.position.addScaledVector(this._forward, moveZ);
-                    this.camera.position.addScaledVector(this._right, moveX);
-                } else {
-                    // Wall sliding: project movement onto wall-parallel plane
-                    const slideMove = this.calculateSlideMovement(this._moveVector, this._collisionDir);
-                    const slideDistance = slideMove.length();
-                    
-                    if (slideDistance > 0.001) {
-                        const slideDirNorm = slideMove.clone().normalize();
-                        if (!this.checkCollision(slideDirNorm, slideDistance)) {
-                            this.camera.position.add(slideMove);
-                        }
-                    }
+                // 8-ray multi-direction check: returns adjusted slide vector or null if fully blocked
+                const adjusted = this.checkCollisionMultiRay(this._moveVector);
+                if (adjusted) {
+                    this.camera.position.add(adjusted);
                 }
+                // If null: fully blocked, don't move
             } else {
-                // No collision - direct position update
+                // No collision objects yet — direct position update
                 this.camera.position.addScaledVector(this._forward, moveZ);
                 this.camera.position.addScaledVector(this._right, moveX);
             }

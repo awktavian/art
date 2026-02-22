@@ -32,9 +32,10 @@ function createVolumetricCone() {
     const material = new THREE.MeshBasicMaterial({
         color: 0xF5F0E8,
         transparent: true,
-        opacity: 0.04,
+        opacity: 0.15,
         side: THREE.BackSide,
-        depthWrite: false
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
     });
     const cone = new THREE.Mesh(geometry, material);
     cone.position.set(DIMENSIONS.rotunda.apertureOffset || 0, DIMENSIONS.rotunda.height - h * 0.5, 0);
@@ -146,12 +147,36 @@ export class AtmosphereManager {
 
     update(delta) {
         if (!this.enabled) return;
-        // Optional: subtle motion on dust (CPU-driven slight drift)
         if (this.dustMotes?.geometry?.attributes?.position) {
             const pos = this.dustMotes.geometry.attributes.position.array;
+            const t = Date.now() * 0.001;
+            if (!this._dustVelocities) {
+                this._dustVelocities = new Float32Array(pos.length);
+                for (let i = 0; i < this._dustVelocities.length; i += 3) {
+                    this._dustVelocities[i]     = (Math.random() - 0.5) * 0.002;
+                    this._dustVelocities[i + 1] = Math.random() * 0.001;
+                    this._dustVelocities[i + 2] = (Math.random() - 0.5) * 0.002;
+                }
+            }
+            const vels = this._dustVelocities;
+            const maxY = DIMENSIONS.rotunda.height * 0.8;
             for (let i = 0; i < pos.length; i += 3) {
-                pos[i + 1] += Math.sin(Date.now() * 0.001 + i) * 0.002;
-                if (pos[i + 1] > DIMENSIONS.rotunda.height * 0.8) pos[i + 1] = 0;
+                const x = pos[i], z = pos[i + 2];
+                const lateralX = Math.sin(x * 1.3 + t * 0.7) * Math.cos(z * 0.9 + t * 0.5);
+                const lateralZ = Math.cos(x * 0.8 + t * 0.6) * Math.sin(z * 1.1 + t * 0.4);
+                vels[i]     += lateralX * 0.0002;
+                vels[i + 1] += 0.0005;
+                vels[i + 2] += lateralZ * 0.0002;
+                vels[i]     *= 0.98;
+                vels[i + 1] *= 0.99;
+                vels[i + 2] *= 0.98;
+                pos[i]     += vels[i];
+                pos[i + 1] += vels[i + 1];
+                pos[i + 2] += vels[i + 2];
+                if (pos[i + 1] > maxY) {
+                    pos[i + 1] = 0;
+                    vels[i + 1] = 0;
+                }
             }
             this.dustMotes.geometry.attributes.position.needsUpdate = true;
         }

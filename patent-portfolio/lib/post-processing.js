@@ -595,7 +595,7 @@ const ChromaticAberrationShader = {
             float edgeFactor = smoothstep(0.2, 0.8, dist);
             float offset = amount * edgeFactor;
             
-            vec2 offsetDir = normalize(dir) * offset;
+            vec2 offsetDir = dist > 0.001 ? normalize(dir) * offset : vec2(0.0);
             
             // Sample each color channel with slight offset
             float r = texture2D(tDiffuse, vUv + offsetDir).r;
@@ -691,10 +691,10 @@ const ColorGradingShader = {
             float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
             color.rgb = mix(vec3(luminance), color.rgb, saturation);
             
-            // Warmth (shift toward orange in highlights)
-            float highlightMask = smoothstep(0.5, 1.0, luminance);
-            color.r += warmth * highlightMask;
-            color.b -= warmth * 0.5 * highlightMask;
+            // Warmth applied to midtones
+            float midtoneMask = smoothstep(0.2, 0.7, luminance);
+            color.r += warmth * midtoneMask;
+            color.b -= warmth * 0.5 * midtoneMask;
             
             // Cool shadows
             float shadowMask = 1.0 - smoothstep(0.0, 0.3, luminance);
@@ -729,6 +729,9 @@ export class PostProcessingManager {
         
         // Current zone for color grading
         this.currentZone = 'rotunda';
+        this._targetZoneProfile = null;
+        this._zoneTransitionElapsed = 0;
+        this._zoneTransitionDuration = 2.0;
         
         // Focal point tracking
         this.focusTarget = null;
@@ -1013,17 +1016,9 @@ export class PostProcessingManager {
         };
         
         const profile = profiles[zone] || profiles.rotunda;
-        
-        colorGrading.uniforms.tint.value.copy(profile.tint);
-        colorGrading.uniforms.tintStrength.value = profile.tintStrength;
-        colorGrading.uniforms.warmth.value = profile.warmth;
-        colorGrading.uniforms.saturation.value = profile.saturation;
-        colorGrading.uniforms.contrast.value = profile.contrast || 1.05;
-        
-        // Update ACES exposure per zone
-        if (this.passes.aces) {
-            this.passes.aces.uniforms.exposure.value = profile.exposure || 1.0;
-        }
+
+        this._targetZoneProfile = profile;
+        this._zoneTransitionElapsed = 0;
     }
     
     // ═══════════════════════════════════════════════════════════════════════
@@ -1135,12 +1130,34 @@ export class PostProcessingManager {
     
     update(deltaTime) {
         this.time += deltaTime;
-        
+
+        // Zone transition lerp
+        if (this._targetZoneProfile) {
+            this._zoneTransitionElapsed += deltaTime;
+            const alpha = Math.min(this._zoneTransitionElapsed / this._zoneTransitionDuration, 1.0);
+            const p = this._targetZoneProfile;
+            const cg = this.passes.colorGrading;
+            if (cg) {
+                cg.uniforms.contrast.value   += (p.contrast   - cg.uniforms.contrast.value)   * alpha;
+                cg.uniforms.saturation.value += (p.saturation - cg.uniforms.saturation.value) * alpha;
+                cg.uniforms.warmth.value     += (p.warmth     - cg.uniforms.warmth.value)     * alpha;
+                cg.uniforms.tintStrength.value += (p.tintStrength - cg.uniforms.tintStrength.value) * alpha;
+                cg.uniforms.tint.value.lerp(p.tint, alpha);
+            }
+            if (this.passes.aces) {
+                const exposure = p.exposure || 1.0;
+                this.passes.aces.uniforms.exposure.value += (exposure - this.passes.aces.uniforms.exposure.value) * alpha;
+            }
+            if (alpha >= 1.0) {
+                this._targetZoneProfile = null;
+            }
+        }
+
         // Update film grain time
         if (this.passes.grain) {
             this.passes.grain.uniforms.time.value = this.time;
         }
-        
+
         // Update focus for DoF
         this.updateFocus();
         

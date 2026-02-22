@@ -901,7 +901,7 @@ export class E8LatticeArtwork extends THREE.Group {
         ctx.textAlign = 'center';
         ctx.fillText('E₈ Lattice Properties', 256, 50);
         ctx.font = '14px "IBM Plex Sans", sans-serif';
-        ctx.fillText('(Viazovska 2016 - Fields Medal)', 256, 75);
+        ctx.fillText('(Viazovska — proof 2016, Fields Medal 2022)', 256, 75);
         
         // Definition
         ctx.fillStyle = '#FFD700';

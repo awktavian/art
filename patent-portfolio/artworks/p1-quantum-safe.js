@@ -975,6 +975,26 @@ export class QuantumSafeArtwork extends THREE.Group {
     // INTERACTION
     // ═══════════════════════════════════════════════════════════════════════
     
+    _playEncryptionTone() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const now = ctx.currentTime;
+            // Ascending sweep: key generation → lock
+            [440, 554, 659].forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.15, now + i * 0.08);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.15);
+                osc.connect(gain).connect(ctx.destination);
+                osc.start(now + i * 0.08);
+                osc.stop(now + i * 0.08 + 0.15);
+            });
+            setTimeout(() => ctx.close(), 500);
+        } catch (e) { /* audio unavailable */ }
+    }
+
     onClick(intersection) {
         // Prompt for message to encrypt
         const messages = [
@@ -986,12 +1006,13 @@ export class QuantumSafeArtwork extends THREE.Group {
             '7 colonies unite',
             'E8 lattice rules'
         ];
-        
+
         // Cycle through messages
         const currentIdx = messages.indexOf(this.lastPlaintext);
         const nextIdx = (currentIdx + 1) % messages.length;
-        
+
         this.encryptMessage(messages[nextIdx]);
+        this._playEncryptionTone();
         
         // Microdelight: track encryptions
         this.microdelights.encryptionsDone++;

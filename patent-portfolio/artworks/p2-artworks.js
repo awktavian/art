@@ -46,8 +46,12 @@ function createEducationalLabel(text, options = {}) {
     
     // Background
     ctx.fillStyle = bgColor;
-    ctx.roundRect?.(4, 4, maxWidth - 8, 120, 8);
-    ctx.fill?.();
+    if (ctx.roundRect) {
+        ctx.roundRect(4, 4, maxWidth - 8, 120, 8);
+    } else {
+        ctx.rect(4, 4, maxWidth - 8, 120);
+    }
+    ctx.fill();
     
     // Text
     ctx.font = `${fontSize}px "IBM Plex Sans", sans-serif`;
@@ -178,11 +182,11 @@ export class G2EquivariantArtwork extends THREE.Group {
             transparent: true,
             opacity: 0.3
         });
-        
-        // Connect adjacent roots
+
+        // Connect adjacent roots within each ring
         for (let i = 0; i < 6; i++) {
             const next = (i + 1) % 6;
-            
+
             // Short to short
             const points1 = [
                 this.nodes[i].position.clone(),
@@ -192,7 +196,7 @@ export class G2EquivariantArtwork extends THREE.Group {
             const line1 = new THREE.Line(geo1, edgeMat);
             this.edges.push(line1);
             this.add(line1);
-            
+
             // Long to long
             const points2 = [
                 this.nodes[i + 6].position.clone(),
@@ -202,6 +206,24 @@ export class G2EquivariantArtwork extends THREE.Group {
             const line2 = new THREE.Line(geo2, edgeMat);
             this.edges.push(line2);
             this.add(line2);
+        }
+
+        // Short-to-long connections — triple bond structure of G2
+        // Each short root i connects to the corresponding long root i+6
+        const tripleMat = new THREE.LineBasicMaterial({
+            color: 0xFF6B35,
+            transparent: true,
+            opacity: 0.5
+        });
+        for (let i = 0; i < 6; i++) {
+            const points = [
+                this.nodes[i].position.clone(),
+                this.nodes[i + 6].position.clone()
+            ];
+            const geo = new THREE.BufferGeometry().setFromPoints(points);
+            const line = new THREE.Line(geo, tripleMat);
+            this.edges.push(line);
+            this.add(line);
         }
     }
     

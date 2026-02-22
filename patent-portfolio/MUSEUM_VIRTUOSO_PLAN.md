@@ -1,300 +1,122 @@
-# Patent Museum: Virtuoso Experience Plan
+# Patent Museum: Current State & Remaining Work
 
-**Goal:** Transform the museum from 10% to 100% quality — a fully realized, immersive experience worthy of Exploratorium/Guggenheim standards.
-
----
-
-## Phase 1: Critical Foundation Fixes (Blocking Issues)
-
-### 1.1 Rendering Pipeline Fixes
-- [ ] **Remove duplicate POST_PROCESSING_QUALITY export** in `lib/post-processing.js`
-- [ ] **Fix SSRPass/GTAOPass imports** - implement proper CDN fallbacks
-- [ ] **Fix splash screen not dismissing** - ensure pointer lock triggers correctly
-- [ ] **Fix WebGL context lost handling** - implement proper recovery
-- [ ] **Fix state machine transitions** - ensure LOADING→READY works
-
-### 1.2 Core Initialization Fixes  
-- [ ] **Fix renderer initialization order** - ensure scene exists before render
-- [ ] **Fix post-processing initialization** - handle missing passes gracefully
-- [ ] **Fix audio context initialization** - user gesture requirement
-- [ ] **Add comprehensive error boundaries** around all init functions
+Last updated after Ralph audit and full P1/P2/P3 refinement pass.
 
 ---
 
-## Phase 2: Collision & Physics System (NEW)
+## What Is Done
 
-### 2.1 Collision Detection Implementation
-Location: `museum/navigation.js`
+The museum is substantially complete. The following systems are implemented and working:
 
-**Current State:** Players walk through walls and artworks. Only floor height and circular boundary exist.
+**Navigation & Physics**
+- 8-ray collision system with wall slide (`navigation.js`)
+- Minimap with click-to-teleport, zoom controls, wing progress tracking (`wayfinding.js`)
+- Gallery signage: hanging signs, floor markers, return arrows (`wayfinding.js`)
+- Proximity trigger system: 3m spark, 5s sustain
 
-**Implementation:**
-- [ ] **Tag collision geometry** - Add `userData.collidable = true` to all walls in `architecture.js`
-- [ ] **Implement raycaster collision** in `update()`:
-  - Cast rays in movement direction before applying movement
-  - Check against tagged collision objects
-  - Prevent movement if collision detected
-- [ ] **Implement wall sliding** - project movement along wall surface when blocked
-- [ ] **Add collision margin** - 0.3m buffer from walls
+**Content & Education**
+- Info panel with full patent data, beginner/expert toggle, glossary tooltips (26 terms auto-highlighted) (`info-panel.js`)
+- Plaque system (2 draw calls, canvas-baked)
+- Journey tracker with localStorage persistence
+- Visitor identity system with RDF/Turtle export
 
-### 2.2 Artwork Collision
-- [ ] **Add bounding boxes to artworks** in `gallery-loader.js`
-- [ ] **Create collision group** for efficient raycasting
-- [ ] **Implement artwork proximity stopping** - can't walk into art
+**Artworks**
+- P1: 6 bespoke, scientifically accurate visualizations — all implemented
+- P2: 18 distinct visualizations with interactive demos — all implemented
+- P3: 30 unique geometries with 20 animation types — all implemented
+- Fano constellation centerpiece — implemented
+- 7 wing-specific architectural enhancements — implemented
 
-### 2.3 Spatial Partitioning (Performance)
-- [ ] **Implement octree** for collision geometry
-- [ ] **Only check nearby objects** - reduce raycast count
-- [ ] **Cache collision results** - reuse for multiple rays
+**Environment**
+- Turrell-inspired lighting with diurnal sky disc
+- Spatial audio: HRTF, footsteps, wing entrance sounds
+- Zone transition tweens (post-processing, lighting)
+- Adaptive quality presets (emergency through ultra)
+- Loading screen with colony dot animation
 
----
-
-## Phase 3: Performance Optimization
-
-### 3.1 GPU Particle Migration
-Location: `main.js` lines 1470-1481
-
-**Current:** CPU-updated particles (2100+ ops/frame)
-**Target:** Full GPU particle system
-
-- [ ] **Replace dustParticles** with `GPUParticleSystem`
-- [ ] **Move all particle updates to vertex shader**
-- [ ] **Remove CPU fallback code**
-- [ ] **Implement particle LOD** - reduce count beyond 30m
-
-### 3.2 Raycasting Optimization
-- [ ] **Throttle hover raycasting** - every 2-3 frames or on mousemove only
-- [ ] **Cache interactable objects** - don't rebuild every frame
-- [ ] **Use spatial partitioning** for intersection tests
-
-### 3.3 Location Update Optimization
-Location: `main.js:1327` `updateLocation()`
-
-- [ ] **Cache location calculation** - only update when camera moves >1m
-- [ ] **Reduce COLONY_ORDER iteration** - precompute wing positions
-
-### 3.4 Memory Management
-- [ ] **Fix particle attribute disposal** in `reduceParticles()`
-- [ ] **Add cleanup to artwork dispose()** methods
-- [ ] **Remove event listeners on cleanup**
-- [ ] **Implement resource pooling** for common geometries/materials
-
-### 3.5 LOD System Implementation
-- [ ] **Particle count LOD** - reduce at distance
-- [ ] **Artwork detail LOD** - simplify beyond 50m
-- [ ] **Shadow LOD** - disable for distant objects
+**Infrastructure**
+- WebXR support (VR + AR modules)
+- Accessibility manager (ARIA, voice nav, reduced motion)
+- Debug system with URL parameters
+- State machine with error recovery
+- Achievement toast display
 
 ---
 
-## Phase 4: Content Enhancement (Educational Quality)
+## Remaining Work
 
-### 4.1 Introductory Panels (All Artworks)
+### Content Gaps
 
-Each artwork needs a "What You're Looking At" panel:
+**P2 microdelight dispatches**
+Most P2 artworks do not fire achievement events. P1 dispatches correctly. P2 needs the same `dispatchEvent(new CustomEvent('achievement', ...))` calls wired to meaningful milestones in each artwork's demo mode.
 
-| Artwork | Introduction Needed |
-|---------|---------------------|
-| P1-001 EFE-CBF | "What is a Control Barrier Function?" |
-| P1-002 Fano | "What is a Fano Plane? What is Byzantine Fault Tolerance?" |
-| P1-003 E8 | "What is E8? What is Semantic Routing?" |
-| P1-004 S15 Hopf | "What are Octonions? What is a Hopf Fibration?" |
-| P1-005 RSSM | "What is a Recurrent State Space Model?" |
-| P1-006 Quantum | "What is the Quantum Threat? What is Lattice Cryptography?" |
+**P2 educational content**
+`EDUCATIONAL_CONTENT` in `info-panel.js` has entries for P1 patents only. Need 18 entries for P2 patents covering: concept, analogy, significance, application. Same structure as P1.
 
-- [ ] **Create introductory panel component** - consistent design
-- [ ] **Add beginner/expert toggle** - switch explanation depth
-- [ ] **Add glossary tooltips** - hover definitions for technical terms
-- [ ] **Add "Try This" interaction hints** - guide visitor engagement
+**Earcon Orchestration artwork plays no audio**
+The earcon artwork (`P2-007` or equivalent) is silent. It demonstrates earcon design but produces no sound. This is the most ironic gap in the museum. Wire actual Web Audio API tones to the earcon visualization events.
 
-### 4.2 Real-World Examples
-- [ ] **P1-001 EFE-CBF:** "Robot approaching obstacle" scenario
-- [ ] **P1-002 Fano:** "Blockchain consensus" example
-- [ ] **P1-003 E8:** "How search queries become routes"
-- [ ] **P1-004 S15 Hopf:** "Neural state encoding"
-- [ ] **P1-005 RSSM:** "Predicting future observations"
-- [ ] **P1-006 Quantum:** "Step-by-step key exchange"
+### Interaction Gaps
 
-### 4.3 Cross-References
-- [ ] **Add "Related Patents" links** between artworks
-- [ ] **Add "Prerequisites" indicators** - viewing order suggestions
-- [ ] **Add "Deep Dive" expandable sections** - for experts
+**Cross-artwork navigation**
+Clicking "Related Patents" in the info panel does nothing. Should teleport camera to the referenced artwork. Requires mapping patent IDs to world positions and calling the teleport function.
 
----
+**P3 click interaction**
+P3 artworks have no demo mode. Clicking does nothing beyond opening the info panel. Add a click handler that triggers a brief animation highlight or parameter change — even a simple one.
 
-## Phase 5: Wayfinding & Navigation
+**Missing P3 animation cases**
+`update()` in P3 artworks has no handler for `wave` and `gossipNode` animation types. These fall through silently. Add the missing cases.
 
-### 5.1 Enhanced Minimap
-Location: `museum/navigation.js` minimap code
+### Performance
 
-- [ ] **Add artwork markers** - dots showing artwork locations
-- [ ] **Add gallery room boundaries** - visual distinction
-- [ ] **Implement click-to-teleport** - click on minimap to navigate
-- [ ] **Add zoom levels** - overview/detail
-- [ ] **Add legend/key** - explain symbols
-- [ ] **Add "You are here" text label**
-- [ ] **Add visited/unvisited indicators** - track progress
+**Zone culling for architecture**
+All 7 wings render every frame. Zone-based culling was disabled and never re-enabled. Re-enable frustum + distance culling for wing geometry when visitor is not in or near that wing.
 
-### 5.2 Gallery Signage
-Location: `museum/architecture.js`
+### Engineering
 
-- [ ] **Add gallery category labels** at wing entrances
-- [ ] **Add artwork count indicators** - "3 exhibits in this gallery"
-- [ ] **Add "Return to Rotunda" directional signs**
-- [ ] **Add distance markers** - "30m to Crystal Gallery"
+**CI pipeline**
+No GitHub Actions workflow exists. Need `.github/workflows/test.yml` that runs `npm test` on push/PR.
 
-### 5.3 Information Kiosk System
-- [ ] **Create kiosk mesh** at rotunda entrance
-- [ ] **Add "You Are Here" 3D map**
-- [ ] **Add recommended tour paths** - beginner/expert routes
-- [ ] **Add accessibility information**
+**Console.log cleanup**
+`main.js` has 44+ `console.log` calls that will appear in production. Replace with the debug system (URL param `?debug=true` already gates the debug overlay). Wrap all logs in `if (DEBUG)` or remove them.
+
+**Playwright headless mode**
+Test runner has `headless: false` hardcoded. CI cannot run with a display. Change to `headless: !process.env.CI` or equivalent.
+
+### Accessibility
+
+**P1 artwork formula canvases**
+Formula rendering uses `<canvas>` elements with no `aria-label` or fallback text. Screen readers see nothing. Add descriptive `aria-label` to each canvas describing the formula it renders.
+
+### UX
+
+**Curated visitor path**
+No suggested order for first-time visitors. Add a "Start Here" prompt in the vestibule that offers a Fano-ordered wing sequence (the 7 lines of the Fano plane map naturally to a traversal order).
+
+**Vestibule darkening on wing entry**
+When visitor enters a wing, the vestibule should dim slightly to amplify contrast between the active wing and the rotunda. The zone transition system exists — add a vestibule ambient light dimmer to the transition tween.
+
+### Tests
+
+**Visual regression tests**
+`tests/visual/` directory exists but is empty. Add baseline screenshots for each wing entrance and at least one P1 artwork. Playwright can capture these; plug into CI.
 
 ---
 
-## Phase 6: Visual Polish & Interactions
+## Priority Order
 
-### 6.1 Artwork Visual Enhancements
-
-| Artwork | Enhancement |
-|---------|-------------|
-| P1-001 EFE-CBF | Enhanced landscape colors, particle trails |
-| P1-002 Fano | Animated consensus voting, role highlights |
-| P1-003 E8 | Root animation smoothing, search result glow |
-| P1-004 S15 Hopf | Fiber ride camera work, dimension labels |
-| P1-005 RSSM | State trajectory visualization, KL divergence graph |
-| P1-006 Quantum | Encryption animation polish, lattice rotation |
-
-### 6.2 Interaction Polish
-Location: `lib/interactions.js`
-
-- [ ] **Enhance hover feedback** - more prominent glow
-- [ ] **Add click confirmation** - satisfying visual/audio
-- [ ] **Implement dwell indicators** - show sustain progress
-- [ ] **Add discovery celebration** - reward finding hidden interactions
-
-### 6.3 Lighting Polish
-Location: `museum/lighting.js`
-
-- [ ] **Add artwork label task lighting** - illuminate plaques
-- [ ] **Implement proximity-activated illumination** - artworks light up as you approach
-- [ ] **Add transition polish** - smoother zone changes
+1. P2 educational content — highest visitor impact, pure content work
+2. P2 microdelight dispatches — completes the achievement loop
+3. Earcon audio — obvious irony, one-session fix
+4. Console.log cleanup + Playwright headless — CI unblocked after these two
+5. CI pipeline — everything else benefits from it
+6. Cross-artwork navigation — significant UX upgrade
+7. P3 click interaction + missing animation cases — completes P3
+8. P1 formula canvas accessibility — ARIA labels, quick
+9. Zone culling — performance, measure first
+10. Curated path + vestibule dimming — polish, post-CI
+11. Visual regression tests — last, needs stable baselines
 
 ---
 
-## Phase 7: Audio Polish
-
-### 7.1 Spatial Audio
-- [ ] **Verify HRTF implementation** - binaural positioning
-- [ ] **Add artwork-specific soundscapes** - each piece has unique audio
-- [ ] **Add footstep sounds** - surface-appropriate
-- [ ] **Add ambient museum sounds** - subtle life
-
-### 7.2 Interaction Audio
-- [ ] **Add hover sounds** - subtle acknowledgment
-- [ ] **Add click sounds** - satisfying confirmation
-- [ ] **Add discovery sounds** - reward finding secrets
-- [ ] **Add transition sounds** - entering/leaving galleries
-
----
-
-## Phase 8: Accessibility
-
-### 8.1 Visual Accessibility
-- [ ] **Add high-contrast mode**
-- [ ] **Ensure colorblind-friendly palette**
-- [ ] **Add motion reduction option**
-
-### 8.2 Input Accessibility  
-- [ ] **Full keyboard navigation** - Tab through artworks
-- [ ] **Add keyboard shortcuts overlay** (press ? for help)
-- [ ] **Implement voice navigation** - "Go to Crystal Gallery"
-
-### 8.3 Screen Reader Support
-- [ ] **Add ARIA labels to all UI elements**
-- [ ] **Add audio descriptions for artworks**
-- [ ] **Announce gallery changes**
-
----
-
-## Phase 9: XR Polish
-
-### 9.1 VR Enhancements
-- [ ] **Verify Apple Vision Pro compatibility**
-- [ ] **Test hand tracking interactions**
-- [ ] **Optimize for 90fps** - disable screen-space effects
-- [ ] **Add VR comfort options** - vignette on movement
-
-### 9.2 AR Features
-- [ ] **Implement AR viewing** - place artwork in real space
-- [ ] **Add AR wayfinding** - arrows in real world
-
----
-
-## Phase 10: Testing & Verification
-
-### 10.1 Functional Testing
-- [ ] Test all artworks render correctly
-- [ ] Test all interactions work
-- [ ] Test navigation (walking, teleport, menu)
-- [ ] Test collision system
-- [ ] Test audio system
-
-### 10.2 Performance Testing
-- [ ] Profile FPS on low-end device
-- [ ] Check memory usage over time
-- [ ] Verify no memory leaks
-- [ ] Test with all quality presets
-
-### 10.3 XR Testing
-- [ ] Test WebXR on Quest
-- [ ] Test on Vision Pro simulator
-- [ ] Verify hand tracking
-- [ ] Test teleportation
-
-### 10.4 Accessibility Testing
-- [ ] Screen reader compatibility
-- [ ] Keyboard-only navigation
-- [ ] Color contrast verification
-
----
-
-## Implementation Priority
-
-### Immediate (Blocking)
-1. Phase 1: Critical Foundation Fixes
-2. Phase 2.1-2.2: Basic Collision System
-
-### High Priority (Core Experience)
-3. Phase 3.1-3.2: Performance (GPU particles, raycasting)
-4. Phase 4.1: Introductory Panels
-5. Phase 5.1: Enhanced Minimap
-
-### Medium Priority (Polish)
-6. Phase 6: Visual & Interaction Polish
-7. Phase 5.2-5.3: Wayfinding
-8. Phase 7: Audio Polish
-
-### Lower Priority (Excellence)
-9. Phase 8: Accessibility
-10. Phase 9: XR Polish
-11. Phase 10: Comprehensive Testing
-
----
-
-## Success Criteria
-
-**Virtuoso Quality Checklist:**
-- [ ] No rendering errors or blank screens
-- [ ] Can't walk through walls or artworks
-- [ ] 60fps on modern hardware, 30fps+ on low-end
-- [ ] Every artwork has educational intro panel
-- [ ] Minimap shows where you are and where artworks are
-- [ ] Click-to-teleport works from minimap
-- [ ] All interactions feel satisfying
-- [ ] Audio enhances experience (not annoying)
-- [ ] Works in VR (Vision Pro simulator passes)
-- [ ] Keyboard navigation works
-- [ ] No memory leaks after 10 minutes
-
----
-
-*h(x) ≥ 0 always. craft(x) → ∞ always.*
+`h(x) ≥ 0 always`

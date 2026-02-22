@@ -414,13 +414,34 @@ export class JourneyTracker {
             grove: 8,
             crystal: 7
         };
-        
+
+        // Category letter → colony mapping (matches architecture.js COLONY_DATA.categories)
+        // Patent IDs encode category as: P1-001 (P1s use numeric suffix), P2-A4 / P3-A7 (P2/P3 use letter)
+        const CATEGORY_TO_COLONY = {
+            A: 'crystal', B: 'crystal',
+            C: 'nexus',   J: 'nexus',
+            D: 'grove',
+            E: 'forge',   I: 'forge',
+            F: 'flow',
+            G: 'spark',   K: 'spark',
+            H: 'beacon'
+        };
+
+        // P1 patents (P1-001 … P1-006) belong to the Crystal wing (foundational math)
+        const P1_COLONY = 'crystal';
+
+        function patentToColony(id) {
+            // P1-NNN — foundational, Crystal wing
+            if (/^P1-/i.test(id)) return P1_COLONY;
+            // P2-XX or P3-XX — extract category letter after the dash
+            const m = id.match(/^P[23]-([A-Z])/i);
+            if (m) return CATEGORY_TO_COLONY[m[1].toUpperCase()] || null;
+            return null;
+        }
+
         const progress = {};
         for (const wing of COLONY_ORDER) {
-            const wingPatents = this.state.viewedPatents.filter(id => {
-                // Simple heuristic: patent wing from ID or random assignment
-                return id.includes(wing.charAt(0).toUpperCase());
-            });
+            const wingPatents = this.state.viewedPatents.filter(id => patentToColony(id) === wing);
             progress[wing] = {
                 visited: this.state.visitedWings[wing],
                 timeSpent: Math.round(this.state.wingTime[wing]),

@@ -277,14 +277,54 @@ function createGehryDome(group, materials, radius, height, apertureRadius, apert
     
     // Sky disc visible through aperture
     const skyGeo = new THREE.CircleGeometry(apertureRadius - 0.1, 32);
-    const skyMat = new THREE.MeshBasicMaterial({ 
-        color: 0x4488AA, 
-        side: THREE.DoubleSide 
+    const skyMat = new THREE.ShaderMaterial({
+        uniforms: {
+            time: { value: 0 }
+        },
+        vertexShader: `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform float time;
+            varying vec2 vUv;
+
+            vec3 skyColor(float t) {
+                vec3 preDawn = vec3(0.102, 0.039, 0.180);
+                vec3 sunrise = vec3(0.831, 0.686, 0.216);
+                vec3 noon    = vec3(0.267, 0.533, 0.667);
+                vec3 dusk    = vec3(0.961, 0.620, 0.043);
+
+                float s = mod(t, 1.0);
+                if (s < 0.25) return mix(preDawn, sunrise, s / 0.25);
+                if (s < 0.5)  return mix(sunrise, noon,    (s - 0.25) / 0.25);
+                if (s < 0.75) return mix(noon,    dusk,    (s - 0.5)  / 0.25);
+                return mix(dusk, preDawn, (s - 0.75) / 0.25);
+            }
+
+            void main() {
+                float t = mod(time / 120.0, 1.0);
+                gl_FragColor = vec4(skyColor(t), 1.0);
+            }
+        `,
+        side: THREE.DoubleSide
     });
     const sky = new THREE.Mesh(skyGeo, skyMat);
+    sky.name = 'sky-disc';
     sky.position.set(apertureOffset, height - 0.5, 0);
     sky.rotation.x = Math.PI / 2;
     group.add(sky);
+
+    // Emissive ring around aperture edge
+    const apertureRingGeo = new THREE.TorusGeometry(apertureRadius - 0.1, 0.1, 16, 64);
+    const apertureRingMat = new THREE.MeshBasicMaterial({ color: 0xF5F0E8, transparent: true, opacity: 0.6 });
+    const apertureRing = new THREE.Mesh(apertureRingGeo, apertureRingMat);
+    apertureRing.position.set(apertureOffset, height - 0.5, 0);
+    apertureRing.rotation.x = Math.PI / 2;
+    group.add(apertureRing);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1703,6 +1743,13 @@ export function animateFanoSculpture(sculpture, time, deltaTime, playerPosition)
     }
     
     sculpture.userData._animator.update(time, deltaTime || 0.016, playerPosition);
+
+    const skyDisc = sculpture.parent && sculpture.parent.getObjectByName
+        ? sculpture.parent.getObjectByName('sky-disc')
+        : null;
+    if (skyDisc && skyDisc.material && skyDisc.material.uniforms) {
+        skyDisc.material.uniforms.time.value = time;
+    }
 }
 
 // Legacy compatibility stubs

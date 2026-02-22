@@ -377,6 +377,9 @@ export class CullingManager {
         // Update frequency (frames)
         this.updateFrequency = options.updateFrequency || 2;
         this._frameCount = 0;
+
+        // Cached vector for world-position queries (avoids per-frame allocation)
+        this._tempVec = new THREE.Vector3();
     }
     
     /**
@@ -497,10 +500,12 @@ export class CullingManager {
      * @param {number} distance
      */
     applyLOD(artwork, distance) {
-        const lodLevel = this.distanceCuller.getLODLevel({ 
-            getWorldPosition: () => artwork.position 
-        });
-        
+        const lodLevel = this.distanceCuller.getLODLevel(artwork);
+
+        // Dirty-flag check: skip traverse if LOD level hasn't changed
+        if (artwork.userData._lastLodLevel === lodLevel) return;
+        artwork.userData._lastLodLevel = lodLevel;
+
         // Apply material simplification based on LOD
         artwork.traverse(child => {
             if (child.isMesh && child.material) {

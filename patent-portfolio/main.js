@@ -43,6 +43,7 @@ import { getDebugManager } from './lib/debug-system.js';
 import { getCullingManager, SimpleOctree } from './lib/culling-system.js';
 import { getSettingsManager } from './lib/settings-menu.js';
 import { getJourneyTracker } from './lib/journey-tracker.js';
+import { getVisitorIdentity } from './lib/visitor-identity.js';
 import { VitalsDisplay } from './lib/vitals-display.js';
 import { 
     createGradientEnvironmentMap, 
@@ -52,7 +53,19 @@ import {
 import { ProximityTriggerManager } from './lib/proximity-triggers.js';
 import { AtmosphereManager } from './lib/atmosphere.js';
 import { createFloatingCard } from './components/floating-card.js';
-import { CONTEXT_PROMPTS } from './lib/interactions.js';
+const CONTEXT_PROMPTS = {
+    'P1-001': { action: 'Explore the safety landscape', hint: 'See h(x) ≥ 0 and the barrier' },
+    'P1-002': { action: 'Touch a colony node', hint: 'Seven nodes, unanimous consensus' },
+    'P1-003': { action: 'Rotate the 8D projection', hint: '240 roots in 8 dimensions' },
+    'P1-004': { action: 'Ride the S7 fiber', hint: 'Octonion structure' },
+    'P1-005': { action: 'Run the imagination', hint: 'World model prediction' },
+    'P1-006': { action: 'Encrypt your message', hint: 'Quantum-safe LWE' },
+    'P2-A1': { action: 'Explore G2 layers', hint: '14-dimensional root system' },
+    'P2-B1': { action: 'See the 3-tier barrier', hint: 'Concentric safety shells' },
+    'P2-C1': { action: 'Watch CRDT healing', hint: 'Cross-hub sync' },
+    'P2-D1': { action: 'Trace the bifurcation', hint: 'Catastrophe KAN' },
+    'P2-I2': { action: 'Enter the audit chamber', hint: '6 parallel judges' }
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN APPLICATION
@@ -127,6 +140,8 @@ class PatentMuseum {
         // Cached vectors for render loop (avoid allocations per frame)
         this._soundForward = new THREE.Vector3(0, 0, -1);
         this._soundUp = new THREE.Vector3(0, 1, 0);
+        this._prevCameraPos = new THREE.Vector3();
+        this._footstepAccum = 0;
         this._frameCount = 0;
         
         // XR System
@@ -177,10 +192,6 @@ class PatentMuseum {
         });
         
         // Error handlers
-        this.stateMachine.on('retryOperation', ({ type, attempt }) => {
-            this.retryOperation(type, attempt);
-        });
-        
         this.stateMachine.on('reinitialize', ({ type }) => {
             if (type === ErrorType.WEBGL_CONTEXT_LOST) {
                 this.reinitializeRenderer();
@@ -247,11 +258,6 @@ class PatentMuseum {
         if (this.soundDesign) {
             this.soundDesign.resume?.();
         }
-    }
-    
-    retryOperation(type, attempt) {
-        console.log(`Retrying ${type} operation (attempt ${attempt})`);
-        // Specific retry logic based on type
     }
     
     reinitializeRenderer() {
@@ -612,24 +618,38 @@ class PatentMuseum {
         loadingScreen.classList.add('hidden');
         loadingScreen.setAttribute('aria-hidden', 'true');
         
-        // After fade completes, clean up
+        // After fade completes, clean up and show arrival overlay
         setTimeout(() => {
             // Show minimap
             if (minimapEl) {
                 minimapEl.style.opacity = '1';
             }
-            
+
             // Remove constellation
             if (constellation && constellation.parentNode) {
                 constellation.remove();
             }
-            
+
             // Remove loading screen from DOM
             if (loadingScreen.parentNode) {
                 loadingScreen.remove();
             }
-            
+
             console.log('✅ Loading screen removed');
+
+            // Show arrival overlay poem for 2 seconds on first load
+            const arrivalOverlay = document.getElementById('arrival-overlay');
+            if (arrivalOverlay && !sessionStorage.getItem('arrival-shown')) {
+                sessionStorage.setItem('arrival-shown', '1');
+                // Fade in
+                requestAnimationFrame(() => {
+                    arrivalOverlay.classList.add('arrival-visible');
+                    // Fade out after 2 seconds
+                    setTimeout(() => {
+                        arrivalOverlay.classList.remove('arrival-visible');
+                    }, 2000);
+                });
+            }
         }, 700);  // Slightly longer than the 0.6s CSS transition
     }
     
@@ -1056,7 +1076,7 @@ class PatentMuseum {
         const container = document.createElement('div');
         container.id = 'audio-controls';
         container.innerHTML = `
-            <button id="audio-toggle" aria-label="Toggle audio" title="Toggle audio">
+            <button id="audio-toggle" aria-label="Unmute audio" aria-pressed="false" title="Toggle audio">
                 <svg id="audio-icon-on" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
                     <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
@@ -1196,6 +1216,9 @@ class PatentMuseum {
         // Event listeners
         document.getElementById('audio-toggle').addEventListener('click', () => {
             const isEnabled = this.soundDesign.toggle();
+            const btn = document.getElementById('audio-toggle');
+            btn.setAttribute('aria-pressed', isEnabled ? 'true' : 'false');
+            btn.setAttribute('aria-label', isEnabled ? 'Mute audio' : 'Unmute audio');
             document.getElementById('audio-icon-on').style.display = isEnabled ? 'block' : 'none';
             document.getElementById('audio-icon-off').style.display = isEnabled ? 'none' : 'block';
             document.getElementById('audio-bars').classList.toggle('muted', !isEnabled);
@@ -1236,13 +1259,18 @@ class PatentMuseum {
                 this.onInteract();
             }
             if (e.key === 'Escape') {
-                // Close gallery menu if open
                 const galleryMenu = document.getElementById('gallery-menu');
                 if (galleryMenu && galleryMenu.classList.contains('visible')) {
                     this._closeGalleryMenu(galleryMenu);
+                    e.stopImmediatePropagation();
                     return;
                 }
-                this.closeArtworkPanel();
+                const artworkPanel = document.getElementById('artwork-panel');
+                if (artworkPanel && artworkPanel.style.display !== 'none') {
+                    this.closeArtworkPanel();
+                    e.stopImmediatePropagation();
+                    return;
+                }
             }
         });
         
@@ -1281,13 +1309,50 @@ class PatentMuseum {
 
         // Microdelight handler — achievement/discovery/easter-egg sounds and visuals
         window.addEventListener('artwork-microdelight', (e) => {
-            const { type, patentId, name } = e.detail || {};
+            const { type, patentId, name, colony } = e.detail || {};
             console.log(`✨ Microdelight [${type}]: ${name} (${patentId})`);
             if (this.soundDesign) {
                 if (type === 'achievement') this.soundDesign.playInteraction('consensus');
                 else if (type === 'easter-egg') this.soundDesign.playInteraction('discovery');
                 else this.soundDesign.playInteraction('success');
             }
+
+            // Visual achievement toast — bottom-right, colony-colored, 233ms fade
+            const COLONY_HEX = {
+                spark: '#FF6B35', forge: '#D4AF37', flow: '#4ECDC4',
+                nexus: '#9B7EBD', beacon: '#F59E0B', grove: '#7EB77F', crystal: '#67D4E4'
+            };
+            const accentColor = COLONY_HEX[colony] || '#67D4E4';
+            const toast = document.createElement('div');
+            toast.className = 'achievement-toast';
+            toast.style.cssText = [
+                'position:fixed',
+                'bottom:24px',
+                'right:24px',
+                'z-index:99999',
+                'padding:12px 18px',
+                'background:rgba(10,10,18,0.92)',
+                `border-left:3px solid ${accentColor}`,
+                'border-radius:6px',
+                'box-shadow:0 8px 24px rgba(0,0,0,0.5)',
+                'font-family:"IBM Plex Sans",system-ui,sans-serif',
+                'font-size:13px',
+                'color:#E8E4DC',
+                'pointer-events:none',
+                'opacity:0',
+                'transition:opacity 233ms ease',
+                'max-width:280px'
+            ].join(';');
+            const label = type === 'achievement' ? 'Achievement' : type === 'easter-egg' ? 'Discovery' : 'Milestone';
+            toast.innerHTML = `<div style="font-size:11px;color:${accentColor};margin-bottom:4px;text-transform:uppercase;letter-spacing:.08em">${label}</div><div style="font-weight:600;color:#fff">${name || patentId || 'Unlocked'}</div>`;
+            document.body.appendChild(toast);
+            // Trigger fade-in on next frame
+            requestAnimationFrame(() => { toast.style.opacity = '1'; });
+            // Fade out and remove after 3s
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 233);
+            }, 3000);
         });
 
         // Interactive Demo: focus camera on artwork when user clicks Demo in info panel
@@ -1816,6 +1881,14 @@ class PatentMuseum {
             }
         }
 
+        // Unified journey tracking — record in both systems whenever a patent is viewed
+        if (patentId) {
+            if (this.journeyTracker) {
+                this.journeyTracker.viewPatent(patentId);
+            }
+            getVisitorIdentity().recordVisit(patentId);
+        }
+
         // Dispatch to the InfoPanel system
         if (patentId) {
             window.dispatchEvent(new CustomEvent('patent-select', {
@@ -2046,6 +2119,9 @@ class PatentMuseum {
             // Update sound design zone (ambient soundscape)
             if (this.soundDesign && this.soundDesign.isInitialized) {
                 this.soundDesign.setZone(zone);
+                if (zone !== 'rotunda') {
+                    this.soundDesign.playWingEntrance(zone);
+                }
             }
             
             // Update post-processing color grading for colony
@@ -2129,6 +2205,25 @@ class PatentMuseum {
         // CRITICAL: Navigation first (most important for responsiveness)
         if (this.navigation) {
             this.navigation.update(clampedDelta);
+        }
+
+        // Update spatial audio listener position to track camera
+        if (this.soundDesign?.isInitialized && this.camera) {
+            this.camera.getWorldDirection(this._soundForward);
+            this._soundUp.set(0, 1, 0);
+            this.soundDesign.updateListenerPosition(this.camera.position, this._soundForward, this._soundUp);
+
+            // Footstep detection — trigger when accumulated movement exceeds stride length
+            const dx = this.camera.position.x - this._prevCameraPos.x;
+            const dz = this.camera.position.z - this._prevCameraPos.z;
+            this._footstepAccum += Math.sqrt(dx * dx + dz * dz);
+            this._prevCameraPos.copy(this.camera.position);
+            if (this._footstepAccum > 2.0) {
+                this._footstepAccum = 0;
+                const zone = this.currentLocation?.toLowerCase().includes('rotunda') ? 'rotunda' :
+                    this.currentLocation?.toLowerCase().split(' ')[0] || 'rotunda';
+                this.soundDesign.playFootstep(zone);
+            }
         }
         
         // Update culling system (every 3rd frame)
