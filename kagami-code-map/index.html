@@ -3283,6 +3283,24 @@
                     <span class="layer-label">Labels</span>
                     <span class="layer-switch"></span>
                 </label>
+                <label class="layer-toggle" title="Color by cognitive complexity">
+                    <input type="checkbox" data-layer="complexity">
+                    <span class="layer-icon">🧠</span>
+                    <span class="layer-label">Complexity</span>
+                    <span class="layer-switch"></span>
+                </label>
+                <label class="layer-toggle" title="Highlight refactoring hotspots">
+                    <input type="checkbox" data-layer="hotspots">
+                    <span class="layer-icon">⚡</span>
+                    <span class="layer-label">Hotspots</span>
+                    <span class="layer-switch"></span>
+                </label>
+                <label class="layer-toggle" title="Color by architecture layer">
+                    <input type="checkbox" data-layer="arch">
+                    <span class="layer-icon">🏗️</span>
+                    <span class="layer-label">Layers</span>
+                    <span class="layer-switch"></span>
+                </label>
                 <label class="layer-toggle" title="Focus on selected cluster">
                     <input type="checkbox" data-layer="focus">
                     <span class="layer-icon">🎯</span>
@@ -3752,6 +3770,9 @@
                     heat: false,
                     labels: true,
                     focus: false,
+                    complexity: false,
+                    hotspots: false,
+                    arch: false,
                 },
             },
             
@@ -4360,21 +4381,19 @@
         let lastRenderState = null;
         
         function render(timestamp = performance.now()) {
-            const frameStart = performance.now();
             const deltaTime = timestamp - lastFrameTime;
             lastFrameTime = timestamp;
             
             // Compute rolling average frame time
             frameTimeAvg = frameTimeAvg * 0.85 + deltaTime * 0.15;
             
-            // Adaptive quality based on frame time
             if (state.view === 'semantic') {
-                if (frameTimeAvg > 50 && state.semantic.quality !== 'low') {
+                const q = state.semantic.quality;
+                if (frameTimeAvg > 50 && q !== 'low') {
                     state.semantic.quality = 'low';
-                    console.log('[Render] Quality → low (frame avg:', frameTimeAvg.toFixed(1), 'ms)');
-                } else if (frameTimeAvg > 25 && frameTimeAvg <= 50 && state.semantic.quality === 'high') {
+                } else if (frameTimeAvg > 28 && q === 'high') {
                     state.semantic.quality = 'med';
-                } else if (frameTimeAvg <= 20 && state.semantic.quality !== 'high' && !state.semantic.dragging) {
+                } else if (frameTimeAvg <= 18 && q !== 'high' && !state.semantic.dragging) {
                     state.semantic.quality = 'high';
                 }
             }
@@ -4392,15 +4411,6 @@
                 // Semantic view always renders (3D needs continuous animation)
                 renderSemantic();
                 lastRenderState = null;
-            }
-            
-            // Track actual frame time
-            const frameEnd = performance.now();
-            const actualFrameTime = frameEnd - frameStart;
-            
-            // Use requestIdleCallback for non-critical tasks if frame was slow
-            if (actualFrameTime > 16 && window.requestIdleCallback) {
-                // Defer expensive operations
             }
             
             rafId = requestAnimationFrame(render);
@@ -5394,20 +5404,62 @@
             const c = COLORS[cat] || COLORS.Other;
             
             // ═══════════════════════════════════════════════════════════════════════════
-            // HEAT LAYER — Color intensity by importance
+            // HEAT / COMPLEXITY / ARCH LAYER — Color override modes
             // ═══════════════════════════════════════════════════════════════════════════
             let heatColor = c.hex;
-            if (layers.heat) {
+            let isHeatMode = layers.heat || layers.complexity || layers.arch;
+            if (layers.complexity) {
+                // Cognitive complexity heatmap: green → yellow → red
+                const cog = file.cognitiveComplexity || 0;
+                const heat = Math.min(1, cog / 40); // 40+ = max heat
+                const hue = 120 - heat * 120; // Green(120) → Red(0)
+                const sat = 60 + heat * 40;
+                const light = 45 + heat * 10;
+                heatColor = `hsl(${hue}, ${sat}%, ${light}%)`;
+                alpha = Math.max(0.5, alpha);
+                if (cog === 0) alpha *= 0.3; // Dim files with no complexity data
+            } else if (layers.arch) {
+                // Architecture layer coloring: cool (low priority) → warm (high priority)
+                const layerPriorities = { sensing: 50, homeostasis: 100, orchestration: 150, context: 200, memory: 250, learning: 300, self_improvement: 350 };
+                const layer = file.priorityLayer;
+                if (layer && layerPriorities[layer] !== undefined) {
+                    const norm = layerPriorities[layer] / 350;
+                    const hue = 220 - norm * 220; // Blue(220) → Red(0)
+                    const sat = 70 + norm * 25;
+                    const light = 45 + norm * 15;
+                    heatColor = `hsl(${hue}, ${sat}%, ${light}%)`;
+                    alpha = Math.max(0.6, alpha);
+                } else {
+                    alpha *= 0.15; // Dim unclassified files
+                }
+            } else if (layers.heat) {
                 const importance = file.importance || 0;
                 const lines = Math.log10(Math.max(1, file.lines || 1)) / 5;
                 const heat = Math.min(1, importance + lines * 0.3);
-                
-                // Interpolate from cool (blue) to hot (red/yellow)
                 const hue = 240 - heat * 240; // Blue → Red
                 const sat = 70 + heat * 30;
                 const light = 40 + heat * 20;
                 heatColor = `hsl(${hue}, ${sat}%, ${light}%)`;
                 alpha = Math.max(0.5, alpha);
+            }
+
+            // ═══════════════════════════════════════════════════════════════════════════
+            // HOTSPOT PULSE — sinusoidal glow for high-churn complex files
+            // ═══════════════════════════════════════════════════════════════════════════
+            const isHotspot = layers.hotspots && (file.hotspotScore || 0) >= 0.4;
+            if (isHotspot) {
+                const hotTime = performance.now() * 0.003;
+                const hotPulse = 0.3 + 0.7 * ((file.hotspotScore || 0.5) * (0.5 + 0.5 * Math.sin(hotTime + file.path.length)));
+                const hotGlowSize = size * (3 + hotPulse * 2);
+                const hotGlow = ctx.createRadialGradient(sx, sy, 0, sx, sy, hotGlowSize);
+                const hotIntensity = Math.min(1, (file.hotspotScore || 0) * 1.5);
+                hotGlow.addColorStop(0, `rgba(255, 80, 40, ${0.5 * hotPulse * hotIntensity})`);
+                hotGlow.addColorStop(0.4, `rgba(255, 120, 20, ${0.25 * hotPulse * hotIntensity})`);
+                hotGlow.addColorStop(1, 'transparent');
+                ctx.fillStyle = hotGlow;
+                ctx.beginPath();
+                ctx.arc(sx, sy, hotGlowSize, 0, Math.PI * 2);
+                ctx.fill();
             }
             
             // ═══════════════════════════════════════════════════════════════════════════
@@ -5503,7 +5555,7 @@
             // ═══════════════════════════════════════════════════════════════════════════
             // MAIN NODE WITH ENHANCED GRADIENT & LIGHTING
             // ═══════════════════════════════════════════════════════════════════════════
-            if (!layers.heat && !sel && !hov && !rel && quality !== 'low') {
+            if (!isHeatMode && !isHotspot && !sel && !hov && !rel && quality !== 'low') {
                 const sprite = getNodeSprite(cat, size);
                 ctx.globalAlpha = alpha;
                 ctx.drawImage(sprite, sx - sprite.width / 2, sy - sprite.height / 2);
@@ -5519,7 +5571,7 @@
                 
                 // 2. Main gradient with light direction
                 const nodeGrad = ctx.createRadialGradient(sx - size * 0.35, sy - size * 0.35, 0, sx, sy, size * 1.1);
-                if (layers.heat) {
+                if (isHeatMode) {
                     nodeGrad.addColorStop(0, heatColor);
                     nodeGrad.addColorStop(0.6, heatColor.replace('hsl', 'hsla').replace(')', ', 0.85)'));
                     nodeGrad.addColorStop(1, heatColor.replace('hsl', 'hsla').replace(')', ', 0.6)'));
@@ -5554,7 +5606,7 @@
                 }
                 
                 // 4. Rim lighting effect (subtle edge glow)
-                if (size > 5 && quality === 'high' && !layers.heat) {
+                if (size > 5 && quality === 'high' && !isHeatMode) {
                     ctx.strokeStyle = c.light + alphaHex(alpha * 0.3);
                     ctx.lineWidth = 1;
                     ctx.beginPath();
@@ -5881,6 +5933,7 @@
                 
                 if (state.semantic.dragging) {
                     saveStateDebounced();
+                    state.semantic._dragReleaseT = 0;
                 }
                 state.semantic.dragging = false;
                 semanticTouchState = { type: null };
@@ -6011,6 +6064,51 @@
                 if (searchSelectedIdx >= 0) results[searchSelectedIdx].scrollIntoView({ block: 'nearest' });
             }
             
+            // Parse filter prefixes like complexity:>20, hotspot:>0.5, layer:P350, security:high, todo:>5
+            function parseFilterPrefixes(query) {
+                const filters = [];
+                const textParts = [];
+                const prefixRe = /\b(complexity|cognitive|hotspot|layer|security|todo|change):([><=!]*)(\S+)/gi;
+                let match;
+                let lastIndex = 0;
+
+                while ((match = prefixRe.exec(query)) !== null) {
+                    if (match.index > lastIndex) textParts.push(query.slice(lastIndex, match.index));
+                    const field = match[1].toLowerCase();
+                    const op = match[2] || '>=';
+                    const val = match[3];
+                    filters.push({ field, op, val });
+                    lastIndex = match.index + match[0].length;
+                }
+                if (lastIndex < query.length) textParts.push(query.slice(lastIndex));
+
+                return { filters, textQuery: textParts.join(' ').trim() };
+            }
+
+            function applyFilterPrefixes(file, filters) {
+                for (const { field, op, val } of filters) {
+                    let fileVal;
+                    switch (field) {
+                        case 'complexity': case 'cognitive': fileVal = file.cognitiveComplexity || file.complexity || 0; break;
+                        case 'hotspot': fileVal = file.hotspotScore || 0; break;
+                        case 'todo': fileVal = file.todoCount || 0; break;
+                        case 'change': fileVal = file.changeFrequency || 0; break;
+                        case 'security': return file.securitySeverity === val || (val === 'any' && file.securityFindings > 0);
+                        case 'layer': return (file.priorityLayer || '').toLowerCase().includes(val.toLowerCase()) || ('P' + ({ sensing: 50, homeostasis: 100, orchestration: 150, context: 200, memory: 250, learning: 300, self_improvement: 350 }[file.priorityLayer] || '')).includes(val);
+                        default: continue;
+                    }
+                    const numVal = parseFloat(val);
+                    if (isNaN(numVal)) continue;
+                    if (op === '>' && !(fileVal > numVal)) return false;
+                    if (op === '>=' && !(fileVal >= numVal)) return false;
+                    if (op === '<' && !(fileVal < numVal)) return false;
+                    if (op === '<=' && !(fileVal <= numVal)) return false;
+                    if (op === '=' && !(fileVal === numVal)) return false;
+                    if (!op && !(fileVal >= numVal)) return false;
+                }
+                return true;
+            }
+
             function performSearch(query) {
                 if (!query || query.length < CONFIG.ui.searchMinLength) {
                     searchResults.classList.remove('active');
@@ -6018,11 +6116,18 @@
                     updateStats();
                     return;
                 }
-                
-                const tokens = tokenize(query);
+
+                // Parse filter prefixes
+                const { filters, textQuery } = parseFilterPrefixes(query);
+                const hasFilters = filters.length > 0;
+                const hasText = textQuery.length >= CONFIG.ui.searchMinLength;
+
+                // If only filters (no text), match all files that pass filters
+                const tokens = hasText ? tokenize(textQuery) : [];
                 const allScored = [];
                 for (const f of state.files) {
-                    const score = scoreFile(f, tokens);
+                    if (hasFilters && !applyFilterPrefixes(f, filters)) continue;
+                    const score = hasText ? scoreFile(f, tokens) : (f.importance || 0.1) * 100;
                     if (score > 0) allScored.push({ file: f, score });
                 }
                 allScored.sort((a, b) => b.score - a.score);
@@ -6256,11 +6361,10 @@
             const treemapView = document.getElementById('treemap-view');
             const semanticView = document.getElementById('semantic-view');
             
-            // Street View style: Cinematic zoom with blur
             const transitionStyle = `
-                opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), 
-                transform 0.7s cubic-bezier(0.4, 0, 0.2, 1),
-                filter 0.5s ease-out
+                opacity ${TRANSITION_MS}ms cubic-bezier(0.4, 0, 0.2, 1), 
+                transform ${TRANSITION_MS}ms cubic-bezier(0.4, 0, 0.2, 1),
+                filter ${TRANSITION_MS * 0.7}ms ease-out
             `;
             treemapView.style.transition = transitionStyle;
             semanticView.style.transition = transitionStyle;
@@ -6840,7 +6944,10 @@
                 const lineCount = health.lineCount || 0;
                 const healthScore = health.healthScore || 0;
                 const avgComplexity = health.avgComplexity || 0;
+                const avgCognitive = health.avgCognitiveComplexity || 0;
                 const todoCount = health.todoCount || 0;
+                const securityCount = health.securityFindings || 0;
+                const hotspotCount = health.hotspotCount || 0;
                 
                 const colors = clusterColors[i];
                 const description = cluster.role || clusterDescriptions[i];
@@ -6870,14 +6977,19 @@
                                 <div class="colony-stat-value">${formatNum(lineCount)}</div>
                             </div>
                             <div class="colony-stat">
-                                <div class="colony-stat-label">Complexity</div>
-                                <div class="colony-stat-value">${avgComplexity.toFixed(1)}</div>
+                                <div class="colony-stat-label">Cognitive</div>
+                                <div class="colony-stat-value" style="color: ${avgCognitive > 20 ? '#ff6b6b' : avgCognitive > 10 ? '#ffd93d' : '#6bcb77'}">${avgCognitive.toFixed(1)}</div>
                             </div>
                             <div class="colony-stat">
                                 <div class="colony-stat-label">TODOs</div>
                                 <div class="colony-stat-value">${todoCount}</div>
                             </div>
                         </div>
+                        ${(securityCount || hotspotCount) ? `
+                        <div class="colony-stats" style="margin-top: 4px;">
+                            ${securityCount ? `<div class="colony-stat"><div class="colony-stat-label">Security</div><div class="colony-stat-value" style="color: #ff6b6b">${securityCount}</div></div>` : ''}
+                            ${hotspotCount ? `<div class="colony-stat"><div class="colony-stat-label">Hotspots</div><div class="colony-stat-value" style="color: #ffd93d">${hotspotCount}</div></div>` : ''}
+                        </div>` : ''}
                         <div class="colony-health">
                             <div class="colony-health-bar">
                                 <div class="colony-health-fill ${healthClass}" style="width: ${healthScore}%"></div>
@@ -7253,8 +7365,8 @@
                 html += `</div>`;
             }
             
-            // Graph metrics row (v6.0 features)
-            const hasGraphMetrics = file.pagerank || file.betweenness || file.inDegree || file.complexity;
+            // Graph metrics row (v6.0 + v8.0 features)
+            const hasGraphMetrics = file.pagerank || file.betweenness || file.inDegree || file.complexity || file.cognitiveComplexity;
             if (hasGraphMetrics) {
                 html += `<div class="tt-metrics">`;
                 if (file.pagerank) {
@@ -7267,11 +7379,24 @@
                 if (file.outDegree) {
                     html += `<span class="tt-metric" title="Dependencies"><span class="tt-metric-icon">↑</span>${file.outDegree}</span>`;
                 }
-                if (file.complexity) {
+                if (file.cognitiveComplexity) {
+                    const cogColor = file.cognitiveComplexity > 30 ? '#ff6b6b' : file.cognitiveComplexity > 15 ? '#ffd93d' : '#6bcb77';
+                    html += `<span class="tt-metric" title="Cognitive complexity (SonarSource)" style="color: ${cogColor}"><span class="tt-metric-icon">🧠</span>${file.cognitiveComplexity}</span>`;
+                } else if (file.complexity) {
                     const complexityColor = file.complexity > 20 ? '#ff6b6b' : file.complexity > 10 ? '#ffd93d' : '#6bcb77';
                     html += `<span class="tt-metric" title="Cyclomatic complexity" style="color: ${complexityColor}"><span class="tt-metric-icon">🔀</span>${file.complexity}</span>`;
                 }
+                if (file.hotspotScore && file.hotspotScore >= 0.3) {
+                    const hotColor = file.hotspotScore >= 0.7 ? '#ff6b6b' : file.hotspotScore >= 0.5 ? '#ffd93d' : '#87ceeb';
+                    html += `<span class="tt-metric" title="Hotspot score (complexity × churn)" style="color: ${hotColor}"><span class="tt-metric-icon">⚡</span>${Math.round(file.hotspotScore * 100)}%</span>`;
+                }
                 html += `</div>`;
+            }
+
+            // Priority layer badge (v8.0)
+            if (file.priorityLayer) {
+                const layerLabels = { sensing: 'P50 Sensing', homeostasis: 'P100 Homeostasis', orchestration: 'P150 Orchestration', context: 'P200 Context', memory: 'P250 Memory', learning: 'P300 Learning', self_improvement: 'P350 Self-Improvement' };
+                html += `<div class="tt-section"><span class="tt-label">Layer</span><span class="tt-values"><code>${layerLabels[file.priorityLayer] || file.priorityLayer}</code></span></div>`;
             }
             
             // Warnings (TODOs, circular deps)
@@ -7284,6 +7409,10 @@
             }
             if (file.coupling && file.coupling > 0.7) {
                 warnings.push(`<span class="tt-warning" title="High external coupling">🔗 ${Math.round(file.coupling * 100)}% external</span>`);
+            }
+            if (file.securityFindings && file.securityFindings > 0) {
+                const sevColor = file.securitySeverity === 'high' ? '#ff6b6b' : file.securitySeverity === 'medium' ? '#ffd93d' : '#87ceeb';
+                warnings.push(`<span class="tt-warning" title="Security signals detected" style="color: ${sevColor}">🔒 ${file.securityFindings} finding${file.securityFindings > 1 ? 's' : ''} (${file.securitySeverity || 'low'})</span>`);
             }
             if (warnings.length > 0) {
                 html += `<div class="tt-warnings">${warnings.join('')}</div>`;
@@ -7493,6 +7622,8 @@
             const pagerank = file.pagerank ? (file.pagerank * 10000).toFixed(2) : null;
             const complexity = file.complexity || 0;
             const complexityColor = complexity > 20 ? '#ff6b6b' : complexity > 10 ? '#ffd93d' : '#6bcb77';
+            const cogComplexity = file.cognitiveComplexity || 0;
+            const cogColor = cogComplexity > 30 ? '#ff6b6b' : cogComplexity > 15 ? '#ffd93d' : '#6bcb77';
             
             let html = `
                 <!-- Stats Grid -->
@@ -7542,13 +7673,50 @@
                         <div class="info-box-label">Coupling</div>
                         <div class="info-box-value">${Math.round(file.coupling * 100)}%</div>
                     </div>` : ''}
+                    ${cogComplexity ? `
+                    <div class="info-box info-box-small">
+                        <div class="info-box-label">Cognitive</div>
+                        <div class="info-box-value" style="color: ${cogColor}">${cogComplexity}</div>
+                    </div>` : ''}
+                    ${file.hotspotScore ? `
+                    <div class="info-box info-box-small">
+                        <div class="info-box-label">Hotspot</div>
+                        <div class="info-box-value" style="color: ${file.hotspotScore >= 0.7 ? '#ff6b6b' : file.hotspotScore >= 0.5 ? '#ffd93d' : '#87ceeb'}">${Math.round(file.hotspotScore * 100)}%</div>
+                    </div>` : ''}
+                    ${file.securityFindings ? `
+                    <div class="info-box info-box-small">
+                        <div class="info-box-label">Security</div>
+                        <div class="info-box-value" style="color: ${file.securitySeverity === 'high' ? '#ff6b6b' : '#ffd93d'}">${file.securityFindings} ${file.securitySeverity || ''}</div>
+                    </div>` : ''}
                 </div>
-                
+
+                <!-- Priority Layer -->
+                ${file.priorityLayer ? `
+                <div class="panel-tags" style="margin-bottom: 8px;">
+                    <span class="panel-badge" style="border-color: var(--accent-primary); color: var(--accent-primary)">
+                        ${{ sensing: 'P50 Sensing', homeostasis: 'P100 Homeostasis', orchestration: 'P150 Orchestration', context: 'P200 Context', memory: 'P250 Memory', learning: 'P300 Learning', self_improvement: 'P350 Self-Improvement' }[file.priorityLayer] || file.priorityLayer}
+                    </span>
+                </div>` : ''}
+
+                <!-- Per-Function Complexity (v8.0) -->
+                ${file.functionComplexity && file.functionComplexity.length > 0 ? `
+                <div class="section-title">Complex Functions <span class="section-count">${file.functionComplexity.length}</span></div>
+                <div class="panel-list">
+                    ${file.functionComplexity.slice(0, 5).map(fc => {
+                        const fcColor = fc.cognitive > 30 ? '#ff6b6b' : fc.cognitive > 15 ? '#ffd93d' : '#6bcb77';
+                        return `<div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 0;">
+                            <code class="panel-code" style="flex: 1;">${escapeHtml(fc.name)}</code>
+                            <span style="color: ${fcColor}; font-size: 11px; font-weight: 600; margin-left: 8px;">🧠 ${fc.cognitive}</span>
+                        </div>`;
+                    }).join('')}
+                </div>` : ''}
+
                 <!-- Warnings -->
-                ${(file.inCycle || file.todoCount) ? `
+                ${(file.inCycle || file.todoCount || file.securityFindings) ? `
                 <div class="panel-warnings">
                     ${file.inCycle ? '<span class="panel-warning panel-warning-cycle">🔄 Circular Dependency</span>' : ''}
                     ${file.todoCount ? `<span class="panel-warning">📝 ${file.todoCount} TODO${file.todoCount > 1 ? 's' : ''}</span>` : ''}
+                    ${file.securityFindings ? `<span class="panel-warning" style="background: rgba(255,107,107,0.15); border-color: rgba(255,107,107,0.3);">🔒 ${file.securityFindings} security finding${file.securityFindings > 1 ? 's' : ''}</span>` : ''}
                 </div>` : ''}
             `;
             

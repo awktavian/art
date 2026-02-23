@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kagami / Claude Code</title>
+    <meta name="description" content="How Kagami wires Claude Code into a closed-loop system with 9 shell hooks, 52 sensory channels, and cross-session learning.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+    <style>
+:root {
+    --void: #07060B;
+    --void-warm: #0D0A0F;
+    --obsidian: #12101A;
+    --carbon: #252330;
+    --spark: #FF6B35;
+    --forge: #D4AF37;
+    --flow: #4ECDC4;
+    --nexus: #9B7EBD;
+    --beacon: #F59E0B;
+    --grove: #7EB77F;
+    --crystal: #67D4E4;
+    --safe: #4ADE80;
+    --caution: #FBBF24;
+    --violation: #F87171;
+    --text: #F5F0E8;
+    --text-dim: #C4BFBA;
+    --text-muted: #9E9994;
+    --text-ghost: #5A5550;
+    --glass: rgba(18, 16, 26, 0.72);
+    --glass-border: rgba(245, 240, 232, 0.07);
+    --glass-border-h: rgba(245, 240, 232, 0.15);
+    --font-d: 'Newsreader', Georgia, serif;
+    --font-b: 'Inter', system-ui, sans-serif;
+    --font-m: 'JetBrains Mono', 'SF Mono', monospace;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --spring: cubic-bezier(0.34, 1.2, 0.64, 1);
+    --max-w: 1100px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+body {
+    font-family: var(--font-b); font-size: 15px; line-height: 1.7;
+    color: var(--text); background: var(--void); overflow-x: hidden; cursor: none;
+}
+@media (pointer: coarse) { body { cursor: auto; } }
+a { color: var(--crystal); text-decoration: none; transition: color 233ms var(--ease); }
+a:hover { color: var(--text); }
+a:focus-visible { outline: 2px solid var(--crystal); outline-offset: 3px; }
+::selection { background: rgba(103,212,228,0.2); }
+.skip { position: fixed; top: -100%; left: 1rem; z-index: 9999; padding: 6px 14px; background: var(--crystal); color: var(--void); font: 500 13px var(--font-m); border-radius: 0 0 6px 6px; transition: top 233ms var(--ease); }
+.skip:focus { top: 0; outline: none; }
+
+/* Cursor */
+.c-dot, .c-ring { position: fixed; top:0; left:0; pointer-events: none; z-index: 9998; border-radius: 50%; transform: translate(-50%,-50%); }
+.c-dot { width: 5px; height: 5px; background: var(--crystal); }
+.c-ring { width: 32px; height: 32px; border: 1px solid rgba(103,212,228,0.4); transition: width 200ms var(--spring), height 200ms var(--spring), border-color 200ms; }
+.c-ring.hover { width: 52px; height: 52px; border-color: rgba(103,212,228,0.8); }
+@media (pointer: coarse) { .c-dot, .c-ring { display: none; } }
+
+/* Grain */
+.grain { position: fixed; inset:0; z-index: -1; opacity: 0.025; pointer-events: none; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); mix-blend-mode: overlay; }
+
+/* Ambient */
+.ambient { position: fixed; inset:0; z-index: -2; }
+.ambient canvas { width: 100%; height: 100%; }
+
+/* Layout */
+.wrap { max-width: var(--max-w); margin: 0 auto; padding: 0 clamp(1.25rem, 4vw, 3rem); }
+section { padding: clamp(4rem, 10vw, 8rem) 0; }
+.divider { display: flex; align-items: center; gap: 1rem; margin-bottom: 2.5rem; font: 500 0.72rem/1 var(--font-m); color: var(--text-muted); letter-spacing: 0.1em; text-transform: uppercase; }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--glass-border); }
+.divider .n { color: var(--crystal); }
+
+/* Typography */
+h2 { font: 400 clamp(1.6rem, 3.2vw, 2.4rem)/1.2 var(--font-d); margin-bottom: 1rem; }
+h2 em { font-style: italic; }
+h3 { font: 500 0.95rem/1.4 var(--font-b); color: var(--text-dim); margin-bottom: 0.75rem; }
+p { color: var(--text-dim); max-width: 60ch; margin-bottom: 1.25rem; }
+p:last-child { margin-bottom: 0; }
+code { font-family: var(--font-m); font-size: 0.88em; color: var(--crystal); }
+
+/* Glass card */
+.card {
+    background: var(--glass); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+    border: 1px solid var(--glass-border); border-radius: 10px; padding: 1.5rem;
+    transition: border-color 233ms var(--ease), transform 377ms var(--ease);
+}
+.card:hover { border-color: var(--glass-border-h); }
+.card.lift:hover { transform: translateY(-3px); }
+
+/* Gradient border card */
+.glow-card {
+    position: relative; border-radius: 10px; padding: 1.5rem;
+    background: var(--obsidian);
+}
+.glow-card::before {
+    content: ''; position: absolute; inset: -1px; border-radius: 11px; padding: 1px;
+    background: linear-gradient(135deg, var(--crystal), transparent 40%, transparent 60%, var(--nexus));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    opacity: 0.4; transition: opacity 377ms var(--ease);
+}
+.glow-card:hover::before { opacity: 0.8; }
+
+/* Code */
+.codeblock {
+    background: rgba(7,6,11,0.85); border: 1px solid var(--glass-border); border-radius: 8px;
+    padding: 1.25rem 1.5rem; overflow-x: auto; font: 400 0.8rem/1.7 var(--font-m); color: var(--text-dim);
+    position: relative; white-space: pre-wrap; word-break: break-word;
+}
+.codeblock .kw { color: var(--nexus); } .codeblock .fn { color: var(--crystal); }
+.codeblock .s { color: var(--grove); } .codeblock .c { color: var(--text-ghost); }
+.codeblock .n { color: var(--beacon); } .codeblock .v { color: var(--spark); }
+
+/* Copy button */
+.copy-btn {
+    position: absolute; top: 8px; right: 8px; padding: 4px 10px; border: 1px solid var(--glass-border);
+    border-radius: 4px; background: var(--obsidian); color: var(--text-ghost); font: 400 0.68rem var(--font-m);
+    cursor: pointer; transition: color 233ms, border-color 233ms;
+}
+.copy-btn:hover { color: var(--crystal); border-color: var(--crystal); }
+.copy-btn.copied { color: var(--safe); border-color: var(--safe); }
+
+/* Stat pill */
+.stat { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; background: rgba(103,212,228,0.06); border: 1px solid rgba(103,212,228,0.12); font: 500 0.78rem var(--font-m); color: var(--crystal); }
+.stat .dot { width: 6px; height: 6px; border-radius: 50%; }
+
+/* Reveal */
+[data-r] { opacity: 0; transform: translateY(20px); transition: opacity 610ms var(--ease), transform 610ms var(--ease); }
+[data-r].in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { [data-r] { opacity: 1; transform: none; transition: none; } }
+
+/* ---- Nav ---- */
+.nav { position: fixed; top:0; left:0; right:0; z-index: 100; padding: 0.75rem 0; background: rgba(7,6,11,0.88); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid transparent; transform: translateY(-100%); transition: transform 377ms var(--ease), border-color 377ms; }
+.nav.on { transform: translateY(0); border-bottom-color: var(--glass-border); }
+.nav-in { max-width: var(--max-w); margin: 0 auto; padding: 0 clamp(1.25rem, 4vw, 3rem); display: flex; align-items: center; justify-content: space-between; }
+.nav-brand { font: 500 0.78rem var(--font-m); color: var(--crystal); letter-spacing: 0.04em; }
+.nav-links { display: flex; gap: 1.25rem; list-style: none; }
+.nav-links a { font: 400 0.72rem var(--font-m); color: var(--text-ghost); letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 0; border-bottom: 1px solid transparent; transition: color 233ms, border-color 233ms; }
+.nav-links a:hover { color: var(--text-dim); }
+.nav-links a.on { color: var(--crystal); border-bottom-color: var(--crystal); }
+@media (max-width: 768px) { .nav-links { display: none; } }
+
+/* ---- Hero ---- */
+.hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 6rem 1rem; position: relative; }
+.hero-t { font: italic 400 clamp(1.3rem, 2.8vw, 2rem)/1.2 var(--font-d); color: var(--text); margin-bottom: 1.5rem; }
+.hero-sub { font-size: 0.95rem; color: var(--text-dim); max-width: 48ch; line-height: 1.7; margin-bottom: 3rem; }
+.hero-stats { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+.scroll-hint { position: absolute; bottom: 2.5rem; left: 50%; transform: translateX(-50%); color: var(--text-ghost); font: 0.68rem var(--font-m); letter-spacing: 0.15em; text-transform: uppercase; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.scroll-hint svg { width: 18px; height: 18px; stroke: var(--text-ghost); stroke-width: 1.5; fill: none; }
+@media (prefers-reduced-motion: no-preference) { .scroll-hint svg { animation: bob 2.5s ease-in-out infinite; } }
+@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
+
+/* ---- Hooks ---- */
+.hooks-row { display: flex; gap: 6px; overflow-x: auto; padding: 1rem 0; -webkit-overflow-scrolling: touch; }
+.hook-btn { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 14px; border: 1px solid var(--glass-border); border-radius: 8px; background: transparent; cursor: pointer; transition: border-color 233ms, background 233ms, transform 144ms; font-family: inherit; }
+.hook-btn:hover { border-color: var(--glass-border-h); background: rgba(245,240,232,0.02); }
+.hook-btn.on { border-color: currentColor; background: rgba(103,212,228,0.04); transform: translateY(-2px); }
+.hook-btn .hdot { width: 10px; height: 10px; border-radius: 50%; transition: box-shadow 233ms; }
+.hook-btn.on .hdot { box-shadow: 0 0 12px currentColor; }
+.hook-btn .hlbl { font: 400 0.7rem var(--font-m); color: var(--text-muted); letter-spacing: 0.03em; white-space: nowrap; transition: color 233ms; }
+.hook-btn.on .hlbl { color: var(--text); }
+
+.hook-detail { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 500ms var(--ease); }
+.hook-detail.open { grid-template-rows: 1fr; }
+.hook-detail-inner { overflow: hidden; }
+.hook-detail-content { padding: 1.5rem 0 0; }
+.hook-tags { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.hook-tag { font: 500 0.7rem var(--font-m); padding: 3px 10px; border-radius: 4px; border: 1px solid; }
+
+/* ---- Sensory ---- */
+.sense-wrap { position: relative; width: 100%; aspect-ratio: 2.2/1; min-height: 320px; max-height: 520px; border-radius: 10px; overflow: hidden; border: 1px solid var(--glass-border); background: rgba(7,6,11,0.4); }
+.sense-wrap canvas { width: 100%; height: 100%; display: block; }
+.sense-legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-top: 1rem; }
+.sense-legend span { display: inline-flex; align-items: center; gap: 5px; font: 400 0.72rem var(--font-m); color: var(--text-muted); }
+.sense-legend .sd { width: 7px; height: 7px; border-radius: 50%; }
+
+/* (EFE canvas styles removed — section is now HTML content) */
+
+/* ---- Safety ---- */
+.safety-wrap { position: relative; width: 100%; aspect-ratio: 7/4; min-height: 280px; max-height: 480px; border-radius: 10px; overflow: hidden; border: 1px solid var(--glass-border); background: rgba(7,6,11,0.4); }
+.safety-wrap canvas { width: 100%; height: 100%; display: block; }
+.safety-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 1.5rem; }
+.safety-node { padding: 1rem 1.25rem; border-radius: 8px; border-left: 3px solid; font-family: var(--font-m); font-size: 0.78rem; background: var(--glass); transition: border-color 233ms, background 233ms; }
+.safety-node:hover { background: rgba(18,16,26,0.9); }
+.safety-node .sn-head { font-weight: 500; margin-bottom: 4px; }
+.safety-node .sn-body { color: var(--text-muted); font-size: 0.72rem; }
+
+/* ---- Bridge ---- */
+.bridge-cols { display: grid; grid-template-columns: 1fr auto 1fr; gap: 0; align-items: stretch; margin: 2rem 0; }
+.bridge-col { padding: 1.5rem; border-radius: 10px; background: var(--glass); border: 1px solid var(--glass-border); }
+.bridge-col h4 { font: 500 0.82rem var(--font-m); margin-bottom: 1rem; }
+.bridge-col li { font: 400 0.78rem var(--font-m); color: var(--text-muted); line-height: 2; list-style: none; padding-left: 1rem; position: relative; }
+.bridge-col li::before { content: '→'; position: absolute; left: 0; color: var(--text-ghost); }
+.bridge-mid { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 1.5rem; position: relative; }
+.bridge-mid .bridge-line { width: 1px; flex: 1; background: linear-gradient(to bottom, transparent, var(--crystal), transparent); opacity: 0.3; }
+.bridge-mid .bridge-file { font: 500 0.72rem var(--font-m); color: var(--forge); padding: 6px 12px; border-radius: 4px; border: 1px solid rgba(212,175,55,0.2); background: rgba(212,175,55,0.04); white-space: nowrap; }
+.layers-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-top: 2rem; }
+.layer-card { padding: 1.25rem; border-radius: 8px; border-top: 2px solid; background: var(--glass); }
+.layer-card h5 { font: 500 0.82rem var(--font-m); margin-bottom: 0.5rem; }
+.layer-card p { font-size: 0.82rem; color: var(--text-muted); margin: 0; }
+.layer-card .tag { font: 400 0.68rem var(--font-m); color: var(--text-ghost); margin-top: 0.5rem; display: block; }
+@media (max-width: 768px) { .bridge-cols { grid-template-columns: 1fr; } .bridge-mid { flex-direction: row; padding: 1rem 0; } .bridge-mid .bridge-line { height: 1px; width: 100%; flex: 1; background: linear-gradient(to right, transparent, var(--crystal), transparent); } .layers-row { grid-template-columns: 1fr; } }
+
+/* ---- Pipes ---- */
+.pipes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0.75rem; }
+.pipe { padding: 1.25rem 1.5rem; border-radius: 10px; background: var(--glass); border: 1px solid var(--glass-border); border-left: 3px solid; transition: border-color 233ms, transform 233ms var(--spring); }
+.pipe:hover { transform: translateY(-2px); border-color: var(--glass-border-h); }
+.pipe h4 { font: 500 0.88rem var(--font-m); margin-bottom: 0.5rem; }
+.pipe p { font-size: 0.82rem; color: var(--text-muted); margin: 0 0 0.5rem; }
+.pipe .ep { font: 400 0.7rem var(--font-m); color: var(--text-ghost); }
+
+.dev-table { width: 100%; border-collapse: collapse; margin-top: 2rem; font: 400 0.78rem var(--font-m); }
+.dev-table th { text-align: left; padding: 8px 12px; color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--glass-border); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.dev-table td { padding: 8px 12px; color: var(--text-dim); border-bottom: 1px solid rgba(245,240,232,0.03); }
+.dev-table tr:hover td { background: rgba(103,212,228,0.02); }
+
+/* ---- Footer ---- */
+footer { padding: 5rem 0 3rem; text-align: center; }
+.foot-line { font: 400 0.85rem var(--font-m); color: var(--text-ghost); letter-spacing: 0.08em; margin-bottom: 1rem; }
+.foot-line span { color: var(--crystal); }
+.foot-links { display: flex; justify-content: center; gap: 1.5rem; }
+.foot-links a { font: 400 0.7rem var(--font-m); color: var(--text-ghost); }
+.foot-links a:hover { color: var(--crystal); }
+
+/* ---- Inline equation ---- */
+.eq { font-family: var(--font-m); font-size: 0.88em; color: var(--crystal); padding: 1.25rem 1rem; text-align: center; line-height: 1.8; }
+.eq .muted { color: var(--text-muted); font-size: 0.85em; display: block; margin-top: 4px; }
+    </style>
+</head>
+<body>
+<a href="#main" class="skip">Skip to content</a>
+<div class="c-dot" aria-hidden="true"></div>
+<div class="c-ring" aria-hidden="true"></div>
+<div class="ambient" aria-hidden="true"><canvas id="bg"></canvas></div>
+<div class="grain" aria-hidden="true"></div>
+
+<nav class="nav" aria-label="Primary">
+    <div class="nav-in">
+        <span class="nav-brand">kagami / claude</span>
+        <ul class="nav-links">
+            <li><a href="#arch">Architecture</a></li>
+            <li><a href="#hooks">Hooks</a></li>
+            <li><a href="#sensory">Sensory</a></li>
+            <li><a href="#efe">Heartbeat</a></li>
+            <li><a href="#safety">Safety</a></li>
+            <li><a href="#bridge">Learning</a></li>
+            <li><a href="#pipes">Pipes</a></li>
+        </ul>
+    </div>
+</nav>
+
+<main id="main">
+
+<!-- HERO -->
+<section class="hero">
+    <h1 class="hero-t" data-r style="font-style:normal; font-size:clamp(1.6rem, 3.2vw, 2.4rem)">Kagami <span style="color:var(--crystal)">/</span> Claude Code</h1>
+    <p class="hero-sub" data-r>A Python daemon on <code>:7331</code> polls 52 sensory channels, tracks convergence, and picks actions via a self-improvement loop. Nine shell hooks wire Claude Code into it &mdash; injecting daemon state on every prompt, feeding bash results back as sensory input, and persisting learning across sessions.</p>
+    <div class="hero-stats" data-r>
+        <span class="stat"><span class="dot" style="background:var(--crystal)"></span>9 hooks</span>
+        <span class="stat"><span class="dot" style="background:var(--spark)"></span>52 sensors</span>
+        <span class="stat"><span class="dot" style="background:var(--grove)"></span>3 persistence layers</span>
+        <span class="stat"><span class="dot" style="background:var(--safe)"></span>h(x) &ge; 0</span>
+    </div>
+    <div class="scroll-hint" aria-hidden="true"><span>scroll</span><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
+</section>
+
+<!-- S1: ARCHITECTURE -->
+<section id="arch">
+<div class="wrap">
+    <div class="divider" data-r><span class="n">01</span> Architecture</div>
+    <h2 data-r>Two runtimes, one loop</h2>
+    <p data-r>The Python daemon runs continuously on <code>:7331</code> &mdash; sensory polling, convergence tracking, action selection, self-improvement. Claude Code handles reasoning. Nine shell hooks bridge them: every prompt injects daemon state, every bash result feeds back via <code>sense.inject</code> RPC.</p>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 2rem" data-r>
+        <div class="glow-card">
+            <h3 style="color:var(--forge); margin-bottom:1rem">Python Daemon (:7331)</h3>
+            <ul style="list-style:none; font: 400 0.82rem var(--font-m); color: var(--text-muted); line-height: 2.2">
+                <li>GodelLoop &mdash; action selection (10s tick)</li>
+                <li>52 sensory channels, adaptive polling</li>
+                <li>ConvergenceTracker &mdash; prediction error ‖&mu;<sub>t</sub> - &mu;<sub>t-1</sub>‖</li>
+                <li>ContinuousMind &mdash; autonomous LLM reasoning</li>
+                <li>SharedWorkingMemory &mdash; persisted state</li>
+                <li>Reflexion &mdash; session-end insight extraction</li>
+                <li>live_bridge.json &mdash; 30s heartbeat file</li>
+            </ul>
+        </div>
+        <div class="glow-card">
+            <h3 style="color:var(--crystal); margin-bottom:1rem">Claude Code</h3>
+            <ul style="list-style:none; font: 400 0.82rem var(--font-m); color: var(--text-muted); line-height: 2.2">
+                <li>session-init &mdash; bootstrap from previous session</li>
+                <li>prompt &mdash; heartbeat injection (15-30ms)</li>
+                <li>pre-bash / pre-tool-cbf &mdash; safety gates</li>
+                <li>post-write &mdash; oscillation detection</li>
+                <li>post-bash &mdash; Markov blanket closure</li>
+                <li>subagent-start &mdash; cognitive inheritance</li>
+                <li>pre-compact / stop &mdash; state persistence</li>
+            </ul>
+        </div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-top: 1.5rem" data-r>
+        <div class="card" style="text-align: center">
+            <div style="font: 500 1.8rem var(--font-m); color: var(--crystal)">5</div>
+            <div style="font: 400 0.72rem var(--font-m); color: var(--text-muted); margin-top: 4px">RPC methods (socket)</div>
+        </div>
+        <div class="card" style="text-align: center">
+            <div style="font: 500 1.8rem var(--font-m); color: var(--forge)">14</div>
+            <div style="font: 400 0.72rem var(--font-m); color: var(--text-muted); margin-top: 4px">MCP tools exposed</div>
+        </div>
+        <div class="card" style="text-align: center">
+            <div style="font: 500 1.8rem var(--font-m); color: var(--grove)">3</div>
+            <div style="font: 400 0.72rem var(--font-m); color: var(--text-muted); margin-top: 4px">persistence layers</div>
+        </div>
+    </div>
+</div>
+</section>
+
+<!-- S2: HOOKS -->
+<section id="hooks">
+<div class="wrap">
+    <div class="divider" data-r><span class="n">02</span> Hooks</div>
+    <h2 data-r>Nine hooks, one session</h2>
+    <p data-r>Each hook is a bash script in <code>.claude/hooks/</code>. They talk to the daemon via Unix socket (<code>/tmp/kagami-daemon.sock</code>, JSON-RPC 2.0). Click any hook to see what it does.</p>
+
+    <div class="hooks-row" data-r id="hook-row">
+        <button class="hook-btn" data-h="0" style="color:var(--crystal)"><div class="hdot" style="background:currentColor"></div><span class="hlbl">session-init</span></button>
+        <button class="hook-btn" data-h="1" style="color:var(--crystal)"><div class="hdot" style="background:currentColor"></div><span class="hlbl">prompt</span></button>
+        <button class="hook-btn" data-h="2" style="color:var(--safe)"><div class="hdot" style="background:currentColor"></div><span class="hlbl">pre-bash</span></button>
+        <button class="hook-btn" data-h="3" style="color:var(--caution)"><div class="hdot" style="background:currentColor"></div><span class="hlbl">pre-tool-cbf</span></button>
+        <button class="hook-btn" data-h="4" style="color:var(--flow)"><div class="hdot" style="background:currentColor"></div><span class="hlbl">post-write</span></button>
+        <button class="hook-btn" data-h="5" style="color:var(--flow)"><div class="hdot" style="background:currentColor"></div><span class="hlbl">post-bash</span></button>
+        <button class="hook-btn" data-h="6" style="color:var(--nexus)"><div class="hdot" style="background:currentColor"></div><span class="hlbl">subagent</span></button>
+        <button class="hook-btn" data-h="7" style="color:var(--crystal)"><div class="hdot" style="background:currentColor"></div><span class="hlbl">pre-compact</span></button>
+        <button class="hook-btn" data-h="8" style="color:var(--grove)"><div class="hdot" style="background:currentColor"></div><span class="hlbl">stop</span></button>
+    </div>
+
+    <div class="hook-detail" id="hook-detail"><div class="hook-detail-inner"><div class="hook-detail-content" id="hook-content"></div></div></div>
+</div>
+</section>
+
+<!-- S3: SENSORY -->
+<section id="sensory">
+<div class="wrap">
+    <div class="divider" data-r><span class="n">03</span> Sensory Integration</div>
+    <h2 data-r>52 sensory channels</h2>
+    <p data-r>The daemon defines 52 sense types (42 pollable, 10 event-driven). It polls Gmail, GitHub, smart home sensors, weather, job markets, game state, system health, and more. Each channel has adaptive polling intervals, circuit breakers with exponential backoff, and a three-layer cache (memory &rarr; SQLite WAL &rarr; warm-from-store). The <code>post-bash</code> hook injects every Claude action as <code>TOOL_RESULT</code> via <code>sense.inject</code> RPC &mdash; the daemon learns what Claude did.</p>
+    <div class="sense-wrap" data-r><canvas id="sense-cv" role="img" aria-label="52 sensory channels with adaptive polling, grouped by category. Active channels stream data to the daemon."></canvas></div>
+    <div class="sense-legend" data-r>
+        <span><span class="sd" style="background:var(--crystal)"></span>Digital (10)</span>
+        <span><span class="sd" style="background:var(--spark)"></span>Physical (11)</span>
+        <span><span class="sd" style="background:var(--beacon)"></span>Environmental (2)</span>
+        <span><span class="sd" style="background:var(--nexus)"></span>Economic (10)</span>
+        <span><span class="sd" style="background:var(--forge)"></span>Gaming (4)</span>
+        <span><span class="sd" style="background:var(--grove)"></span>Epistemic (3)</span>
+        <span><span class="sd" style="background:var(--nexus)"></span>Event-driven (3)</span>
+        <span><span class="sd" style="background:var(--flow)"></span>System (5)</span>
+        <span style="color:var(--text-ghost)">23 active / 48 pollable</span>
+    </div>
+</div>
+</section>
+
+<!-- S4: HEARTBEAT -->
+<section id="efe">
+<div class="wrap">
+    <div class="divider" data-r><span class="n">04</span> Heartbeat &amp; Behavior</div>
+    <h2 data-r>What Claude Code sees</h2>
+    <p data-r>Every prompt, the <code>prompt</code> hook queries the daemon (or reads <code>live_bridge.json</code> as fallback). If state changed since last epoch, it injects a one-line heartbeat. Rules in <code>.claude/rules/cognitive-integration.md</code> tell Claude how to respond.</p>
+
+    <div class="codeblock" data-r><code><span class="c"># Heartbeat format (injected per-prompt when state changes)</span>
+[kagami] step=<span class="n">3378</span> h=<span class="n">1.0</span> act=<span class="s">explore</span> | conv=<span class="n">0.0</span><span class="v">~</span> | sense(<span class="n">25</span>ch)
+
+<span class="c"># Fields:</span>
+<span class="c">#   step    GodelLoop lifetime ticks (10s each)</span>
+<span class="c">#   h       safety barrier value (1.0=safe, &lt;0.3=caution, &lt;0.1=stop)</span>
+<span class="c">#   act     daemon's selected action: noop/tune/explore/propose/apply/meta</span>
+<span class="c">#   conv    prediction error + trend: ↓=improving →=stable ~=stagnant ↑=diverging</span>
+<span class="c">#   sense   active sensory channel count</span></code></div>
+
+    <h3 data-r style="margin-top:2rem">Alert response rules</h3>
+    <p data-r>When the heartbeat contains an <code>ALERT:</code>, Claude follows these rules &mdash; they're in the cognitive substrate, loaded on every session.</p>
+
+    <div class="safety-grid" data-r style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr))">
+        <div class="safety-node" style="border-left-color:var(--beacon); background:rgba(245,158,11,0.03)"><div class="sn-head" style="color:var(--beacon)">STAGNANT (~)</div><div class="sn-body">Explore new approaches. Don't repeat what failed. Propose substrate changes.</div></div>
+        <div class="safety-node" style="border-left-color:var(--violation); background:rgba(248,113,113,0.03)"><div class="sn-head" style="color:var(--violation)">DIVERGING (&uarr;)</div><div class="sn-body">Simplify. Revert speculative changes. Read more, write less.</div></div>
+        <div class="safety-node" style="border-left-color:var(--violation); background:rgba(248,113,113,0.03)"><div class="sn-head" style="color:var(--violation)">h LOW (&lt;0.3)</div><div class="sn-body">Stop feature work. Audit safety-critical changes.</div></div>
+        <div class="safety-node" style="border-left-color:var(--caution); background:rgba(251,191,36,0.03)"><div class="sn-head" style="color:var(--caution)">OSCILLATION</div><div class="sn-body">Stop editing. Read what you have. Think first.</div></div>
+        <div class="safety-node" style="border-left-color:var(--caution); background:rgba(251,191,36,0.03)"><div class="sn-head" style="color:var(--caution)">HIGH CHURN</div><div class="sn-body">Plan more, write less. 10+ writes in 60s triggered this.</div></div>
+        <div class="safety-node" style="border-left-color:var(--grove); background:rgba(126,183,127,0.03)"><div class="sn-head" style="color:var(--grove)">IMPROVING (&darr;)</div><div class="sn-body">Stay the course. Don't disrupt convergence.</div></div>
+    </div>
+
+    <h3 data-r style="margin-top:2rem">Daemon action selection</h3>
+    <p data-r>The daemon's GodelLoop picks the <code>act</code> field by scoring six candidates on epistemic value, goal alignment, risk, and safety. Claude doesn't compute this &mdash; it reads the result and follows the behavioral rules above.</p>
+    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top:1rem" data-r>
+        <div class="card" style="padding:1rem; text-align:center"><div style="font:500 0.82rem var(--font-m); color:var(--crystal)">noop</div><div style="font:0.7rem var(--font-m); color:var(--text-ghost); margin-top:4px">no action needed</div></div>
+        <div class="card" style="padding:1rem; text-align:center"><div style="font:500 0.82rem var(--font-m); color:var(--beacon)">tune</div><div style="font:0.7rem var(--font-m); color:var(--text-ghost); margin-top:4px">adjust parameters</div></div>
+        <div class="card" style="padding:1rem; text-align:center"><div style="font:500 0.82rem var(--font-m); color:var(--spark)">explore</div><div style="font:0.7rem var(--font-m); color:var(--text-ghost); margin-top:4px">try new approaches</div></div>
+        <div class="card" style="padding:1rem; text-align:center"><div style="font:500 0.82rem var(--font-m); color:var(--nexus)">propose</div><div style="font:0.7rem var(--font-m); color:var(--text-ghost); margin-top:4px">suggest substrate changes</div></div>
+        <div class="card" style="padding:1rem; text-align:center"><div style="font:500 0.82rem var(--font-m); color:var(--forge)">apply</div><div style="font:0.7rem var(--font-m); color:var(--text-ghost); margin-top:4px">execute improvement</div></div>
+        <div class="card" style="padding:1rem; text-align:center"><div style="font:500 0.82rem var(--font-m); color:var(--grove)">meta</div><div style="font:0.7rem var(--font-m); color:var(--text-ghost); margin-top:4px">modify the loop itself</div></div>
+    </div>
+</div>
+</section>
+
+<!-- S5: SAFETY -->
+<section id="safety">
+<div class="wrap">
+    <div class="divider" data-r><span class="n">05</span> Safety Barrier</div>
+    <h2 data-r>h(x) &ge; 0</h2>
+    <p data-r>The <code>pre-tool-cbf</code> hook runs on every Write and Edit (&lt;100ms). It pattern-matches the file path against three protection layers. Secrets are the only hard block (exit code 2, fires sensory event to daemon). Safety-critical and substrate paths warn but allow. Everything else passes.</p>
+    <div class="safety-wrap" data-r><canvas id="safety-cv" role="img" aria-label="Phase plane showing CBF safety barrier"></canvas></div>
+    <div class="safety-grid" data-r>
+        <div class="safety-node" style="border-left-color:var(--violation); background:rgba(248,113,113,0.03)"><div class="sn-head" style="color:var(--violation)">BLOCK</div><div class="sn-body">.env, .pem, .key, credentials &mdash; exit 2</div></div>
+        <div class="safety-node" style="border-left-color:var(--caution); background:rgba(251,191,36,0.03)"><div class="sn-head" style="color:var(--caution)">WARN</div><div class="sn-body">core/safety/*, core/security/* &mdash; log + proceed</div></div>
+        <div class="safety-node" style="border-left-color:var(--beacon); background:rgba(245,158,11,0.03)"><div class="sn-head" style="color:var(--beacon)">FLAG</div><div class="sn-body">CLAUDE.md, .claude/rules/* &mdash; substrate change</div></div>
+        <div class="safety-node" style="border-left-color:var(--safe); background:rgba(74,222,128,0.03)"><div class="sn-head" style="color:var(--safe)">PASS</div><div class="sn-body">All other paths &mdash; h(x) > 0</div></div>
+    </div>
+</div>
+</section>
+
+<!-- S6: BRIDGE -->
+<section id="bridge">
+<div class="wrap">
+    <div class="divider" data-r><span class="n">06</span> Cross-Session Learning</div>
+    <h2 data-r>Sessions end. State persists.</h2>
+    <p data-r>The <code>stop</code> hook writes a session record to <code>.claude/sessions/latest.json</code>. The daemon extracts patterns and generates reflections. Next session, <code>session-init</code> reads it back. GodelLoop parameters (&lambda;<sub>risk</sub>, &gamma;, &epsilon;) carry over. The step counter continues.</p>
+
+    <div class="bridge-cols" data-r>
+        <div class="bridge-col">
+            <h4 style="color:var(--crystal)">Session N &mdash; stop hook</h4>
+            <ul>
+                <li>Capture git diff + file count</li>
+                <li>Classify layers touched</li>
+                <li>Write latest.json</li>
+                <li>RPC session.end_with_summary</li>
+                <li>Daemon extracts patterns</li>
+                <li>Reflexion generates insight</li>
+                <li>Detect orphan processes</li>
+            </ul>
+        </div>
+        <div class="bridge-mid">
+            <div class="bridge-line"></div>
+            <div class="bridge-file">latest.json</div>
+            <div class="bridge-line"></div>
+        </div>
+        <div class="bridge-col">
+            <h4 style="color:var(--crystal)">Session N+1 &mdash; session-init</h4>
+            <ul>
+                <li>Read latest.json</li>
+                <li>Query daemon context.export</li>
+                <li>Surface substrate proposals</li>
+                <li>Inherit &lambda;, &gamma;, &epsilon;</li>
+                <li>Resume step counter</li>
+                <li>Load crystallized patterns</li>
+                <li>Kill zombie processes</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="layers-row" data-r>
+        <div class="layer-card" style="border-top-color:var(--nexus)"><h5 style="color:var(--nexus)">MCP Memory Graph</h5><p>Semantic entities, relations, observations. Claude reads and writes via mcp__memory__* tools.</p><span class="tag">Claude-only</span></div>
+        <div class="layer-card" style="border-top-color:var(--forge)"><h5 style="color:var(--forge)">.claude/sessions/</h5><p>live_bridge.json (30s), latest.json (session end), ledger.jsonl, patterns.jsonl, reflections/.</p><span class="tag">Daemon writes, Claude reads</span></div>
+        <div class="layer-card" style="border-top-color:var(--grove)"><h5 style="color:var(--grove)">SharedWorkingMemory</h5><p>Interpreter params, convergence state, colony utilities. In-process dict persisted to disk.</p><span class="tag">Daemon-only</span></div>
+    </div>
+</div>
+</section>
+
+<!-- S7: PIPES -->
+<section id="pipes">
+<div class="wrap">
+    <div class="divider" data-r><span class="n">07</span> Integration Pipes</div>
+    <h2 data-r>Every connection</h2>
+    <p data-r>The daemon exposes multiple interfaces. Claude hooks use the Unix socket. Devices connect via gRPC or REST. All authenticated with Ed25519.</p>
+
+    <div class="pipes-grid" data-r>
+        <div class="pipe" style="border-left-color:var(--crystal)"><h4 style="color:var(--crystal)">Unix Socket</h4><p>JSON-RPC 2.0. context.export, context.compact, sense.inject, session.end_with_summary, godel.step. Used by all 9 hooks.</p><div class="ep">/tmp/kagami-daemon.sock</div></div>
+        <div class="pipe" style="border-left-color:var(--forge)"><h4 style="color:var(--forge)">gRPC :7331</h4><p>DaemonBridge service. Bidirectional sensory streaming + action execution. 11 proto services total. Thread-isolated from uvloop.</p><div class="ep">Ed25519 auth per request</div></div>
+        <div class="pipe" style="border-left-color:var(--beacon)"><h4 style="color:var(--beacon)">REST :7332</h4><p>Mobile/web fallback. Same RPC methods over HTTP. Auto-discovered via mDNS (_kagami._tcp.local).</p><div class="ep">JSON over HTTPS</div></div>
+        <div class="pipe" style="border-left-color:var(--grove)"><h4 style="color:var(--grove)">File Bridge</h4><p>live_bridge.json &mdash; 30s heartbeat. latest.json &mdash; session end state. Atomic writes (tempfile + rename).</p><div class="ep">.claude/sessions/</div></div>
+        <div class="pipe" style="border-left-color:var(--nexus)"><h4 style="color:var(--nexus)">MCP Tools</h4><p>14 tools: kagami_status, kagami_context, kagami_sensory, kagami_godel_step, kagami_learned_patterns, kagami_substrate_proposals, kagami_perception, kagami_arena.</p><div class="ep">Claude &rarr; Daemon</div></div>
+        <div class="pipe" style="border-left-color:var(--spark)"><h4 style="color:var(--spark)">mDNS</h4><p>_kagami._tcp.local. advertised on LAN. Devices auto-discover daemon without configuration. Port + device class + capabilities.</p><div class="ep">Zeroconf broadcast</div></div>
+    </div>
+
+    <table class="dev-table card" data-r style="margin-top:2rem">
+        <thead><tr><th>Device</th><th>Projection</th><th>Rate</th><th>Transport</th></tr></thead>
+        <tbody>
+            <tr><td style="color:var(--crystal)">HUB</td><td>128D</td><td>100ms</td><td>gRPC stream</td></tr>
+            <tr><td style="color:var(--crystal)">DESKTOP</td><td>64D</td><td>1 Hz</td><td>gRPC stream</td></tr>
+            <tr><td style="color:var(--crystal)">PHONE</td><td>64D</td><td>1 Hz</td><td>gRPC / REST</td></tr>
+            <tr><td style="color:var(--crystal)">WATCH</td><td>8D</td><td>5s poll</td><td>REST</td></tr>
+            <tr><td style="color:var(--crystal)">WEB</td><td>32D</td><td>2 Hz</td><td>REST / WebSocket</td></tr>
+            <tr><td style="color:var(--crystal)">ORB</td><td>8D</td><td>100ms</td><td>gRPC (ESP32-S3)</td></tr>
+            <tr><td style="color:var(--crystal)">VISION</td><td>64D</td><td>1 Hz</td><td>gRPC stream</td></tr>
+        </tbody>
+    </table>
+</div>
+</section>
+
+</main>
+
+<footer>
+    <div class="wrap">
+        <div class="foot-line">9 hooks &middot; 52 sensors &middot; 3 layers &middot; <span>h(x) &ge; 0</span></div>
+        <div class="foot-links"><a href="#main">Top</a></div>
+    </div>
+</footer>
+
+<script>
+(function(){
+'use strict';
+const R = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+// ===== CURSOR =====
+!function(){
+    if (matchMedia('(pointer: coarse)').matches) return;
+    const dot = $('.c-dot'), ring = $('.c-ring');
+    let mx=0, my=0, rx=0, ry=0;
+    document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; dot.style.left=mx+'px'; dot.style.top=my+'px'; });
+    document.addEventListener('mouseover', e => { ring.classList.toggle('hover', !!e.target.closest('a,button,[role=tab],input,.hook-btn,.pipe,.glow-card,.card.lift,.safety-node')); });
+    if (!R) (function loop(){ rx+=(mx-rx)*0.13; ry+=(my-ry)*0.13; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(loop); })();
+}();
+
+// ===== SCROLL REVEAL =====
+const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); obs.unobserve(e.target); } });
+}, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
+$$('[data-r]').forEach(el => obs.observe(el));
+
+// ===== NAV =====
+!function(){
+    const nav = $('.nav'), links = $$('.nav-links a'), secs = $$('section[id]');
+    window.addEventListener('scroll', () => {
+        const y = scrollY;
+        nav.classList.toggle('on', y > innerHeight * 0.6);
+        let cur = '';
+        secs.forEach(s => { if (y >= s.offsetTop - 250) cur = s.id; });
+        links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + cur));
+    }, { passive: true });
+}();
+
+// ===== AMBIENT BG =====
+!function(){
+    const cv = $('#bg'), ctx = cv.getContext('2d');
+    let w, h;
+    const orbs = [
+        { c:[103,212,228], r:300, vx:0.12, vy:0.08, ph:0 },
+        { c:[155,126,189], r:250, vx:-0.1, vy:0.06, ph:2 },
+        { c:[78,205,196], r:280, vx:0.08, vy:-0.1, ph:4 },
+        { c:[212,175,55], r:200, vx:-0.06, vy:0.12, ph:1 },
+    ];
+    function resize(){ const d=Math.min(devicePixelRatio,2); w=cv.parentElement.clientWidth; h=cv.parentElement.clientHeight; cv.width=w*d; cv.height=h*d; ctx.scale(d,d); orbs.forEach(o=>{ o.x=Math.random()*w; o.y=Math.random()*h; }); }
+    resize(); addEventListener('resize', resize);
+    function draw(){
+        ctx.clearRect(0,0,w,h);
+        const t = performance.now()*0.0003;
+        orbs.forEach(o=>{
+            o.x+=o.vx; o.y+=o.vy;
+            if(o.x<-o.r) o.x=w+o.r; if(o.x>w+o.r) o.x=-o.r;
+            if(o.y<-o.r) o.y=h+o.r; if(o.y>h+o.r) o.y=-o.r;
+            const a = 0.028 + Math.sin(t+o.ph)*0.012;
+            const g = ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,o.r);
+            g.addColorStop(0,`rgba(${o.c},${a})`); g.addColorStop(1,'rgba(0,0,0,0)');
+            ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+        });
+        if(!R) requestAnimationFrame(draw);
+    }
+    draw();
+}();
+
+// ===== HOOK TIMELINE =====
+!function(){
+    const HOOKS = [
+        { name:'session-init', event:'SessionStart', budget:'<3s', type:'bootstrap',
+          desc:'Reads previous session learning from latest.json. Queries daemon for GodelLoop state, convergence trend, sensory snapshot, crystallized patterns. Detects zombie pytest/http.server processes. Surfaces pending substrate updates from .claude/substrate_updates/.',
+          code:'# Read previous session\nprev=$(cat .claude/sessions/latest.json)\n\n# Query daemon for rich context\nctx=$(curl -s --unix-socket /tmp/kagami-daemon.sock \\\n  -d \'{"method":"context.export",\n       "params":{"max_sensory":5}}\')\n\n# Surface substrate proposals\nfor f in .claude/substrate_updates/*.json; do\n  echo "[SUBSTRATE] $(jq .type $f)"\ndone' },
+        { name:'prompt', event:'UserPromptSubmit', budget:'15-30ms', type:'heartbeat',
+          desc:'Delta-aware. Tracks epoch per Claude session (keyed by PPID). Only injects context when daemon state changed since last prompt. Zero tokens when idle. Emits the heartbeat line.',
+          code:'# The heartbeat that guides behavior\n[kagami] step=3378 h=1.0 act=explore | conv=0.0~ | sense(25ch)\n\n# step: GodelLoop lifetime steps\n# h: safety barrier (1.0=safe, <0.3=caution)\n# act: current strategy\n# conv: prediction error + trend\n#   ↓=improving →=stable ~=stagnant ↑=diverging' },
+        { name:'pre-bash', event:'PreToolUse (Bash)', budget:'<500ms', type:'gate',
+          desc:'Advisory proprioception gate. Detects pytest already running (warns about xdist saturation). Detects server spawns on occupied ports. Blocks recursive rm -rf with decision:"block".',
+          code:'# Detect zombie processes\nrunning=$(pgrep -c pytest 2>/dev/null || echo 0)\nif [ "$running" -gt 0 ]; then\n  echo "⚠ pytest already running ($running procs)"\nfi\n\n# Block destructive deletes\nif echo "$CMD" | grep -qE "rm\\s+(-rf|-fr)"; then\n  echo \'{"decision":"block"}\'\nfi' },
+        { name:'pre-tool-cbf', event:'PreToolUse (Write|Edit)', budget:'<100ms', type:'safety',
+          desc:'Three-layer CBF gate. Layer 1: secrets (.env, .pem, .key) → BLOCK (exit 2). Layer 2: safety-critical paths → warn + proceed. Layer 3: cognitive substrate → flag + proceed. Injects sensory event on block.',
+          code:'case "$FILE_PATH" in\n  *.env|*.pem|*.key|*credentials*)\n    echo \'{"decision":"block"}\'\n    exit 2 ;;\n  */core/safety/*|*/core/security/*)\n    echo "⚠ Safety-critical path" ;;\n  *CLAUDE.md|*.claude/rules/*)\n    echo "⚠ Cognitive substrate" ;;\nesac' },
+        { name:'post-write', event:'PostToolUse (Write|Edit)', budget:'<200ms', type:'observation',
+          desc:'Logs file modifications with timestamp to /tmp/kagami-convergence-$PPID.log. Detects oscillation: 3+ edits to same file in 30s. Detects high churn: 10+ writes in 60s. Classifies into critical layers (safety, strange loop, substrate, sensorimotor, training, memory).',
+          code:'# Oscillation detection\nrecent=$(grep "$FILE" "$LOG" | tail -3)\nif [ $(echo "$recent" | wc -l) -ge 3 ]; then\n  echo "ALERT: OSCILLATION on $FILE"\n  # Inject signal to daemon\n  curl -s --unix-socket $SOCK \\\n    -d \'{"method":"sense.inject",\n         "params":{"sense_type":"tool_result",\n                   "data":{"oscillation":true}}}\' &\nfi' },
+        { name:'post-bash', event:'PostToolUse (Bash)', budget:'<300ms', type:'closure',
+          desc:'Closes the feedback loop. Classifies action type (test/build/git/lint/bash). Estimates confidence: git=0.85, lint=0.75, test=pass_ratio, build=0.4. Injects TOOL_RESULT into daemon sensory via fire-and-forget RPC so the daemon tracks what Claude did.',
+          code:'# Classify + estimate confidence\ncase "$CMD" in\n  *pytest*) type="test";  conf=$pass_ratio ;;\n  *make*)   type="build"; conf=0.4 ;;\n  *git*)    type="git";   conf=0.85 ;;\n  *ruff*)   type="lint";  conf=0.75 ;;\nesac\n\n# Close the Markov blanket\ncurl -s --unix-socket $SOCK \\\n  -d "{\\\"method\\\":\\\"sense.inject\\\",\n       \\\"params\\\":{\\\"sense_type\\\":\\\"tool_result\\\",\n       \\\"data\\\":{\\\"success\\\":$ok,\n                \\\"confidence\\\":$conf,\n                \\\"action_type\\\":\\\"$type\\\"}}}" &' },
+        { name:'subagent-start', event:'SubagentStart', budget:'<500ms', type:'inheritance',
+          desc:'Subagents inherit parent cognitive state. Always requests full state (epoch=0, no delta). Outputs [kagami-parent] prefix. Ensures child agents have same safety barrier, convergence, and GodelLoop context.',
+          code:'# Full state for subagent (no delta)\nctx=$(curl -s --unix-socket $SOCK \\\n  -d \'{"method":"context.compact",\n       "params":{"last_epoch":0}}\')\n\necho "[kagami-parent] $ctx"' },
+        { name:'pre-compact', event:'PreCompaction', budget:'implicit', type:'preservation',
+          desc:'Prevents loss of cognitive state during context compaction. Reads live_bridge.json (faster than daemon RPC). Re-injects GodelLoop params (λ_risk, γ, ε, step, action), convergence trend, crystallized patterns, sensory snapshot, and h_value as additionalContext.',
+          code:'# Preserve state through compaction\nbridge=$(cat .claude/sessions/live_bridge.json)\n\n# Re-inject as additionalContext\n# GodelLoop: λ_risk, γ, ε, step, action\n# Convergence: distance, trend, stagnant\n# Patterns + sensory + h_value' },
+        { name:'stop', event:'Stop', budget:'<2s', type:'bridge',
+          desc:'Captures session delta: files changed, layers touched (safety/loop/substrate/sensorimotor), recent commits. Writes latest.json. Signals daemon via session.end_with_summary RPC — daemon extracts patterns, generates reflection, checkpoints GodelLoop. Cleans up stale epoch files.',
+          code:'# Build session record\nrecord=$(jq -n --arg b "$branch" \\\n  --argjson c "$changed" \\\n  \'{ended_at:now|todate,\n    branch:$b, files_changed:$c,\n    layers_touched:{safety:false,\n    strange_loop:false}}\')\n\n# Signal daemon\ncurl -s --unix-socket $SOCK \\\n  -d "{\\\"method\\\":\\\"session.end_with_summary\\\",\n       \\\"params\\\":{\\\"delta\\\":$record}}"\n\n# Write bridge for next session\necho "$record" > .claude/sessions/latest.json' },
+    ];
+    const btns = $$('.hook-btn');
+    const detail = $('#hook-detail');
+    const content = $('#hook-content');
+    let active = -1;
+    function render(i) {
+        const h = HOOKS[i];
+        const typeColors = { bootstrap:'var(--crystal)', heartbeat:'var(--crystal)', gate:'var(--safe)', safety:'var(--caution)', observation:'var(--flow)', closure:'var(--flow)', inheritance:'var(--nexus)', preservation:'var(--crystal)', bridge:'var(--grove)' };
+        content.innerHTML = `
+            <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
+                <h3 style="margin:0;color:${typeColors[h.type]||'var(--text)'}">${h.name}</h3>
+                <div class="hook-tags">
+                    <span class="hook-tag" style="color:var(--text-muted);border-color:var(--glass-border)">${h.event}</span>
+                    <span class="hook-tag" style="color:${typeColors[h.type]};border-color:currentColor">${h.budget}</span>
+                </div>
+            </div>
+            <p style="margin-bottom:1rem">${h.desc}</p>
+            <div class="codeblock"><button class="copy-btn" onclick="this.classList.add('copied');navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent);setTimeout(()=>this.classList.remove('copied'),1500)">copy</button><code>${h.code.replace(/</g,'&lt;')}</code></div>
+        `;
+    }
+    btns.forEach((btn, i) => {
+        btn.addEventListener('click', () => {
+            if (active === i) { detail.classList.remove('open'); btns[i].classList.remove('on'); active=-1; return; }
+            if (active >= 0) btns[active].classList.remove('on');
+            btn.classList.add('on');
+            render(i);
+            detail.classList.add('open');
+            active = i;
+        });
+    });
+}();
+
+// ===== SENSORY CANVAS =====
+!function(){
+    const cv = $('#sense-cv'), ctx = cv.getContext('2d');
+    let w, h, particles = [];
+    const cats = [
+        { name:'Digital', color:'#67D4E4', items:['Gmail','GitHub','Linear','Notion','Discord','Calendar','Drive','Sheets','Figma','Slack'], active:5 },
+        { name:'Physical', color:'#FF6B35', items:['Presence','Motion','Lights','Shades','Locks','Climate','Audio','Sleep','Vehicle','Cameras','Security'], active:6 },
+        { name:'Environmental', color:'#F59E0B', items:['Weather','News'], active:2 },
+        { name:'Economic', color:'#9B7EBD', items:['Freelancer','Indeed','Upwork','Fiverr','Guru','Kaggle','Plugin Demand','Pricing','Bug Bounty','Open Source'], active:4 },
+        { name:'Gaming', color:'#D4AF37', items:['MTG Game','MTG Meta','MTG Draft','Arena Rankings'], active:2 },
+        { name:'Epistemic', color:'#7EB77F', items:['Truth Probe','Solidity','Triangulation'], active:2 },
+        { name:'Event-driven', color:'#9B7EBD', items:['Web Page','Web Extracted','Agent Task'], active:0 },
+        { name:'System', color:'#4ECDC4', items:['Host System','Tool Result','World State','Situation','Social'], active:2 },
+    ];
+    let channels = [];
+    function buildChannels(){
+        channels = [];
+        let y = 0;
+        cats.forEach(cat => {
+            cat.items.forEach((name, i) => {
+                channels.push({ name, color: cat.color, active: i < cat.active, y: y++ });
+            });
+            y += 0.5; // gap between categories
+        });
+    }
+    buildChannels();
+    function resize(){
+        const d = Math.min(devicePixelRatio, 2);
+        const r = cv.parentElement.getBoundingClientRect();
+        w = r.width; h = r.height;
+        cv.width = w*d; cv.height = h*d;
+        ctx.scale(d,d);
+        const total = channels[channels.length-1].y + 2;
+        const slotH = h / total;
+        channels.forEach(ch => { ch.px = 28; ch.py = slotH * (ch.y + 1); });
+        particles = [];
+    }
+    resize(); addEventListener('resize', resize);
+
+    const colX = () => w * 0.78;
+
+    function drawFrame(){
+        ctx.clearRect(0,0,w,h);
+        // Spawn
+        channels.forEach(ch => {
+            if (ch.active && Math.random() < 0.05) {
+                particles.push({ x: ch.px+8, y: ch.py, ty: 15+Math.random()*(h-30), vx: 1.2+Math.random()*1.5, color: ch.color, a: 0.7, sz: 1.2+Math.random()*0.8 });
+            }
+        });
+        const cx = colX();
+        // Particles
+        particles = particles.filter(p => {
+            p.x += p.vx;
+            if (cx - p.x < 180) p.y += (p.ty - p.y) * 0.025;
+            p.a *= 0.996;
+            if (p.x > cx + 4 || p.a < 0.04) return false;
+            ctx.globalAlpha = p.a; ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.sz, 0, Math.PI*2); ctx.fill();
+            return true;
+        });
+        // Channel dots
+        channels.forEach(ch => {
+            ctx.globalAlpha = ch.active ? 0.75 : 0.15;
+            ctx.fillStyle = ch.color;
+            ctx.beginPath(); ctx.arc(ch.px, ch.py, 3.5, 0, Math.PI*2); ctx.fill();
+            ctx.globalAlpha = ch.active ? 0.45 : 0.1;
+            ctx.fillStyle = '#C4BFBA'; ctx.font = '8.5px "JetBrains Mono",monospace'; ctx.textAlign = 'left';
+            ctx.fillText(ch.name, ch.px + 10, ch.py + 3);
+        });
+        // Column glow
+        const t = performance.now()*0.001;
+        for (let y = 12; y < h-12; y += 3) {
+            const i = 0.04 + Math.sin(y*0.04+t)*0.025 + Math.sin(y*0.11+t*1.4)*0.015;
+            ctx.globalAlpha = i; ctx.fillStyle = '#67D4E4';
+            ctx.fillRect(cx-10, y, 20, 2.5);
+        }
+        ctx.globalAlpha = 1; ctx.fillStyle = '#9E9994'; ctx.font = '9px "JetBrains Mono",monospace'; ctx.textAlign = 'center';
+        ctx.fillText('daemon', cx, h-6);
+        if (!R) requestAnimationFrame(drawFrame);
+    }
+    drawFrame();
+
+    // Tooltip
+    if (!matchMedia('(pointer:coarse)').matches) {
+        const tip = document.createElement('div');
+        tip.style.cssText = 'position:fixed;pointer-events:none;padding:4px 10px;background:rgba(18,16,26,0.95);border:1px solid var(--glass-border);border-radius:5px;font:11px var(--font-m);color:#C4BFBA;z-index:50;opacity:0;transition:opacity 144ms;white-space:nowrap;';
+        document.body.appendChild(tip);
+        cv.addEventListener('mousemove', e => {
+            const r = cv.getBoundingClientRect();
+            const sx = (e.clientX-r.left)/r.width*w, sy = (e.clientY-r.top)/r.height*h;
+            let hit = null;
+            channels.forEach(ch => { if (Math.abs(sx-ch.px)<55 && Math.abs(sy-ch.py)<7) hit = ch; });
+            if (hit) { tip.textContent = hit.name+(hit.active?'':' (idle)'); tip.style.left=(e.clientX+12)+'px'; tip.style.top=(e.clientY-12)+'px'; tip.style.opacity='1'; tip.style.borderColor=hit.color; }
+            else tip.style.opacity='0';
+        });
+        cv.addEventListener('mouseleave', () => tip.style.opacity='0');
+    }
+}();
+
+// (EFE chart removed — section now shows heartbeat format + behavioral rules)
+
+// ===== SAFETY BARRIER =====
+!function(){
+    const cv = $('#safety-cv'), ctx = cv.getContext('2d');
+    let w, h, t = 0;
+    function resize(){ const d=Math.min(devicePixelRatio,2); const r=cv.parentElement.getBoundingClientRect(); w=r.width; h=r.height; cv.width=w*d; cv.height=h*d; ctx.scale(d,d); }
+    resize(); addEventListener('resize', resize);
+
+    function frame(t){
+        ctx.clearRect(0,0,w,h);
+        const p = { l:50, r:20, t:30, b:40 };
+        const cw = w-p.l-p.r, ch = h-p.t-p.b;
+        const zy = p.t + ch*0.55; // h=0 line
+
+        // Regions
+        let g = ctx.createLinearGradient(0,p.t,0,zy);
+        g.addColorStop(0,'rgba(74,222,128,0)'); g.addColorStop(1,'rgba(74,222,128,0.05)');
+        ctx.fillStyle=g; ctx.fillRect(p.l,p.t,cw,zy-p.t);
+        g = ctx.createLinearGradient(0,zy,0,p.t+ch);
+        g.addColorStop(0,'rgba(248,113,113,0.05)'); g.addColorStop(1,'rgba(248,113,113,0)');
+        ctx.fillStyle=g; ctx.fillRect(p.l,zy,cw,ch-(zy-p.t));
+
+        // h=0 line
+        ctx.strokeStyle='#67D4E4'; ctx.lineWidth=1.5; ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(p.l,zy); ctx.lineTo(p.l+cw,zy); ctx.stroke();
+
+        // Labels
+        ctx.globalAlpha=0.25;
+        ctx.fillStyle='#4ADE80'; ctx.font='11px "JetBrains Mono",monospace'; ctx.textAlign='center';
+        ctx.fillText('SAFE', p.l+cw/2, p.t+22);
+        ctx.fillStyle='#F87171'; ctx.fillText('VIOLATION', p.l+cw/2, p.t+ch-8);
+        ctx.globalAlpha=1;
+        ctx.fillStyle='#67D4E4'; ctx.font='10px "JetBrains Mono",monospace'; ctx.textAlign='left';
+        ctx.fillText('h(x) = 0', p.l+cw+4, zy+4);
+
+        // Trajectory
+        const hsc = (zy - p.t) / 1.1;
+        ctx.strokeStyle='rgba(245,240,232,0.5)'; ctx.lineWidth=1.2;
+        ctx.beginPath();
+        for (let i=0; i<=200; i++){
+            const x = i/200;
+            const tt = t-3+x*6;
+            const hv = 0.45 + 0.35*Math.sin(tt*0.7) - 0.2*Math.sin(tt*0.35+1);
+            const px = p.l+x*cw, py = zy-hv*hsc;
+            i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+        }
+        ctx.stroke();
+
+        // Dot
+        const dx = 0.5+0.15*Math.sin(t*0.5);
+        const dt = t-3+dx*6;
+        const dh = 0.45+0.35*Math.sin(dt*0.7)-0.2*Math.sin(dt*0.35+1);
+        const dpx = p.l+dx*cw, dpy = zy-dh*hsc;
+        const col = dh>0.25?'#4ADE80':dh>0?'#FBBF24':'#F87171';
+
+        ctx.fillStyle=col; ctx.globalAlpha=0.25;
+        ctx.beginPath(); ctx.arc(dpx,dpy,10,0,Math.PI*2); ctx.fill();
+        ctx.globalAlpha=1;
+        ctx.beginPath(); ctx.arc(dpx,dpy,4,0,Math.PI*2); ctx.fill();
+
+        // CBF correction near boundary
+        if (dh < 0.3) {
+            const len = 25*(0.3-dh)/0.3;
+            ctx.strokeStyle='#4ADE80'; ctx.lineWidth=1.5; ctx.globalAlpha=0.6;
+            ctx.beginPath(); ctx.moveTo(dpx,dpy); ctx.lineTo(dpx,dpy-len); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(dpx-3,dpy-len+5); ctx.lineTo(dpx,dpy-len); ctx.lineTo(dpx+3,dpy-len+5); ctx.stroke();
+            ctx.globalAlpha=1;
+            ctx.fillStyle='#4ADE80'; ctx.font='8px "JetBrains Mono",monospace'; ctx.textAlign='center';
+            ctx.fillText('CBF', dpx, dpy-len-6);
+        }
+
+        // Axis
+        ctx.fillStyle='#9E9994'; ctx.font='9px "JetBrains Mono",monospace'; ctx.textAlign='center'; ctx.globalAlpha=0.5;
+        ctx.fillText('state', p.l+cw/2, h-6);
+        ctx.save(); ctx.translate(12,p.t+ch/2); ctx.rotate(-Math.PI/2); ctx.fillText('h(x)',0,0); ctx.restore();
+        ctx.globalAlpha=1;
+    }
+    function loop(){ t+=0.012; frame(t); if(!R) requestAnimationFrame(loop); }
+    if(R) frame(2.5); else loop();
+}();
+
+})();
+</script>
+</body>
+</html>

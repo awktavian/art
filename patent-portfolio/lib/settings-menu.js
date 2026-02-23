@@ -14,7 +14,6 @@
  * h(x) ≥ 0 always
  */
 
-import * as THREE from 'three';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DEVICE PROFILES - Pareto optimal presets per device class

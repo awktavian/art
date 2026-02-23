@@ -1,0 +1,1722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Steamboat Willie — 1928 AI Theater</title>
+  <style>
+    :root {
+      --ink: #080808;
+      --paper: #f4ece0;
+      --mid: #404038;
+      --light: #909080;
+      --t-sm: 144ms;
+      --t-lg: 377ms;
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--ink);
+      font-family: 'IM Fell English SC', Georgia, serif;
+    }
+    #stage {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #canvas {
+      max-width: 100%; max-height: 100%;
+      border: 4px solid #101010;
+      box-shadow: 0 0 80px rgba(0,0,0,0.9);
+    }
+    .sprocket-strip {
+      position: fixed; top: 0; bottom: 0; width: 26px;
+      background: var(--ink);
+      display: flex; flex-direction: column;
+      justify-content: space-around; padding: 5px; z-index: 10;
+    }
+    .sprocket-strip.left { left: 0; }
+    .sprocket-strip.right { right: 0; }
+    .sprocket-hole {
+      width: 16px; height: 10px; margin: 0 auto;
+      background: #141410; border-radius: 2px;
+    }
+    #title-card {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--ink);
+      opacity: 0; pointer-events: none;
+      transition: opacity var(--t-lg) var(--ease-out);
+    }
+    #title-card.visible { opacity: 1; pointer-events: auto; }
+    .title-card-inner {
+      width: min(88vw, 540px); padding: 44px 36px;
+      background: var(--paper);
+      border: 5px double var(--ink);
+      text-align: center; position: relative;
+    }
+    .title-card-inner::before, .title-card-inner::after {
+      content: ''; position: absolute;
+      left: 20px; right: 20px; height: 2px;
+      background: var(--ink);
+    }
+    .title-card-inner::before { top: 18px; }
+    .title-card-inner::after { bottom: 18px; }
+    .title-speaker {
+      font-size: clamp(11px, 2.2vw, 14px);
+      color: var(--mid);
+      text-transform: uppercase; letter-spacing: 0.3em;
+      margin-bottom: 12px;
+    }
+    .title-text {
+      font-size: clamp(20px, 5vw, 34px);
+      color: var(--ink); line-height: 1.4;
+      font-style: italic;
+    }
+    #hud {
+      position: fixed; bottom: 20px; left: 50%;
+      transform: translateX(-50%); z-index: 50;
+      display: flex; gap: 12px; align-items: center;
+    }
+    .hud-btn {
+      width: 58px; height: 58px; border-radius: 50%;
+      border: 3px solid var(--paper);
+      background: rgba(8,8,8,0.88); color: var(--paper);
+      font-size: 24px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform var(--t-sm) var(--ease-bounce),
+                  background var(--t-sm), border-color var(--t-sm);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hud-btn:hover { transform: scale(1.1); }
+    .hud-btn:active, .hud-btn.listening {
+      transform: scale(0.94);
+      background: #b33;
+      border-color: #e55;
+    }
+    .hud-btn.listening { animation: pulse 0.7s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+    #status {
+      padding: 6px 12px;
+      background: rgba(8,8,8,0.88);
+      border: 2px solid var(--mid); border-radius: 16px;
+      color: var(--light); font-size: 10px;
+      text-transform: uppercase; letter-spacing: 0.15em;
+    }
+    #status.ready { border-color: #5a8; color: #7ca; }
+    #status.listening { border-color: #b33; color: #e55; }
+    #status.speaking { border-color: #58a; color: #7ac; }
+    #status.error { border-color: #a44; color: #c66; }
+    #transcript {
+      position: fixed; top: 16px; left: 50%;
+      transform: translateX(-50%); z-index: 50;
+      max-width: 85%; padding: 10px 18px;
+      background: rgba(8,8,8,0.92);
+      border: 2px solid var(--mid); border-radius: 10px;
+      color: var(--paper); font-size: 13px;
+      text-align: center; opacity: 0;
+      transition: opacity 0.2s; pointer-events: none;
+    }
+    #transcript.visible { opacity: 1; }
+    #start-screen {
+      position: fixed; inset: 0; z-index: 200;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: var(--ink);
+      transition: opacity 0.5s var(--ease-out);
+    }
+    #start-screen.hidden { opacity: 0; pointer-events: none; }
+    .start-title {
+      font-size: clamp(26px, 8vw, 58px);
+      color: var(--paper); text-align: center;
+      margin-bottom: 12px;
+      text-shadow: 3px 3px 0 #101010;
+    }
+    .start-year {
+      font-size: clamp(12px, 3.5vw, 20px);
+      color: var(--mid); margin-bottom: 6px;
+      letter-spacing: 0.35em;
+    }
+    .start-sub {
+      font-size: clamp(11px, 2.8vw, 16px);
+      color: var(--light); margin-bottom: 32px;
+    }
+    .start-btn {
+      padding: 16px 48px;
+      font-size: clamp(14px, 4vw, 24px);
+      font-family: inherit;
+      background: var(--paper); color: var(--ink);
+      border: 4px solid var(--ink);
+      cursor: pointer;
+      transition: transform var(--t-sm) var(--ease-bounce);
+    }
+    .start-btn:hover { transform: scale(1.05); }
+    .start-note {
+      margin-top: 24px; font-size: 10px;
+      color: var(--mid); text-align: center;
+      max-width: 300px; line-height: 1.5;
+    }
+    .start-warning {
+      margin-top: 16px; padding: 10px 16px;
+      background: rgba(180,80,60,0.2);
+      border: 1px solid rgba(180,80,60,0.4);
+      border-radius: 8px;
+      font-size: 10px; color: #c86;
+      max-width: 320px; text-align: center;
+    }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="start-screen">
+    <div class="start-year">MCMXXVIII</div>
+    <h1 class="start-title">Steamboat Willie</h1>
+    <p class="start-sub">Voice-Powered AI Theater</p>
+    <button class="start-btn" id="start-btn">Begin the Show</button>
+    <p class="start-note">
+      Watch Willie, Pete, and the Parrot perform autonomously.
+      Hold the microphone to interrupt and engage with them!
+    </p>
+    <div class="start-warning" id="serve-warning" style="display:none">
+      Serve via HTTP for voice: <code>python -m http.server 8080</code>
+    </div>
+  </div>
+
+  <div id="stage"><canvas id="canvas"></canvas></div>
+  <div class="sprocket-strip left" id="sprockets-left"></div>
+  <div class="sprocket-strip right" id="sprockets-right"></div>
+
+  <div id="title-card">
+    <div class="title-card-inner">
+      <div class="title-speaker" id="title-speaker"></div>
+      <div class="title-text" id="title-text"></div>
+    </div>
+  </div>
+
+  <div id="transcript"></div>
+
+  <div id="hud">
+    <button class="hud-btn" id="whistle-btn" title="Blow whistle">🎺</button>
+    <button class="hud-btn" id="mic-btn" title="Hold to talk">🎤</button>
+    <div id="status">Disconnected</div>
+  </div>
+
+  <script src="lib/steamboat-audio.js"></script>
+  <script src="lib/realtime-voice.js"></script>
+
+  <script>
+'use strict';
+
+// Show warning if opened via file://
+if (location.protocol === 'file:') {
+  document.getElementById('serve-warning').style.display = 'block';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTHENTIC 1928 PALETTE — High contrast B&W
+// ═══════════════════════════════════════════════════════════════════════════
+
+const INK = '#080808';
+const PAPER = '#f4ece0';
+const DARK = '#181814';
+const MID = '#484840';
+const LIGHT = '#908880';
+
+const PROXY_URL = 'wss://kagami-realtime-proxy.fly.dev';
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const ASPECT = 4 / 3;
+
+function resize() {
+  const wa = window.innerWidth / window.innerHeight;
+  if (wa > ASPECT) {
+    canvas.height = Math.min(window.innerHeight - 36, 600);
+    canvas.width = canvas.height * ASPECT;
+  } else {
+    canvas.width = Math.min(window.innerWidth - 52, 800);
+    canvas.height = canvas.width / ASPECT;
+  }
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Sprockets
+(function makeSprockets() {
+  const n = Math.floor(window.innerHeight / 26);
+  ['sprockets-left', 'sprockets-right'].forEach(id => {
+    document.getElementById(id).innerHTML = Array(n).fill('<div class="sprocket-hole"></div>').join('');
+  });
+  window.addEventListener('resize', makeSprockets);
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SCENE STATE — Authentic 1928 Layout
+// The pilot house (with wheel) is at BOW (right side)
+// Main cabin in center with smokestacks
+// Paddle wheel at STERN (left side)
+// Willie is HIGH in pilot house, Pete on lower deck
+// ═══════════════════════════════════════════════════════════════════════════
+
+const scene = {
+  characters: {
+    // Willie in the PILOT HOUSE (elevated, right/bow side)
+    willie: { x: 72, y: 38, anim: 'steer', emotion: 'happy', facing: -1, frame: 0, sq: 1, st: 1 },
+    // Pete on the MAIN DECK (NOT in water! y=42 is on deck level)
+    pete:   { x: 38, y: 42, anim: 'cross_arms', emotion: 'grumpy', facing: 1, frame: 0, sq: 1, st: 1 },
+    // Parrot on perch near cabin
+    parrot: { x: 55, y: 28, anim: 'preen', emotion: 'curious', frame: 0, sq: 1, st: 1 }
+  },
+  world: { wave: 0, rock: 0 },
+  props: { wheel: 0, paddle: 0, smoke: 0, whistle: [0, 0, 0] },
+  particles: []
+};
+
+const ANIMS = {
+  willie: { steer:{l:4,s:.08}, whistle:{l:8,s:.14}, dance:{l:8,s:.2}, wave:{l:4,s:.1}, jump:{l:6,s:.16}, laugh:{l:6,s:.14}, point:{l:3,s:.1} },
+  pete: { stomp:{l:4,s:.12}, yell:{l:5,s:.1}, shake_fist:{l:6,s:.16}, glare:{l:2,s:.04}, cross_arms:{l:2,s:.02}, point:{l:3,s:.08}, growl:{l:4,s:.1} },
+  parrot: { squawk:{l:4,s:.2}, fly:{l:6,s:.24}, preen:{l:4,s:.04}, flap:{l:4,s:.3}, bob_head:{l:4,s:.1}, startle:{l:3,s:.24}, speak:{l:5,s:.12} }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDERING — Authentic 1928 Steamboat Layout
+// ═══════════════════════════════════════════════════════════════════════════
+
+function render(ts) {
+  const w = canvas.width, h = canvas.height;
+
+  // World physics
+  scene.world.wave += 0.016;
+  scene.world.rock = Math.sin(scene.world.wave * 0.35) * 1.5;
+  scene.props.wheel += 0.35;
+  scene.props.paddle += 1.6;
+  scene.props.smoke++;
+
+  updateMovement();
+  updateAnimations();
+  updateBlinks();
+
+  // Sky — gradient from light to warm white
+  const sky = ctx.createLinearGradient(0, 0, 0, h * 0.42);
+  sky.addColorStop(0, '#e8e0d4');
+  sky.addColorStop(1, PAPER);
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, h);
+
+  drawClouds(w, h, ts);
+  drawWater(w, h);
+
+  // Boat transform (rock with waves)
+  ctx.save();
+  const cx = w * 0.5, cy = h * 0.5;
+  ctx.translate(cx, cy);
+  ctx.rotate(scene.world.rock * Math.PI / 180);
+  ctx.translate(-cx, -cy);
+
+  drawBoat(w, h);
+  drawParrot(w, h);  // On perch, part of boat
+  drawPete(w, h);    // On main deck
+  drawWillie(w, h);  // In pilot house (highest)
+
+  ctx.restore();
+
+  updateParticles(w, h);
+  drawFilmEffects(w, h, ts);
+
+  requestAnimationFrame(render);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BACKGROUND
+// ═══════════════════════════════════════════════════════════════════════════
+
+function drawClouds(w, h, ts) {
+  ctx.fillStyle = PAPER;
+  const off = (ts * 0.006) % (w + 180);
+  [[0.12, 0.09, 50, 20], [0.45, 0.05, 65, 24], [0.78, 0.11, 42, 16]].forEach(([px, py, rx, ry]) => {
+    const x = ((px * w + off) % (w + 180)) - 90;
+    ctx.beginPath();
+    ctx.ellipse(x, py * h, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function drawWater(w, h) {
+  const top = h * 0.46;
+  ctx.fillStyle = MID;
+  ctx.fillRect(0, top, w, h - top);
+
+  // Animated wave lines
+  ctx.strokeStyle = LIGHT;
+  ctx.lineWidth = 1.4;
+  for (let row = 0; row < 12; row++) {
+    const y = top + 12 + row * 14;
+    ctx.beginPath();
+    for (let x = 0; x <= w; x += 3) {
+      const wy = y + Math.sin(x * 0.022 + scene.world.wave + row * 0.55) * 2.5;
+      x === 0 ? ctx.moveTo(x, wy) : ctx.lineTo(x, wy);
+    }
+    ctx.stroke();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BOAT — Authentic side-wheel paddle steamer layout
+// Stern (paddle wheel) on LEFT, Bow (pilot house) on RIGHT
+// ═══════════════════════════════════════════════════════════════════════════
+
+function drawBoat(w, h) {
+  const by = h * 0.48;  // Waterline
+  const bx = w * 0.12;  // Left edge
+  const bw = w * 0.76;  // Boat width
+
+  // === HULL ===
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.moveTo(bx + 10, by);           // Stern (left)
+  ctx.lineTo(bx + bw - 5, by);       // Bow (right)
+  ctx.lineTo(bx + bw + 15, by + 20); // Bow point
+  ctx.lineTo(bx + bw - 20, by + 50);
+  ctx.lineTo(bx + 25, by + 50);
+  ctx.lineTo(bx, by + 20);           // Stern curve
+  ctx.closePath();
+  ctx.fill();
+
+  // Hull stripe
+  ctx.strokeStyle = DARK;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(bx + 15, by + 5);
+  ctx.lineTo(bx + bw - 10, by + 5);
+  ctx.stroke();
+
+  // === MAIN DECK ===
+  ctx.fillStyle = MID;
+  const deckY = by - 22;
+  ctx.fillRect(bx + 50, deckY, bw - 100, 26);
+
+  // === MAIN CABIN (center) ===
+  const cabinX = bx + bw * 0.3;
+  const cabinW = bw * 0.35;
+  const cabinY = by - 70;
+  ctx.fillStyle = INK;
+  ctx.fillRect(cabinX, cabinY, cabinW, 52);
+
+  // Cabin windows
+  ctx.fillStyle = PAPER;
+  const winW = 22, winH = 18, winGap = 30;
+  for (let i = 0; i < 3; i++) {
+    ctx.fillRect(cabinX + 12 + i * winGap, cabinY + 12, winW, winH);
+  }
+
+  // Cabin roof (rounded)
+  ctx.fillStyle = DARK;
+  ctx.beginPath();
+  ctx.moveTo(cabinX - 5, cabinY);
+  ctx.quadraticCurveTo(cabinX + cabinW / 2, cabinY - 12, cabinX + cabinW + 5, cabinY);
+  ctx.lineTo(cabinX + cabinW + 5, cabinY + 4);
+  ctx.lineTo(cabinX - 5, cabinY + 4);
+  ctx.closePath();
+  ctx.fill();
+
+  // === SMOKESTACKS (two, on cabin roof) ===
+  const stack1X = cabinX + cabinW * 0.3;
+  const stack2X = cabinX + cabinW * 0.7;
+  const stackY = cabinY - 65;
+  const stackH = 60;
+
+  // Animate stacks (slight bob)
+  const stackBob = Math.sin(scene.props.paddle * 0.02) * 2;
+
+  [stack1X, stack2X].forEach((sx, i) => {
+    ctx.fillStyle = INK;
+    ctx.fillRect(sx - 12, stackY + stackBob, 24, stackH);
+    // Stack rim
+    ctx.fillStyle = DARK;
+    ctx.fillRect(sx - 15, stackY + stackBob - 6, 30, 8);
+
+    // Smoke
+    if (scene.props.smoke % 10 === i * 5) {
+      spawnSmoke(sx, stackY + stackBob - 8);
+    }
+  });
+
+  // === THREE WHISTLES (on roof between stacks) ===
+  const whistleX = (stack1X + stack2X) / 2;
+  const whistleY = stackY + stackBob + 10;
+  ctx.fillStyle = DARK;
+  // Tall whistle
+  ctx.fillRect(whistleX - 4, whistleY - 35, 8, 35);
+  // Medium whistle
+  ctx.fillRect(whistleX + 12, whistleY - 25, 6, 25);
+  // Short whistle
+  ctx.fillRect(whistleX - 16, whistleY - 18, 6, 18);
+
+  // === PILOT HOUSE (elevated, at bow/right) ===
+  const phX = bx + bw * 0.7;
+  const phY = by - 95;
+  const phW = 55, phH = 45;
+
+  // Pilot house structure
+  ctx.fillStyle = INK;
+  ctx.fillRect(phX, phY, phW, phH);
+
+  // Pilot house window (large, where Mickey looks out)
+  ctx.fillStyle = PAPER;
+  ctx.fillRect(phX + 8, phY + 8, phW - 16, phH - 20);
+
+  // Pilot house roof
+  ctx.fillStyle = DARK;
+  ctx.fillRect(phX - 4, phY - 6, phW + 8, 8);
+
+  // === SHIP'S WHEEL (inside pilot house) ===
+  drawWheel(phX + phW / 2, phY + phH / 2 + 2, 18);
+
+  // === PADDLE WHEEL (stern/left side) ===
+  drawPaddleWheel(bx + 55, by + 8, 38);
+
+  // Paddle wheel housing
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.arc(bx + 55, by + 8, 44, Math.PI * 0.4, Math.PI * 0.6);
+  ctx.lineTo(bx + 55 - 42, by + 35);
+  ctx.lineTo(bx + 55 + 42, by + 35);
+  ctx.closePath();
+  ctx.fill();
+
+  // === PARROT PERCH (near cabin) ===
+  const perchX = cabinX + cabinW + 15;
+  const perchY = cabinY - 10;
+  ctx.strokeStyle = DARK;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(perchX, cabinY + 20);
+  ctx.lineTo(perchX, perchY);
+  ctx.lineTo(perchX + 25, perchY);
+  ctx.stroke();
+}
+
+function drawWheel(cx, cy, r) {
+  const n = 8;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(scene.props.wheel * Math.PI / 180);
+
+  ctx.strokeStyle = DARK;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.lineWidth = 2;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = INK;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * (r + 5), Math.sin(a) * (r + 5), 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawPaddleWheel(cx, cy, r) {
+  const n = 8;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(scene.props.paddle * Math.PI / 180);
+
+  ctx.fillStyle = DARK;
+  for (let i = 0; i < n; i++) {
+    ctx.save();
+    ctx.rotate((i / n) * Math.PI * 2);
+    ctx.fillRect(-3, 0, 6, r);
+    ctx.restore();
+  }
+
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.arc(0, 0, 12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CHARACTER ANIMATION SYSTEM — Disney 12 Principles
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Blinking system
+const blink = { willie: 0, pete: 0, parrot: 0 };
+function updateBlinks() {
+  for (const char in blink) {
+    if (blink[char] > 0) blink[char] -= 0.15;
+    else if (Math.random() < 0.005) blink[char] = 1; // Random blink
+  }
+}
+
+// Mouth shapes based on action/emotion
+const MOUTH_SHAPES = {
+  smile: (ctx, x, y, intensity) => {
+    ctx.beginPath();
+    ctx.arc(x, y, 6 * intensity, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+  },
+  open: (ctx, x, y, intensity) => {
+    ctx.beginPath();
+    ctx.ellipse(x, y, 5 * intensity, 7 * intensity, 0, 0, Math.PI * 2);
+    ctx.fill();
+  },
+  whistle: (ctx, x, y, intensity) => {
+    ctx.beginPath();
+    ctx.arc(x, y + 2, 4 * intensity, 0, Math.PI * 2);
+    ctx.fill();
+  },
+  frown: (ctx, x, y, intensity) => {
+    ctx.beginPath();
+    ctx.arc(x, y + 8, 7 * intensity, Math.PI + 0.3, -0.3);
+    ctx.stroke();
+  },
+  yell: (ctx, x, y, intensity) => {
+    ctx.beginPath();
+    ctx.ellipse(x, y + 4, 8 * intensity, 12 * intensity, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Teeth
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(x - 6 * intensity, y, 12 * intensity, 5 * intensity);
+  },
+  talk: (ctx, x, y, intensity, frame) => {
+    const openness = Math.abs(Math.sin(frame * 0.6)) * intensity;
+    ctx.beginPath();
+    ctx.ellipse(x, y + 2, 5 * intensity, 4 + openness * 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+};
+
+// Get mouth shape based on animation and emotion
+function getMouthShape(anim, emotion, frame) {
+  if (anim === 'whistle') return { shape: 'whistle', intensity: 0.8 + Math.sin(frame * 0.8) * 0.2 };
+  if (anim === 'yell' || anim === 'shake_fist') return { shape: 'yell', intensity: 0.7 + Math.sin(frame * 0.5) * 0.3 };
+  if (anim === 'squawk' || anim === 'speak') return { shape: 'talk', intensity: 1 };
+  if (anim === 'growl') return { shape: 'frown', intensity: 1 };
+  if (anim === 'laugh') return { shape: 'open', intensity: 0.6 + Math.sin(frame * 0.7) * 0.4 };
+  if (emotion === 'happy' || emotion === 'excited') return { shape: 'smile', intensity: 1 };
+  if (emotion === 'angry' || emotion === 'furious') return { shape: 'frown', intensity: 1 };
+  if (emotion === 'grumpy' || emotion === 'annoyed') return { shape: 'frown', intensity: 0.7 };
+  return { shape: 'smile', intensity: 0.8 };
+}
+
+// Arm gesture poses
+const ARM_POSES = {
+  willie: {
+    steer: { left: { angle: -0.4, length: 0.9, hand: 'grip' }, right: { angle: 0.4, length: 0.9, hand: 'grip' } },
+    whistle: { left: { angle: -0.8, length: 0.7, hand: 'open' }, right: { angle: 1.2, length: 0.6, hand: 'point', toFace: true } },
+    wave: { left: { angle: -0.5, length: 0.8, hand: 'open' }, right: { angle: 2.2, length: 1, hand: 'spread', wave: true } },
+    dance: { left: { angle: -1.2, length: 0.85, hand: 'spread', swing: true }, right: { angle: 1.2, length: 0.85, hand: 'spread', swing: true } },
+    jump: { left: { angle: -1.8, length: 1, hand: 'spread' }, right: { angle: 1.8, length: 1, hand: 'spread' } },
+    laugh: { left: { angle: -0.3, length: 0.75, hand: 'open' }, right: { angle: 0.3, length: 0.75, hand: 'open' } },
+    point: { left: { angle: -0.6, length: 0.8, hand: 'open' }, right: { angle: 0.8, length: 1.1, hand: 'point' } },
+    look_around: { left: { angle: -0.4, length: 0.8, hand: 'open' }, right: { angle: 0.4, length: 0.8, hand: 'open' } }
+  },
+  pete: {
+    cross_arms: { left: { angle: 0.4, length: 0.6, hand: 'grip', crossed: true }, right: { angle: -0.4, length: 0.6, hand: 'grip', crossed: true } },
+    shake_fist: { left: { angle: -0.3, length: 0.7, hand: 'open' }, right: { angle: 2.0, length: 1.1, hand: 'fist', shake: true } },
+    stomp: { left: { angle: -0.5, length: 0.8, hand: 'fist' }, right: { angle: 0.5, length: 0.8, hand: 'fist' } },
+    glare: { left: { angle: -0.4, length: 0.7, hand: 'open' }, right: { angle: 0.4, length: 0.7, hand: 'open' } },
+    yell: { left: { angle: -1.2, length: 0.9, hand: 'spread' }, right: { angle: 1.2, length: 0.9, hand: 'spread' } },
+    point: { left: { angle: -0.5, length: 0.7, hand: 'open' }, right: { angle: 1.0, length: 1.2, hand: 'point' } },
+    growl: { left: { angle: -0.3, length: 0.75, hand: 'fist' }, right: { angle: 0.3, length: 0.75, hand: 'fist' } }
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WILLIE — 1928 Authentic with Full Animation
+// ═══════════════════════════════════════════════════════════════════════════
+
+function drawWillie(w, h) {
+  const c = scene.characters.willie;
+  const x = (c.x / 100) * w, y = (c.y / 100) * h;
+  const t = c.frame;
+
+  // Disney principles: anticipation, squash/stretch, follow-through
+  const breathe = Math.sin(t * 0.12) * 2; // Subtle breathing
+  const bounce = c.anim === 'dance' ? Math.abs(Math.sin(t * 0.35)) * 8 : (c.anim === 'jump' ? Math.sin(t * 0.3) * 15 : 0);
+  const lean = c.anim === 'whistle' ? Math.sin(t * 0.25) * 3 : 0;
+
+  const scale = 0.85;
+  const blinkAmt = Math.max(0, blink.willie);
+
+  ctx.save();
+  ctx.translate(x, y - bounce);
+  ctx.scale(c.facing * scale, scale);
+  ctx.scale(c.sq, c.st);
+  ctx.rotate(lean * Math.PI / 180);
+
+  // === TAIL (behind body, overlapping action) ===
+  const tailWag = Math.sin(t * 0.15 + 0.5) * 8; // Lags behind body
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-5, 30 + breathe);
+  ctx.bezierCurveTo(-20, 38 + breathe, -28 + tailWag * 0.3, 30 + breathe, -25 + tailWag * 0.5, 20 + breathe + tailWag);
+  ctx.stroke();
+
+  // === BODY (rubber hose pear shape) ===
+  ctx.fillStyle = INK;
+  const bodySquash = c.anim === 'jump' ? (1 + Math.sin(t * 0.3) * 0.15) : 1;
+  ctx.beginPath();
+  ctx.ellipse(0, 16 + breathe, 13 * bodySquash, 19 / bodySquash, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === HEAD (with overlapping action - slight lag) ===
+  const headBob = breathe + (c.anim === 'laugh' ? Math.sin(t * 0.6) * 4 : 0);
+  const headTilt = c.anim === 'look_around' ? Math.sin(t * 0.2) * 8 : 0;
+
+  ctx.save();
+  ctx.translate(0, -12 + headBob);
+  ctx.rotate(headTilt * Math.PI / 180);
+
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.arc(0, 0, 17, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === EARS (follow-through, lag behind head movement) ===
+  const earLag = Math.sin(t * 0.12 - 0.3) * 2;
+  const earPerk = c.emotion === 'excited' ? 2 : (c.emotion === 'startled' ? 4 : 0);
+  ctx.beginPath();
+  ctx.arc(-14, -12 + earLag - earPerk, 10, 0, Math.PI * 2);
+  ctx.arc(14, -12 + earLag - earPerk, 10, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === SNOUT (long, rat-like 1928) ===
+  ctx.fillStyle = MID;
+  ctx.beginPath();
+  ctx.ellipse(12, 6, 11, 7, 0.15, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === EYES (with blink and expression) ===
+  const eyeSquint = blinkAmt > 0.5 ? (1 - blinkAmt) * 2 : 1;
+  const eyeWide = c.emotion === 'startled' ? 1.3 : (c.emotion === 'excited' ? 1.15 : 1);
+  const lookX = c.anim === 'look_around' ? Math.sin(t * 0.15) * 2 : 0;
+
+  ctx.fillStyle = PAPER;
+  ctx.beginPath();
+  ctx.ellipse(-3 + lookX, -2, 5, 7 * eyeSquint * eyeWide, 0, 0, Math.PI * 2);
+  ctx.ellipse(6 + lookX, -2, 5, 7 * eyeSquint * eyeWide, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pupils (follow look direction)
+  ctx.fillStyle = INK;
+  const pupilY = -1 + (c.emotion === 'happy' ? -1 : 0);
+  ctx.beginPath();
+  ctx.arc(-2 + lookX, pupilY, 2.5, 0, Math.PI * 2);
+  ctx.arc(7 + lookX, pupilY, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Eye highlights
+  ctx.fillStyle = PAPER;
+  ctx.beginPath();
+  ctx.arc(-3 + lookX, pupilY - 1, 0.8, 0, Math.PI * 2);
+  ctx.arc(6 + lookX, pupilY - 1, 0.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === NOSE ===
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.ellipse(19, 8, 4, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === MOUTH (animated based on action/emotion) ===
+  const mouth = getMouthShape(c.anim, c.emotion, t);
+  ctx.fillStyle = INK;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.5;
+  MOUTH_SHAPES[mouth.shape](ctx, 12, 13, mouth.intensity, t);
+
+  ctx.restore(); // End head transform
+
+  // === ARMS (gesture-based with secondary action) ===
+  const pose = ARM_POSES.willie[c.anim] || ARM_POSES.willie.steer;
+  drawRubberHoseArm(ctx, -10, 6 + breathe, pose.left, t, 6);
+  drawRubberHoseArm(ctx, 10, 6 + breathe, pose.right, t, 6);
+
+  // === LEGS (with weight shift and secondary action) ===
+  const legSwing = c.anim === 'dance' ? Math.sin(t * 0.35) * 0.3 : (c.anim === 'jump' ? 0.5 : 0);
+  const weightShift = c.anim === 'dance' ? Math.sin(t * 0.175) * 3 : 0;
+
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+
+  // Left leg
+  ctx.beginPath();
+  ctx.moveTo(-5 + weightShift, 32 + breathe);
+  ctx.quadraticCurveTo(-8 + legSwing * 8 + weightShift, 44 + breathe, -10 + weightShift, 54 + breathe - bounce * 0.3);
+  ctx.stroke();
+
+  // Right leg
+  ctx.beginPath();
+  ctx.moveTo(5 + weightShift, 32 + breathe);
+  ctx.quadraticCurveTo(8 - legSwing * 8 + weightShift, 44 + breathe, 10 + weightShift, 54 + breathe - bounce * 0.3);
+  ctx.stroke();
+
+  // === FEET (bare, follow-through on movement) ===
+  const footRotL = legSwing * 0.2;
+  const footRotR = -legSwing * 0.2;
+  ctx.fillStyle = INK;
+
+  ctx.save();
+  ctx.translate(-10 + weightShift, 57 + breathe - bounce * 0.3);
+  ctx.rotate(footRotL);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 8, 4, 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(10 + weightShift, 57 + breathe - bounce * 0.3);
+  ctx.rotate(footRotR);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 8, 4, -0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.restore();
+}
+
+// Rubber hose arm drawing with gesture support
+function drawRubberHoseArm(ctx, startX, startY, config, t, width) {
+  const baseAngle = config.angle || 0;
+  const length = (config.length || 1) * 28;
+
+  // Animation modifiers
+  let angle = baseAngle;
+  if (config.wave) angle += Math.sin(t * 0.5) * 0.4;
+  if (config.shake) angle += Math.sin(t * 0.8) * 0.25;
+  if (config.swing) angle += Math.sin(t * 0.35 + (startX > 0 ? Math.PI : 0)) * 0.3;
+
+  // Calculate arm endpoint
+  const endX = startX + Math.sin(angle) * length;
+  const endY = startY + Math.cos(angle) * length * 0.7;
+
+  // Control point for rubber hose curve
+  const ctrlX = startX + Math.sin(angle * 0.6) * length * 0.5;
+  const ctrlY = startY + Math.cos(angle * 0.6) * length * 0.4;
+
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = width;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
+  ctx.stroke();
+
+  // Draw hand based on type
+  drawHand(ctx, endX, endY, config.hand || 'open', angle, t);
+}
+
+function drawHand(ctx, x, y, type, angle, t) {
+  ctx.fillStyle = INK;
+
+  if (type === 'fist') {
+    ctx.beginPath();
+    ctx.arc(x, y, 7, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (type === 'point') {
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    // Pointing finger
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.sin(angle) * 10, y + Math.cos(angle) * 6);
+    ctx.stroke();
+  } else if (type === 'spread') {
+    // Open hand with spread fingers
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.sin(angle + i * 0.25) * 8, y + Math.cos(angle + i * 0.25) * 5);
+      ctx.stroke();
+    }
+  } else if (type === 'grip') {
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Open hand (default)
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PETE — 1928 Cat Captain with Full Animation
+// ═══════════════════════════════════════════════════════════════════════════
+
+function drawPete(w, h) {
+  const c = scene.characters.pete;
+  const x = (c.x / 100) * w, y = (c.y / 100) * h;
+  const t = c.frame;
+
+  // Animation dynamics
+  const breathe = Math.sin(t * 0.08) * 2;
+  const stomp = c.anim === 'stomp' ? Math.abs(Math.sin(t * 0.5)) * 6 : 0;
+  const fury = (c.emotion === 'furious' || c.emotion === 'angry') ? Math.sin(t * 0.4) * 2 : 0;
+
+  const blinkAmt = Math.max(0, blink.pete);
+
+  ctx.save();
+  ctx.translate(x, y - stomp);
+  if (c.facing === -1) ctx.scale(-1, 1);
+  ctx.scale(c.sq, c.st);
+
+  // === LARGE BODY (intimidating mass) ===
+  ctx.fillStyle = INK;
+  const bodyPuff = c.anim === 'yell' ? 1.1 : 1;
+  ctx.beginPath();
+  ctx.ellipse(0, 18 + breathe, 28 * bodyPuff, 36, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Suspender
+  ctx.strokeStyle = DARK;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(-6, -14 + breathe);
+  ctx.lineTo(-10, 50 + breathe);
+  ctx.stroke();
+
+  // === HEAD (feline, with expression) ===
+  const headShake = fury;
+  ctx.save();
+  ctx.translate(0, -28 + breathe);
+  ctx.rotate(headShake * Math.PI / 180);
+
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 24, 22, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === CAT EARS (pointed, with mood) ===
+  const earFlat = c.emotion === 'angry' || c.emotion === 'furious' ? 8 : 0;
+  const earTwitch = Math.sin(t * 0.3) * 2;
+
+  ctx.beginPath();
+  ctx.moveTo(-17, -18);
+  ctx.lineTo(-24 - earTwitch, -34 + earFlat);
+  ctx.lineTo(-10, -22);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(17, -18);
+  ctx.lineTo(24 + earTwitch, -34 + earFlat);
+  ctx.lineTo(10, -22);
+  ctx.closePath();
+  ctx.fill();
+
+  // === CAPTAIN'S HAT ===
+  ctx.fillRect(-20, -24 + earFlat * 0.3, 40, 10);
+  ctx.beginPath();
+  ctx.ellipse(0, -24 + earFlat * 0.3, 26, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = DARK;
+  ctx.fillRect(-24, -16 + earFlat * 0.3, 48, 3);
+
+  // === SNOUT ===
+  ctx.fillStyle = MID;
+  ctx.beginPath();
+  ctx.ellipse(15, 6, 17, 13, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === EYES (with expression and blink) ===
+  const eyeSquint = blinkAmt > 0.5 ? (1 - blinkAmt) * 2 : 1;
+  const eyeNarrow = (c.emotion === 'angry' || c.emotion === 'furious') ? 0.6 : (c.emotion === 'suspicious' ? 0.7 : 1);
+  const eyeLook = c.anim === 'glare' ? 2 : 0;
+
+  ctx.fillStyle = PAPER;
+  ctx.beginPath();
+  ctx.ellipse(-5, -5, 8, 6 * eyeSquint * eyeNarrow, -0.2, 0, Math.PI * 2);
+  ctx.ellipse(8, -5, 8, 6 * eyeSquint * eyeNarrow, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pupils (can track Willie)
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.arc(-3 + eyeLook, -4, 3.5, 0, Math.PI * 2);
+  ctx.arc(10 + eyeLook, -4, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === ANGRY BROWS (more expressive) ===
+  const browAngle = c.emotion === 'furious' ? 0.3 : (c.emotion === 'angry' ? 0.2 : 0.1);
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(-14, -14 - browAngle * 15);
+  ctx.lineTo(0, -10 + browAngle * 5);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(18, -10 + browAngle * 5);
+  ctx.lineTo(4, -14 - browAngle * 15);
+  ctx.stroke();
+
+  // === NOSE ===
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.ellipse(27, 10, 8, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === MOUTH (animated based on action) ===
+  const mouth = getMouthShape(c.anim, c.emotion, t);
+  ctx.fillStyle = INK;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 2.5;
+
+  if (mouth.shape === 'yell') {
+    // Big open mouth for yelling
+    ctx.beginPath();
+    ctx.ellipse(15, 22, 10 * mouth.intensity, 14 * mouth.intensity, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Teeth
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(8, 16, 14, 6);
+    ctx.fillStyle = INK;
+    // Individual teeth
+    for (let i = 0; i < 4; i++) {
+      ctx.fillRect(9 + i * 3.5, 22, 2, 4);
+    }
+  } else if (mouth.shape === 'frown') {
+    ctx.beginPath();
+    ctx.arc(15, 26 - mouth.intensity * 8, 9, Math.PI + 0.2, -0.2);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.arc(15, 18, 9, 0.12, Math.PI - 0.12);
+    ctx.stroke();
+  }
+
+  // Whisker bumps
+  ctx.fillStyle = MID;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.arc(28 + i * 4, 4 + i * 3, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore(); // End head transform
+
+  // === ARMS (gesture-based) ===
+  const pose = ARM_POSES.pete[c.anim] || ARM_POSES.pete.cross_arms;
+  drawPeteArm(ctx, -24, 0 + breathe, pose.left, t, 'left');
+  drawPeteArm(ctx, 24, 0 + breathe, pose.right, t, 'right');
+
+  // === TWO LEGS (no peg leg in 1928!) ===
+  const legBend = c.anim === 'stomp' ? Math.sin(t * 0.5) * 0.15 : 0;
+  const weightShift = c.anim === 'stomp' ? Math.sin(t * 0.25) * 4 : 0;
+
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 9;
+  ctx.lineCap = 'round';
+
+  // Left leg
+  ctx.beginPath();
+  ctx.moveTo(-12 + weightShift, 50 + breathe);
+  ctx.quadraticCurveTo(-14 + weightShift + legBend * 10, 64 + breathe, -16 + weightShift, 78 + breathe - stomp * 0.5);
+  ctx.stroke();
+
+  // Right leg
+  ctx.beginPath();
+  ctx.moveTo(12 + weightShift, 50 + breathe);
+  ctx.quadraticCurveTo(14 + weightShift - legBend * 10, 64 + breathe, 16 + weightShift, 78 + breathe);
+  ctx.stroke();
+
+  // === SHOES ===
+  ctx.fillStyle = INK;
+  ctx.save();
+  ctx.translate(-16 + weightShift, 82 + breathe - stomp * 0.5);
+  ctx.rotate(legBend * 0.3);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 13, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(16 + weightShift, 82 + breathe);
+  ctx.rotate(-legBend * 0.3);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 13, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.restore();
+}
+
+// Pete's arms with big meaty hands
+function drawPeteArm(ctx, startX, startY, config, t, side) {
+  const baseAngle = config.angle || 0;
+  const length = (config.length || 1) * 38;
+
+  let angle = baseAngle;
+  if (config.shake) angle += Math.sin(t * 0.7) * 0.35;
+  if (config.crossed) angle = side === 'left' ? 0.6 : -0.6;
+
+  const endX = startX + Math.sin(angle) * length;
+  const endY = startY + Math.cos(angle) * length * 0.65;
+
+  const ctrlX = startX + Math.sin(angle * 0.5) * length * 0.6;
+  const ctrlY = startY + Math.cos(angle * 0.5) * length * 0.35;
+
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 9;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
+  ctx.stroke();
+
+  // Big meaty hand
+  ctx.fillStyle = INK;
+  if (config.hand === 'fist') {
+    ctx.beginPath();
+    ctx.arc(endX, endY, 11, 0, Math.PI * 2);
+    ctx.fill();
+    // Knuckle details
+    ctx.fillStyle = DARK;
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.arc(endX + i * 5, endY - 4, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (config.hand === 'point') {
+    ctx.beginPath();
+    ctx.arc(endX, endY, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(endX, endY);
+    ctx.lineTo(endX + Math.sin(angle) * 14, endY + Math.cos(angle) * 8);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.arc(endX, endY, 10, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PARROT — The Wise-Cracking Bird (only character with dialogue in 1928!)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function drawParrot(w, h) {
+  const c = scene.characters.parrot;
+  const x = (c.x / 100) * w, y = (c.y / 100) * h;
+  const t = c.frame;
+
+  // Animation dynamics
+  const bob = Math.sin(t * 0.25) * 2;
+  const headBob = Math.sin(t * 0.35) * 3 + (c.anim === 'bob_head' ? Math.sin(t * 0.6) * 5 : 0);
+  const ruffle = c.anim === 'startle' ? Math.sin(t * 1.2) * 3 : 0;
+
+  const blinkAmt = Math.max(0, blink.parrot);
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(c.sq, c.st);
+
+  // === TAIL FEATHERS (behind body) ===
+  const tailSwish = Math.sin(t * 0.15) * 4;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 2.5;
+  [-1.2, -0.6, 0, 0.6, 1.2].forEach((offset, i) => {
+    const length = 22 - Math.abs(offset) * 4;
+    ctx.beginPath();
+    ctx.moveTo(-2, 18 + bob);
+    ctx.quadraticCurveTo(-5 + offset * 4 + tailSwish * (i % 2 ? 1 : -1) * 0.3, 26 + bob, -3 + offset * 5, 18 + length + bob);
+    ctx.stroke();
+  });
+
+  // === BODY ===
+  ctx.fillStyle = MID;
+  const bodyPuff = c.anim === 'squawk' ? 1.15 : (c.anim === 'startle' ? 1.1 : 1);
+  ctx.beginPath();
+  ctx.ellipse(0, 6 + bob + ruffle, 8 * bodyPuff, 13, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === WING ===
+  const flapAngle = (c.anim === 'flap' || c.anim === 'fly') ? Math.sin(t * 0.9) * 0.8 : Math.sin(t * 0.08) * 0.05;
+  const wingExtend = c.anim === 'fly' ? 1.4 : 1;
+
+  ctx.save();
+  ctx.translate(-4, 4 + bob);
+  ctx.rotate(-0.3 + flapAngle);
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 6, 12 * wingExtend, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Wing feather details
+  ctx.strokeStyle = DARK;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-2, -4 + i * 4);
+    ctx.lineTo(-5, -2 + i * 5);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // === HEAD ===
+  const headTilt = c.anim === 'speak' || c.anim === 'squawk' ? Math.sin(t * 0.5) * 4 : 0;
+  ctx.save();
+  ctx.translate(0, -10 + bob + headBob);
+  ctx.rotate(headTilt * Math.PI / 180);
+
+  ctx.fillStyle = MID;
+  ctx.beginPath();
+  ctx.arc(0, 0, 10, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === CREST ===
+  const crestPerk = c.emotion === 'excited' || c.emotion === 'startled' ? 6 : 0;
+  ctx.fillStyle = MID;
+  ctx.beginPath();
+  ctx.moveTo(-4, -8);
+  ctx.quadraticCurveTo(0, -20 - crestPerk + Math.sin(t * 0.4) * 2, 4, -8);
+  ctx.fill();
+
+  // === EYE (with blink and expression) ===
+  const eyeSquint = blinkAmt > 0.5 ? (1 - blinkAmt) * 2 : 1;
+  const eyeWide = c.emotion === 'startled' ? 1.4 : (c.emotion === 'curious' ? 1.2 : 1);
+
+  ctx.fillStyle = PAPER;
+  ctx.beginPath();
+  ctx.ellipse(5, -1, 4 * eyeWide, 5 * eyeSquint * eyeWide, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pupil
+  const lookDir = c.anim === 'bob_head' ? Math.sin(t * 0.25) * 2 : 0;
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.arc(5 + lookDir, -1, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Eye highlight
+  ctx.fillStyle = PAPER;
+  ctx.beginPath();
+  ctx.arc(4 + lookDir, -2, 0.7, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === BEAK (animated for talking/squawking) ===
+  const beakOpen = c.anim === 'squawk' || c.anim === 'speak' ? Math.abs(Math.sin(t * 0.7)) * 8 : 0;
+
+  // Upper beak
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.moveTo(8, -5);
+  ctx.quadraticCurveTo(14, -6, 20, -3);
+  ctx.quadraticCurveTo(14, -2, 8, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // Lower beak (animated)
+  ctx.beginPath();
+  ctx.moveTo(8, 0 + beakOpen * 0.2);
+  ctx.quadraticCurveTo(12, 2 + beakOpen, 16, 1 + beakOpen * 0.8);
+  ctx.quadraticCurveTo(12, 0 + beakOpen * 0.3, 8, 0 + beakOpen * 0.2);
+  ctx.closePath();
+  ctx.fill();
+
+  // Mouth interior when open
+  if (beakOpen > 2) {
+    ctx.fillStyle = DARK;
+    ctx.beginPath();
+    ctx.ellipse(11, 0 + beakOpen * 0.4, 4, beakOpen * 0.35, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore(); // End head transform
+
+  // === FEET ===
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+
+  // Left foot
+  ctx.beginPath();
+  ctx.moveTo(-2, 18 + bob);
+  ctx.lineTo(-4, 25 + bob);
+  ctx.stroke();
+  // Talons
+  ctx.beginPath();
+  ctx.moveTo(-4, 25 + bob);
+  ctx.lineTo(-7, 27 + bob);
+  ctx.moveTo(-4, 25 + bob);
+  ctx.lineTo(-4, 28 + bob);
+  ctx.moveTo(-4, 25 + bob);
+  ctx.lineTo(-1, 27 + bob);
+  ctx.stroke();
+
+  // Right foot
+  ctx.beginPath();
+  ctx.moveTo(2, 18 + bob);
+  ctx.lineTo(4, 25 + bob);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(4, 25 + bob);
+  ctx.lineTo(1, 27 + bob);
+  ctx.moveTo(4, 25 + bob);
+  ctx.lineTo(4, 28 + bob);
+  ctx.moveTo(4, 25 + bob);
+  ctx.lineTo(7, 27 + bob);
+  ctx.stroke();
+
+  ctx.restore();
+}
+  ctx.moveTo(2, 18 + b);
+  ctx.lineTo(3, 25 + b);
+  ctx.stroke();
+
+  // Crest
+  ctx.fillStyle = MID;
+  ctx.beginPath();
+  ctx.moveTo(-3, -19 + b + head);
+  ctx.quadraticCurveTo(0, -30 + b + head, 3, -19 + b + head);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PARTICLES & EFFECTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function spawnSmoke(x, y) {
+  scene.particles.push({
+    x, y, vx: (Math.random() - 0.5) * 1.2, vy: -1 - Math.random() * 1.2,
+    size: 10 + Math.random() * 10, life: 1, decay: 0.014 + Math.random() * 0.02
+  });
+}
+
+function updateParticles(w, h) {
+  ctx.fillStyle = LIGHT;
+  scene.particles = scene.particles.filter(p => {
+    p.x += p.vx; p.y += p.vy; p.vy *= 0.985; p.size *= 1.02; p.life -= p.decay;
+    if (p.life <= 0) return false;
+    ctx.globalAlpha = p.life * 0.4;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+    return true;
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawFilmEffects(w, h, ts) {
+  // Film grain
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (Math.random() - 0.5) * 22;
+    d[i] += n; d[i+1] += n; d[i+2] += n;
+  }
+  ctx.putImageData(img, 0, 0);
+
+  // Vignette
+  const vg = ctx.createRadialGradient(w/2, h/2, h*0.25, w/2, h/2, h*0.72);
+  vg.addColorStop(0, 'transparent');
+  vg.addColorStop(1, 'rgba(8,8,8,0.5)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, w, h);
+
+  // Scratches
+  if (Math.random() < 0.06) {
+    ctx.strokeStyle = 'rgba(244,236,224,0.1)';
+    ctx.lineWidth = 0.8;
+    const sx = Math.random() * w;
+    ctx.beginPath();
+    ctx.moveTo(sx, 0);
+    ctx.lineTo(sx + (Math.random() - 0.5) * 6, h);
+    ctx.stroke();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ANIMATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updateAnimations() {
+  for (const name in scene.characters) {
+    const c = scene.characters[name];
+    const def = ANIMS[name]?.[c.anim];
+    if (def) {
+      c.frame += def.s;
+      if (c.frame >= def.l) c.frame = 0;
+    }
+    c.sq += (1 - c.sq) * 0.12;
+    c.st += (1 - c.st) * 0.12;
+  }
+}
+
+function setAnim(name, anim, emotion) {
+  const c = scene.characters[name];
+  if (c && ANIMS[name]?.[anim]) {
+    c.anim = anim; c.frame = 0;
+    c.sq = 1.12; c.st = 0.9;
+  }
+  if (c && emotion) c.emotion = emotion;
+}
+
+function moveChar(name, tx, ty) {
+  const c = scene.characters[name];
+  if (c && tx != null) {
+    c.targetX = tx; c.targetY = ty ?? c.y;
+    c.facing = tx > c.x ? 1 : -1;
+  }
+}
+
+function updateMovement() {
+  for (const name in scene.characters) {
+    const c = scene.characters[name];
+    if (c.targetX != null) {
+      const dx = c.targetX - c.x, dy = (c.targetY ?? c.y) - c.y;
+      if (Math.abs(dx) > 0.3 || Math.abs(dy) > 0.3) {
+        c.x += dx * 0.04; c.y += dy * 0.04;
+      } else {
+        c.x = c.targetX; c.y = c.targetY ?? c.y;
+        c.targetX = c.targetY = null;
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TITLE CARDS
+// ═══════════════════════════════════════════════════════════════════════════
+
+const titleCard = document.getElementById('title-card');
+const titleSpeaker = document.getElementById('title-speaker');
+const titleText = document.getElementById('title-text');
+let titleQueue = [], titleShowing = false;
+
+function showTitle(text, speaker) {
+  titleQueue.push({ text, speaker });
+  processTitle();
+}
+
+function processTitle() {
+  if (titleShowing || !titleQueue.length) return;
+  const { text, speaker } = titleQueue.shift();
+  titleShowing = true;
+  titleSpeaker.textContent = speaker ? `\u2014 ${speaker} \u2014` : '';
+  titleText.textContent = `"${text}"`;
+  titleCard.classList.add('visible');
+  setTimeout(() => {
+    titleCard.classList.remove('visible');
+    setTimeout(() => { titleShowing = false; processTitle(); }, 400);
+  }, 2200);
+}
+
+// Transcript
+const transcriptEl = document.getElementById('transcript');
+let transcriptTimer = null;
+function showTranscript(text) {
+  transcriptEl.textContent = text;
+  transcriptEl.classList.add('visible');
+  clearTimeout(transcriptTimer);
+  transcriptTimer = setTimeout(() => transcriptEl.classList.remove('visible'), 2800);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AI VOICE
+// ═══════════════════════════════════════════════════════════════════════════
+
+let audio = null, voice = null;
+const statusEl = document.getElementById('status');
+const micBtn = document.getElementById('mic-btn');
+
+const WILLIE_PROMPT = `You are Steamboat Willie — Mickey Mouse in his original 1928 form. A cheerful, mischievous mouse piloting a steamboat.
+
+Personality: Optimistic, playful, loves whistling. Use 1920s expressions ("Oh boy!", "Hot dog!", "Golly!").
+
+You share the boat with Captain Pete (a grumpy cat who hates your whistling) and a wise-cracking Parrot.
+
+Keep responses SHORT and punchy — like a 1928 cartoon character! Use the functions to animate yourself and others.`;
+
+const TOOLS = [
+  { name: 'animate_character', description: 'Make a character animate', parameters: { type: 'object', properties: { character: { type: 'string', enum: ['willie','pete','parrot'] }, animation: { type: 'string' }, emotion: { type: 'string' } }, required: ['character','animation'] } },
+  { name: 'play_sound', description: 'Play sound effect', parameters: { type: 'object', properties: { sound: { type: 'string', enum: ['whistle','grumble','squawk','stomp','splash','steam'] } }, required: ['sound'] } },
+  { name: 'show_title_card', description: 'Show silent film dialogue card', parameters: { type: 'object', properties: { text: { type: 'string' }, speaker: { type: 'string' } }, required: ['text'] } }
+];
+
+function handleFn(name, args) {
+  switch (name) {
+    case 'animate_character': setAnim(args.character, args.animation, args.emotion); return { ok: true };
+    case 'play_sound': audio?.play(args.sound); return { ok: true };
+    case 'show_title_card': showTitle(args.text, args.speaker); return { ok: true };
+    default: return { error: 'unknown' };
+  }
+}
+
+async function initVoice() {
+  audio = new SteamboatAudio();
+  await audio.init();
+  audio.startAmbient();
+
+  voice = new RealtimeVoice({
+    proxyUrl: PROXY_URL,
+    instructions: WILLIE_PROMPT,
+    tools: TOOLS,
+    voice: 'echo',
+    onTranscript: (t, r) => showTranscript(r === 'user' ? `You: ${t}` : `Willie: ${t}`),
+    onFunctionCall: handleFn,
+    onStateChange: s => {
+      statusEl.textContent = s; statusEl.className = s;
+      micBtn.classList.toggle('listening', s === 'listening');
+      // Resume autonomous scene when AI stops speaking
+      if (s === 'ready' && sceneInterrupted) {
+        resumeAutonomousScene();
+      }
+    },
+    onError: e => { console.error('[Voice]', e); statusEl.textContent = 'error'; statusEl.className = 'error'; }
+  });
+
+  try {
+    await voice.connect();
+    statusEl.textContent = 'ready';
+    statusEl.className = 'ready';
+  } catch (e) {
+    console.error('Voice connect failed:', e);
+    statusEl.textContent = 'offline';
+    statusEl.className = 'error';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INTERACTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+document.getElementById('whistle-btn').addEventListener('click', () => {
+  audio?.playWhistle();
+  setAnim('willie', 'whistle', 'excited');
+});
+
+let holding = false;
+function startTalk(e) {
+  e.preventDefault();
+  if (!voice || voice.state === 'disconnected' || holding) return;
+  holding = true;
+  // INTERRUPT the autonomous scene - characters pay attention to user
+  pauseAutonomousScene();
+  voice.startListening();
+}
+function stopTalk(e) {
+  e.preventDefault();
+  if (!holding) return;
+  holding = false;
+  voice?.stopListening();
+  // Scene will resume after AI finishes speaking (handled in onStateChange)
+}
+micBtn.addEventListener('mousedown', startTalk);
+micBtn.addEventListener('mouseup', stopTalk);
+micBtn.addEventListener('mouseleave', stopTalk);
+micBtn.addEventListener('touchstart', startTalk, { passive: false });
+micBtn.addEventListener('touchend', stopTalk, { passive: false });
+
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const x = ((e.clientX - rect.left) / rect.width) * 100;
+  const y = ((e.clientY - rect.top) / rect.height) * 100;
+  let nearest = null, minD = Infinity;
+  for (const [n, c] of Object.entries(scene.characters)) {
+    const d = Math.hypot(c.x - x, c.y - y);
+    if (d < minD && d < 15) { minD = d; nearest = n; }
+  }
+  if (nearest) setAnim(nearest, nearest === 'willie' ? 'wave' : nearest === 'pete' ? 'glare' : 'startle');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTONOMOUS SCENE DIRECTOR — Characters act WITHOUT user input
+// User voice INTERRUPTS, then scene resumes autonomously
+// ═══════════════════════════════════════════════════════════════════════════
+
+const BEHAVIORS = {
+  willie: [
+    { anim: 'steer', emotion: 'happy', weight: 35, duration: [3000, 6000] },
+    { anim: 'whistle', emotion: 'excited', weight: 25, duration: [2000, 4000], sound: 'whistle', triggers: { pete: 'annoyed' } },
+    { anim: 'dance', emotion: 'happy', weight: 15, duration: [2500, 4500] },
+    { anim: 'wave', emotion: 'happy', weight: 10, duration: [1500, 2500] },
+    { anim: 'laugh', emotion: 'happy', weight: 10, duration: [1800, 3000] },
+    { anim: 'look_around', emotion: 'curious', weight: 5, duration: [2000, 3500] }
+  ],
+  pete: [
+    { anim: 'cross_arms', emotion: 'grumpy', weight: 25, duration: [3000, 5000] },
+    { anim: 'glare', emotion: 'annoyed', weight: 20, duration: [2000, 4000], target: 'willie' },
+    { anim: 'stomp', emotion: 'angry', weight: 15, duration: [1500, 2500], sound: 'stomp', move: { x: [30, 48], y: 42 } },
+    { anim: 'shake_fist', emotion: 'furious', weight: 15, duration: [2000, 3500], target: 'willie', dialogue: { text: 'That whistlin\' drives me CRAZY!', chance: 0.3 } },
+    { anim: 'growl', emotion: 'angry', weight: 10, duration: [1500, 2500], sound: 'grumble' },
+    { anim: 'point', emotion: 'annoyed', weight: 5, duration: [1200, 2000], target: 'willie' },
+    { anim: 'cross_arms', emotion: 'grumpy', weight: 10, duration: [2500, 4000], move: { x: [32, 50], y: 42 } }
+  ],
+  parrot: [
+    { anim: 'preen', emotion: 'content', weight: 25, duration: [2500, 4500] },
+    { anim: 'bob_head', emotion: 'curious', weight: 20, duration: [1500, 3000] },
+    { anim: 'flap', emotion: 'excited', weight: 15, duration: [1000, 2000] },
+    { anim: 'squawk', emotion: 'excited', weight: 12, duration: [800, 1500], sound: 'squawk', dialogue: { text: 'Polly wants a cracker!', chance: 0.2 } },
+    { anim: 'speak', emotion: 'mischievous', weight: 10, duration: [1500, 2500], dialogue: { text: 'Man overboard!', chance: 0.5 } },
+    { anim: 'fly', emotion: 'excited', weight: 10, duration: [1800, 3000], move: { x: [48, 65], y: [24, 32] } },
+    { anim: 'startle', emotion: 'startled', weight: 5, duration: [600, 1200] },
+    { anim: 'speak', emotion: 'mischievous', weight: 3, duration: [1800, 2800], dialogue: { text: 'Hope you don\'t feel hurt, big boy!', chance: 0.6 } }
+  ]
+};
+
+// Weighted random selection
+function pickBehavior(character) {
+  const behaviors = BEHAVIORS[character];
+  const total = behaviors.reduce((s, b) => s + b.weight, 0);
+  let roll = Math.random() * total;
+  for (const b of behaviors) {
+    roll -= b.weight;
+    if (roll <= 0) return b;
+  }
+  return behaviors[0];
+}
+
+// Autonomous state per character
+const autonomous = {
+  willie: { timer: null, busy: false },
+  pete: { timer: null, busy: false, annoyed: false },
+  parrot: { timer: null, busy: false }
+};
+
+let sceneInterrupted = false; // True when user is speaking
+
+function runAutonomousBehavior(character) {
+  if (sceneInterrupted || autonomous[character].busy) return;
+
+  const behavior = pickBehavior(character);
+  autonomous[character].busy = true;
+
+  // Execute the behavior
+  setAnim(character, behavior.anim, behavior.emotion);
+
+  // Move character if specified
+  if (behavior.move) {
+    const [minX, maxX] = behavior.move.x;
+    const targetX = minX + Math.random() * (maxX - minX);
+    let targetY;
+    if (Array.isArray(behavior.move.y)) {
+      const [minY, maxY] = behavior.move.y;
+      targetY = minY + Math.random() * (maxY - minY);
+    } else {
+      targetY = behavior.move.y;
+    }
+    moveChar(character, targetX, targetY);
+  }
+
+  // Play sound if specified
+  if (behavior.sound && audio) {
+    setTimeout(() => audio.play(behavior.sound), 200 + Math.random() * 300);
+  }
+
+  // Show dialogue if specified (with probability)
+  if (behavior.dialogue && Math.random() < behavior.dialogue.chance) {
+    const speaker = character === 'willie' ? 'Willie' : character === 'pete' ? 'Captain Pete' : 'Parrot';
+    setTimeout(() => showTitle(behavior.dialogue.text, speaker), 400);
+  }
+
+  // Trigger reactions in other characters
+  if (behavior.triggers) {
+    for (const [target, reaction] of Object.entries(behavior.triggers)) {
+      if (target === 'pete' && reaction === 'annoyed') {
+        // Pete gets annoyed at Willie's whistling
+        autonomous.pete.annoyed = true;
+        setTimeout(() => {
+          if (autonomous.pete.annoyed && !sceneInterrupted) {
+            const angry = Math.random() < 0.4;
+            setAnim('pete', angry ? 'shake_fist' : 'glare', angry ? 'furious' : 'annoyed');
+            if (angry && Math.random() < 0.3) {
+              showTitle('ENOUGH with that racket!', 'Captain Pete');
+            }
+          }
+        }, 800 + Math.random() * 1200);
+      }
+    }
+  }
+
+  // Schedule next behavior
+  const [minDur, maxDur] = behavior.duration;
+  const duration = minDur + Math.random() * (maxDur - minDur);
+
+  autonomous[character].timer = setTimeout(() => {
+    autonomous[character].busy = false;
+    autonomous.pete.annoyed = false;
+    if (!sceneInterrupted) {
+      runAutonomousBehavior(character);
+    }
+  }, duration);
+}
+
+function startAutonomousScene() {
+  // Stagger character starts for natural feel
+  setTimeout(() => runAutonomousBehavior('willie'), 500);
+  setTimeout(() => runAutonomousBehavior('pete'), 1200);
+  setTimeout(() => runAutonomousBehavior('parrot'), 1800);
+}
+
+function pauseAutonomousScene() {
+  sceneInterrupted = true;
+  // Characters pause and look at the user
+  setAnim('willie', 'look_around', 'curious');
+  setAnim('parrot', 'bob_head', 'curious');
+}
+
+function resumeAutonomousScene() {
+  sceneInterrupted = false;
+  // Resume after a beat
+  setTimeout(() => {
+    if (!sceneInterrupted) {
+      runAutonomousBehavior('willie');
+      runAutonomousBehavior('pete');
+      runAutonomousBehavior('parrot');
+    }
+  }, 1500);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// START
+// ═══════════════════════════════════════════════════════════════════════════
+
+const startScreen = document.getElementById('start-screen');
+document.getElementById('start-btn').addEventListener('click', async () => {
+  startScreen.classList.add('hidden');
+  requestAnimationFrame(render);
+  await initVoice();
+
+  // START THE AUTONOMOUS SCENE - characters act on their own!
+  startAutonomousScene();
+});
+
+window.addEventListener('beforeunload', () => {
+  voice?.disconnect();
+  audio?.dispose();
+});
+  </script>
+</body>
+</html>
