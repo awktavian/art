@@ -4,400 +4,308 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Cancellation</title>
-<meta name="description" content="Fermat's equation has no integer solutions. In the quaternion integers, it does. A machine-checked example and a structural lesson.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;1,8..60,300;1,8..60,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;1,8..60,300&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #0a0a0c;
+  --bg: #08080a;
   --gold: #D4AF37;
   --gold-soft: #e8c49a;
-  --gold-glow: rgba(212,175,55,0.08);
-  --gold-flare: rgba(212,175,55,0.25);
   --blue: #7aafc2;
-  --blue-glow: rgba(122,175,194,0.12);
   --green: #8eb87e;
-  --green-glow: rgba(142,184,126,0.08);
   --rose: #c49898;
   --text: #FAFAF8;
-  --text-body: rgba(250,250,248,0.6);
-  --text-dim: rgba(250,250,248,0.28);
-  --text-ghost: rgba(250,250,248,0.1);
-  --glass: rgba(255,250,245,0.025);
+  --body: rgba(250,250,248,0.55);
+  --dim: rgba(250,250,248,0.22);
+  --ghost: rgba(250,250,248,0.08);
+  --glass: rgba(255,250,245,0.02);
   --border: rgba(212,175,55,0.06);
-  --display: 'Cormorant Garamond', Georgia, serif;
-  --body: 'Source Serif 4', Georgia, serif;
+  --serif: 'Cormorant Garamond', Georgia, serif;
+  --reading: 'Source Serif 4', Georgia, serif;
   --mono: 'JetBrains Mono', monospace;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: var(--body);
+  font-family: var(--reading);
   font-weight: 300;
-  font-size: 18px;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
-  cursor: none;
 }
 
-.cursor-ring { position: fixed; width: 28px; height: 28px; border: 1px solid var(--gold); border-radius: 50%; pointer-events: none; z-index: 9999; mix-blend-mode: difference; transition: transform 0.15s ease, opacity 0.3s; transform: translate(-50%,-50%); }
-.cursor-dot { position: fixed; width: 4px; height: 4px; background: var(--gold); border-radius: 50%; pointer-events: none; z-index: 10000; transform: translate(-50%,-50%); box-shadow: 0 0 8px rgba(212,175,55,0.15); }
-.scroll-progress { position: fixed; top: 0; left: 0; height: 2px; z-index: 9998; background: linear-gradient(90deg, var(--gold), var(--blue)); }
+.page { max-width: 800px; margin: 0 auto; padding: 0 44px; }
 
-.atmo { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: radial-gradient(ellipse 60% 50% at 15% 85%, rgba(212,175,55,0.03) 0%, transparent 50%), radial-gradient(ellipse 50% 60% at 85% 15%, rgba(122,175,194,0.02) 0%, transparent 50%); }
-.grain { position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.02; }
-#dust { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+.r { opacity: 0; transform: translateY(32px); transition: opacity 700ms var(--ease), transform 700ms var(--ease); }
+.r.v { opacity: 1; transform: none; }
 
-.content { position: relative; z-index: 2; max-width: 780px; margin: 0 auto; padding: 0 40px; }
-.reveal { opacity: 0; transform: translateY(40px); transition: opacity 800ms var(--ease), transform 800ms var(--ease); }
-.reveal.visible { opacity: 1; transform: none; }
+/* ═══════ HERO ═══════ */
+.hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  text-align: center; padding: 120px 0;
+}
 
-.hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 140px 0 120px; }
-.hero-eyebrow { font-family: var(--mono); font-size: 0.62rem; font-weight: 300; letter-spacing: 0.3em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 56px; opacity: 0; animation: fadeUp 800ms 400ms var(--ease) forwards; }
-.hero-title { font-family: var(--display); font-size: clamp(4rem, 12vw, 8rem); font-weight: 300; font-style: italic; line-height: 1; color: var(--gold); text-shadow: 0 0 80px rgba(212,175,55,0.2), 0 0 160px rgba(212,175,55,0.06); margin-bottom: 72px; opacity: 0; animation: fadeUp 1200ms 600ms var(--ease) forwards; transition: text-shadow 800ms var(--ease); }
-.hero-title:hover { text-shadow: 0 0 120px rgba(212,175,55,0.35), 0 0 240px rgba(212,175,55,0.1); }
-.hero-equation { font-family: var(--display); font-size: clamp(3.5rem, 10vw, 7rem); font-weight: 300; color: var(--blue); letter-spacing: 0.08em; text-shadow: 0 0 60px var(--blue-glow); padding: 40px 0 64px; opacity: 0; animation: fadeUp 1200ms 1000ms var(--ease) forwards; }
-.hero-equation sup { font-size: 0.4em; vertical-align: super; }
-.hero-subtitle { font-family: var(--display); font-size: clamp(1.3rem, 3vw, 1.8rem); font-weight: 300; font-style: italic; color: var(--text-body); max-width: 520px; line-height: 1.8; opacity: 0; animation: fadeUp 1000ms 1500ms var(--ease) forwards; }
-@keyframes fadeUp { from { opacity: 0; transform: translateY(36px); } to { opacity: 1; transform: none; } }
+.hero h1 {
+  font-family: var(--serif);
+  font-size: clamp(5rem, 14vw, 10rem);
+  font-weight: 300; font-style: italic;
+  line-height: 0.95; color: var(--gold);
+  text-shadow: 0 0 100px rgba(212,175,55,0.18);
+  margin-bottom: 80px;
+  opacity: 0; animation: up 1.2s 0.4s var(--ease) forwards;
+}
 
-.section { padding: 180px 0 120px; position: relative; }
-.section::before { content: ''; position: absolute; top: 180px; left: 0; width: 2px; height: 0; background: var(--gold); opacity: 0.15; transition: height 1.5s var(--ease); }
-.section.visible::before { height: calc(100% - 300px); }
-.section-num { font-family: var(--display); font-size: clamp(3rem, 6vw, 4.5rem); font-weight: 300; color: var(--text-ghost); line-height: 1; margin-bottom: 20px; transition: color 500ms var(--ease), text-shadow 500ms var(--ease); }
-.section.visible .section-num { color: var(--text-dim); text-shadow: 0 0 40px var(--gold-glow); }
-.section-title { font-family: var(--display); font-size: clamp(2.2rem, 5.5vw, 3.5rem); font-weight: 400; line-height: 1.12; margin-bottom: 56px; letter-spacing: -0.02em; }
-.section-title em { font-style: italic; color: var(--gold); }
+.hero .eq {
+  font-family: var(--serif);
+  font-size: clamp(4rem, 11vw, 8rem);
+  font-weight: 300; color: var(--blue);
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 80px rgba(122,175,194,0.12);
+  margin-bottom: 80px;
+  opacity: 0; animation: up 1.2s 0.8s var(--ease) forwards;
+}
+.hero .eq sup { font-size: 0.4em; vertical-align: super; }
 
-.prose { font-size: 1.1rem; font-weight: 300; line-height: 2.15; color: var(--text-body); max-width: 620px; }
-.prose p { margin-bottom: 32px; }
-.prose strong { color: var(--text); font-weight: 400; }
-.prose em { font-family: var(--display); font-style: italic; font-size: 1.15em; color: var(--text); }
-.prose .m { font-family: var(--mono); font-size: 0.78em; font-weight: 300; color: var(--blue); padding: 3px 8px; background: rgba(122,175,194,0.06); border-radius: 4px; }
-.prose .hl { color: var(--gold-soft); text-shadow: 0 0 24px rgba(212,175,55,0.12); }
+.hero p {
+  font-family: var(--serif);
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-weight: 300; font-style: italic;
+  color: var(--body); max-width: 500px;
+  line-height: 1.7;
+  opacity: 0; animation: up 1s 1.4s var(--ease) forwards;
+}
 
-.math-block { padding: 64px 48px; margin: 56px 0; background: var(--glass); border: 1px solid var(--border); border-radius: 20px; backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); text-align: center; transition: border-color 500ms var(--ease), box-shadow 500ms var(--ease); }
-.math-block:hover { border-color: rgba(212,175,55,0.18); box-shadow: 0 0 100px var(--gold-glow); }
-.math-solution { font-family: var(--display); font-style: italic; font-size: clamp(1.5rem, 3.5vw, 2.4rem); font-weight: 300; color: var(--gold-soft); text-shadow: 0 0 40px rgba(212,175,55,0.1); margin-bottom: 28px; line-height: 1.5; }
-.math-verify { font-family: var(--mono); font-size: 0.65rem; font-weight: 300; color: var(--green); letter-spacing: 0.05em; padding: 10px 20px; display: inline-block; background: var(--green-glow); border-radius: 24px; border: 1px solid rgba(142,184,126,0.1); }
+@keyframes up { from { opacity:0; transform:translateY(28px); } to { opacity:1; transform:none; } }
 
-.proof { padding: 52px 44px; margin: 56px 0; background: var(--glass); border-left: 3px solid var(--green); border-radius: 0 20px 20px 0; position: relative; overflow: hidden; }
-.proof:hover { border-left-color: rgba(142,184,126,0.9); }
-.proof::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, var(--green-glow) 0%, transparent 40%); pointer-events: none; }
-.proof-label { font-family: var(--mono); font-size: 0.58rem; font-weight: 300; letter-spacing: 0.2em; text-transform: uppercase; color: var(--green); margin-bottom: 28px; position: relative; z-index: 1; }
-.proof-step { font-family: var(--mono); font-size: 0.88rem; font-weight: 300; line-height: 2.4; color: var(--text-body); position: relative; z-index: 1; }
-.proof-step > span { display: block; }
-.proof-step .val { color: var(--blue); }
-.proof-step .cancel { color: var(--gold); font-weight: 400; }
-.proof-step .result { color: var(--green); font-weight: 400; }
-.proof-step .note { display: block; font-family: var(--body); font-style: italic; font-size: 0.8rem; color: var(--text-dim); margin: 2px 0 16px 0; }
-.proof-qed { font-family: var(--display); font-size: 1.3rem; color: var(--green); margin-top: 24px; position: relative; z-index: 1; }
+/* ═══════ SECTIONS ═══════ */
+section { padding: 160px 0 120px; }
 
-.proof.visible .proof-step > span { opacity: 0; transform: translateX(-12px); animation: stepIn 600ms var(--ease) forwards; }
-.proof.visible .proof-step > span:nth-child(1) { animation-delay: 0ms; }
-.proof.visible .proof-step > span:nth-child(2) { animation-delay: 120ms; }
-.proof.visible .proof-step > span:nth-child(3) { animation-delay: 240ms; }
-.proof.visible .proof-step > span:nth-child(4) { animation-delay: 360ms; }
-.proof.visible .proof-step > span:nth-child(5) { animation-delay: 480ms; }
-.proof.visible .proof-step > span:nth-child(6) { animation-delay: 600ms; }
-.proof.visible .proof-step > span:nth-child(7) { animation-delay: 720ms; }
-.proof.visible .proof-step > span:nth-child(8) { animation-delay: 840ms; }
-.proof.visible .proof-step > span:nth-child(9) { animation-delay: 960ms; }
-.proof.visible .proof-step > span:nth-child(10) { animation-delay: 1080ms; }
-.proof.visible .proof-step > span:nth-child(11) { animation-delay: 1200ms; }
-@keyframes stepIn { to { opacity: 1; transform: none; } }
+section h2 {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 6vw, 4rem);
+  font-weight: 300; line-height: 1.1;
+  margin-bottom: 56px;
+}
+section h2 em { font-style: italic; color: var(--gold); }
 
-.pull-quote { font-family: var(--display); font-style: italic; font-size: clamp(1.5rem, 3.5vw, 2.2rem); font-weight: 300; color: var(--gold); text-shadow: 0 0 50px rgba(212,175,55,0.06); padding: 60px 0 60px 44px; margin: 56px 0; border-left: 1px solid rgba(212,175,55,0.08); max-width: 580px; line-height: 1.5; transition: border-color 500ms var(--ease), padding-left 500ms var(--spring); }
-.pull-quote:hover { border-color: var(--gold-flare); padding-left: 52px; }
+.text {
+  font-size: clamp(1.05rem, 1.8vw, 1.25rem);
+  line-height: 2.1; color: var(--body);
+  max-width: 600px;
+}
+.text p { margin-bottom: 32px; }
+.text strong { color: var(--text); font-weight: 400; }
+.text em { font-family: var(--serif); font-style: italic; font-size: 1.15em; color: var(--text); }
+.text .c { font-family: var(--mono); font-size: 0.78em; color: var(--blue); padding: 2px 6px; background: rgba(122,175,194,0.06); border-radius: 3px; }
 
-.result-table { width: 100%; margin: 56px 0; border-collapse: separate; border-spacing: 0; background: var(--glass); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; }
-.result-table th { font-family: var(--mono); font-size: 0.58rem; font-weight: 300; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim); text-align: left; padding: 20px 24px; border-bottom: 1px solid var(--border); }
-.result-table td { padding: 20px 24px; font-size: 0.95rem; font-weight: 300; border-bottom: 1px solid rgba(212,175,55,0.025); color: var(--text-body); transition: background 250ms var(--ease); }
-.result-table tr:hover td { background: rgba(255,250,245,0.02); }
-.result-table tr:last-child td { border-bottom: none; }
-.result-table .yes { color: var(--green); font-weight: 400; }
-.result-table .no { color: var(--rose); opacity: 0.6; }
-.result-table .algebra { font-family: var(--display); font-size: 1.15rem; }
-.result-table .dim { font-family: var(--mono); font-size: 0.82rem; color: var(--text-dim); }
-.result-table .nc { color: var(--gold); }
+/* ═══════ THE COMPUTATION ═══════ */
+.comp {
+  padding: 56px 48px; margin: 56px 0;
+  background: var(--glass);
+  border-left: 3px solid var(--green);
+  border-radius: 0 20px 20px 0;
+  font-family: var(--mono);
+  font-size: clamp(0.9rem, 1.5vw, 1.05rem);
+  font-weight: 300; line-height: 2.6;
+  color: var(--body);
+}
+.comp .g { color: var(--gold); }
+.comp .b { color: var(--blue); }
+.comp .k { color: var(--green); }
+.comp .d { color: var(--dim); font-style: italic; font-family: var(--reading); }
+.comp > div { opacity: 0; transform: translateX(-8px); }
+.comp.v > div { animation: step 500ms var(--ease) forwards; }
+.comp.v > div:nth-child(1) { animation-delay: 0ms; }
+.comp.v > div:nth-child(2) { animation-delay: 100ms; }
+.comp.v > div:nth-child(3) { animation-delay: 200ms; }
+.comp.v > div:nth-child(4) { animation-delay: 300ms; }
+.comp.v > div:nth-child(5) { animation-delay: 400ms; }
+.comp.v > div:nth-child(6) { animation-delay: 500ms; }
+.comp.v > div:nth-child(7) { animation-delay: 600ms; }
+.comp.v > div:nth-child(8) { animation-delay: 700ms; }
+.comp.v > div:nth-child(9) { animation-delay: 800ms; }
+@keyframes step { to { opacity:1; transform:none; } }
 
-.caveat { padding: 36px 32px; margin: 48px 0; background: rgba(196,152,152,0.03); border: 1px solid rgba(196,152,152,0.08); border-radius: 16px; }
-.caveat-label { font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--rose); margin-bottom: 16px; opacity: 0.7; }
-.caveat p { font-size: 0.92rem; line-height: 1.9; color: var(--text-body); margin-bottom: 12px; }
-.caveat p:last-child { margin-bottom: 0; }
+/* ═══════ QUOTE ═══════ */
+.quote {
+  font-family: var(--serif); font-style: italic;
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  font-weight: 300; color: var(--gold);
+  padding: 64px 0 64px 40px; margin: 48px 0;
+  border-left: 1px solid rgba(212,175,55,0.1);
+  max-width: 560px; line-height: 1.45;
+}
 
-.sep { height: 1px; max-width: 100px; margin: 0 auto; background: linear-gradient(90deg, transparent, var(--border), transparent); }
+/* ═══════ TABLE ═══════ */
+.tbl {
+  width: 100%; margin: 48px 0;
+  border-collapse: separate; border-spacing: 0;
+  background: var(--glass); border: 1px solid var(--border);
+  border-radius: 16px; overflow: hidden;
+  font-size: clamp(0.9rem, 1.5vw, 1.05rem);
+}
+.tbl th { font-family: var(--mono); font-size: 0.6rem; font-weight: 300; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); text-align: left; padding: 18px 24px; border-bottom: 1px solid var(--border); }
+.tbl td { padding: 18px 24px; color: var(--body); border-bottom: 1px solid rgba(255,255,255,0.02); }
+.tbl tr:last-child td { border-bottom: none; }
+.tbl .y { color: var(--green); font-weight: 400; }
+.tbl .n { color: var(--rose); opacity: 0.5; }
+.tbl .a { font-family: var(--serif); font-size: 1.2em; }
+
+/* ═══════ LEAN ═══════ */
+.lean {
+  padding: 48px 40px; margin: 48px 0;
+  background: var(--glass); border: 1px solid rgba(142,184,126,0.08);
+  border-radius: 16px;
+  font-family: var(--mono); font-size: 0.85rem; font-weight: 300;
+  line-height: 2; color: var(--green);
+  text-align: center;
+}
+.lean .sig { color: var(--body); }
+.lean .badge { display: inline-block; margin-top: 16px; padding: 8px 20px; font-size: 0.65rem; color: var(--green); background: rgba(142,184,126,0.06); border: 1px solid rgba(142,184,126,0.1); border-radius: 20px; letter-spacing: 0.06em; }
+
+/* ═══════ NOTE ═══════ */
+.note { padding: 28px 28px; margin: 40px 0; border: 1px solid rgba(196,152,152,0.06); border-radius: 12px; font-size: 0.88rem; line-height: 1.8; color: var(--body); }
+.note em { color: var(--dim); font-size: 0.78rem; font-family: var(--mono); font-style: normal; letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* ═══════ FOOTER ═══════ */
 footer { padding: 120px 0 80px; text-align: center; }
-footer .line { font-family: var(--mono); font-size: 0.6rem; font-weight: 300; color: var(--text-dim); letter-spacing: 0.06em; }
-footer .line + .line { margin-top: 10px; }
-footer .final-eq { font-family: var(--display); font-style: italic; font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 300; color: var(--text-ghost); margin-top: 48px; transition: color 800ms var(--ease), text-shadow 800ms var(--ease); }
-footer .final-eq:hover { color: var(--gold); text-shadow: 0 0 80px rgba(212,175,55,0.25); }
-footer .final-eq sup { font-size: 0.45em; vertical-align: super; }
-footer .coda { font-family: var(--display); font-style: italic; font-size: 1rem; color: var(--text-dim); margin-top: 36px; }
+footer .f { font-family: var(--mono); font-size: 0.58rem; color: var(--dim); letter-spacing: 0.06em; margin-bottom: 8px; }
+footer .eq { font-family: var(--serif); font-style: italic; font-size: clamp(2.2rem, 6vw, 4rem); color: var(--ghost); margin: 40px 0 32px; transition: color 800ms, text-shadow 800ms; }
+footer .eq:hover { color: var(--gold); text-shadow: 0 0 80px rgba(212,175,55,0.2); }
+footer .eq sup { font-size: 0.4em; vertical-align: super; }
+footer .end { font-family: var(--serif); font-style: italic; font-size: 1.1rem; color: var(--dim); }
 
-@media (max-width: 640px) { .content { padding: 0 24px; } .hero { padding: 100px 0 80px; } .section { padding: 120px 0 80px; } .section::before { display: none; } body { cursor: auto; } .cursor-ring, .cursor-dot { display: none; } }
+.sep { height: 1px; max-width: 80px; margin: 0 auto; background: linear-gradient(90deg, transparent, var(--border), transparent); }
+
+@media (max-width: 640px) { .page { padding: 0 24px; } section { padding: 100px 0 80px; } .comp { padding: 36px 28px; } }
 ::selection { background: rgba(212,175,55,0.2); color: var(--gold-soft); }
 ::-webkit-scrollbar { width: 3px; }
-::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.08); border-radius: 2px; }
 </style>
 </head>
 <body>
 
-<div class="cursor-ring" id="cursorRing"></div>
-<div class="cursor-dot" id="cursorDot"></div>
-<div class="scroll-progress" id="scrollProgress"></div>
-<div class="atmo"></div>
-<svg class="grain" width="100%" height="100%"><filter id="g"><feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(#g)"/></svg>
-<canvas id="dust"></canvas>
+<div class="page">
 
-<div class="content">
-
-  <!-- ═══════════ HERO ═══════════ -->
+  <!-- HERO -->
   <section class="hero">
-    <div class="hero-eyebrow">March 2026</div>
-    <h1 class="hero-title">The Cancellation</h1>
-    <div class="hero-equation">a<sup>3</sup> + b<sup>3</sup> = c<sup>3</sup></div>
-    <p class="hero-subtitle">
-      Fermat said this has no solution.<br>
-      He was right &mdash; in the integers.<br>
-      In the quaternion integers, it does.
-    </p>
+    <h1>The<br>Cancellation</h1>
+    <div class="eq">a<sup>3</sup> + b<sup>3</sup> = c<sup>3</sup></div>
+    <p>Fermat said no solution exists.<br>In four dimensions, one does.</p>
   </section>
 
-  <div class="sep" style="margin-bottom: 40px;"></div>
+  <div class="sep"></div>
 
-  <!-- ═══════════ I ═══════════ -->
-  <section class="section reveal">
-    <div class="section-num">I</div>
-    <h2 class="section-title">The <em>Example</em></h2>
-    <div class="prose">
-      <p>
-        In 1843, William Rowan Hamilton discovered the <strong>quaternions</strong> &mdash; a four-dimensional number system with three imaginary units <span class="m">i, j, k</span> satisfying <span class="m">i&sup2; = j&sup2; = k&sup2; = &minus;1</span>. Unlike ordinary numbers, quaternion multiplication is not commutative: <span class="m">ij = k</span> but <span class="m">ji = &minus;k</span>.
-      </p>
-      <p>
-        The <strong>Lipschitz integers</strong> are quaternions with integer coordinates: <span class="m">&Zopf; + &Zopf;i + &Zopf;j + &Zopf;k</span>. They form a ring &mdash; you can add, subtract, and multiply them, and the results are again Lipschitz integers. Here is a triple of Lipschitz integers whose cubes satisfy Fermat's equation:
-      </p>
+  <!-- THE EXAMPLE -->
+  <section class="r">
+    <h2>The <em>example</em></h2>
+    <div class="text">
+      <p>Three quaternion integers, each of norm 2. Their cubes satisfy the equation Fermat's Last Theorem forbids.</p>
     </div>
 
-    <div class="math-block reveal">
-      <div class="math-solution">
-        a = 1 + i &emsp;&emsp; b = &minus;1 + j &emsp;&emsp; c = &minus;i &minus; j
-      </div>
-      <div class="math-verify">&#10003; &ensp; a&sup3; + b&sup3; = c&sup3; &ensp; &middot; &ensp; N(a) = N(b) = N(c) = 2 &ensp; &middot; &ensp; all three nonzero</div>
-    </div>
-
-    <div class="proof reveal">
-      <div class="proof-label">Verification</div>
-      <div class="proof-step">
-        <span><span class="val">a&sup2;</span> &ensp;=&ensp; (1 + i)&sup2; &ensp;=&ensp; 1 + 2i + i&sup2; &ensp;=&ensp; 1 + 2i &minus; 1 &ensp;=&ensp; <span class="val">2i</span></span>
-        <span><span class="val">a&sup3;</span> &ensp;=&ensp; 2i &middot; (1 + i) &ensp;=&ensp; 2i + 2i&sup2; &ensp;=&ensp; <span class="result">&minus;2 + 2i</span></span>
-        <span class="note">real part of a&sup3; is &minus;2</span>
-        <span><span class="val">b&sup2;</span> &ensp;=&ensp; (&minus;1 + j)&sup2; &ensp;=&ensp; 1 &minus; 2j + j&sup2; &ensp;=&ensp; <span class="val">&minus;2j</span></span>
-        <span><span class="val">b&sup3;</span> &ensp;=&ensp; &minus;2j &middot; (&minus;1 + j) &ensp;=&ensp; 2j &minus; 2j&sup2; &ensp;=&ensp; <span class="result">+2 + 2j</span></span>
-        <span class="note">real part of b&sup3; is +2</span>
-        <span>&nbsp;</span>
-        <span><span class="val">a&sup3; + b&sup3;</span> &ensp;=&ensp; (&minus;2 + 2i) + (2 + 2j) &ensp;=&ensp; <span class="cancel">&minus;2 + 2 = 0</span> &ensp;+&ensp; <span class="result">2i + 2j</span></span>
-        <span class="note">the real parts cancel &mdash; opposite signs from opposite subalgebras</span>
-        <span><span class="val">c&sup2;</span> &ensp;=&ensp; (&minus;i &minus; j)&sup2; &ensp;=&ensp; i&sup2; + <span class="cancel">ij + ji</span> + j&sup2; &ensp;=&ensp; &minus;1 + <span class="cancel">k &minus; k</span> &minus; 1 &ensp;=&ensp; <span class="val">&minus;2</span></span>
-        <span class="note">anti-commutativity: ij = &minus;ji, so cross terms cancel &rarr; c&sup2; is real</span>
-        <span><span class="val">c&sup3;</span> &ensp;=&ensp; &minus;2 &middot; (&minus;i &minus; j) &ensp;=&ensp; <span class="result">2i + 2j</span> &emsp; &#10003;</span>
-      </div>
-      <div class="proof-qed">&#9632; &ensp; a&sup3; + b&sup3; = c&sup3; = 2i + 2j</div>
+    <div class="comp r">
+      <div><span class="b">a</span> = 1 + i &emsp;&emsp; <span class="b">b</span> = &minus;1 + j &emsp;&emsp; <span class="b">c</span> = &minus;i &minus; j</div>
+      <div>&nbsp;</div>
+      <div>a&sup3; &ensp;=&ensp; (1+i)&sup2;(1+i) &ensp;=&ensp; 2i(1+i) &ensp;=&ensp; <span class="k">&minus;2 + 2i</span></div>
+      <div>b&sup3; &ensp;=&ensp; (&minus;1+j)&sup2;(&minus;1+j) &ensp;=&ensp; &minus;2j(&minus;1+j) &ensp;=&ensp; <span class="k">+2 + 2j</span></div>
+      <div>&nbsp;</div>
+      <div>a&sup3; + b&sup3; &ensp;=&ensp; (<span class="g">&minus;2</span> + 2i) + (<span class="g">+2</span> + 2j) &ensp;=&ensp; <span class="k">2i + 2j</span></div>
+      <div class="d">real parts cancel: &minus;2 + 2 = 0</div>
+      <div>&nbsp;</div>
+      <div>c&sup2; &ensp;=&ensp; i&sup2; + <span class="g">ij + ji</span> + j&sup2; &ensp;=&ensp; &minus;1 + <span class="g">k &minus; k</span> &minus; 1 &ensp;=&ensp; &minus;2</div>
+      <div>c&sup3; &ensp;=&ensp; &minus;2(&minus;i&minus;j) &ensp;=&ensp; <span class="k">2i + 2j</span> &ensp; &#10003;</div>
     </div>
   </section>
 
-  <!-- ═══════════ II ═══════════ -->
-  <section class="section reveal">
-    <div class="section-num">II</div>
-    <h2 class="section-title">The <em>Mechanism</em></h2>
-    <div class="prose">
-      <p>
-        <span class="m">a = 1 + i</span> lives in the complex subalgebra <span class="m">&Ropf; + &Ropf;i</span>. <span class="m">b = &minus;1 + j</span> lives in a different copy: <span class="m">&Ropf; + &Ropf;j</span>. These two planes share only the real axis.
-      </p>
-      <p>
-        When you cube <em>a</em>, its real part is <span class="hl">&minus;2</span>. When you cube <em>b</em>, its real part is <span class="hl">+2</span>. They cancel. The imaginary parts &mdash; which live in independent directions &mdash; combine freely.
-      </p>
-      <p>
-        Two structural features make this work:
-      </p>
-      <p>
-        <strong>Anti-commutativity</strong>: <span class="m">ij = &minus;ji</span>. When you square <em>c = &minus;i &minus; j</em>, the cross terms <em>ij</em> and <em>ji</em> are equal in magnitude and opposite in sign. They annihilate each other. This makes c&sup2; a pure real number (&minus;2), which in turn makes c&sup3; proportional to <em>c</em> itself.
-      </p>
-      <p>
-        <strong>Orthogonal subalgebras</strong>: <em>a</em> and <em>b</em> live in different complex planes. Their cubes have real parts with opposite signs because <span class="m">a = 1 + u</span> and <span class="m">b = &minus;1 + v</span> have opposite real components, and the cube formula amplifies this opposition.
-      </p>
-      <p>
-        In the ordinary integers, there is only one direction. Both real parts point the same way. They add. They never cancel.
-      </p>
+  <!-- WHY -->
+  <section class="r">
+    <h2>Why it <em>works</em></h2>
+    <div class="text">
+      <p><span class="c">a</span> lives in the complex plane <span class="c">&Ropf;+&Ropf;i</span>. <span class="c">b</span> lives in a different one: <span class="c">&Ropf;+&Ropf;j</span>. They share only the real line. Their cubes have real parts of opposite sign. Those parts cancel.</p>
+      <p>Then <span class="c">c = &minus;i&minus;j</span> needs c&sup2; to be real. It is &mdash; because <strong>ij = &minus;ji</strong>. The cross terms in c&sup2; annihilate each other. That's anti-commutativity: swapping the order of multiplication flips the sign. It makes c&sup2; collapse to a number, and c&sup3; proportional to c.</p>
+      <p>In &Zopf;, there is one direction. Real parts add. They never cancel. In four dimensions, independent imaginary directions anti-commute, and the cancellation is exact &mdash; for every odd power, not just cubes.</p>
     </div>
 
-    <div class="pull-quote reveal">
-      Anti-commutativity is the lock. Orthogonal imaginary directions are the key.
-    </div>
+    <div class="quote r">Anti-commutativity is the lock. Two imaginary directions are the key.</div>
   </section>
 
-  <!-- ═══════════ III ═══════════ -->
-  <section class="section reveal">
-    <div class="section-num">III</div>
-    <h2 class="section-title">The <em>General Case</em></h2>
-    <div class="prose">
-      <p>The cubic example generalizes to all odd exponents. The real-part cancellation persists because of a trigonometric identity.</p>
-    </div>
+  <!-- BOUNDARY -->
+  <section class="r">
+    <h2>The <em>boundary</em></h2>
+    <div class="text"><p>Hurwitz (1898): there are exactly four normed division algebras. The first with anti-commuting square roots of &minus;1 is the quaternions.</p></div>
 
-    <div class="proof reveal">
-      <div class="proof-label">Theorem</div>
-      <div class="proof-step">
-        <span>Let <span class="val">u, v</span> be pure imaginary quaternions with u&sup2; = v&sup2; = &minus;1 and <span class="cancel">uv = &minus;vu</span>.</span>
-        <span>Set <span class="val">a = 1 + u</span>, &ensp; <span class="val">b = &minus;1 + v</span>. Then for all odd p &ge; 3:</span>
-        <span>&nbsp;</span>
-        <span>a<sup>p</sup> = 2<sup>p/2</sup>(cos(p&pi;/4) + u&middot;sin(p&pi;/4))</span>
-        <span>b<sup>p</sup> = 2<sup>p/2</sup>(cos(3p&pi;/4) + v&middot;sin(3p&pi;/4))</span>
-        <span>&nbsp;</span>
-        <span>Re(a<sup>p</sup>) + Re(b<sup>p</sup>) = 2<sup>p/2</sup>[cos(p&pi;/4) + cos(3p&pi;/4)]</span>
-        <span>&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&ensp;= 2<sup>(p+2)/2</sup> &middot; <span class="cancel">cos(p&pi;/2)</span> &middot; cos(p&pi;/4) = <span class="result">0</span></span>
-        <span class="note">cos(p&pi;/2) = 0 for all odd p &mdash; the real parts always cancel</span>
-        <span>&nbsp;</span>
-        <span>Setting c<sub>p</sub> = &tau;<sub>p</sub>(&minus;1)<sup>(p&minus;1)/2</sup>(u + v), where &tau;<sub>p</sub> = &radic;2 &middot; sin(p&pi;/4) &in; {&plusmn;1}:</span>
-        <span><span class="result">a<sup>p</sup> + b<sup>p</sup> = c<sub>p</sub><sup>&thinsp;p</sup></span> &emsp; for all odd p &ge; 3.</span>
-      </div>
-      <div class="proof-qed">&#9632;</div>
-    </div>
-
-    <div class="caveat reveal">
-      <div class="caveat-label">Note</div>
-      <p>The sign of c depends on p (mod 8). For p = 3: c = &minus;u &minus; v. For p = 7: c = u + v. The same <em>a</em> and <em>b</em> work for all odd p, but c must be adjusted. The hypothesis requires anti-commutativity (<em>uv = &minus;vu</em>), not merely distinctness.</p>
-    </div>
-  </section>
-
-  <!-- ═══════════ IV ═══════════ -->
-  <section class="section reveal">
-    <div class="section-num">IV</div>
-    <h2 class="section-title">The <em>Boundary</em></h2>
-    <div class="prose">
-      <p>
-        There are exactly four normed division algebras over the reals: dimensions 1, 2, 4, 8. This is Hurwitz's theorem (1898). The first algebra with two anti-commuting square roots of &minus;1 is the quaternions.
-      </p>
-    </div>
-
-    <table class="result-table reveal">
-      <thead><tr><th>Algebra</th><th>Dim</th><th>Commutative</th><th>Anti-comm. pairs</th><th>a&sup3;+b&sup3;=c&sup3;</th></tr></thead>
+    <table class="tbl r">
+      <thead><tr><th>Algebra</th><th>Dim</th><th>Anti-comm. pairs</th><th>a&sup3;+b&sup3;=c&sup3;</th></tr></thead>
       <tbody>
-        <tr><td class="algebra">&Zopf;</td><td class="dim">1</td><td>yes</td><td class="dim">0</td><td class="no">No &mdash; FLT (Wiles 1995)</td></tr>
-        <tr><td class="algebra">&Zopf;[i]</td><td class="dim">2</td><td>yes</td><td class="dim">0</td><td class="no">No &mdash; (Ward 2008)</td></tr>
-        <tr><td class="algebra" style="color:var(--green)">Lipschitz</td><td class="dim">4</td><td class="nc">no</td><td class="dim">3</td><td class="yes"><strong>Yes</strong> &mdash; 3 families</td></tr>
-        <tr><td class="algebra" style="color:var(--green)">𝕆 (Gravesian)</td><td class="dim">8</td><td class="nc">no</td><td class="dim">21</td><td class="yes"><strong>Yes</strong> &mdash; 21 families</td></tr>
+        <tr><td class="a">&Zopf;</td><td>1</td><td>0</td><td class="n">No &mdash; FLT</td></tr>
+        <tr><td class="a">&Zopf;[i]</td><td>2</td><td>0</td><td class="n">No</td></tr>
+        <tr><td class="a" style="color:var(--green)">ℍ<sub>&Zopf;</sub></td><td>4</td><td>3</td><td class="y">Yes</td></tr>
+        <tr><td class="a" style="color:var(--green)">𝕆<sub>&Zopf;</sub></td><td>8</td><td>21</td><td class="y">Yes</td></tr>
       </tbody>
     </table>
 
-    <div class="prose">
-      <p>
-        For even exponents p &ge; 6, the equation reduces to Fermat's equation on the norms (ordinary integers), so FLT still applies. Even-power solutions don't exist. The phenomenon is specific to odd exponents.
-      </p>
-    </div>
-
-    <div class="caveat reveal">
-      <div class="caveat-label">Scope</div>
-      <p>The table is restricted to the four real normed division algebras. Commutative rings can also violate Fermat-type equations for other reasons (e.g., <span class="m">1&sup3; + 1&sup3; = t&sup3;</span> in <span class="m">&Zopf;[t]/(t&sup3;&minus;2)</span>). What this construction isolates is one specific structural feature &mdash; anti-commuting imaginary directions &mdash; that enables solutions in a family of division algebras where the norm form is definite and no zero divisors exist.</p>
+    <div class="note r">
+      <em>Scope</em> &ensp; This table covers the four real normed division algebras. Commutative rings can violate Fermat-type equations by other mechanisms. What this construction isolates is one structural feature &mdash; anti-commuting square roots of &minus;1 &mdash; in algebras with definite norm and no zero divisors. Even exponents &ge; 6 reduce to classical FLT on the norms; the phenomenon is specific to odd powers.
     </div>
   </section>
 
-  <!-- ═══════════ V ═══════════ -->
-  <section class="section reveal">
-    <div class="section-num">V</div>
-    <h2 class="section-title">Formal <em>Proof</em></h2>
-    <div class="prose">
-      <p>
-        The identity is proved symbolically in Lean 4 &mdash; not by evaluating a computation, but by <em>rewriting</em> the algebra in the kernel itself. The proof works in any ring R (not necessarily commutative) with elements u, v satisfying three axioms. No native code evaluation. No compiler trust. Every step is a kernel-checked application of distributivity and the three hypotheses.
-      </p>
+  <!-- PROOF -->
+  <section class="r">
+    <h2>The <em>proof</em></h2>
+    <div class="text">
+      <p>The cubic identity is proved symbolically in Lean 4 &mdash; in any ring with u&sup2; = v&sup2; = &minus;1 and uv + vu = 0. No computation. Pure rewriting. Kernel-verified.</p>
     </div>
 
-    <div class="proof reveal">
-      <div class="proof-label">Lean 4 &ensp; &middot; &ensp; SymbolicFermat.lean</div>
-      <div class="proof-step">
-        <span><span class="val">theorem</span> symbolic_fermat_cubic</span>
-        <span>&ensp;&ensp;{R : Type*} [Ring R] (u v : R)</span>
-        <span>&ensp;&ensp;(hu : u * u = -1)</span>
-        <span>&ensp;&ensp;(hv : v * v = -1)</span>
-        <span>&ensp;&ensp;(hac : u * v + v * u = 0) :</span>
-        <span>&ensp;&ensp;(1 + u) * ((1 + u) * (1 + u)) +</span>
-        <span>&ensp;&ensp;(-1 + v) * ((-1 + v) * (-1 + v)) =</span>
-        <span>&ensp;&ensp;(-u - v) * ((-u - v) * (-u - v)) := <span class="val">by</span></span>
-        <span class="note">Proof: expand squares via distributivity, rewrite u&sup2;&rarr;&minus;1, v&sup2;&rarr;&minus;1, uv+vu&rarr;0, close with abel.</span>
-        <span class="note">Three hypotheses. Pure rewriting. Zero computation. Kernel-verified.</span>
-      </div>
-      <div class="proof-qed">&#9632; &ensp; <span style="font-size:0.8em; color:var(--text-dim);">Build completed successfully &middot; 0 sorry &middot; 0 native_decide &middot; 0 axioms</span></div>
+    <div class="lean r">
+      <div><span class="sig">theorem</span> symbolic_fermat_cubic</div>
+      <div><span class="sig">&ensp;&ensp;{R : Type*} [Ring R] (u v : R)</span></div>
+      <div><span class="sig">&ensp;&ensp;(hu : u * u = -1) (hv : v * v = -1)</span></div>
+      <div><span class="sig">&ensp;&ensp;(hac : u * v + v * u = 0) :</span></div>
+      <div><span class="sig">&ensp;&ensp;(1+u)*((1+u)*(1+u)) + (-1+v)*((-1+v)*(-1+v))</span></div>
+      <div><span class="sig">&ensp;&ensp;= (-u-v)*((-u-v)*(-u-v))</span></div>
+      <div class="badge">0 sorry &ensp;&middot;&ensp; 0 native_decide &ensp;&middot;&ensp; 0 axioms &ensp;&middot;&ensp; kernel-checked</div>
     </div>
 
-    <div class="caveat reveal">
-      <div class="caveat-label">What the proof covers</div>
-      <p>The symbolic proof verifies the cubic case (p = 3) in any ring with anti-commuting square roots of &minus;1. The all-odd-p generalization rests on the trigonometric identity cos(p&pi;/2) = 0, which is elementary mathematics but not formally verified in Lean. A separate <span class="m">native_decide</span> check confirms the numerical identity for specific Lipschitz quaternion coordinates.</p>
+    <div class="text">
+      <p>The all-odd-p extension: for a = 1+u and b = &minus;1+v, the real parts of a<sup>p</sup> and b<sup>p</sup> sum to 2<sup>p/2</sup>[cos(p&pi;/4) + cos(3p&pi;/4)] = 2<sup>(p+2)/2</sup>&middot;cos(p&pi;/2)&middot;cos(p&pi;/4) = <strong>0</strong>, since cos(p&pi;/2) vanishes for all odd p. This is elementary trigonometry, not formally verified.</p>
     </div>
   </section>
 
-  <!-- ═══════════ VI ═══════════ -->
-  <section class="section reveal">
-    <div class="section-num">VI</div>
-    <h2 class="section-title">What It <em>Means</em></h2>
-    <div class="prose">
-      <p>
-        Not that Fermat was wrong. Not that Wiles missed a loophole. And not that non-commutativity magically destroys all Fermat phenomena.
-      </p>
-      <p>
-        What it means is that impossibility theorems in arithmetic live inside a habitat. In &Zopf;, powers are trapped in a brutally rigid ecology &mdash; the kind that takes seven years and the Langlands program to fully understand. In Lipschitz quaternion integers, you suddenly have intersecting complex planes and anti-commuting directions whose squares collapse in just the right way. The same exponent goes from impossible to easy because the ambient algebra changed.
-      </p>
-      <p>
-        The construction isolates one structural feature absent from &Zopf;: <strong>anti-commuting square roots of &minus;1</strong>. Their presence enables a cancellation that their absence forbids. The proof of that absence in &Zopf; is trivial. The proof that the absence of <em>all</em> possible escape routes in &Zopf; is sufficient to block Fermat solutions &mdash; that is Wiles' 109 pages.
-      </p>
-      <p>
-        This example does not simplify Wiles. It contextualizes him. Breaking Fermat in four dimensions takes one line of trigonometry. Proving it can't break in one dimension took seven years of solitary work and the deepest mathematics of the twentieth century. The asymmetry is the point.
-      </p>
+  <!-- MEANING -->
+  <section class="r">
+    <h2>What it <em>means</em></h2>
+    <div class="text">
+      <p>Impossibility theorems live inside a habitat. In &Zopf;, powers are trapped in a rigid arithmetic ecology &mdash; the kind Wiles needed seven years and the Langlands program to map. In the quaternion integers, anti-commuting directions create a structural bypass. The same exponent goes from impossible to easy because the ambient algebra changed.</p>
+      <p>This does not simplify Wiles. It contextualizes him. Breaking Fermat in four dimensions takes one identity. Proving it can't break in one dimension took 109 pages. The asymmetry is the point.</p>
     </div>
 
-    <div class="pull-quote reveal">
-      Beautiful example. Real mathematics. Not a revolution.<br>
-      <span style="font-size: 0.7em; color: var(--text-dim); font-style: normal;">Best read as a sharply illuminating counterexample to a naive extension of FLT, and a reminder that algebraic structure &mdash; not just exponent size &mdash; decides what equations can breathe.</span>
+    <div class="quote r">Beautiful example. Real mathematics.<br>Not a revolution.</div>
+
+    <div class="note r">
+      <em>Prior work</em> &ensp; Apel (1931) studied Fermat's equation in real quaternions. Ribenboim (2004) studied it over p-adic quaternion fields. Li &amp; Yuan (2025, arXiv:2503.03621) studied Fermat and Catalan equations over M&sub2;(&Zopf;). Ward (2008) proved the cubic has only trivial solutions in &Zopf;[i]. This specific construction &mdash; with its anti-commutativity mechanism and odd-p generalization &mdash; appears to be a fresh observation within established territory.
     </div>
   </section>
 
-  <!-- ═══════════ VII ═══════════ -->
-  <section class="section reveal">
-    <div class="section-num">VII</div>
-    <h2 class="section-title"><em>Prior</em> Work</h2>
-    <div class="prose">
-      <p>
-        The terrain is not unexplored. Apel (1931) studied Fermat's equation in real quaternions. Ribenboim (2004) studied it over <em>p</em>-adic quaternion fields. Li and Yuan (2025, arXiv:2503.03621) studied Fermat's and Catalan's equations over 2&times;2 integer matrices, which contain the Lipschitz integers as a subring. Ward (2008) proved Fermat's cubic has only trivial solutions in &Zopf;[i].
-      </p>
-      <p>
-        This specific triple &mdash; with its explicit anti-commutativity mechanism and odd-exponent generalization &mdash; appears to be a fresh observation. But the broader question of Fermat equations in non-commutative algebras is established mathematical territory.
-      </p>
-    </div>
-  </section>
+  <div class="sep" style="margin: 100px auto;"></div>
 
-  <div class="sep" style="margin: 120px auto;"></div>
-
-  <!-- ═══════════ FOOTER ═══════════ -->
   <footer>
-    <div class="line">Cubic case: symbolically proved in Lean 4 kernel &middot; 0 sorry &middot; 0 native_decide</div>
-    <div class="line">General odd p: elementary trigonometry &middot; Lipschitz + Gravesian cases verified</div>
-    <div class="final-eq">a<sup>3</sup> + b<sup>3</sup> = c<sup>3</sup></div>
-    <div class="coda">The cancellation is exact.</div>
+    <div class="f">Symbolic proof: Lean 4.28.0 &ensp;&middot;&ensp; SymbolicFermat.lean &ensp;&middot;&ensp; March 2026</div>
+    <div class="eq">a<sup>3</sup> + b<sup>3</sup> = c<sup>3</sup></div>
+    <div class="end">The cancellation is exact.</div>
   </footer>
 
 </div>
 
 <script>
-(function(){var r=document.getElementById('cursorRing'),d=document.getElementById('cursorDot'),mx=0,my=0,rx=0,ry=0;document.addEventListener('mousemove',function(e){mx=e.clientX;my=e.clientY;d.style.left=mx+'px';d.style.top=my+'px'});function a(){rx+=(mx-rx)*0.15;ry+=(my-ry)*0.15;r.style.left=rx+'px';r.style.top=ry+'px';requestAnimationFrame(a)}a();document.querySelectorAll('.math-block,.proof,.pull-quote,.result-table tr,.math-verify').forEach(function(el){el.addEventListener('mouseenter',function(){r.style.transform='translate(-50%,-50%) scale(1.5)';r.style.opacity='0.5'});el.addEventListener('mouseleave',function(){r.style.transform='translate(-50%,-50%) scale(1)';r.style.opacity='1'})})})();
-(function(){var b=document.getElementById('scrollProgress');window.addEventListener('scroll',function(){b.style.width=window.scrollY/(document.body.scrollHeight-window.innerHeight)*100+'%'})})();
-(function(){var c=document.getElementById('dust'),x=c.getContext('2d'),W,H,p=[];function rz(){W=c.width=innerWidth;H=c.height=innerHeight}rz();addEventListener('resize',rz);for(var i=0;i<35;i++)p.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.2+0.3,dx:(Math.random()-0.5)*0.12,dy:-Math.random()*0.1-0.02,o:Math.random()*0.25+0.04});function d(){x.clearRect(0,0,W,H);for(var q of p){q.x+=q.dx;q.y+=q.dy;if(q.y<-10){q.y=H+10;q.x=Math.random()*W}if(q.x<-10)q.x=W+10;if(q.x>W+10)q.x=-10;x.beginPath();x.arc(q.x,q.y,q.r,0,Math.PI*2);x.fillStyle='rgba(212,175,55,'+q.o+')';x.fill()}requestAnimationFrame(d)}d()})();
-(function(){var o=new IntersectionObserver(function(e){e.forEach(function(n){if(n.isIntersecting)n.target.classList.add('visible')})},{threshold:0.08,rootMargin:'0px 0px -100px 0px'});document.querySelectorAll('.reveal,.section,.proof').forEach(function(el){o.observe(el)})})();
+new IntersectionObserver(function(e){e.forEach(function(x){if(x.isIntersecting)x.target.classList.add('v')})},{threshold:0.08,rootMargin:'0px 0px -80px 0px'}).observe(document.querySelector('.page'));
+document.querySelectorAll('.r').forEach(function(el){new IntersectionObserver(function(e){if(e[0].isIntersecting)el.classList.add('v')},{threshold:0.08,rootMargin:'0px 0px -80px 0px'}).observe(el)});
 </script>
 
 </body>
