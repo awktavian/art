@@ -67,12 +67,12 @@ anti-commuting pairs of imaginary units.
 The proof is a single induction requiring only $u^2 = v^2 = -1$ and $uv + vu = 0$.
 Among normed division algebras over $\R$, this yields a sharp threshold:
 Fermat's equation has nontrivial solutions if and only if $\dim \geq 4$.
-Two further mechanisms produce solutions in other rings:
-mutual zero divisors give solutions for \emph{all} exponents in the sedenions ($\dim \geq 16$),
-and conjugate-pair cancellation gives cube-sum identities in certain commutative extensions.
-All results are machine-verified in Lean~4
-(29 files, 355 declarations, zero \texttt{sorry}, zero axioms;
-Section~\ref{sec:lean}).
+A second mechanism --- zero-divisor binomial collapse --- produces solutions
+for \emph{all} exponents in associative rings with mutual annihilators.
+We discuss its potential application beyond division algebras
+and identify conjugate-pair cancellation as a third route to cube-sum identities.
+The core results (Sections~2--5) are machine-verified in Lean~4
+(Section~\ref{sec:lean}).
 \end{abstract}
 
 \maketitle
@@ -114,8 +114,10 @@ Three mechanisms break FLT outside $\Z$:
 \begin{enumerate}[label=(\Alph*)]
   \item \textbf{Anti-commutativity} ($\dim \geq 4$, odd $p$).
     Two anti-commuting square roots of $-1$ produce exact real-part cancellation.
-  \item \textbf{Zero divisors} ($\dim \geq 16$, all $n \geq 1$).
+  \item \textbf{Zero divisors} (associative rings, all $n \geq 1$).
     Mutual annihilators $ab = ba = 0$ collapse the binomial: $(a+b)^n = a^n + b^n$.
+    Requires associativity; application to non-associative algebras like the sedenions
+    is obstructed (Section~\ref{sec:sedenion}).
   \item \textbf{Conjugate pairs} (commutative, cubes).
     In rings like $\Z[\sqrt{-5}]$, conjugate-pair cancellation yields cube-sum identities.
 \end{enumerate}
@@ -143,8 +145,8 @@ P.~Pollack~\cite{PPollack2018} established Waring bounds for quaternion cubes;
 A.~Pollack~\cite{APollack2020} constructed modular forms on $G_2$;
 Conway--Smith~\cite{ConwaySmith2003} developed quaternion and octonion integer arithmetic.
 The all-odd-$p$ identity (Theorem~\ref{thm:main}), the dimension threshold
-(Theorem~\ref{thm:dim}), and the sedenion phase transition (Theorem~\ref{thm:zerodiv})
-are new.
+(Theorem~\ref{thm:dim}), and the identification of the sedenion obstruction
+(Section~\ref{sec:sedenion}) are new.
 
 The full formalization: 29 Lean~4 files, 9{,}102 lines, 355 declarations,
 zero \texttt{sorry}, zero axioms beyond Lean's foundations.
@@ -522,52 +524,41 @@ The classic zero-divisor pair of Moreno~\cite{Moreno1998}:
   \beta = (e_6, -e_5) = e_6 - e_{13}
 \]
 in the Cayley-Dickson representation $\Se = \OO \times \OO$.
-Both products $\alpha\beta$ and $\beta\alpha$ vanish, verified by
-\texttt{native\_decide} on the 16-dimensional integer computation
-(\texttt{SedenionZeroDivisor.lean}).
-
-\smallskip\noindent\textbf{Proof strategy.}
-Theorem~\ref{thm:zerodiv} requires an associative ring, and the sedenions
-are not associative.
-Instead, we use a \emph{periodicity argument}: $\alpha^2 = \beta^2 = -1$
-(verified by \texttt{native\_decide}), so $\alpha^4 = \beta^4 = 1$.
-Setting $\gamma = \alpha + \beta$, one also verifies $\gamma^4 = 1$.
-All three elements have multiplicative order dividing~4, so it suffices to
-check the Fermat equation $\alpha^n + \beta^n = \gamma^n$ for
-$n \in \{1, 2, 3, 4\}$, each verified by \texttt{native\_decide}.
-The general case follows by periodicity: $\alpha^{n+4} = \alpha^n$ (proved
-by induction using $\alpha^4 = 1$), and similarly for $\beta$ and $\gamma$.
-
-This avoids any appeal to associativity.
-The full proof is in \texttt{SedenionZeroDivisor.lean},
-theorem \texttt{sedenion\_fermat\_all\_exponents}.
+Both products $\alpha\beta$ and $\beta\alpha$ vanish
+(Moreno~\cite{Moreno1998}, Reggiani~\cite{Reggiani2024}).
 \end{example}
 
-\begin{remark}
-Alternatively, one can observe that the generated subalgebra
-$\langle \alpha, \beta \rangle$ inside $\Se$ is at most 4-dimensional
-and contained in an associative subalgebra (since $\alpha\beta = \beta\alpha = 0$
-forces all mixed products to vanish). In this subalgebra,
-Theorem~\ref{thm:zerodiv} applies directly.
-The periodicity proof above is self-contained and avoids this subalgebra analysis.
+\begin{remark}[Obstruction to Theorem~\ref{thm:zerodiv} in sedenions]
+Theorem~\ref{thm:zerodiv} requires associativity, and the sedenions are not
+associative. Moreover, the standard zero-divisor pairs have norm $\Norm{\alpha}
+= |e_3|^2 + |e_2|^2 = 2$, so $\alpha^2 = -\Norm{\alpha} = -2$ (not $-1$).
+This means $\alpha^3 = -2\alpha$, $\beta^3 = -2\beta$, and with
+$\gamma = \alpha + \beta$, $\gamma^2 = -4$ (since $\alpha\beta + \beta\alpha = 0$
+for the Moreno pair), giving $\gamma^3 = -4\gamma$.
+Then $\alpha^3 + \beta^3 = -2\gamma \neq -4\gamma = \gamma^3$.
+
+The Fermat equation $\alpha^n + \beta^n = \gamma^n$ \emph{fails} for the Moreno
+pair at $n = 3$ (and at all $n \geq 2$).
+Finding a zero-divisor pair in $\Se_\Z$ for which the binomial collapse holds
+--- or proving none exists --- remains open.
 \end{remark}
 
 \begin{remark}
-This is a \emph{phase transition} in the Cayley-Dickson tower.
-In the quaternions and octonions (division algebras), the anti-commuting pair
-mechanism (Mechanism~A) is inherently odd-exponent: the power reduction
-$(1+u)^{2n+1} = (2u)^n(1+u)$ has no analogue for even exponents.
-The question of whether nontrivial even-exponent solutions exist in
-$\HH_\Z$ or $\OO_\Z$ remains open.
-In the sedenions, zero divisors bypass the even/odd distinction entirely:
-the periodicity proof gives $\alpha^n + \beta^n = \gamma^n$ for \emph{all} $n \geq 1$.
+Theorem~\ref{thm:zerodiv} applies in any \emph{associative} ring with zero divisors.
+Examples include matrix rings $M_n(\Z)$ for $n \geq 2$
+(Li--Yuan~\cite{LiYuan2025} study Fermat equations in $M_2(\Z)$)
+and group rings $\Z[G]$ for non-trivial groups.
+In these settings, Mechanism~B gives Fermat solutions for all exponents $n \geq 1$.
+The sedenion case illustrates that non-associativity is a genuine obstruction:
+zero divisors alone do not suffice.
+\end{remark}
 
-More precisely, the Cayley-Dickson algebra at dimension $2^k$ has $\binom{2^k - 1}{2}$
-anti-commuting pair families (Mechanism~A), which grow as $O(4^k)$.
-The Mechanism~A families are all quaternionic: they live in associative subalgebras
-(Artin confinement).
-Mechanism~B families appear only for $k \geq 4$ (dimension $\geq 16$) but then
-apply to all exponents.
+\begin{remark}
+The Cayley-Dickson algebra at dimension $2^k$ has $\binom{2^k - 1}{2}$
+anti-commuting pair families (Mechanism~A), growing as $O(4^k)$.
+These are all quaternionic (Artin confinement).
+Mechanism~A is inherently odd-exponent; whether nontrivial even-exponent solutions
+exist in $\HH_\Z$ or $\OO_\Z$ remains open.
 \end{remark}
 
 %% ═══════════════════════════════════════════════════════════════════════
@@ -613,9 +604,15 @@ and the solution family depends only on the pair, all 21 lie in one orbit.
   $\C$ & 2 & 0 & No (Wiles) & No \\
   $\HH$ & 4 & $\binom{3}{2} = 3$ & Open & No \\
   $\OO$ & 8 & $\binom{7}{2} = 21$ & Open & No \\
-  $\Se$ & 16 & $\binom{15}{2} = 105$ & Yes (Mech.~B) & Yes \\
+  $\Se$ & 16 & $\binom{15}{2} = 105$ & Open$^\dagger$ & Open$^\dagger$ \\
   \bottomrule
 \end{tabular}
+
+\smallskip\noindent
+{\footnotesize ${}^\dagger$Theorem~\ref{thm:zerodiv} requires associativity;
+the sedenions are non-associative and the standard zero-divisor pairs have
+$\alpha^2 = -2 \neq -1$, obstructing both the binomial collapse and periodicity
+arguments (see Remark~7.3).}
 \end{table}
 
 \subsection{Waring bounds}
@@ -760,7 +757,7 @@ Every theorem in this paper is formalized in Lean~4 with Mathlib.
   \texttt{AllOddPrimes.lean} & All odd $p$ (kernel-checked) & Thm.~\ref{thm:allodd} \\
   \texttt{DimensionThreshold.lean} & Dimension boundary & Thm.~\ref{thm:dimension} \\
   \texttt{ZeroDivisorFermat.lean} & Zero-divisor collapse (kernel-checked) & Thm.~\ref{thm:zerodiv} \\
-  \texttt{SedenionZeroDivisor.lean} & Sedenion instantiation & Ex.~\ref{ex:sedenion} \\
+  \texttt{SedenionZeroDivisor.lean} & Sedenion obstruction analysis & Remark~7.3 \\
   \texttt{G2OrbitCollapse.lean} & $G_2$ orbit analysis & Thm.~\ref{thm:g2orbit} \\
   \texttt{Bridge.lean} & Langlands stratification & Thm.~\ref{thm:shimura} \\
   \texttt{Conjectures.lean} & 17 conjectures (documentation) & --- \\
@@ -783,8 +780,10 @@ The formalization uses two proof strategies:
     They are valid in any ring satisfying the hypotheses.
   \item \textbf{Computational verification} (\texttt{native\_decide}) for concrete instances:
     specific triples in $\HH_\Z$ and $\OO_\Z$, all 21 family verifications,
-    sedenion zero-divisor products, and the Gaussian integer exhaustive search.
+    and the Gaussian integer exhaustive search.
     These verify that the abstract hypotheses are satisfied by the concrete algebras.
+    The sedenion analysis (Section~\ref{sec:sedenion}) is partially formalized;
+    the obstruction $\alpha^2 = -2$ was identified during formalization.
 \end{enumerate}
 
 Zero \texttt{sorry}. Zero axioms beyond Lean's foundations
@@ -858,9 +857,11 @@ if and only if $V(\varphi)_{\mathrm{prim}}(\Q_v) \neq \varnothing$ for all place
 is surjective modulo every prime tested ($p \leq 13$),
 so no Brauer-Manin obstruction at finite primes.
 
-\begin{conjecture}[No Third Mechanism --- S3]\label{conj:nothird}
-Every nontrivial solution to $a^n + b^n = c^n$ in $\Se_\Z$ (for $n \geq 3$)
-arises from either Mechanism~A (anti-commutativity) or Mechanism~B (zero divisors).
+\begin{conjecture}[Sedenion Fermat --- S3]\label{conj:sedenion}
+Does the Fermat equation $a^n + b^n = c^n$ have nontrivial solutions in $\Se_\Z$
+for $n \geq 3$?  Mechanism~A gives odd-exponent solutions (via anti-commuting pairs
+in quaternionic subalgebras). Mechanism~B fails (Section~\ref{sec:sedenion}).
+The even-exponent case is open.
 \end{conjecture}
 
 \begin{conjecture}[Waring Linear Growth --- B2]\label{conj:waringlinear}
