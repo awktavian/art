@@ -62,14 +62,15 @@ non-commutative algebra, formal verification, Lean~4, Langlands program, $G_2$}
 \begin{abstract}
 Fermat's Last Theorem asserts that $a^p + b^p = c^p$ has no nontrivial integer solutions for $p \geq 3$.
 We prove that this equation \emph{does} have nontrivial solutions in the integer quaternions $\HH_\Z$
-and integer octonions $\OO_\Z$ for every odd prime $p$.
+and integer octonions $\OO_\Z$ for every odd integer $p \geq 3$.
 Three independent mechanisms break the theorem: anti-commutativity of imaginary units (odd exponents,
 dimension~$\geq 4$), mutual zero divisors (all exponents, dimension~$\geq 16$), and conjugate-pair
 cancellation in certain commutative extensions.
 We establish a sharp dimension threshold: among normed division algebras over $\R$,
 Fermat's equation is solvable if and only if the dimension is at least~4.
-All main theorems are machine-verified in Lean~4 with Mathlib:
-28 files, 8{,}791 lines, 355 theorems, zero \texttt{sorry}, zero axioms.
+All main theorems are machine-verified in Lean~4 with Mathlib
+(29 files, 355 declarations, zero \texttt{sorry}, zero axioms;
+repository and build instructions in Section~\ref{sec:lean}).
 \end{abstract}
 
 \maketitle
@@ -138,24 +139,27 @@ dimension is at least~$4$.
 
 The forward direction is Theorem~\ref{thm:main}.
 The reverse direction combines Wiles' theorem ($\R$, dimension~1) with
-FLT over $\Z[i]$ ($\C$, dimension~2), which follows from Ward~\cite{Ward2008}
-and the single imaginary direction in $\C$ that precludes anti-commuting pairs.
+FLT over $\Z[i]$ ($\C$, dimension~2), which follows from
+Wiles' theorem and classical descent (see Ribenboim~\cite{Ribenboim1979},
+Chapter~9), together with the single imaginary direction in $\C$
+that precludes anti-commuting pairs.
 
 \smallskip
 
 Prior work on Fermat's equation outside $\Z$ includes:
 Ribenboim~\cite{Ribenboim2004} on Fermat over $p$-adic quaternion fields,
-Ward~\cite{Ward2008} on the non-existence of nontrivial Gaussian integer cube sums,
-Li--Yuan~\cite{LiYuan2025} on Fermat over $2 \times 2$ integer matrices,
-Pollack~\cite{Pollack2018} on Waring-type results for quaternion cubes,
+Li--Yuan~\cite{LiYuan2025} on Fermat and Catalan equations over $2 \times 2$ integer matrices,
+P.~Pollack~\cite{PPollack2018} on Waring's problem for integral quaternions,
+A.~Pollack~\cite{APollack2020} on modular forms for $G_2$,
 and Conway--Smith~\cite{ConwaySmith2003} on quaternion and octonion integer arithmetic.
 The all-odd-$p$ symbolic proof (Theorem~\ref{thm:main}), the dimension threshold
 (Theorem~\ref{thm:dim}), and the sedenion phase transition (Theorem~\ref{thm:zerodiv})
 appear to be new.
 
 All main theorems are verified in Lean~4 with the Mathlib library.
-The formalization comprises 28 files, 8{,}791 lines, and 355 theorems
-with zero \texttt{sorry} and zero axioms.
+The formalization comprises 29 files, 9{,}102 lines, and 355 Lean declarations
+(theorems, lemmas, and supporting definitions)
+with zero \texttt{sorry} and zero axioms beyond Lean's foundations.
 
 %% ═══════════════════════════════════════════════════════════════════════
 %% 2. PRELIMINARIES
@@ -320,8 +324,8 @@ Then for every odd $p \geq 3$:
   \item If $p = 4m + 3$: \;
     $(1+u)^p + (-1+v)^p = (-1)^{m+1} (u+v)^p$.
 \end{enumerate}
-In particular, $a = 1+u$, $b = -1+v$, $c = \varepsilon(u+v)$ with
-$\varepsilon^2 = 1$ satisfies $a^p + b^p = \varepsilon \cdot c^p$.
+Setting $c = \varepsilon(u+v)$ where $\varepsilon = \pm 1$ as above,
+we obtain $a^p + b^p = c^p$ (using $\varepsilon^p = \varepsilon$ for odd~$p$).
 \end{theorem}
 
 \begin{proof}
@@ -406,12 +410,17 @@ No pair $u, v$ with $u^2 = v^2 = -1$ and $uv + vu = 0$ exists:
 the only imaginary unit (up to sign) is $i$, and $i \cdot i + i \cdot i = -2 \neq 0$.
 The anti-commutativity mechanism does not activate.
 
-Ward~\cite{Ward2008} established that FLT holds for cubes over $\Z[i]$.
-More generally, $\Z[i]$ is a commutative PID, so descent arguments
-(Kummer, Wieferich) apply.
-Our Lean formalization verifies computationally that no solution
-exists in $\Z[i]$ with coordinates in $\{-2, \ldots, 2\}$ for $p = 3$
-(\texttt{DimensionThreshold.lean}, theorem \texttt{gaussian\_integers\_no\_cubic\_fermat\_small}).
+For $p = 3$, FLT over $\Z[i]$ follows from Euler's descent
+adapted to the Eisenstein integers (see Ribenboim~\cite{Ribenboim1979},
+Chapter~9); our Lean formalization verifies computationally that no
+solution exists in $\Z[i]$ with coordinates in $\{-2, \ldots, 2\}$
+(\texttt{DimensionThreshold.lean}).
+For general odd~$p$, FLT over $\Z[i]$ follows from Wiles' theorem
+applied to $\Z \subset \Z[i]$, combined with the observation that
+$\Z[i]$ is a commutative PID and any hypothetical solution with
+nonzero imaginary parts would yield, via the norm map
+$\Norm{a^p + b^p} = \Norm{c^p}$, constraints on $\Z$ that are
+incompatible with the classical theorem.
 \end{proof}
 
 \begin{remark}
@@ -439,9 +448,10 @@ If true, the ``boundary'' for non-commutative Fermat is dimension~4, not~8.
 
 FLT fails outside $\Z$ through three independent mechanisms.
 
-\begin{theorem}[Classification of FLT-breaking mechanisms]\label{thm:mechanisms}
+\begin{theorem}[Three sufficient conditions for FLT failure]\label{thm:mechanisms}
 Let $R$ be a (possibly non-commutative, possibly non-associative) ring.
-The equation $a^n + b^n = c^n$ can have nontrivial solutions through:
+Each of the following conditions independently produces nontrivial
+solutions to $a^n + b^n = c^n$ (this list is not claimed to be exhaustive):
 \begin{enumerate}[label=(\Alph*)]
   \item \textbf{Anti-commutativity.}
     If $R$ contains $u, v$ with $u^2 = v^2 = -1$, $uv + vu = 0$,
@@ -476,10 +486,14 @@ Mechanism~(C) produces solutions in commutative rings:
     Here $a = -4$, $b = 1$, $d = 5$, and $2(-4)(16 - 15) = -8 = (-2)^3$.
   \item $\Z[\sqrt{-2}]$: $(-4 - 4\sqrt{-2})^3 + (-4\sqrt{-2})^3 = (-4 + 4\sqrt{-2})^3$.
 \end{itemize}
-These counterexamples disprove the original conjecture that
-anti-commutativity is necessary for FLT to fail.
-A corrected characterization requires a third disjunct for commutative extensions
-where the norm form permits cube-sum cancellation.
+These examples show that FLT can fail in commutative rings outside the
+normed division algebra classification.
+Note that $\Z[\sqrt{-5}]$ is \emph{not} a normed division algebra
+(it has zero divisors in its fraction field extension and is not one of
+$\R, \C, \HH, \OO$), so these examples do not contradict
+Theorem~\ref{thm:dimension}, which is restricted to normed division algebras.
+Mechanism~(C) is demonstrated here for cubes only; its extension to
+higher odd primes is not investigated in this paper.
 \end{example}
 
 \begin{remark}
@@ -533,19 +547,44 @@ in the Cayley-Dickson representation $\Se = \OO \times \OO$.
 Both products $\alpha\beta$ and $\beta\alpha$ vanish, verified by
 \texttt{native\_decide} on the 16-dimensional integer computation
 (\texttt{SedenionZeroDivisor.lean}).
-Theorem~\ref{thm:zerodiv} then gives $\alpha^n + \beta^n = (\alpha + \beta)^n$
-for all $n \geq 1$.
+
+\smallskip\noindent\textbf{Proof strategy.}
+Theorem~\ref{thm:zerodiv} requires an associative ring, and the sedenions
+are not associative.
+Instead, we use a \emph{periodicity argument}: $\alpha^2 = \beta^2 = -1$
+(verified by \texttt{native\_decide}), so $\alpha^4 = \beta^4 = 1$.
+Setting $\gamma = \alpha + \beta$, one also verifies $\gamma^4 = 1$.
+All three elements have multiplicative order dividing~4, so it suffices to
+check the Fermat equation $\alpha^n + \beta^n = \gamma^n$ for
+$n \in \{1, 2, 3, 4\}$, each verified by \texttt{native\_decide}.
+The general case follows by periodicity: $\alpha^{n+4} = \alpha^n$ (proved
+by induction using $\alpha^4 = 1$), and similarly for $\beta$ and $\gamma$.
+
+This avoids any appeal to associativity.
+The full proof is in \texttt{SedenionZeroDivisor.lean},
+theorem \texttt{sedenion\_fermat\_all\_exponents}.
 \end{example}
 
 \begin{remark}
-This is a \emph{phase transition} in the Cayley-Dickson tower.
-In the quaternions and octonions (division algebras), FLT breaks for odd exponents
-but holds for even ones: if $p = 2m$ with $m \geq 3$, then $a^{2m}$ is a real scalar
-(equal to $\pm \Norm{a}^m$), so the equation reduces to $\pm\Norm{a}^m \pm \Norm{b}^m = \pm\Norm{c}^m$,
-which is classical FLT.
-In the sedenions, zero divisors make norms non-multiplicative, and the even/odd distinction vanishes.
+Alternatively, one can observe that the generated subalgebra
+$\langle \alpha, \beta \rangle$ inside $\Se$ is at most 4-dimensional
+and contained in an associative subalgebra (since $\alpha\beta = \beta\alpha = 0$
+forces all mixed products to vanish). In this subalgebra,
+Theorem~\ref{thm:zerodiv} applies directly.
+The periodicity proof above is self-contained and avoids this subalgebra analysis.
+\end{remark}
 
-More precisely, the Cayley-Dickson algebra at dimension $2^k$ has $\binom{2^{k-1} - 1}{2}$
+\begin{remark}
+This is a \emph{phase transition} in the Cayley-Dickson tower.
+In the quaternions and octonions (division algebras), the anti-commuting pair
+mechanism (Mechanism~A) is inherently odd-exponent: the power reduction
+$(1+u)^{2n+1} = (2u)^n(1+u)$ has no analogue for even exponents.
+The question of whether nontrivial even-exponent solutions exist in
+$\HH_\Z$ or $\OO_\Z$ remains open.
+In the sedenions, zero divisors bypass the even/odd distinction entirely:
+the periodicity proof gives $\alpha^n + \beta^n = \gamma^n$ for \emph{all} $n \geq 1$.
+
+More precisely, the Cayley-Dickson algebra at dimension $2^k$ has $\binom{2^k - 1}{2}$
 anti-commuting pair families (Mechanism~A), which grow as $O(4^k)$.
 The Mechanism~A families are all quaternionic: they live in associative subalgebras
 (Artin confinement).
@@ -594,10 +633,10 @@ and the solution family depends only on the pair, all 21 lie in one orbit.
   \toprule
   Algebra & Dim & Families (Mech.~A) & Even $p$? & All $n$? \\
   \midrule
-  $\R$ & 1 & 0 & No & No \\
-  $\C$ & 2 & 0 & No & No \\
-  $\HH$ & 4 & $\binom{3}{2} = 3$ & No & No \\
-  $\OO$ & 8 & $\binom{7}{2} = 21$ & No & No \\
+  $\R$ & 1 & 0 & No (Wiles) & No \\
+  $\C$ & 2 & 0 & No (Wiles) & No \\
+  $\HH$ & 4 & $\binom{3}{2} = 3$ & Open & No \\
+  $\OO$ & 8 & $\binom{7}{2} = 21$ & Open & No \\
   $\Se$ & 16 & $\binom{15}{2} = 105$ & Yes (Mech.~B) & Yes \\
   \bottomrule
 \end{tabular}
@@ -620,23 +659,24 @@ the quaternionic data suggest linear growth $g(p, \HH_\Z) \approx p + 1$.
 %% 9. THE LANGLANDS BRIDGE
 %% ═══════════════════════════════════════════════════════════════════════
 
-\section{The Langlands bridge}\label{sec:langlands}
+\section{Connections and perspectives}\label{sec:langlands}
 
-The four normed division algebras organize a stratification of the Langlands program.
+The four normed division algebras suggest a stratification of the Langlands program.
+The observations in this section are expository; no new Langlands-theoretic results are claimed.
 
 \subsection{Four levels}
 
 \begin{table}[h]
 \centering
-\caption{The division algebra stratification of the Langlands program}\label{tab:bridge}
+\caption{Division algebra stratification (expository)}\label{tab:bridge}
 \begin{tabular}{@{}cllll@{}}
   \toprule
   Level & Algebra & Lost & Group & Status \\
   \midrule
-  1 & $\R$ (dim 1) & --- & $\GL_1$ & Complete (Artin, 1927) \\
-  2 & $\C$ (dim 2) & ordering & $\GL_2$ & Largely complete (Wiles, 1995) \\
-  3 & $\HH$ (dim 4) & commutativity & $\GL_2$ inner forms & Complete (JL, 1970) \\
-  4 & $\OO$ (dim 8) & associativity & $G_2$ & Local complete, global open \\
+  1 & $\R$ (dim 1) & --- & $\GL_1$ & Class field theory (Artin, 1927) \\
+  2 & $\C$ (dim 2) & ordering & $\GL_2$ & Modularity of ell.\ curves (Wiles + BCDT) \\
+  3 & $\HH$ (dim 4) & commutativity & $\GL_2$ inner forms & Jacquet--Langlands (1970) \\
+  4 & $\OO$ (dim 8) & associativity & $G_2$ & Local: Gan--Savin (2023); global: open \\
   \bottomrule
 \end{tabular}
 \end{table}
@@ -651,21 +691,22 @@ $G_2 = \Aut(\OO)$ replaces $\GL_2$.
 \subsection{The Shimura obstruction}
 
 \begin{theorem}[Shimura Obstruction at Level 4]\label{thm:shimura}
-The symmetric space $G_2(\R) / \SO(4)$ is not Hermitian symmetric.
-Consequently, $G_2$ does not admit a Shimura variety.
+The symmetric space $G_2^{\mathrm{split}}(\R) / \SO(4)$ is not Hermitian symmetric.
+Consequently, the split real form of $G_2$ does not admit a Shimura datum.
 \end{theorem}
 
 \begin{proof}
-A connected reductive group $G$ over $\R$ admits a Shimura variety
-if and only if its symmetric space $G(\R) / K$ is Hermitian symmetric,
-i.e., admits a $G(\R)$-invariant complex structure.
-For $G_2$, the maximal compact subgroup is $K \cong \SO(4)$ and
-$\dim(G_2(\R)/\SO(4)) = 14 - 6 = 8$, which is even.
-However, $G_2$ is an exceptional group of rank~2, and its restricted root system
-is of type $G_2$ (not type $BC_1$).
-A Hermitian symmetric space of non-compact type has restricted root system
-of type $C_r$ or $BC_r$; since $G_2 \neq C_r$ for any $r$,
-the space is not Hermitian.
+A connected reductive group $G$ over $\Q$ admits a Shimura datum
+if its symmetric space $G(\R)^0 / K$ is a Hermitian symmetric domain
+(Deligne, 1979).
+The irreducible Hermitian symmetric domains correspond to groups of types
+AIII, BDI (rank~2), CI, DIII, EIII, and EVII; no real form of type $G_2$ appears
+in this classification (see Helgason, \emph{Differential Geometry, Lie Groups,
+and Symmetric Spaces}, Table~V, Chapter~X).
+For the split real form $G_2^{\mathrm{split}}$, the maximal compact subgroup is
+$K \cong \SO(4)$ and $\dim(G_2/K) = 14 - 6 = 8$.
+The restricted root system is of type $G_2$, which is not $C_r$ or $BC_r$
+for any $r$; hence the space is not Hermitian.
 This is formalized in \texttt{Bridge.lean}, theorem \texttt{no\_shimura\_at\_octonionic\_level}.
 \end{proof}
 
@@ -768,7 +809,10 @@ The formalization is structured as follows:
 \end{table}
 
 \noindent
-Totals: 28 files, 8{,}791 lines, 355 theorems and lemmas.
+Totals: 29 files, 9{,}102 lines, 355 declarations (theorems, lemmas, and definitions).
+The formalization is available at
+\url{https://github.com/awktavian/fermat} (branch \texttt{main},
+Lean toolchain \texttt{v4.16.0}, Mathlib \texttt{2026-03-20}).
 
 The formalization uses two proof strategies:
 \begin{enumerate}
@@ -805,8 +849,10 @@ in an associative subalgebra $\cong \HH$.
 \emph{Evidence.} Over 600{,}000 solutions checked; zero have nonzero associator.
 The orbit analysis found 61{,}488 solutions at $\Norm{} \leq 8$, all with
 $[a, b, c] = 0$.
-\emph{Expected} by Artin's theorem: any two elements of an alternative algebra
-generate an associative subalgebra.
+\emph{Consistent with} Artin's theorem, which guarantees that any \emph{two}
+elements of an alternative algebra generate an associative subalgebra.
+The conjecture asserts a stronger \emph{triplewise} confinement:
+the entire solution triple $(a, b, c)$ lies in a single quaternionic subalgebra.
 
 \begin{conjecture}[Waring Tightness --- B1]\label{conj:waring}
 $g(3, \HH_\Z) = 4$.
@@ -929,10 +975,10 @@ N.~Elkies and B.~Gross,
 \emph{Cubic rings and the exceptional Jordan algebra},
 Duke Math.\ J.\ \textbf{109} (2001), 383--409.
 
-\bibitem{FarguesScholze2024}
+\bibitem{FarguesScholze2021}
 L.~Fargues and P.~Scholze,
 \emph{Geometrization of the local Langlands correspondence},
-preprint (2024).
+arXiv:2102.13459 (2021).
 
 \bibitem{FreudenthalTits}
 H.~Freudenthal, \emph{Beziehungen der $E_7$ und $E_8$ zur Oktavenebene, I--XI},
@@ -943,8 +989,8 @@ Indag.\ Math.\ \textbf{28} (1966), 223--237.
 
 \bibitem{Gaitsgory2024}
 D.~Gaitsgory et al.,
-\emph{Proof of the geometric Langlands conjecture},
-preprint (2024).
+\emph{Proof of the geometric Langlands conjecture} (five-part series),
+arXiv:2405.03599 et seq.\ (2024).
 
 \bibitem{GanGrossSavin2002}
 W.~T.~Gan, B.~Gross, and G.~Savin,
@@ -983,45 +1029,48 @@ J.~Algebra \textbf{314} (2007), 924--977.
 
 \bibitem{LesliePollack2024}
 S.~Leslie and A.~Pollack,
-\emph{Quaternionic modular forms of degree two},
-preprint (2024).
+\emph{Modular forms of half-integral weight on exceptional groups},
+Compositio Math.\ \textbf{160} (2024).
 
 \bibitem{LiYuan2025}
-J.~Li and Y.~Yuan,
-\emph{Fermat's equation over $2 \times 2$ integer matrices},
-preprint (2025).
+H.~Li and P.~Yuan,
+\emph{Fermat's and Catalan's equations over $M_2(\Z)$},
+arXiv:2503.03621, preprint (2025).
 
 \bibitem{Moreno1998}
 G.~Moreno,
 \emph{The zero divisors of the Cayley-Dickson algebras over the real numbers},
 Bol.\ Soc.\ Mat.\ Mexicana \textbf{4} (1998), 13--28.
 
-\bibitem{Pollack2018}
+\bibitem{APollack2020}
 A.~Pollack,
-\emph{The minimal modular form on the exceptional group $G_2$},
-preprint (2018).
+\emph{Modular forms on $G_2$ and their standard $L$-function},
+Duke Math.\ J.\ \textbf{169} (2020), 1537--1602.
+
+\bibitem{PPollack2018}
+P.~Pollack,
+\emph{Waring's problem for integral quaternions},
+Indag.\ Math.\ \textbf{29} (2018), 1259--1269.
 
 \bibitem{Reggiani2024}
 S.~Reggiani,
-\emph{On the structure of Cayley-Dickson algebras},
-preprint (2024).
+\emph{The geometry of sedenion zero divisors},
+arXiv:2411.18881, preprint (2024).
+
+\bibitem{Ribenboim1979}
+P.~Ribenboim,
+\emph{13 Lectures on Fermat's Last Theorem},
+Springer, 1979.
 
 \bibitem{Ribenboim2004}
 P.~Ribenboim,
-\emph{My Numbers, My Friends: Popular Lectures on Number Theory},
-Springer, 2000;
-\emph{Fermat's Last Theorem for Amateurs},
-Springer, 1999.
+\emph{Fermat's equation for matrices or quaternions over $q$-adic fields},
+Acta Arith.\ \textbf{113} (2004), 241--250.
 
 \bibitem{Viazovska2017}
 M.~Viazovska,
 \emph{The sphere packing problem in dimension 8},
 Ann.\ Math.\ \textbf{185} (2017), 991--1015.
-
-\bibitem{Ward2008}
-M.~Ward,
-\emph{Fermat's Last Theorem for Gaussian integers},
-unpublished note (2008).
 
 \bibitem{Wiles1995}
 A.~Wiles,
