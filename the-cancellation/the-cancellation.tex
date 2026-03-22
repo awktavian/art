@@ -50,7 +50,7 @@
 \title{Fermat's Equation in Non-Commutative Division Algebras}
 \author{Tim Jacoby}
 \address{7331}
-\email{tim@7331.ink}
+\email{timothyjacoby@gmail.com}
 \date{March 2026}
 
 \begin{document}
@@ -60,17 +60,19 @@
 non-commutative algebra, formal verification, Lean~4, Langlands program, $G_2$}
 
 \begin{abstract}
-Fermat's Last Theorem asserts that $a^p + b^p = c^p$ has no nontrivial integer solutions for $p \geq 3$.
-We prove that this equation \emph{does} have nontrivial solutions in the integer quaternions $\HH_\Z$
-and integer octonions $\OO_\Z$ for every odd integer $p \geq 3$.
-Three independent mechanisms break the theorem: anti-commutativity of imaginary units (odd exponents,
-dimension~$\geq 4$), mutual zero divisors (all exponents, dimension~$\geq 16$), and conjugate-pair
-cancellation in certain commutative extensions.
-We establish a sharp dimension threshold: among normed division algebras over $\R$,
-Fermat's equation is solvable if and only if the dimension is at least~4.
-All main theorems are machine-verified in Lean~4 with Mathlib
+Fermat's Last Theorem fails in the integer quaternions and integer octonions.
+For every odd $p \geq 3$, we exhibit explicit nontrivial solutions to
+$a^p + b^p = c^p$ in $\HH_\Z$ and $\OO_\Z$, constructed from
+anti-commuting pairs of imaginary units.
+The proof is a single induction requiring only $u^2 = v^2 = -1$ and $uv + vu = 0$.
+Among normed division algebras over $\R$, this yields a sharp threshold:
+Fermat's equation has nontrivial solutions if and only if $\dim \geq 4$.
+Two further mechanisms produce solutions in other rings:
+mutual zero divisors give solutions for \emph{all} exponents in the sedenions ($\dim \geq 16$),
+and conjugate-pair cancellation gives cube-sum identities in certain commutative extensions.
+All results are machine-verified in Lean~4
 (29 files, 355 declarations, zero \texttt{sorry}, zero axioms;
-repository and build instructions in Section~\ref{sec:lean}).
+Section~\ref{sec:lean}).
 \end{abstract}
 
 \maketitle
@@ -81,22 +83,16 @@ repository and build instructions in Section~\ref{sec:lean}).
 
 \section{Introduction}\label{sec:intro}
 
-Fermat's Last Theorem (FLT), proved by Wiles~\cite{Wiles1995} in 1995, states that for integers $n \geq 3$,
-the equation $a^n + b^n = c^n$ has no solutions with $a, b, c \in \Z \setminus \{0\}$.
-The proof marshals the full force of the modularity theorem for semistable elliptic curves over $\Q$,
-Ribet's level-lowering theorem, and the dimension-zero space $S_2(\Gamma_0(2))$.
-Every step depends, explicitly or implicitly, on the commutativity of $\Z$.
+Wiles' proof of Fermat's Last Theorem~\cite{Wiles1995} --- that $a^n + b^n = c^n$
+has no nontrivial integer solutions for $n \geq 3$ --- depends at every stage on the
+commutativity of $\Z$: modularity, level lowering, the vanishing of $S_2(\Gamma_0(2))$.
+Remove commutativity and the theorem collapses.
 
-This paper asks: what happens when commutativity is removed?
-
-The integer quaternions $\HH_\Z$ and integer octonions $\OO_\Z$ are the natural testing ground.
-These are the integer subrings of the only normed division algebras over $\R$ beyond $\R$ and $\C$
-(Hurwitz~\cite{Hurwitz1898}).
+The integer quaternions $\HH_\Z$ and integer octonions $\OO_\Z$ are the natural arena.
+By Hurwitz~\cite{Hurwitz1898}, these are the integer subrings of the only
+normed division algebras over $\R$ beyond $\R$ and $\C$.
 The quaternions (dimension~4) are associative but non-commutative;
-the octonions (dimension~8) are neither commutative nor associative,
-though they are alternative (every two elements generate an associative subalgebra, by Artin's theorem).
-
-The main result is:
+the octonions (dimension~8) are alternative but neither commutative nor associative.
 
 \begin{theorem}[Main Theorem]\label{thm:main}
 For every odd integer $p \geq 3$, the equation $a^p + b^p = c^p$
@@ -110,23 +106,18 @@ where $\varepsilon = (-1)^{\lfloor (p-1)/4 \rfloor}$ for $p \equiv 1 \pmod{4}$
 and $\varepsilon = (-1)^{\lfloor (p-1)/4 \rfloor + 1}$ for $p \equiv 3 \pmod{4}$.
 \end{theorem}
 
-The proof is purely algebraic: it requires only distributivity, the relations
-$u^2 = v^2 = -1$, $uv + vu = 0$, and an induction on the exponent.
-The quaternion integers $\HH_\Z$ and Cayley integers $\OO_\Z$ both contain
-such pairs --- any two distinct imaginary basis units suffice.
+The proof needs only distributivity, $u^2 = v^2 = -1$, $uv + vu = 0$,
+and induction.
+Any two distinct imaginary basis units in $\HH_\Z$ or $\OO_\Z$ provide such a pair.
 
 Three mechanisms break FLT outside $\Z$:
 \begin{enumerate}[label=(\Alph*)]
-  \item \textbf{Anti-commutativity.} For $u^2 = v^2 = -1$ with $uv + vu = 0$,
-    the real parts of $(1+u)^p$ and $(-1+v)^p$ cancel exactly.
-    This requires dimension $\geq 4$ (two independent imaginary directions) and works for all odd~$p$.
-  \item \textbf{Zero divisors.} If $ab = ba = 0$ with $a, b \neq 0$,
-    then $(a+b)^n = a^n + b^n$ for all $n \geq 1$.
-    This requires dimension $\geq 16$ (the sedenions are the first Cayley-Dickson algebra with
-    zero divisors) and works for \emph{all} exponents, including even ones.
-  \item \textbf{Conjugate pairs.} In certain commutative extensions of $\Z$
-    (e.g., $\Z[\sqrt{-5}]$), conjugate-pair cancellation produces cube-sum identities.
-    This mechanism is commutative and does not require non-commutativity.
+  \item \textbf{Anti-commutativity} ($\dim \geq 4$, odd $p$).
+    Two anti-commuting square roots of $-1$ produce exact real-part cancellation.
+  \item \textbf{Zero divisors} ($\dim \geq 16$, all $n \geq 1$).
+    Mutual annihilators $ab = ba = 0$ collapse the binomial: $(a+b)^n = a^n + b^n$.
+  \item \textbf{Conjugate pairs} (commutative, cubes).
+    In rings like $\Z[\sqrt{-5}]$, conjugate-pair cancellation yields cube-sum identities.
 \end{enumerate}
 
 The dimension threshold is sharp:
@@ -146,20 +137,17 @@ that precludes anti-commuting pairs.
 
 \smallskip
 
-Prior work on Fermat's equation outside $\Z$ includes:
-Ribenboim~\cite{Ribenboim2004} on Fermat over $p$-adic quaternion fields,
-Li--Yuan~\cite{LiYuan2025} on Fermat and Catalan equations over $2 \times 2$ integer matrices,
-P.~Pollack~\cite{PPollack2018} on Waring's problem for integral quaternions,
-A.~Pollack~\cite{APollack2020} on modular forms for $G_2$,
-and Conway--Smith~\cite{ConwaySmith2003} on quaternion and octonion integer arithmetic.
-The all-odd-$p$ symbolic proof (Theorem~\ref{thm:main}), the dimension threshold
+Prior work: Ribenboim~\cite{Ribenboim2004} studied Fermat over $p$-adic quaternion fields;
+Li--Yuan~\cite{LiYuan2025} treated Fermat and Catalan over $M_2(\Z)$;
+P.~Pollack~\cite{PPollack2018} established Waring bounds for quaternion cubes;
+A.~Pollack~\cite{APollack2020} constructed modular forms on $G_2$;
+Conway--Smith~\cite{ConwaySmith2003} developed quaternion and octonion integer arithmetic.
+The all-odd-$p$ identity (Theorem~\ref{thm:main}), the dimension threshold
 (Theorem~\ref{thm:dim}), and the sedenion phase transition (Theorem~\ref{thm:zerodiv})
-appear to be new.
+are new.
 
-All main theorems are verified in Lean~4 with the Mathlib library.
-The formalization comprises 29 files, 9{,}102 lines, and 355 Lean declarations
-(theorems, lemmas, and supporting definitions)
-with zero \texttt{sorry} and zero axioms beyond Lean's foundations.
+The full formalization: 29 Lean~4 files, 9{,}102 lines, 355 declarations,
+zero \texttt{sorry}, zero axioms beyond Lean's foundations.
 
 %% ═══════════════════════════════════════════════════════════════════════
 %% 2. PRELIMINARIES
@@ -177,15 +165,14 @@ The only normed division algebras over $\R$ are
 $\R$ (dimension~1), $\C$ (dimension~2), $\HH$ (dimension~4), and $\OO$ (dimension~8).
 \end{theorem}
 
-These four algebras sit in the Cayley-Dickson tower: each is obtained from the previous
-by a doubling construction $A \mapsto A \oplus A\ell$ with multiplication
-$(a, b)(c, d) = (ac - \bar{d}b, \, da + b\bar{c})$.
-At each step, a structural property is lost:
-$\R \to \C$ loses ordering,
-$\C \to \HH$ loses commutativity,
+These are the Cayley-Dickson tower: each algebra is obtained from the previous
+by doubling, $(a, b)(c, d) = (ac - \bar{d}b, \, da + b\bar{c})$.
+Each step loses structure:
+$\R \to \C$ loses ordering;
+$\C \to \HH$ loses commutativity;
 $\HH \to \OO$ loses associativity.
-The octonions retain \emph{alternativity}: every subalgebra generated by two elements is
-associative (Artin's theorem).
+The octonions retain \emph{alternativity}: any two elements generate an
+associative subalgebra (Artin's theorem).
 
 \subsection{Integer subrings}
 
@@ -224,8 +211,8 @@ $(u+v)^2 = -2$.
 $(u+v)^2 = u^2 + uv + vu + v^2 = -1 + 0 + (-1) = -2$.
 \end{proof}
 
-These identities imply that powers of $1+u$, $-1+v$, and $u+v$ grow in a controlled way,
-enabling the induction in Section~\ref{sec:general}.
+These control the growth of powers and drive the induction
+in Section~\ref{sec:general}.
 
 %% ═══════════════════════════════════════════════════════════════════════
 %% 3. THE CUBIC THEOREM
@@ -364,16 +351,12 @@ so $(-1)^{m+1}(u+v)^{4m+3} = (-1)^{m+1} \cdot (-2) \cdot 4^m (u+v)
 \end{proof}
 
 \begin{remark}
-The sign $\varepsilon$ cycles with period~8 in $p$:
+The sign $\varepsilon$ cycles with period~8:
 $p \equiv 1, 3, 5, 7 \pmod{8}$ gives $\varepsilon = +1, -1, -1, +1$.
-This sign is harmless: since $p$ is odd, $(-c)^p = -(c^p)$, so
-$a^p + b^p = \varepsilon \cdot c^p$ is equivalent to $a^p + b^p = (\varepsilon c)^p$.
-\end{remark}
-
-\begin{remark}
-The proof is entirely kernel-checked in Lean~4 without \texttt{native\_decide}
-or \texttt{sorry}: see \texttt{AllOddPrimes.lean}, theorems
-\texttt{fermat\_all\_p\_mod1} and \texttt{fermat\_all\_p\_mod3}.
+Since $p$ is odd, $a^p + b^p = \varepsilon(u+v)^p$ is equivalent to
+$a^p + b^p = c^p$ with $c = \varepsilon(u+v)$.
+The proof is entirely kernel-checked in Lean~4 --- no \texttt{native\_decide},
+no \texttt{sorry} (\texttt{AllOddPrimes.lean}).
 \end{remark}
 
 %% ═══════════════════════════════════════════════════════════════════════
@@ -424,20 +407,18 @@ incompatible with the classical theorem.
 \end{proof}
 
 \begin{remark}
-The threshold is equivalently characterized: among normed division algebras,
-$\dim A \geq 4$ if and only if $A$ is non-commutative.
-The mechanism that breaks FLT is non-commutativity (specifically, anti-commutativity
-of imaginary units), not non-associativity.
-The quaternions are associative and already suffice.
+Equivalently: $\dim A \geq 4$ iff $A$ is non-commutative.
+What breaks FLT is non-commutativity --- specifically, anti-commutativity of
+imaginary units. Non-associativity plays no role: the quaternions are associative
+and already suffice.
 \end{remark}
 
 \begin{remark}[Artin confinement]
-Every known solution to $a^p + b^p = c^p$ in $\OO_\Z$ lies in an associative
+Every known solution to $a^p + b^p = c^p$ in $\OO_\Z$ lies in a quaternionic
 subalgebra $\mathrm{span}\{1, e_i, e_j, e_i e_j\} \cong \HH$.
-Computational evidence (over 600{,}000 solutions checked) supports the
-conjecture that all octonionic solutions are confined to quaternionic
-subalgebras (Conjecture~\ref{conj:artin}).
-If true, the ``boundary'' for non-commutative Fermat is dimension~4, not~8.
+Over 600{,}000 solutions checked; none escape.
+If this confinement holds universally (Conjecture~\ref{conj:artin}),
+the true boundary is dimension~4.
 \end{remark}
 
 %% ═══════════════════════════════════════════════════════════════════════
@@ -497,12 +478,10 @@ higher odd primes is not investigated in this paper.
 \end{example}
 
 \begin{remark}
-Mechanism~(A) is the sharpest, producing solutions where the entire sum lies
-in the imaginary subspace (real parts cancel to zero).
-Mechanism~(C) accounts for approximately 70\% of all solutions found
-computationally but is harder to prove symbolically for general~$p$.
-Mechanism~(B) is the bluntest: in the sedenions, it eliminates the
-even/odd distinction entirely.
+Mechanism~(A) is the sharpest: real parts cancel to zero.
+Mechanism~(C) accounts for $\sim$70\% of solutions found computationally
+but resists symbolic generalization beyond cubes.
+Mechanism~(B) is the bluntest: it kills the even/odd distinction entirely.
 \end{remark}
 
 %% ═══════════════════════════════════════════════════════════════════════
@@ -511,10 +490,9 @@ even/odd distinction entirely.
 
 \section{Beyond division: the sedenion phase transition}\label{sec:sedenion}
 
-The Cayley-Dickson doubling continues past the octonions:
-$\Se = \OO \oplus \OO\ell$ are the \emph{sedenions} (dimension~16).
-They are power-associative and flexible but no longer alternative,
-and crucially, they contain \emph{zero divisors}: nonzero elements whose product is zero.
+The doubling continues: $\Se = \OO \oplus \OO\ell$ are the \emph{sedenions}
+(dimension~16), power-associative and flexible but no longer alternative.
+Crucially, they contain \emph{zero divisors}.
 
 \begin{theorem}[Zero-Divisor Binomial Collapse]\label{thm:zerodiv}
 Let $R$ be an associative ring with $a, b \in R$ satisfying $ab = ba = 0$, $a \neq 0$, $b \neq 0$.
@@ -600,10 +578,8 @@ apply to all exponents.
 
 \subsection{$G_2$ orbit collapse}
 
-The 21 octonionic solution families are indexed by pairs $(e_i, e_j)$
-with $1 \leq i < j \leq 7$.
-The automorphism group of the octonions is the exceptional Lie group
-$G_2 = \Aut(\OO)$, a 14-dimensional compact Lie group.
+The 21 octonionic families correspond to pairs $(e_i, e_j)$, $1 \leq i < j \leq 7$.
+The automorphism group $G_2 = \Aut(\OO)$ is 14-dimensional and compact.
 
 \begin{theorem}[$G_2$ Orbit Collapse]\label{thm:g2orbit}
 All 21 solution families form a single orbit under $G_2$.
@@ -644,10 +620,9 @@ and the solution family depends only on the pair, all 21 lie in one orbit.
 
 \subsection{Waring bounds}
 
-In $\Z$, the Waring number $g(3) = 9$: every integer is a sum of at most 9 cubes.
-The quaternionic integers appear to have much smaller Waring numbers.
-
-Computational data for all 4{,}785 Lipschitz integers with $\Norm{q} \leq 30$:
+The classical Waring number $g(3) = 9$.
+Quaternionic integers are far more cube-efficient.
+Data for all 4{,}785 Lipschitz integers with $\Norm{q} \leq 30$:
 \begin{itemize}
   \item $g(3, \HH_\Z) \leq 4$. Only 12 elements (all at norm~26) require 4 cubes.
   \item $g(5, \HH_\Z) \leq 5$, $g(7, \HH_\Z) \leq 6$.
@@ -681,12 +656,9 @@ The observations in this section are expository; no new Langlands-theoretic resu
 \end{tabular}
 \end{table}
 
-Fermat's Last Theorem lives at Level~2.
-The proof passes through Level~3: Ribet's level-lowering uses the
-Jacquet-Langlands correspondence (inner forms of $\GL_2$ over quaternion algebras)
-to transfer modular representations between Shimura curves and modular curves.
-The octonionic extension (this paper) probes Level~4, where the automorphism group
-$G_2 = \Aut(\OO)$ replaces $\GL_2$.
+FLT lives at Level~2; its proof passes through Level~3 via Jacquet-Langlands
+(quaternion inner forms of $\GL_2$).
+The octonionic results probe Level~4, where $G_2 = \Aut(\OO)$ replaces $\GL_2$.
 
 \subsection{The Shimura obstruction}
 
@@ -716,18 +688,13 @@ geometrically.
 
 \subsection{The Gross-Savin program}
 
-The viable route to $G_2$ Galois representations passes through the
-Gross-Savin program~\cite{GrossSavin1998}.
+The viable route: the Gross-Savin program~\cite{GrossSavin1998}.
+Automorphic forms on compact $G_2$ theta-lift to Siegel cusp forms on $\GSp_6$,
+which \emph{is} a Shimura variety.
+Galois representations then exist via Kret--Shin~\cite{KretShin2023},
+with Satake parameters forcing the image into $G_2(\Q_\ell) \subset \GSp_6(\Q_\ell)$.
 
-The idea: automorphic forms on the compact form of $G_2$ theta-lift
-to Siegel cusp forms on $\GSp_6$.
-The Siegel modular variety for $\GSp_6$ \emph{is} a Shimura variety,
-so Galois representations exist by the construction of
-Kret--Shin~\cite{KretShin2023}.
-The Satake parameter constraint forces the image to lie in
-$G_2(\Q_\ell) \subset \GSp_6(\Q_\ell)$.
-
-The program has advanced substantially:
+Current status:
 \begin{itemize}
   \item Steps 1--2 (theta lift to nonzero Siegel cusp form): proved by
     Gross--Savin~\cite{GrossSavin1998}.
@@ -741,28 +708,24 @@ Global modularity lifting ($R = T$ for $G_2$) remains wide open.
 
 \subsection{Connection to Bhargava's higher composition laws}
 
-The split form of $G_2$ acts on $\Z^2 \otimes \Z^3 \otimes \Z^3$
-(Zorn's vector matrices), parametrizing cubic rings.
-Bhargava~\cite{Bhargava2004} showed that $\GL_2(\Z) \times \GL_3(\Z)$-orbits
-on $2 \times 3 \times 3$ cubes of integers parametrize pairs of ideal classes
-in cubic rings.
+Split $G_2$ acts on $\Z^2 \otimes \Z^3 \otimes \Z^3$ (Zorn vector matrices),
+parametrizing cubic rings.
+Bhargava~\cite{Bhargava2004} showed $\GL_2(\Z) \times \GL_3(\Z)$-orbits
+on $2 \times 3 \times 3$ integer cubes parametrize pairs of ideal classes in cubic rings.
 
-Our construction connects: the octonionic Fermat solutions live on the trilinear
-variety $V(\varphi) = \{ (a, b, c) \in (\Z^7)^3 : \varphi(a, b, c) = 0 \}$
+The octonionic Fermat solutions live on the trilinear variety
+$V(\varphi) = \{ (a, b, c) \in (\Z^7)^3 : \varphi(a, b, c) = 0 \}$
 where $\varphi(a, b, c) = \langle c, a \times b \rangle$ is the $G_2$-invariant
-trilinear form and $\times$ is the octonionic cross product.
-The $G_2(\Z)$-orbits on Zorn integer matrices yield cubic forms;
-computational data (6{,}560 matrices $\to$ 9{,}565 cubic forms $\to$ 47{,}961 cubic rings,
-all with discriminant $\equiv 0 \pmod{4}$) suggest a parametrization theorem
-connecting the octonionic integer lattice to Bhargava's program.
+trilinear form.
+Computational pipeline: 6{,}560 Zorn matrices $\to$ 9{,}565 cubic forms
+$\to$ 47{,}961 cubic rings, all with discriminant $\equiv 0 \pmod{4}$.
 
 \subsection{The magic square}
 
-The Freudenthal-Tits magic square~\cite{FreudenthalTits} organizes the relationship
-between division algebras and Lie algebras.
-Given two normed division algebras $A, B$, the construction
+The Freudenthal-Tits magic square~\cite{FreudenthalTits} maps pairs of
+division algebras to Lie algebras via
 $M(A, B) = \mathrm{Der}(A) \oplus (A_0 \otimes J_0) \oplus \mathrm{Der}(J)$
-(where $J = J_3(B)$) produces:
+($J = J_3(B)$):
 \[
 \begin{array}{c|cccc}
   & \R & \C & \HH & \OO \\ \hline
@@ -772,11 +735,9 @@ $M(A, B) = \mathrm{Der}(A) \oplus (A_0 \otimes J_0) \oplus \mathrm{Der}(J)$
   \OO & F_4 & E_6 & E_7 & E_8
 \end{array}
 \]
-The octonionic column produces all five exceptional Lie algebras
-($G_2, F_4, E_6, E_7, E_8$).
-The entry $M(\OO, \OO) = E_8$ connects the octonionic Fermat program
-to the $E_8$ lattice (Viazovska~\cite{Viazovska2017}) and, speculatively,
-to the Langlands program for exceptional groups.
+The octonionic column produces all five exceptional Lie algebras.
+$M(\OO, \OO) = E_8$ connects to the $E_8$ lattice
+(Viazovska~\cite{Viazovska2017}) and, speculatively, to exceptional Langlands.
 
 %% ═══════════════════════════════════════════════════════════════════════
 %% 10. MACHINE VERIFICATION
@@ -784,8 +745,7 @@ to the Langlands program for exceptional groups.
 
 \section{Machine verification}\label{sec:lean}
 
-All theorems in this paper are formalized in Lean~4 with the Mathlib library.
-The formalization is structured as follows:
+Every theorem in this paper is formalized in Lean~4 with Mathlib.
 
 \begin{table}[h]
 \centering
@@ -827,8 +787,8 @@ The formalization uses two proof strategies:
     These verify that the abstract hypotheses are satisfied by the concrete algebras.
 \end{enumerate}
 
-The entire formalization builds without error, \texttt{sorry}, or axiom declarations
-beyond Lean's foundational axioms (\texttt{propext}, \texttt{Quot.sound}, \texttt{Classical.choice}).
+Zero \texttt{sorry}. Zero axioms beyond Lean's foundations
+(\texttt{propext}, \texttt{Quot.sound}, \texttt{Classical.choice}).
 
 %% ═══════════════════════════════════════════════════════════════════════
 %% 11. OPEN PROBLEMS AND CONJECTURES
@@ -836,9 +796,8 @@ beyond Lean's foundational axioms (\texttt{propext}, \texttt{Quot.sound}, \textt
 
 \section{Open problems and conjectures}\label{sec:open}
 
-The octonionic Fermat program generates a constellation of precise, falsifiable conjectures.
-We state ten, selected from a registry of 17
-(the full list is documented in \texttt{Conjectures.lean}).
+Ten conjectures, selected from 17 in \texttt{Conjectures.lean}.
+All are precise and falsifiable.
 
 \begin{conjecture}[Artin Confinement --- A4]\label{conj:artin}
 Every solution to $a^p + b^p = c^p$ in $\OO_\Z$ ($p$ odd, $\geq 3$) lies
