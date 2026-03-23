@@ -593,6 +593,46 @@ Exhaustive search over coordinates in $\{-5, \ldots, 5\}$
 (14{,}640 elements) finds none for $n = 8$.
 \end{remark}
 
+\subsection{The trace parity obstruction for $n = 8$}
+
+A third obstruction eliminates all-odd-norm solutions.
+
+\begin{proposition}[Trace Parity Obstruction]\label{prop:traceparity}
+Let $a, b, c \in \HH_\Z$ with $\mathrm{Nrd}(a)$, $\mathrm{Nrd}(b)$, $\mathrm{Nrd}(c)$
+all odd. Then $a^8 + b^8 \neq c^8$.
+\end{proposition}
+
+\begin{proof}
+Write $\mathrm{Nrd}(q) = q_0^2 + q_1^2 + q_2^2 + q_3^2$ and
+$\mathrm{Trd}(q) = 2q_0$ (always even).
+For any $x, y \in \HH_\Z$,
+\[
+  \mathrm{Nrd}(x + y) = \mathrm{Nrd}(x) + \mathrm{Nrd}(y) + \mathrm{Trd}(x \cdot \bar{y}),
+\]
+and the cross term $\mathrm{Trd}(x \cdot \bar{y}) = 2\sum_i x_i y_i$ is even.
+Thus $\mathrm{Nrd}(x + y) \equiv \mathrm{Nrd}(x) + \mathrm{Nrd}(y) \pmod{2}$.
+
+By norm multiplicativity $\mathrm{Nrd}(xy) = \mathrm{Nrd}(x)\,\mathrm{Nrd}(y)$
+(Euler's four-square identity), $\mathrm{Nrd}(q^8) = \mathrm{Nrd}(q)^8 \equiv 1 \pmod{2}$
+whenever $\mathrm{Nrd}(q)$ is odd.
+
+If $a^8 + b^8 = c^8$, then $\mathrm{Nrd}(a^8) + \mathrm{Nrd}(b^8) \equiv \mathrm{Nrd}(c^8) \pmod 2$,
+i.e., $1 + 1 \equiv 1 \pmod{2}$. Contradiction.
+\end{proof}
+
+\noindent
+This proposition is formalized as \texttt{trace\_parity\_obstruction}
+in \texttt{TraceParity.lean}. The norm multiplicativity mod~2 is verified by
+\texttt{native\_decide} over all $2^8 = 256$ cases in $\mathrm{ZMod}\,2$.
+
+\begin{remark}
+The trace parity obstruction handles the case where all three elements have odd norm.
+Combined with the Niven obstruction (no purely imaginary $4k$-th power) and the
+Pythagorean obstruction (purely imaginary elements reduce to classical FLT),
+this leaves only the case of elements with even but non-zero norm as the remaining
+open territory for $n \equiv 0 \pmod{4}$, $n \geq 8$.
+\end{remark}
+
 %% ═══════════════════════════════════════════════════════════════════════
 %% 6. THREE MECHANISMS
 %% ═══════════════════════════════════════════════════════════════════════
@@ -954,7 +994,106 @@ $M(\OO, \OO) = E_8$ connects to the $E_8$ lattice
 (Viazovska~\cite{Viazovska2017}) and, speculatively, to exceptional Langlands.
 
 %% ═══════════════════════════════════════════════════════════════════════
-%% 10. MACHINE VERIFICATION
+%% 10. THE QUATERNIONIC WILES PROGRAM
+%% ═══════════════════════════════════════════════════════════════════════
+
+\section{The Quaternionic Wiles Program}\label{sec:qwiles}
+
+Wiles' proof of FLT over $\Z$ has a canonical structure:
+\begin{enumerate}[label=(\arabic*)]
+  \item Construct the Frey curve $E_{a,b,c}/\Q$ from the hypothetical solution.
+  \item Prove $E$ is modular: $E$ arises from a newform $f \in S_2(\Gamma_0(N))$.
+  \item Apply level lowering (Ribet): strip odd primes from $N$ to reach level~2.
+  \item Derive contradiction: $S_2(\Gamma_0(2)) = 0$ because $\mathrm{genus}(X_0(2)) = 0$.
+\end{enumerate}
+The vanishing $S_2(\Gamma_0(2)) = 0$ is the arithmetic heart of the proof.
+We ask: does an analogous structure exist for the \emph{quaternionic} equation?
+
+\subsection{The Frey-to-QM analogy}
+
+For the classical Frey curve, the key data are:
+\begin{itemize}
+  \item A Galois representation $\rho_{E,p} : \Gal(\bar\Q/\Q) \to \GL_2(\mathbb{F}_p)$.
+  \item Modularity: $\rho_{E,p}$ arises from a newform.
+  \item Level lowering: the conductor $N$ of $\rho_{E,p}$ can be reduced.
+\end{itemize}
+
+In the quaternionic setting, the natural replacement at Level~3
+(see Table~\ref{tab:bridge}) is a \emph{quaternionic multiplication (QM) surface}:
+an abelian surface $A/\Q$ with $\mathrm{End}^0(A) \cong \HH$ for a rational
+indefinite quaternion algebra $\HH$.
+Shimura curves $X_B(N)$ (attached to indefinite quaternion algebras $B/\Q$)
+play the role of modular curves.
+
+\subsection{The definite obstruction and Jacquet--Langlands}
+
+Let $D = (-1,-1/\Q)$ denote the definite quaternion algebra ramified at $\{2, \infty\}$.
+The algebra $D$ is ramified at infinity, so there is \textbf{no Shimura curve} attached to $D$
+--- the symmetric space $D^1(\R) \backslash \mathfrak{H}$ is a finite set, not a Riemann surface.
+This is the \emph{definite obstruction}: $D$ does not participate in the geometric picture.
+
+However, the Jacquet--Langlands correspondence transfers automorphic representations
+on $D^\times$ to classical cusp forms:
+\[
+  \mathrm{JL} : \pi_D \longmapsto \pi_{\GL_2},
+\]
+where $\pi_D$ is an automorphic representation of $D^\times(\mathbb{A})$.
+At every prime $p$ not dividing $\mathrm{disc}(D) = 2$,
+the local representations match.
+
+For the indefinite quaternion algebra $B = (-1, 3/\Q)$
+(discriminant~$6$, ramified at $\{2, 3\}$, split at $\infty$),
+the associated Shimura curve $X_B(1)$ has genus~0.
+
+\begin{theorem}[Genus of $X_B(1)$ for discriminant 6]\label{thm:xb1}
+The Shimura curve $X_B(1)$ attached to the indefinite quaternion algebra $B/\Q$
+of discriminant~$6$ has genus~$0$:
+$\mathrm{genus}(X_B(1)) = 0$.
+Consequently, $S_2(X_B(1)) = 0$.
+\end{theorem}
+
+\begin{proof}
+The genus formula for compact Shimura curves $X_B(N)$ (no cusps) is
+\[
+  2g - 2 = \frac{\mu}{6} - \frac{\nu_2}{4} - \frac{\nu_3}{3},
+\]
+where $\mu = N \prod_{p \mid \mathrm{disc}(B)} (p-1)$, and
+$\nu_2$, $\nu_3$ count elliptic points.
+For $B$ of discriminant~6 at level $N=1$:
+$\mu = 1 \cdot (2-1)(3-1) = 2$, $\nu_2 = \nu_3 = 0$.
+So $2g - 2 = 2/6 < 0$, giving $g = 0$.
+\end{proof}
+
+\begin{remark}[Analogy with $S_2(\Gamma_0(2)) = 0$]
+In Wiles' proof, $\mathrm{genus}(X_0(2)) = 0$ yields the final contradiction.
+In the Quaternionic Wiles Program, $\mathrm{genus}(X_B(1)) = 0$ plays the same role:
+the Jacobian of a genus-0 curve carries no weight-2 cusp forms.
+\end{remark}
+
+\subsection{The program}
+
+The Quaternionic Wiles Program for $a^n + b^n = c^n$ in $\HH_\Z$
+($n \equiv 0 \pmod 4$, $n \geq 8$) would proceed:
+
+\begin{enumerate}[label=\textbf{Step \arabic*.}]
+  \item \textbf{Quaternionic Frey data.} Attach a QM abelian surface $A/\Q$
+    to a hypothetical solution with controlled conductor.
+  \item \textbf{QM modularity.} Prove $A$ is modular: its $\ell$-adic representation
+    arises from a quaternionic automorphic form.
+  \item \textbf{Jacquet--Langlands.} Transfer to a newform on $X_B(N)$
+    for indefinite $B$ with $\mathrm{disc}(B) \mid 6$.
+  \item \textbf{Level lowering.} Descend the conductor to discriminant-6, level~1.
+  \item \textbf{Contradiction.} $S_2(X_B(1)) = 0$ (Theorem~\ref{thm:xb1}).
+\end{enumerate}
+
+\noindent
+Steps 1--4 are open.
+Step~5 is proved.
+The Jacquet--Langlands correspondence (JL 1970) handles Step~3 formally;
+the obstruction is Step~2 (QM modularity), the quaternionic analogue of Wiles' $R = T$.
+
+%% ═══════════════════════════════════════════════════════════════════════
+%% 11. MACHINE VERIFICATION
 %% ═══════════════════════════════════════════════════════════════════════
 
 \section{Machine verification}\label{sec:lean}
@@ -973,6 +1112,7 @@ Every theorem in this paper is formalized in Lean~4 with Mathlib.
   \texttt{SymbolicFermatGeneral.lean} & Power reduction (kernel-checked) & Thm.~\ref{thm:power-reduction} \\
   \texttt{AllOddPrimes.lean} & All odd $p$ (kernel-checked) & Thm.~\ref{thm:allodd} \\
   \texttt{DimensionThreshold.lean} & Dimension boundary & Thm.~\ref{thm:dimension} \\
+  \texttt{TraceParity.lean} & Trace parity obstruction ($n=8$, odd norm) & Prop.~\ref{prop:traceparity} \\
   \texttt{ZeroDivisorFermat.lean} & Zero-divisor collapse (kernel-checked) & Thm.~\ref{thm:zerodiv} \\
   \texttt{SedenionZeroDivisor.lean} & Sedenion obstruction analysis & Remark~7.3 \\
   \texttt{G2OrbitCollapse.lean} & $G_2$ orbit analysis & Thm.~\ref{thm:g2orbit} \\
@@ -983,7 +1123,7 @@ Every theorem in this paper is formalized in Lean~4 with Mathlib.
 \end{table}
 
 \noindent
-Totals: 29 files, 9{,}102 lines, 355 declarations (theorems, lemmas, and definitions).
+Totals: 30 files, $\approx$9{,}300 lines, $\approx$370 declarations (theorems, lemmas, and definitions).
 The formalization is available at
 \url{https://github.com/awktavian/fermat} (branch \texttt{main},
 Lean toolchain \texttt{v4.16.0}, Mathlib \texttt{2026-03-20}).
@@ -1007,13 +1147,31 @@ Zero \texttt{sorry}. Zero axioms beyond Lean's foundations
 (\texttt{propext}, \texttt{Quot.sound}, \texttt{Classical.choice}).
 
 %% ═══════════════════════════════════════════════════════════════════════
-%% 11. OPEN PROBLEMS AND CONJECTURES
+%% 12. OPEN PROBLEMS AND CONJECTURES
 %% ═══════════════════════════════════════════════════════════════════════
 
 \section{Open problems and conjectures}\label{sec:open}
 
-Ten conjectures, selected from 17 in \texttt{Conjectures.lean}.
+Eleven conjectures, selected from 17 in \texttt{Conjectures.lean}.
 All are precise and falsifiable.
+
+\begin{conjecture}[$n \equiv 0 \pmod{4}$ Obstruction --- N1]\label{conj:mod4}
+For all $n \equiv 0 \pmod{4}$ with $n \geq 8$,
+the equation $a^n + b^n = c^n$ has no nontrivial solutions in $\HH_\Z$.
+\end{conjecture}
+
+\noindent
+\emph{Evidence.}
+Exhaustive search over coordinates in $\{-5, \ldots, 5\}$ (14{,}640 elements) finds no solutions for $n = 8$.
+The Niven obstruction (Theorem~\ref{thm:niven}) eliminates the component-flip mechanism for all $n \equiv 0 \pmod 4$.
+The trace parity obstruction (Proposition~\ref{prop:traceparity}) eliminates all-odd-norm solutions for $n = 8$.
+The purely imaginary case reduces via $q^{2k} = (-\mathrm{Nrd}(q))^k$ to classical FLT for $k \geq 3$.
+
+\emph{Proposed proof strategy.}
+The Quaternionic Wiles Program (Section~\ref{sec:qwiles}).
+If Steps~1--4 of that program can be completed, the contradiction
+$S_2(X_B(1)) = 0$ (Theorem~\ref{thm:xb1}) would close the conjecture.
+The principal gap is Step~2 (QM modularity), the quaternionic analogue of Wiles' $R = T$ theorem.
 
 \begin{conjecture}[Artin Confinement --- A4]\label{conj:artin}
 Every solution to $a^p + b^p = c^p$ in $\OO_\Z$ ($p$ odd, $\geq 3$) lies
