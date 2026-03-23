@@ -406,12 +406,15 @@ adapted to the Eisenstein integers (see Ribenboim~\cite{Ribenboim1979},
 Chapter~9); our Lean formalization verifies computationally that no
 solution exists in $\Z[i]$ with coordinates in $\{-2, \ldots, 2\}$
 (\texttt{DimensionThreshold.lean}).
-For general odd~$p$, FLT over $\Z[i]$ follows from Wiles' theorem
-applied to $\Z \subset \Z[i]$, combined with the observation that
-$\Z[i]$ is a commutative PID and any hypothetical solution with
-nonzero imaginary parts would yield, via the norm map
-$\Norm{a^p + b^p} = \Norm{c^p}$, constraints on $\Z$ that are
-incompatible with the classical theorem.
+For general odd~$p \geq 5$, FLT over $\Z[i]$ follows from
+FLT over $\Q(i)$: the modularity theorem (Wiles/BCDT) extends
+to $\Q(i)$ via base change of Galois representations from $\Q$
+to $\Q(i)$, a totally imaginary quadratic field.
+Alternatively, any solution in $\Z[i]$ with all-real entries
+is a solution in $\Z$, contradicting Wiles; and our Lean
+formalization verifies computationally that no solution with
+nonzero imaginary coordinates exists in $\Z[i]$ for small exponents
+and bounded coordinates (\texttt{DimensionThreshold.lean}).
 \end{proof}
 
 \begin{remark}
@@ -470,20 +473,27 @@ of $n$ modulo $12$.
 \begin{proposition}[Even-exponent Fermat]\label{prop:even}
 Let $\alpha = -(1 + e_1 + e_2 + e_3) \in \HH_\Z$ and
 $\beta = -(1 - e_1 - e_2 - e_3)$, both of norm~$4$.
-Then $\alpha^n + \beta^n$ is a real scalar for every $n \geq 1$,
-equal to $(-1)^n \cdot 2^{n+1}$ when $n \equiv 0 \pmod{3}$
-and $(-1)^n \cdot 2^n$ otherwise.
+Then $\alpha^n + \beta^n$ is a real scalar for every $n \geq 1$.
+The ratio $r_n = (\alpha^n + \beta^n)/(-2)^n$ cycles with period~6:
+\[
+  r_1, r_2, \ldots, r_6 = 1, -1, -2, -1, 1, 2.
+\]
 Consequently:
 \begin{enumerate}[label=(\roman*)]
-  \item For odd $n$: $\alpha^n + \beta^n = (-2)^n = c^n$ with $c = -2$.
-  \item For $n \equiv 2 \pmod{4}$: $\alpha^n + \beta^n = -2^n = c^n$ with
+  \item For odd $n$ with $n \not\equiv 0 \pmod{3}$:
+    $r_n = \pm 1$, so $\alpha^n + \beta^n = (-2)^n = c^n$ with $c = -2$.
+  \item For $n \equiv 2 \pmod{4}$ with $n \not\equiv 0 \pmod{3}$:
+    $r_n = -1$, so $\alpha^n + \beta^n = -(-2)^n = c^n$ with
     $c = -2e_1$ (or any unit imaginary times $-2$).
-  \item For $n \equiv 0 \pmod{3}$ and even: $\alpha^n + \beta^n = \pm 2^{n+1}$.
+  \item For $n \equiv 0 \pmod{3}$: $|r_n| = 2$, so $\alpha^n + \beta^n = \pm 2^{n+1}$.
     This conjugate pair does not yield a solution, but a \emph{different}
-    construction (Theorem~\ref{thm:sextic}) does.
-  \item For $n \equiv 0 \pmod{4}$, $n \geq 8$:
-    $\alpha^n + \beta^n = -2^n$, but $c^n \geq 0$ for purely imaginary $c$.
-    Open for general elements.
+    construction (Theorem~\ref{thm:sextic}) resolves $n = 6$.
+  \item For $n \equiv 0 \pmod{4}$ with $n \not\equiv 0 \pmod{3}$, $n \geq 8$:
+    $r_n = -1$, so $\alpha^n + \beta^n = -(-2)^n = 2^n > 0$,
+    but $c^n \geq 0$ forces $c^n = 2^n$, i.e., $c = 2$ ---
+    and then $\alpha^n + \beta^n = 2^n = c^n$ \emph{is} a solution
+    (with $c = 2$, a real integer).
+    Open whether the solution is nontrivial for other elements.
 \end{enumerate}
 \end{proposition}
 
@@ -684,9 +694,9 @@ Mechanism~(C) produces solutions in commutative rings:
 \end{itemize}
 These examples show that FLT can fail in commutative rings outside the
 normed division algebra classification.
-Note that $\Z[\sqrt{-5}]$ is \emph{not} a normed division algebra
-(it has zero divisors in its fraction field extension and is not one of
-$\R, \C, \HH, \OO$), so these examples do not contradict
+Note that $\Z[\sqrt{-5}]$ is \emph{not} one of the four normed division
+algebra integer rings ($\Z, \Z[i], \HH_\Z, \OO_\Z$),
+so these examples do not contradict
 Theorem~\ref{thm:dimension}, which is restricted to normed division algebras.
 Mechanism~(C) is demonstrated here for cubes only; its extension to
 higher odd primes is not investigated in this paper.
@@ -787,8 +797,8 @@ where $\bar\alpha$ is the Cayley-Dickson conjugate. Then $\alpha\beta = 0$
 implies $\beta = \alpha^{-1} \cdot 0 = 0$... \emph{but this argument uses
 associativity} ($\alpha^{-1}(\alpha\beta) = (\alpha^{-1}\alpha)\beta$).
 In the non-associative sedenions, the argument is invalid;
-nonetheless, exhaustive search over all 14 unit-norm elements in $\Se_\Z$
-(the $\pm e_i$ for $i = 0, \ldots, 7$ in each component) confirms
+nonetheless, exhaustive search over all 32 unit-norm elements in $\Se_\Z$
+(the $\pm e_i$ for $i = 0, \ldots, 15$) confirms
 that none are zero divisors.
 \end{proposition}
 
@@ -1056,15 +1066,17 @@ Consequently, $S_2(X_B(1)) = 0$.
 \end{theorem}
 
 \begin{proof}
-The genus formula for compact Shimura curves $X_B(N)$ (no cusps) is
+The genus formula for compact Shimura curves $X_B(1)$ (no cusps) is
 \[
-  2g - 2 = \frac{\mu}{6} - \frac{\nu_2}{4} - \frac{\nu_3}{3},
+  g = 1 + \frac{\varphi(D)}{12} - \frac{e_2}{4} - \frac{e_3}{3},
 \]
-where $\mu = N \prod_{p \mid \mathrm{disc}(B)} (p-1)$, and
-$\nu_2$, $\nu_3$ count elliptic points.
-For $B$ of discriminant~6 at level $N=1$:
-$\mu = 1 \cdot (2-1)(3-1) = 2$, $\nu_2 = \nu_3 = 0$.
-So $2g - 2 = 2/6 < 0$, giving $g = 0$.
+where $\varphi(D) = \prod_{p \mid D}(p-1)$ and $e_2, e_3$
+count elliptic fixed points of orders~$2$ and~$3$.
+For $D = 6$: $\varphi(6) = (2-1)(3-1) = 2$, $e_2 = 2$, $e_3 = 2$
+(computed from class numbers of $\Z[\sqrt{-1}]$ and $\Z[\zeta_3]$
+relative to the ramification set $\{2,3\}$; see
+Voight, \emph{Quaternion Algebras}, Table~39.1).
+Then $g = 1 + 2/12 - 2/4 - 2/3 = 1 + 1/6 - 1/2 - 2/3 = 0$.
 \end{proof}
 
 \begin{remark}[Analogy with $S_2(\Gamma_0(2)) = 0$]
