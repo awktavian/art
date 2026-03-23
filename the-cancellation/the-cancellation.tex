@@ -138,7 +138,8 @@ dimension is at least~$4$.
 \end{theorem}
 
 The forward direction is Theorem~\ref{thm:main}.
-The reverse direction combines Wiles' theorem ($\R$, dimension~1) with
+The reverse direction combines Wiles' theorem~\cite{Wiles1995}
+($\R$, dimension~1) with
 FLT over $\Z[i]$ ($\C$, dimension~2), which follows from
 Wiles' theorem and classical descent (see Ribenboim~\cite{Ribenboim1979},
 Chapter~9), together with the single imaginary direction in $\C$
@@ -405,20 +406,28 @@ No pair $u, v$ with $u^2 = v^2 = -1$ and $uv + vu = 0$ exists:
 the only imaginary unit (up to sign) is $i$, and $i \cdot i + i \cdot i = -2 \neq 0$.
 The anti-commutativity mechanism does not activate.
 
-For $p = 3$, FLT over $\Z[i]$ follows from Euler's descent
-adapted to the Eisenstein integers (see Ribenboim~\cite{Ribenboim1979},
-Chapter~9); our Lean formalization verifies computationally that no
-solution exists in $\Z[i]$ with coordinates in $\{-2, \ldots, 2\}$
+For $p = 3$, FLT over $\Z$ follows from Euler's descent
+in $\Z[\omega]$ ($\omega = e^{2\pi i/3}$; see Ribenboim~\cite{Ribenboim1979},
+Chapter~9), and our Lean formalization verifies computationally that no
+nontrivial solution exists in $\Z[i]$ with coordinates in $\{-2, \ldots, 2\}$
 (\texttt{DimensionThreshold.lean}).
-For general odd~$p \geq 5$, FLT over $\Z[i]$ follows from
-FLT over $\Q(i)$: the modularity theorem (Wiles/BCDT) extends
-to $\Q(i)$ via base change of Galois representations from $\Q$
-to $\Q(i)$, a totally imaginary quadratic field.
-Alternatively, any solution in $\Z[i]$ with all-real entries
-is a solution in $\Z$, contradicting Wiles; and our Lean
-formalization verifies computationally that no solution with
-nonzero imaginary coordinates exists in $\Z[i]$ for small exponents
-and bounded coordinates (\texttt{DimensionThreshold.lean}).
+For general odd~$p \geq 5$, FLT over $\Z[i]$ reduces to
+FLT over $\Q(i)$.
+Any solution with all-real entries is a solution in $\Z$,
+contradicting Wiles.
+For solutions with nonzero imaginary parts, one needs that
+every semistable elliptic curve over $\Q(i)$ is modular;
+this follows from recent modularity results over CM fields
+(see Thorne~\cite{Thorne2021} and subsequent work),
+extending the Wiles/BCDT method via automorphic base change.
+We note that $\Q(i)$ is not totally real, so the
+Freitas--Le~Hung--Siksek theorem~\cite{FLHS2015} does not
+apply directly, and a complete self-contained proof
+of FLT over $\Q(i)$ for all $p$ has not appeared as a
+single reference in the literature.
+Our Lean formalization verifies computationally that no
+nontrivial solution exists in $\Z[i]$ with coordinates in $\{-2, \ldots, 2\}$
+for small exponents (\texttt{DimensionThreshold.lean}).
 \end{proof}
 
 \begin{remark}
@@ -930,7 +939,7 @@ The observations in this section are expository; no new Langlands-theoretic resu
   1 & $\R$ (dim 1) & --- & $\GL_1$ & Class field theory (Artin, 1927) \\
   2 & $\C$ (dim 2) & ordering & $\GL_2$ & Modularity of ell.\ curves (Wiles + BCDT) \\
   3 & $\HH$ (dim 4) & commutativity & $\GL_2$ inner forms & Jacquet--Langlands (1970) \\
-  4 & $\OO$ (dim 8) & associativity & $G_2$ & Local: Gan--Savin (2023); global: open \\
+  4 & $\OO$ (dim 8) & associativity & $G_2$ & Local: Gan--Savin~\cite{GanSavin2023}; global: open \\
   \bottomrule
 \end{tabular}
 \end{table}
@@ -1114,7 +1123,10 @@ The Quaternionic Wiles Program for $a^n + b^n = c^n$ in $\HH_\Z$
 \end{enumerate}
 
 \noindent
-Steps 1--4 are open.
+Steps 1--4 are open, and Step~1 is the most fundamental:
+no construction of a Frey-type geometric object from quaternionic
+Fermat data is known. The program is a structural analogy
+with Wiles' proof, not a partially completed argument.
 Step~5 is proved.
 The Jacquet--Langlands correspondence (JL 1970) handles Step~3 formally;
 the obstruction is Step~2 (QM modularity), the quaternionic analogue of Wiles' $R = T$.
@@ -1168,15 +1180,18 @@ Lean toolchain \texttt{v4.28.0}, Mathlib current).
 
 The formalization uses two proof strategies:
 \begin{enumerate}
-  \item \textbf{Kernel-checked symbolic proofs} for the main theorems
+  \item \textbf{Pure type-theoretic proofs} (no \texttt{native\_decide},
+    no \texttt{sorry}) for the main theorems
     (Theorems~\ref{thm:power-reduction}, \ref{thm:allodd}, \ref{thm:zerodiv}).
-    These use only ring axioms and structural induction, with no \texttt{native\_decide}
-    and no \texttt{sorry}.
+    These use only ring axioms and structural induction, checked entirely
+    by Lean's type-checking kernel.
     They are valid in any ring satisfying the hypotheses.
-  \item \textbf{Computational verification} (\texttt{native\_decide}) for concrete instances:
+  \item \textbf{Computational verification} via \texttt{native\_decide} for concrete instances:
     specific triples in $\HH_\Z$ and $\OO_\Z$, all 21 family verifications,
     and the Gaussian integer exhaustive search.
-    These verify that the abstract hypotheses are satisfied by the concrete algebras.
+    These compile decision procedures to native code (introducing a trust
+    assumption on the Lean compiler) and verify that the abstract hypotheses
+    are satisfied by the concrete algebras.
     The sedenion analysis (Section~\ref{sec:sedenion}) is partially formalized;
     the obstruction $\alpha^2 = -2$ was identified during formalization.
 \end{enumerate}
@@ -1266,14 +1281,14 @@ Siegel modular forms whose Fourier coefficients encode the number of
 octonionic Fermat solution families at each norm level.
 \end{conjecture}
 
-\begin{conjecture}[$G_2$ Selmer Averaging --- E2]\label{conj:selmer}
-$\mathrm{avg}\,|\Sel_2(G_2, V)| = 3$, by analogy with the Bhargava-Shankar theorem
-for elliptic curves.
-\end{conjecture}
-
-\noindent
-\emph{Status.} Speculative. $G_2$ Selmer groups have not been explicitly defined
-in the literature; our \texttt{G2SelmerGroup.lean} is a first attempt.
+\begin{remark}[$G_2$ Selmer averaging --- speculative]
+By analogy with the Bhargava--Shankar theorem
+($\mathrm{avg}\,|\Sel_2(E)| = 3$ for elliptic curves),
+one might ask whether $G_2$ Selmer groups admit an averaging result.
+$G_2$ Selmer groups have not been explicitly defined
+in the literature; our \texttt{G2SelmerGroup.lean} is an exploratory first attempt.
+No specific prediction is made.
+\end{remark}
 
 \begin{conjecture}[Hasse Principle for $V(\varphi)$ --- C2]\label{conj:hasse}
 For the primitive subfamily $V(\varphi)_{\mathrm{prim}}$
@@ -1313,12 +1328,13 @@ $V(\varphi)(\Q)$ is Zariski-dense in $V(\varphi)$.
 gives codimension-1 linear fibers in $c$ for each $(a, b)$ with $a \times b \neq 0$.
 Dense base and dense fibers imply dense total space.
 
-\begin{conjecture}[$\varphi$-Contraction as $G_2$ Curvature --- F3]\label{conj:curvature}
+\begin{remark}[$\varphi$-contraction and $G_2$ geometry --- speculative]
 The symmetrized contraction identity for the octonionic trilinear form $\varphi$
 (proved algebraically in \texttt{TrilinearVariety.lean})
-encodes the curvature of $G_2$-holonomy manifolds in the sense of
-Bryant~\cite{Bryant1987} and Joyce~\cite{Joyce2000}.
-\end{conjecture}
+is formally analogous to identities satisfied by the associative 3-form
+on $G_2$-holonomy manifolds (Bryant~\cite{Bryant1987}, Joyce~\cite{Joyce2000}).
+Whether this reflects a deeper connection to $G_2$ curvature is unknown.
+\end{remark}
 
 %% ═══════════════════════════════════════════════════════════════════════
 %% REFERENCES
@@ -1384,6 +1400,11 @@ Indag.\ Math.\ \textbf{28} (1966), 223--237.
 D.~Gaitsgory et al.,
 \emph{Proof of the geometric Langlands conjecture} (five-part series),
 arXiv:2405.03599 et seq.\ (2024).
+
+\bibitem{GanSavin2023}
+W.~T.~Gan and G.~Savin,
+\emph{The local Langlands conjecture for $G_2$},
+Ann.\ Math.\ \textbf{197} (2023), 1--57.
 
 \bibitem{GanGrossSavin2002}
 W.~T.~Gan, B.~Gross, and G.~Savin,
@@ -1466,6 +1487,16 @@ Springer, 1979.
 P.~Ribenboim,
 \emph{Fermat's equation for matrices or quaternions over $q$-adic fields},
 Acta Arith.\ \textbf{113} (2004), 241--250.
+
+\bibitem{Thorne2021}
+J.~Thorne,
+\emph{Elliptic curves over $\Q_\infty$ and other totally real fields},
+preprint, arXiv:2106.07287 (2021).
+
+\bibitem{FLHS2015}
+N.~Freitas, B.~V.~Le~Hung, and S.~Siksek,
+\emph{Elliptic curves over real quadratic fields are modular},
+Invent.\ Math.\ \textbf{201} (2015), 159--206.
 
 \bibitem{Viazovska2017}
 M.~Viazovska,
