@@ -25,6 +25,8 @@ Browser (any art project)
                     └── WebSocket → wss://api.openai.com/v1/realtime
 ```
 
+**Model**: `gpt-4o-realtime-preview` (default; override via `REALTIME_MODEL` env var). Connects to `wss://api.openai.com/v1/realtime` with `OpenAI-Beta: realtime=v1` header.
+
 **Proxy**: `realtime-proxy/server.js` — token bucket rate limiting (10 msg/s, burst 30), per-session cost caps ($2 default), max 5 concurrent sessions. Carries project/colony metadata.
 
 **Shared libraries** (lib/):
@@ -89,6 +91,56 @@ Stats: `http://localhost:8766/stats`
 - Dark void palette, ice/gold accents
 - WCAG 2.1 AA accessibility
 - `prefers-reduced-motion` respected
+
+## Kagami Ecosystem Integration
+
+### Design Tokens
+
+`lib/design-tokens.js` is a **snapshot** copied from `packages/kagami-design-tokens/tokens.json` in the Kagami repo. SSOT is Kagami. When tokens change upstream, re-export and replace `lib/design-tokens.js`. Never define parallel tokens here.
+
+### Colony System
+
+The `/kagami` skill (in the Kagami repo) routes tasks through the 7-colony Fano plane via EFE minimization. The colony→voice mapping in `lib/kagami-voices.js` is the art-project surface of that system — same 7 colonies, same EFE weights, same catastrophe types. When working on art projects as a Claude Code subagent, tasks may be dispatched with a `colony=Y` query param identifying which Fano colony owns the work.
+
+### Voice Libraries
+
+`lib/` contains shared libraries generated/maintained in the Kagami monorepo and mirrored here:
+- `realtime-voice.js`, `kagami-voices.js`, `voice-overlay.js` — voice integration stack
+- `kagami-sounds.js`, `kagami-sounds-data.js` — audio engine
+- `kagami-visuals.js`, `kagami-xr.js` — visual/XR effects
+- `design-tokens.js` — snapshot of Kagami design tokens
+
+### Dispatch Routing
+
+Art project tasks can be dispatched from the Kagami daemon via `start_code_task`. This is the intended path for autonomous agents to spawn Claude Code sessions targeting the art project:
+
+```python
+# Kagami daemon dispatches to art project
+start_code_task(
+    project="/Users/schizodactyl/projects/art",
+    task="...",
+    colony="forge"   # optional Fano colony hint
+)
+```
+
+`start_code_task` is not yet a first-class MCP tool — it currently routes through `DaemonTaskRunner` in the kagami daemon. This note is forward-looking.
+
+## MCP Servers
+
+Claude Code sessions in this project inherit the Kagami MCP configuration. Available servers:
+
+| Server | Access Pattern | Use |
+|--------|---------------|-----|
+| **context7** | `mcp__context7__*` | Current library/framework docs |
+| **memory** | `mcp__memory__*` | Persistent semantic graph |
+| **github** | `mcp__github__*` | Issues, PRs, file access |
+| **docker** | `mcp__docker__*` | Container operations |
+| **playwright** | `mcp__playwright__*` | Browser automation |
+| **sequential-thinking** | `mcp__sequential-thinking__*` | Multi-step reasoning |
+| **computer-use** | `mcp__computer-use__*` | Desktop/screenshot control |
+| **apple-calendar** | `mcp__apple-calendar__*` | Calendar/reminders |
+
+All MCP tools are allowed via `mcp__*` in `.claude/settings.json`. The full kagami hook chain (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, etc.) is active — same as the main Kagami project.
 
 ## MedVerify specifics
 
