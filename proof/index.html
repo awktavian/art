@@ -19,20 +19,45 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-weight: 400;
-  line-height: 1.8; font-size: 16px; -webkit-font-smoothing: antialiased; }
+  line-height: 1.8; font-size: 16px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
 
 /* Grain overlay */
-body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 999;
+body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 100;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   opacity: 0.012; }
 
-/* Sections */
-.section { max-width: 740px; margin: 0 auto; padding: 0 28px; }
-.spacer { height: 160px; }
-.spacer-lg { height: 280px; }
+/* Loading */
+#loading { position: fixed; inset: 0; z-index: 200; background: var(--bg);
+  display: flex; align-items: center; justify-content: center; flex-direction: column;
+  transition: opacity 610ms var(--ease); }
+#loading.done { opacity: 0; pointer-events: none; }
+#loading .spinner { width: 32px; height: 32px; border: 2px solid rgba(212,175,55,0.15);
+  border-top-color: var(--gold); border-radius: 50%; animation: spin 800ms linear infinite; }
+#loading p { margin-top: 16px; font-family: var(--mono); font-size: 12px; color: var(--dim); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Galaxy canvas */
+#galaxy { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+
+/* Scroll content layer */
+#content { position: relative; z-index: 1; }
+
+/* Section containers */
+.act { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 80px 20px; position: relative; }
+.act-inner { max-width: 640px; width: 100%; padding: 48px;
+  background: rgba(7,6,11,0.78); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+
+/* Hero is special — more transparent */
+.act-hero .act-inner { background: rgba(7,6,11,0.55); backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px); border: none; }
+
+/* Breathing spacers between acts */
+.breath { height: 50vh; }
 
 /* Scroll reveal */
-.r { opacity: 0; transform: translateY(40px); transition: opacity 610ms var(--ease), transform 610ms var(--ease); }
+.r { opacity: 0; transform: translateY(32px); transition: opacity 610ms var(--ease), transform 610ms var(--ease); }
 .r.v { opacity: 1; transform: translateY(0); }
 
 /* Typography */
@@ -52,15 +77,12 @@ p { color: var(--mid); margin-bottom: 20px; max-width: 65ch; }
 em { font-family: var(--serif); font-style: italic; color: var(--fg); }
 
 /* Hero */
-.hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center;
-  position: relative; }
-.hero h1 { margin-bottom: 32px; }
-.hero .eq { font-family: var(--serif); font-style: italic; font-size: clamp(2rem, 5vw, 3.5rem);
-  color: var(--gold); margin-bottom: 40px; text-shadow: 0 0 60px rgba(212,175,55,0.12); }
-.hero .eq:hover { text-shadow: 0 0 80px rgba(212,175,55,0.25), 0 0 120px rgba(212,175,55,0.1); }
-.hero p { font-size: 17px; }
-.hero .label { font-family: var(--mono); font-size: 11px; letter-spacing: 2px;
+.hero-label { font-family: var(--mono); font-size: 11px; letter-spacing: 2px;
   text-transform: uppercase; color: var(--dim); margin-bottom: 24px; }
+.eq { font-family: var(--serif); font-style: italic; font-size: clamp(2rem, 5vw, 3.5rem);
+  color: var(--gold); margin-bottom: 40px; text-shadow: 0 0 60px rgba(212,175,55,0.12);
+  cursor: default; transition: text-shadow 377ms var(--ease); }
+.eq:hover { text-shadow: 0 0 80px rgba(212,175,55,0.3), 0 0 120px rgba(212,175,55,0.12); }
 
 /* Quote bar */
 .quote { border-left: 2px solid var(--gold); padding: 16px 0 16px 24px; margin: 32px 0;
@@ -85,10 +107,10 @@ em { font-family: var(--serif); font-style: italic; color: var(--fg); }
 .proof .step:nth-child(4) { transition-delay: 267ms; }
 .proof .step:nth-child(5) { transition-delay: 356ms; }
 .proof .step:nth-child(6) { transition-delay: 445ms; }
-.proof .k { color: var(--grove); } /* key result */
-.proof .b { color: var(--crystal); } /* computed value */
-.proof .g { color: var(--gold); } /* highlight */
-.proof .d { color: var(--dim); font-style: italic; } /* comment */
+.proof .k { color: var(--grove); }
+.proof .b { color: var(--crystal); }
+.proof .g { color: var(--gold); }
+.proof .d { color: var(--dim); font-style: italic; }
 
 /* Theorem boxes */
 .thm { background: rgba(212,175,55,0.04); border: 1px solid rgba(212,175,55,0.12);
@@ -117,250 +139,673 @@ td:first-child { color: var(--fg); font-weight: 500; }
 .timeline .date { font-family: var(--mono); font-size: 12px; color: var(--gold); margin-bottom: 4px; }
 .timeline .who { font-family: var(--serif); font-size: 1.1rem; font-weight: 600; margin-bottom: 4px; }
 
-/* Stats bar */
-.stats { display: flex; flex-wrap: wrap; gap: 24px; margin: 32px 0; }
+/* Stats */
+.stats { display: flex; flex-wrap: wrap; gap: 24px; margin: 32px 0; justify-content: center; }
 .stat { text-align: center; }
 .stat .num { font-family: var(--mono); font-size: 28px; font-weight: 500; color: var(--gold); }
 .stat .lbl { font-size: 11px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; margin-top: 4px; }
 
+/* Theorem links in text */
+.thm-link { color: var(--gold); cursor: pointer; position: relative;
+  text-decoration: none; border-bottom: 1px solid transparent;
+  transition: border-color 233ms var(--ease); }
+.thm-link:hover { border-bottom-color: var(--gold); }
+.thm-link::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 0; height: 1px;
+  background: var(--gold); transition: width 233ms var(--ease); }
+.thm-link:hover::after { width: 100%; }
+
+/* Detail panel */
+.detail-panel { position: fixed; bottom: 0; left: 0; right: 0; max-height: 45vh; z-index: 50;
+  background: rgba(7,6,11,0.92); backdrop-filter: blur(60px); -webkit-backdrop-filter: blur(60px);
+  border-top: 1px solid rgba(255,255,255,0.08);
+  transform: translateY(100%); transition: transform 377ms var(--ease);
+  overflow-y: auto; padding: 32px; }
+.detail-panel.open { transform: translateY(0); }
+.detail-panel .close { position: absolute; top: 16px; right: 20px; background: none; border: none;
+  color: var(--dim); font-size: 20px; cursor: pointer; font-family: var(--sans);
+  transition: color 144ms; }
+.detail-panel .close:hover { color: var(--fg); }
+.detail-panel .dp-name { font-family: var(--mono); font-size: 14px; color: var(--gold);
+  letter-spacing: 1px; margin-bottom: 8px; }
+.detail-panel .dp-domain { font-family: var(--mono); font-size: 11px; color: var(--dim);
+  text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 16px; }
+.detail-panel .dp-explanation { font-family: var(--serif); font-size: 1.1rem; color: var(--mid);
+  line-height: 1.7; margin-bottom: 16px; max-width: 600px; }
+.detail-panel .dp-statement { font-family: var(--mono); font-size: 12px; color: var(--crystal);
+  background: rgba(136,192,208,0.06); padding: 12px 16px; border-radius: 6px;
+  line-height: 1.6; margin-bottom: 16px; white-space: pre-wrap; word-break: break-word; max-width: 600px; }
+.detail-panel .dp-meta { font-family: var(--mono); font-size: 11px; color: var(--dim); }
+.detail-panel .dp-chain { margin-top: 16px; }
+.detail-panel .dp-chain-item { display: inline-block; font-family: var(--mono); font-size: 11px;
+  color: var(--dim); padding: 3px 8px; margin: 2px 4px 2px 0;
+  border: 1px solid rgba(255,255,255,0.06); border-radius: 4px;
+  transition: color 233ms, border-color 233ms; }
+.detail-panel .dp-chain-item.lit { color: var(--gold); border-color: rgba(212,175,55,0.3); }
+
 /* Footer */
-footer { text-align: center; padding: 80px 28px; color: var(--dim); font-size: 13px; }
+footer { position: relative; z-index: 1; text-align: center; padding: 80px 28px;
+  color: var(--dim); font-size: 13px; }
 footer a { color: var(--gold); text-decoration: none; }
 
-/* Nebula backgrounds */
-.bg-crystal { background: radial-gradient(ellipse 60% 40% at 80% 30%, rgba(136,192,208,0.025), transparent 60%); }
-.bg-gold { background: radial-gradient(ellipse 50% 50% at 20% 40%, rgba(212,175,55,0.02), transparent 55%); }
-.bg-ember { background: radial-gradient(ellipse 70% 50% at 60% 60%, rgba(191,97,106,0.02), transparent 50%); }
-.bg-grove { background: radial-gradient(ellipse 60% 60% at 30% 70%, rgba(163,190,140,0.025), transparent 55%); }
-
 @media (max-width: 600px) {
-  .section { padding: 0 20px; }
-  .spacer { height: 100px; }
-  .spacer-lg { height: 180px; }
+  .act { padding: 40px 12px; }
+  .act-inner { padding: 28px 20px; }
   .stats { gap: 16px; }
+  .breath { height: 30vh; }
 }
 </style>
 </head>
 <body>
 
-<!-- ═══════════════════════ ACT I: THE EQUATION ═══════════════════════ -->
+<div id="loading"><div class="spinner"></div><p>Loading proof galaxy...</p></div>
 
-<div class="hero section">
-  <div class="label r">A formalization in Lean 4</div>
-  <h1 class="r">The Great Diagonal</h1>
-  <div class="eq r">∀ f : B → B, ∃ b, f b = b</div>
-  <p class="r">Every impossibility theorem in mathematics — Cantor, Gödel, Turing, Rice, Russell, Tarski — is an instance of <em>one</em> theorem. Lawvere's fixed-point theorem. The diagonal argument. The same proof, wearing different masks.</p>
-  <p class="r dim" style="font-size:14px">31 files · 357 theorems · 7,165 lines · 1 sorry (the Clay Millennium Prize)</p>
-</div>
+<canvas id="galaxy"></canvas>
 
-<div class="spacer-lg"></div>
+<div id="content">
 
-<!-- ═══════════════════════ ACT II: THE PATTERN ═══════════════════════ -->
-
-<div class="section bg-gold">
-  <h2 class="r">The Pattern Nobody Saw</h2>
-  <p class="r">In 1969, F. William Lawvere published a short paper in the <em>Comptes Rendus</em>. The paper proved a single theorem about cartesian closed categories. Almost nobody noticed.</p>
-  <p class="r">The theorem said: if you can enumerate all functions from A to B using elements of A itself — if there exists a surjection <span class="c">e : A → (A → B)</span> — then every transformation <span class="c">f : B → B</span> has a fixed point.</p>
-
-  <div class="thm r">
-    <div class="name">Lawvere's Fixed-Point Theorem (1969)</div>
-    <div class="stmt">If e : A → (A → B) is surjective and f : B → B is any endofunction, then there exists b : B such that f(b) = b.</div>
-    <div class="label">kernel-verified · 0 sorry · 0 axioms · the foundation of everything that follows</div>
+<!-- ACT I: HERO -->
+<section class="act act-hero" data-act="act-hero">
+  <div class="act-inner">
+    <div class="hero-label r">A formalization in Lean 4</div>
+    <h1 class="r">The Great Diagonal</h1>
+    <div class="eq r">&#8704; f : B &#8594; B, &#8707; b, f b = b</div>
+    <p class="r">Every impossibility theorem in mathematics &mdash; Cantor, G&ouml;del, Turing, Rice, Russell, Tarski &mdash; is an instance of <em>one</em> theorem. <span class="thm-link" data-thm="lawvere_reflexive">Lawvere's fixed-point theorem</span>. The diagonal argument. The same proof, wearing different masks.</p>
+    <p class="r dim" style="font-size:14px">31 files &middot; 357 theorems &middot; 7,165 lines &middot; 1 sorry (the Clay Millennium Prize)</p>
   </div>
+</section>
 
-  <p class="r">The proof is five lines. Construct the diagonal: <span class="c">d(a) = f(e(a)(a))</span>. Since e is surjective, d has a preimage: some <span class="c">a₀</span> with <span class="c">e(a₀) = d</span>. Then <span class="c">d(a₀) = f(e(a₀)(a₀)) = f(d(a₀))</span>. Set <span class="c">b = d(a₀)</span>. Done.</p>
+<div class="breath"></div>
 
-  <div class="proof r">
-    <div class="step"><span class="d">-- The proof that unifies all of logic</span></div>
-    <div class="step"><span class="g">theorem</span> lawvere_fixed_point (e : A → (A → B))</div>
-    <div class="step">    (he : Surjective e) (f : B → B) : <span class="k">∃ b, f b = b</span> := by</div>
-    <div class="step">  <span class="b">obtain</span> ⟨a₀, ha₀⟩ := he (fun a => f (e a a))</div>
-    <div class="step">  exact ⟨f (e a₀ a₀), <span class="d">-- the fixed point</span></div>
-    <div class="step">    by <span class="b">simp</span> [show e a₀ = fun a => f (e a a) from ha₀]⟩</div>
+<!-- ACT II: THE PATTERN -->
+<section class="act" data-act="act-lawvere">
+  <div class="act-inner">
+    <h2 class="r">The Pattern Nobody Saw</h2>
+    <p class="r">In 1969, F. William Lawvere published a short paper in the <em>Comptes Rendus</em>. The paper proved a single theorem about cartesian closed categories. Almost nobody noticed.</p>
+    <p class="r">The theorem said: if you can enumerate all functions from A to B using elements of A itself &mdash; if there exists a surjection <span class="c">e : A &rarr; (A &rarr; B)</span> &mdash; then every transformation <span class="c">f : B &rarr; B</span> has a fixed point.</p>
+
+    <div class="thm r">
+      <div class="name">Lawvere's Fixed-Point Theorem (1969)</div>
+      <div class="stmt">If e : A &rarr; (A &rarr; B) is surjective and f : B &rarr; B is any endofunction, then there exists b : B such that f(b) = b.</div>
+      <div class="label">kernel-verified &middot; 0 sorry &middot; 0 axioms &middot; the foundation of everything that follows</div>
+    </div>
+
+    <p class="r">The proof is five lines. Construct the diagonal: <span class="c">d(a) = f(e(a)(a))</span>. Since e is surjective, d has a preimage: some <span class="c">a&#8320;</span> with <span class="c">e(a&#8320;) = d</span>. Then <span class="c">d(a&#8320;) = f(e(a&#8320;)(a&#8320;)) = f(d(a&#8320;))</span>. Set <span class="c">b = d(a&#8320;)</span>. Done.</p>
+
+    <div class="proof r">
+      <div class="step"><span class="d">-- The proof that unifies all of logic</span></div>
+      <div class="step"><span class="g">theorem</span> lawvere_fixed_point (e : A &rarr; (A &rarr; B))</div>
+      <div class="step">&nbsp;&nbsp;&nbsp;&nbsp;(he : Surjective e) (f : B &rarr; B) : <span class="k">&exist; b, f b = b</span> := by</div>
+      <div class="step">&nbsp;&nbsp;<span class="b">obtain</span> &langle;a&#8320;, ha&#8320;&rangle; := he (fun a =&gt; f (e a a))</div>
+      <div class="step">&nbsp;&nbsp;exact &langle;f (e a&#8320; a&#8320;), <span class="d">-- the fixed point</span></div>
+      <div class="step">&nbsp;&nbsp;&nbsp;&nbsp;by <span class="b">simp</span> [show e a&#8320; = fun a =&gt; f (e a a) from ha&#8320;]&rangle;</div>
+    </div>
+
+    <p class="r">The power is in the <em>contrapositive</em>. If f has <em>no</em> fixed point &mdash; like boolean negation, which flips every value &mdash; then e <em>cannot</em> be surjective. No enumeration of all functions can exist.</p>
   </div>
+</section>
 
-  <p class="r">The power is in the <em>contrapositive</em>. If f has <em>no</em> fixed point — like boolean negation, which flips every value — then e <em>cannot</em> be surjective. No enumeration of all functions can exist.</p>
-</div>
+<div class="breath"></div>
 
-<div class="spacer"></div>
+<!-- ACT III: THE MASKS -->
+<section class="act" data-act="act-masks">
+  <div class="act-inner">
+    <h2 class="r">Seven Masks, One Face</h2>
+    <p class="r">Every great impossibility result in the foundations of mathematics is <span class="thm-link" data-thm="lawvere_reflexive">Lawvere's theorem</span> in disguise. The same diagonal argument, applied to different types.</p>
 
-<!-- ═══════════════════════ ACT III: THE MASKS ═══════════════════════ -->
+    <table class="r">
+      <tr><th>Theorem</th><th>A</th><th>B</th><th>f</th><th>Conclusion</th></tr>
+      <tr><td><span class="thm-link gold" data-thm="cantor">Cantor</span></td><td>Sets</td><td>Prop</td><td>&not;</td><td>No surj X &rarr; P(X)</td></tr>
+      <tr><td><span class="thm-link crystal" data-thm="godel_first_incompleteness_abstract">G&ouml;del I</span></td><td>Sentences</td><td>Prop</td><td>&not;Prov</td><td>True &amp; unprovable</td></tr>
+      <tr><td><span class="thm-link ember" data-thm="halting_undecidable_concrete">Turing</span></td><td>Programs</td><td>{h,l}</td><td>flip</td><td>Halting undecidable</td></tr>
+      <tr><td><span class="thm-link violet" data-thm="rice_via_lawvere">Rice</span></td><td>Programs</td><td>Bool</td><td>&not;</td><td>Semantic undecidable</td></tr>
+      <tr><td><span class="thm-link grove" data-thm="russell_is_lawvere">Russell</span></td><td>Sets</td><td>Prop</td><td>&not;&isin;</td><td>No universal set</td></tr>
+      <tr><td><span class="thm-link flow" data-thm="tarski_no_truth_predicate">Tarski</span></td><td>Sentences</td><td>Prop</td><td>&not;T</td><td>No truth predicate</td></tr>
+      <tr><td><span class="thm-link" style="color:var(--beacon)" data-thm="smolensky_theorem">Smolensky</span></td><td>Polys</td><td>F_p</td><td>parity</td><td>AC0[p] &ne; MOD2</td></tr>
+    </table>
 
-<div class="section bg-crystal">
-  <h2 class="r">Seven Masks, One Face</h2>
-  <p class="r">Every great impossibility result in the foundations of mathematics is Lawvere's theorem in disguise. The same diagonal argument, applied to different types.</p>
+    <p class="r">In each case, the argument is identical: assume you can enumerate everything, construct the diagonal, apply the fixed-point-free transform, get a contradiction. The <em>only</em> thing that changes is what A, B, and f are.</p>
 
-  <table class="r">
-    <tr><th>Theorem</th><th>A</th><th>B</th><th>f (no fixed point)</th><th>Conclusion</th></tr>
-    <tr><td class="gold">Cantor (1891)</td><td>Sets</td><td>Prop</td><td>¬ (negation)</td><td>No surjection X → 𝒫(X)</td></tr>
-    <tr><td class="crystal">Gödel I (1931)</td><td>Sentences</td><td>Prop</td><td>¬Provable</td><td>True sentence unprovable</td></tr>
-    <tr><td class="ember">Turing (1936)</td><td>Programs</td><td>{halt, loop}</td><td>flip</td><td>Halting undecidable</td></tr>
-    <tr><td class="violet">Rice (1953)</td><td>Programs</td><td>Bool</td><td>Bool.not</td><td>Semantic props undecidable</td></tr>
-    <tr><td class="grove">Russell (1901)</td><td>Sets</td><td>Prop</td><td>¬ ∈</td><td>No universal set</td></tr>
-    <tr><td class="flow">Tarski (1933)</td><td>Sentences</td><td>Prop</td><td>¬Truth</td><td>No truth predicate</td></tr>
-    <tr><td style="color:var(--beacon)">Smolensky (1987)</td><td>Polynomials</td><td>𝔽ₚ</td><td>parity</td><td>AC⁰[p] can't compute MOD₂</td></tr>
-  </table>
-
-  <p class="r">In each case, the argument is identical: assume you can enumerate everything, construct the diagonal, apply the fixed-point-free transform, get a contradiction. The <em>only</em> thing that changes is what A, B, and f are.</p>
-
-  <div class="quote r">
-    "The diagonal argument is not a trick. It is the <em>structure</em> of self-reference itself — the moment a system tries to describe all of its own descriptions."
-    <span class="attr">— The thesis of this formalization</span>
-  </div>
-</div>
-
-<div class="spacer"></div>
-
-<!-- ═══════════════════════ ACT IV: THE BLINDSPOTS ═══════════════════════ -->
-
-<div class="section bg-ember">
-  <h2 class="r">What You Cannot Prove About Yourself</h2>
-  <p class="r">The diagonal doesn't just create impossibility results. Applied to a <em>self-improving system</em> — one that modifies its own code — it creates <em>blindspots</em>. Five limits that no sufficiently complex system can overcome from within.</p>
-
-  <div class="timeline r">
-    <div class="event">
-      <div class="date">Blindspot 1 · Gödel II</div>
-      <div class="who" style="color:var(--ember)">Consistency</div>
-      <p>The system cannot prove it will never crash. If it could, it would prove its own consistency — contradicting Gödel's second incompleteness theorem.</p>
-    </div>
-    <div class="event">
-      <div class="date">Blindspot 2 · Rice</div>
-      <div class="who" style="color:var(--violet)">Optimality</div>
-      <p>The system cannot prove it has found the <em>best</em> fixed point. "Is this the optimal configuration?" is a non-trivial semantic property — undecidable by Rice's theorem.</p>
-    </div>
-    <div class="event">
-      <div class="date">Blindspot 3 · Turing</div>
-      <div class="who" style="color:var(--crystal)">Halting</div>
-      <p>The system cannot decide whether an arbitrary self-modification will terminate. It must use timeouts, not proofs.</p>
-    </div>
-    <div class="event">
-      <div class="date">Blindspot 4 · P vs NP</div>
-      <div class="who" style="color:var(--nexus)">Complexity</div>
-      <p>The system cannot prove its own time complexity is optimal. This connects to the deepest open problem in mathematics.</p>
-    </div>
-    <div class="event">
-      <div class="date">Blindspot 5 · CBF</div>
-      <div class="who" style="color:var(--grove)">Safety</div>
-      <p>The safety barrier <span class="c">h(x) ≥ 0</span> is maintained by <em>engineering</em> — continuous monitoring and correction — not by proof. Trying to prove safety hits Gödel II.</p>
+    <div class="quote r">
+      "The diagonal argument is not a trick. It is the <em>structure</em> of self-reference itself &mdash; the moment a system tries to describe all of its own descriptions."
+      <span class="attr">&mdash; The thesis of this formalization</span>
     </div>
   </div>
+</section>
 
-  <p class="r">All five blindspots are proved. Not sorry'd, not assumed — <em>proved</em>, from the abstract incompleteness theorems already in the project. Knowing your limits is the closest approximation to transcending them.</p>
-</div>
+<div class="breath"></div>
 
-<div class="spacer"></div>
+<!-- ACT IV: THE BLINDSPOTS -->
+<section class="act" data-act="act-blindspots">
+  <div class="act-inner">
+    <h2 class="r">What You Cannot Prove About Yourself</h2>
+    <p class="r">The diagonal doesn't just create impossibility results. Applied to a <em>self-improving system</em> &mdash; one that modifies its own code &mdash; it creates <em>blindspots</em>. Five limits that no sufficiently complex system can overcome from within.</p>
 
-<!-- ═══════════════════════ ACT V: THE BARRIERS ═══════════════════════ -->
+    <div class="timeline r">
+      <div class="event">
+        <div class="date">Blindspot 1 &middot; G&ouml;del II</div>
+        <div class="who" style="color:var(--ember)">Consistency</div>
+        <p>The system cannot prove it will never crash. If it could, it would prove its own consistency &mdash; contradicting G&ouml;del's second incompleteness theorem.</p>
+      </div>
+      <div class="event">
+        <div class="date">Blindspot 2 &middot; Rice</div>
+        <div class="who" style="color:var(--violet)">Optimality</div>
+        <p>The system cannot prove it has found the <em>best</em> fixed point. "Is this optimal?" is a non-trivial semantic property &mdash; undecidable by <span class="thm-link" data-thm="rice_theorem">Rice's theorem</span>.</p>
+      </div>
+      <div class="event">
+        <div class="date">Blindspot 3 &middot; Turing</div>
+        <div class="who" style="color:var(--crystal)">Halting</div>
+        <p>The system cannot decide whether an arbitrary self-modification will terminate. It must use timeouts, not proofs.</p>
+      </div>
+      <div class="event">
+        <div class="date">Blindspot 4 &middot; P vs NP</div>
+        <div class="who" style="color:var(--nexus)">Complexity</div>
+        <p>The system cannot prove its own time complexity is optimal. This connects to the deepest open problem in mathematics.</p>
+      </div>
+      <div class="event">
+        <div class="date">Blindspot 5 &middot; CBF</div>
+        <div class="who" style="color:var(--grove)">Safety</div>
+        <p>The safety barrier <span class="c">h(x) &ge; 0</span> is maintained by <em>engineering</em> &mdash; continuous monitoring and correction &mdash; not by proof.</p>
+      </div>
+    </div>
 
-<div class="section bg-grove">
-  <h2 class="r">Why P ≠ NP Is Hard</h2>
-  <p class="r">The diagonal argument <em>can</em> prove that some things are undecidable (Turing), uncomputable (Cantor), unprovable (Gödel). So why can't it prove P ≠ NP?</p>
-  <p class="r">Because there are <em>barriers</em> — meta-diagonalizations that diagonalize over <em>proof techniques</em>, not programs. Each barrier says: your method is too general.</p>
-
-  <table class="r">
-    <tr><th>Barrier</th><th>Year</th><th>What It Blocks</th><th>Status</th></tr>
-    <tr><td class="gold">Relativization</td><td>BGS 1975</td><td>Any proof that works with all oracles</td><td class="grove">Proved</td></tr>
-    <tr><td class="crystal">Natural Proofs</td><td>RR 1997</td><td>Any combinatorial large+useful property (given OWF)</td><td class="grove">Structural core proved</td></tr>
-    <tr><td class="violet">Algebrization</td><td>AW 2009</td><td>Any proof using algebraic extensions of oracles</td><td class="grove">Proved</td></tr>
-  </table>
-
-  <p class="r">The deep insight: these barriers are <em>themselves</em> instances of Lawvere's theorem. The PRG in natural proofs "diagonalizes against" the class of natural properties. The oracle in BGS "diagonalizes against" the class of relativizing proofs. Meta-diagonalization: diagonalization all the way down.</p>
-</div>
-
-<div class="spacer"></div>
-
-<!-- ═══════════════════════ ACT VI: THE BRIDGE ═══════════════════════ -->
-
-<div class="section">
-  <h2 class="r">Bridges to Physics</h2>
-  <p class="r">The diagonal framework reaches beyond pure logic. Two bridges connect it to the physical world.</p>
-
-  <h3 class="r" style="color:var(--flow)">Confinement Is Lawvere</h3>
-  <p class="r">In QCD, quarks are <em>confined</em> — they cannot appear in isolation, only in colorless bound states (hadrons). This is structurally identical to Cantor's theorem: the evaluation map on G-sets is not surjective, so gauge-invariant observables cannot distinguish individual quarks. <em>Confinement is non-surjectivity.</em></p>
-
-  <h3 class="r" style="color:var(--crystal)">Smolensky Is Lawvere</h3>
-  <p class="r">Smolensky's 1987 theorem — that AC⁰[p] circuits cannot compute parity — is a diagonal argument. Low-degree polynomials over 𝔽ₚ cannot represent the mod-2 function. The evaluation map from polynomial codes to Boolean functions is not surjective, because parity has degree n (proved via Möbius coefficients) while circuits produce degree < √n.</p>
-
-  <div class="thm r">
-    <div class="name">Smolensky Degree Bound</div>
-    <div class="stmt">The mod-2 parity function on {0,1}ⁿ has top Möbius coefficient (−1)ⁿ⁺¹ · 2ⁿ⁻¹ over 𝔽ₚ, which is nonzero for odd primes p. Therefore parity is not a low-degree polynomial.</div>
-    <div class="label">fully proved · Möbius inversion · 0 sorry</div>
+    <p class="r">All five blindspots are proved. Not sorry'd, not assumed &mdash; <em>proved</em>, from the abstract incompleteness theorems already in the project. Knowing your limits is the closest approximation to transcending them.</p>
   </div>
-</div>
+</section>
 
-<div class="spacer"></div>
+<div class="breath"></div>
 
-<!-- ═══════════════════════ ACT VII: THE LOGIC ═══════════════════════ -->
+<!-- ACT V: THE BARRIERS -->
+<section class="act" data-act="act-barriers">
+  <div class="act-inner">
+    <h2 class="r">Why P &ne; NP Is Hard</h2>
+    <p class="r">The diagonal argument <em>can</em> prove that some things are undecidable (Turing), uncomputable (Cantor), unprovable (G&ouml;del). So why can't it prove P &ne; NP?</p>
+    <p class="r">Because there are <em>barriers</em> &mdash; meta-diagonalizations that diagonalize over <em>proof techniques</em>, not programs. Each barrier says: your method is too general.</p>
 
-<div class="section bg-gold">
-  <h2 class="r">The Logic of Provability</h2>
-  <p class="r">GL — Gödel-Löb provability logic — is the modal logic of what a formal system can prove about its own provability. Its axioms encode exactly the self-referential structure that creates incompleteness.</p>
+    <table class="r">
+      <tr><th>Barrier</th><th>Year</th><th>Blocks</th><th>Status</th></tr>
+      <tr><td><span class="thm-link gold" data-thm="bgs_barrier">Relativization</span></td><td>BGS 1975</td><td>Oracle-general proofs</td><td class="grove">Proved</td></tr>
+      <tr><td class="crystal">Natural Proofs</td><td>RR 1997</td><td>Large+useful properties</td><td class="grove">Core proved</td></tr>
+      <tr><td><span class="thm-link violet" data-thm="aw_barrier_statement">Algebrization</span></td><td>AW 2009</td><td>Algebraic extensions</td><td class="grove">Proved</td></tr>
+    </table>
 
-  <div class="proof r">
-    <div class="step"><span class="d">-- The axiom that makes self-reference productive</span></div>
-    <div class="step"><span class="g">axiom</span> ax_lob (φ : Formula) :</div>
-    <div class="step">    <span class="k">GL⊢ □(□φ → φ) → □φ</span></div>
-    <div class="step"><span class="d">-- "If the system proves that provability of φ implies φ,</span></div>
-    <div class="step"><span class="d">--  then the system proves φ."</span></div>
+    <p class="r">The deep insight: these barriers are <em>themselves</em> instances of Lawvere's theorem. The PRG in natural proofs "diagonalizes against" the class of natural properties. The oracle in BGS "diagonalizes against" the class of relativizing proofs. Meta-diagonalization: diagonalization all the way down.</p>
   </div>
+</section>
 
-  <p class="r">GL soundness is fully proved: every GL-provable formula is valid on all well-founded Kripke frames. This is the <em>first Lean 4 formalization</em> of GL as a Hilbert-style deductive system.</p>
-</div>
+<div class="breath"></div>
 
-<div class="spacer"></div>
+<!-- ACT VI: THE BRIDGE -->
+<section class="act" data-act="act-physics">
+  <div class="act-inner">
+    <h2 class="r">Bridges to Physics</h2>
+    <p class="r">The diagonal framework reaches beyond pure logic. Two bridges connect it to the physical world.</p>
 
-<!-- ═══════════════════════ ACT VIII: THE HIERARCHY ═══════════════════════ -->
+    <h3 class="r" style="color:var(--flow)">Confinement Is Lawvere</h3>
+    <p class="r">In QCD, quarks are <em>confined</em> &mdash; they cannot appear in isolation, only in colorless bound states. This is structurally identical to <span class="thm-link" data-thm="cantor">Cantor's theorem</span>: the evaluation map on G-sets is not surjective, so gauge-invariant observables cannot distinguish individual quarks. <em><span class="thm-link" data-thm="confinement_lawvere_gset">Confinement is non-surjectivity.</span></em></p>
 
-<div class="section">
-  <h2 class="r">Climbing the Ladder of Undecidability</h2>
-  <p class="r">The arithmetic hierarchy is an infinite ladder. At each level, the halting problem for the previous level creates a new, strictly harder problem. The Turing jump <span class="c">A' = {e : φᴬₑ(e)↓}</span> is the engine — it lifts you one level, and it <em>never</em> lets you come back down.</p>
+    <h3 class="r" style="color:var(--crystal)">Smolensky Is Lawvere</h3>
+    <p class="r"><span class="thm-link" data-thm="smolensky_is_lawvere_impossibility">Smolensky's 1987 theorem</span> &mdash; that AC&#8304;[p] circuits cannot compute parity &mdash; is a diagonal argument. Low-degree polynomials over F_p cannot represent the mod-2 function.</p>
 
-  <div class="thm r">
-    <div class="name">Turing Jump Irreducibility</div>
-    <div class="stmt">For every oracle A, the Turing jump A' is not Turing-reducible to A. No oracle machine with access to A can decide the halting problem for A-oracle machines.</div>
-    <div class="label">fully proved · diagonal via OracleCode completeness + antiDiag · 0 sorry</div>
+    <div class="thm r">
+      <div class="name">Smolensky Degree Bound</div>
+      <div class="stmt">The mod-2 parity function on {0,1}&#8319; has top M&ouml;bius coefficient (&minus;1)&#8319;&#8314;&#185; &middot; 2&#8319;&#8315;&#185; over F_p, nonzero for odd primes p. Therefore parity is not low-degree.</div>
+      <div class="label">fully proved &middot; M&ouml;bius inversion &middot; 0 sorry</div>
+    </div>
   </div>
+</section>
 
-  <p class="r">The proof required building <em>new infrastructure</em>: an <span class="c">OracleCode</span> type (9 constructors mirroring Mathlib's <span class="c">RecursiveIn</span>), a Gödel numbering with round-trip proof, and a completeness theorem showing every oracle-computable function has a code. This extends Mathlib's computability library.</p>
-</div>
+<div class="breath"></div>
 
-<div class="spacer"></div>
+<!-- ACT VII: THE LOGIC -->
+<section class="act" data-act="act-gl">
+  <div class="act-inner">
+    <h2 class="r">The Logic of Provability</h2>
+    <p class="r">GL &mdash; G&ouml;del-L&ouml;b provability logic &mdash; is the modal logic of what a formal system can prove about its own provability. Its axioms encode exactly the self-referential structure that creates incompleteness.</p>
 
-<!-- ═══════════════════════ CODA ═══════════════════════ -->
+    <div class="proof r">
+      <div class="step"><span class="d">-- The axiom that makes self-reference productive</span></div>
+      <div class="step"><span class="g">axiom</span> ax_lob (&phi; : Formula) :</div>
+      <div class="step">&nbsp;&nbsp;&nbsp;&nbsp;<span class="k">GL&#8866; &#9633;(&#9633;&phi; &rarr; &phi;) &rarr; &#9633;&phi;</span></div>
+      <div class="step"><span class="d">-- "If the system proves that provability of &phi; implies &phi;,</span></div>
+      <div class="step"><span class="d">--&nbsp; then the system proves &phi;."</span></div>
+    </div>
 
-<div class="section">
-  <h2 class="r">The Numbers</h2>
-  <div class="stats r">
-    <div class="stat"><div class="num">31</div><div class="lbl">Files</div></div>
-    <div class="stat"><div class="num">357</div><div class="lbl">Theorems</div></div>
-    <div class="stat"><div class="num">7,165</div><div class="lbl">Lines</div></div>
-    <div class="stat"><div class="num">14</div><div class="lbl">Domains</div></div>
-    <div class="stat"><div class="num">2,090</div><div class="lbl">Dependencies</div></div>
-    <div class="stat"><div class="num">1</div><div class="lbl">Sorry</div></div>
+    <p class="r">GL soundness is fully proved: every GL-provable formula is valid on all well-founded Kripke frames. This is the <em>first Lean 4 formalization</em> of GL as a Hilbert-style deductive system. <span class="thm-link" data-thm="lob">L&ouml;b's theorem</span> is the crown jewel.</p>
   </div>
-  <p class="r dim" style="text-align:center">The one sorry is the Clay Millennium Prize — the Yang-Mills mass gap. Worth $1,000,000.</p>
-</div>
+</section>
 
-<div class="spacer"></div>
+<div class="breath"></div>
 
-<div class="section">
-  <div class="quote r">
-    "Every impossibility is the same impossibility. Every fixed point is the same fixed point. The diagonal is one."
+<!-- ACT VIII: THE HIERARCHY -->
+<section class="act" data-act="act-hierarchy">
+  <div class="act-inner">
+    <h2 class="r">Climbing the Ladder of Undecidability</h2>
+    <p class="r">The arithmetic hierarchy is an infinite ladder. At each level, the halting problem for the previous level creates a new, strictly harder problem. The <span class="thm-link" data-thm="turingJump">Turing jump</span> <span class="c">A' = {e : &phi;&#7468;_e(e)&darr;}</span> is the engine &mdash; it lifts you one level, and it <em>never</em> lets you come back down.</p>
+
+    <div class="thm r">
+      <div class="name">Turing Jump Irreducibility</div>
+      <div class="stmt">For every oracle A, the Turing jump A' is not Turing-reducible to A. No oracle machine with access to A can decide the halting problem for A-oracle machines.</div>
+      <div class="label">fully proved &middot; diagonal via OracleCode completeness + antiDiag &middot; 0 sorry</div>
+    </div>
+
+    <p class="r">The proof required building <em>new infrastructure</em>: an <span class="c">OracleCode</span> type (9 constructors mirroring Mathlib's <span class="c">RecursiveIn</span>), a G&ouml;del numbering with round-trip proof, and a completeness theorem showing every oracle-computable function has a code.</p>
   </div>
-</div>
+</section>
 
-<div class="spacer-lg"></div>
+<div class="breath"></div>
+
+<!-- CODA: THE NUMBERS -->
+<section class="act" data-act="act-numbers">
+  <div class="act-inner" style="text-align:center">
+    <h2 class="r">The Numbers</h2>
+    <div class="stats r">
+      <div class="stat"><div class="num" data-count="31">0</div><div class="lbl">Files</div></div>
+      <div class="stat"><div class="num" data-count="357">0</div><div class="lbl">Theorems</div></div>
+      <div class="stat"><div class="num" data-count="7165">0</div><div class="lbl">Lines</div></div>
+      <div class="stat"><div class="num" data-count="14">0</div><div class="lbl">Domains</div></div>
+      <div class="stat"><div class="num" data-count="2090">0</div><div class="lbl">Dependencies</div></div>
+      <div class="stat"><div class="num" data-count="1">0</div><div class="lbl">Sorry</div></div>
+    </div>
+    <p class="r dim">The one sorry is the Clay Millennium Prize &mdash; the Yang-Mills mass gap. Worth $1,000,000.</p>
+
+    <div class="quote r" style="text-align:left">
+      "Every impossibility is the same impossibility. Every fixed point is the same fixed point. The diagonal is one."
+    </div>
+  </div>
+</section>
+
+<div class="breath"></div>
 
 <footer>
-  <p>Built with Lean 4 + Mathlib · <a href="https://github.com/awktavian">awktavian</a></p>
+  <p>Built with Lean 4 + Mathlib &middot; <a href="https://github.com/awktavian">awktavian</a></p>
 </footer>
 
+</div><!-- /content -->
+
+<!-- Detail panel -->
+<div class="detail-panel" id="detail">
+  <button class="close" id="detail-close">&times;</button>
+  <div class="dp-domain" id="dp-domain"></div>
+  <div class="dp-name" id="dp-name"></div>
+  <div class="dp-explanation" id="dp-explanation"></div>
+  <div class="dp-statement" id="dp-statement"></div>
+  <div class="dp-meta" id="dp-meta"></div>
+  <div class="dp-chain" id="dp-chain"></div>
+</div>
+
 <script>
-// Scroll reveal
-const obs = new IntersectionObserver((entries) => {
-  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('v'); } });
+(function(){
+'use strict';
+
+// ── CONFIG ──
+const DC = {
+  categorical_logic:[78,205,196], computability:[103,212,228],
+  incompleteness:[228,88,88], self_reference:[155,126,189],
+  modal_logic:[245,158,11], undefinability:[212,175,55],
+  compression:[126,183,127], meta_theory:[255,143,163],
+  physics:[100,181,246], barriers:[239,154,154],
+  unification:[78,205,196], bridges:[90,210,190],
+  paradoxes:[255,110,130], set_theory:[255,107,53]
+};
+
+const ACT_DOMAINS = {
+  'act-hero': null,
+  'act-lawvere': ['categorical_logic','set_theory'],
+  'act-masks': null,
+  'act-blindspots': ['meta_theory','incompleteness','self_reference'],
+  'act-barriers': ['barriers','computability'],
+  'act-physics': ['physics','bridges'],
+  'act-gl': ['modal_logic'],
+  'act-hierarchy': ['computability'],
+  'act-numbers': null
+};
+
+// ── STATE ──
+let nodes = [], edgeMap = {}, nodeByName = {};
+let canvas, ctx, W, H, dpr;
+let currentAct = 'act-hero';
+let highlightDomains = null; // null = all bright
+let targetAlphas = [], currentAlphas = [];
+let hoveredNode = null, hoverLine = null;
+let rotation = 0, scrollY = 0;
+let loaded = false;
+
+// ── LOAD DATA ──
+fetch('codebase-analysis.json').then(r=>r.json()).then(data => {
+  const theorems = data.theorems;
+  // Build nodes
+  nodes = theorems.map((t,i) => ({
+    id: i, name: t.name, domain: t.domain, sorry: t.sorry,
+    ox: (t.x - 0.5) * 2, oy: (t.y - 0.5) * 2, oz: (t.z - 0.5) * 2,
+    px: 0, py: 0, // projected
+    pagerank: t.pagerank, depth: t.depth,
+    explanation: t.explanation || '', statement: t.statement || '',
+    chain: t.chain || [], technique: t.technique || '',
+    consumers: t.consumers || 0, kind: t.kind || '',
+    tactic_profile: t.tactic_profile || {},
+    color: DC[t.domain] || [200,200,200],
+    baseSize: 1.5 + Math.pow(t.pagerank, 0.5) * 5
+  }));
+
+  // Name lookup (case-insensitive, partial match)
+  nodes.forEach(n => { nodeByName[n.name.toLowerCase()] = n; });
+
+  // Edge map
+  (data.edges||[]).forEach(e => {
+    if (!edgeMap[e.source]) edgeMap[e.source] = [];
+    edgeMap[e.source].push(e.target);
+  });
+
+  // Init alphas
+  targetAlphas = new Float32Array(nodes.length).fill(1);
+  currentAlphas = new Float32Array(nodes.length).fill(1);
+
+  loaded = true;
+  document.getElementById('loading').classList.add('done');
+  setTimeout(() => document.getElementById('loading').style.display='none', 700);
+});
+
+// ── CANVAS SETUP ──
+canvas = document.getElementById('galaxy');
+ctx = canvas.getContext('2d');
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── 3D PROJECTION ──
+function project(ox, oy, oz, rot) {
+  const cr = Math.cos(rot), sr = Math.sin(rot);
+  const x = ox * cr - oz * sr;
+  const z = ox * sr + oz * cr;
+  const scale = 280 / (3 + z * 0.5);
+  return { x: W/2 + x * scale, y: H/2 + oy * scale * 0.85 + scrollY * 0.03, z: z, s: scale };
+}
+
+// ── SCROLL TRACKING ──
+window.addEventListener('scroll', () => { scrollY = window.pageYOffset; }, {passive:true});
+
+// IntersectionObserver for acts
+const actObs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting && e.intersectionRatio > 0.3) {
+      const act = e.target.dataset.act;
+      if (act && act !== currentAct) {
+        currentAct = act;
+        updateHighlight();
+      }
+    }
+  });
+}, { threshold: [0.3, 0.6] });
+document.querySelectorAll('[data-act]').forEach(el => actObs.observe(el));
+
+function updateHighlight() {
+  const domains = ACT_DOMAINS[currentAct];
+  highlightDomains = domains;
+  if (!loaded) return;
+  for (let i = 0; i < nodes.length; i++) {
+    if (domains === null) {
+      targetAlphas[i] = 1;
+    } else {
+      targetAlphas[i] = domains.includes(nodes[i].domain) ? 1 : 0.06;
+    }
+  }
+}
+
+// ── SCROLL REVEAL ──
+const revealObs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('v'); });
 }, { threshold: 0.15, rootMargin: '0px 0px -60px 0px' });
-document.querySelectorAll('.r').forEach(el => obs.observe(el));
+document.querySelectorAll('.r').forEach(el => revealObs.observe(el));
+
+// ── STATS COUNTER ──
+let statsCounted = false;
+const statsObs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting && !statsCounted) {
+      statsCounted = true;
+      document.querySelectorAll('.num[data-count]').forEach(el => {
+        const target = parseInt(el.dataset.count);
+        const duration = 2400;
+        const start = performance.now();
+        function tick(now) {
+          const t = Math.min((now - start) / duration, 1);
+          const ease = 1 - Math.pow(1 - t, 3);
+          const val = Math.round(target * ease);
+          el.textContent = val >= 1000 ? val.toLocaleString() : val;
+          if (t < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      });
+    }
+  });
+}, { threshold: 0.3 });
+const statsEl = document.querySelector('.stats');
+if (statsEl) statsObs.observe(statsEl);
+
+// ── THEOREM LINKS ──
+function findNode(name) {
+  const low = name.toLowerCase();
+  if (nodeByName[low]) return nodeByName[low];
+  for (const n of nodes) {
+    if (n.name.toLowerCase().includes(low)) return n;
+  }
+  return null;
+}
+
+document.querySelectorAll('.thm-link').forEach(link => {
+  const thmName = link.dataset.thm;
+  link.addEventListener('mouseenter', () => {
+    const node = findNode(thmName);
+    if (!node) return;
+    hoveredNode = node;
+    // Get link position for line drawing
+    const rect = link.getBoundingClientRect();
+    hoverLine = { x: rect.left + rect.width/2, y: rect.top + rect.height };
+  });
+  link.addEventListener('mouseleave', () => {
+    hoveredNode = null;
+    hoverLine = null;
+  });
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    const node = findNode(thmName);
+    if (node) showDetail(node);
+  });
+});
+
+// ── DETAIL PANEL ──
+const detail = document.getElementById('detail');
+const dpName = document.getElementById('dp-name');
+const dpDomain = document.getElementById('dp-domain');
+const dpExplanation = document.getElementById('dp-explanation');
+const dpStatement = document.getElementById('dp-statement');
+const dpMeta = document.getElementById('dp-meta');
+const dpChain = document.getElementById('dp-chain');
+
+function showDetail(node) {
+  dpName.textContent = node.name;
+  dpDomain.textContent = node.domain.replace(/_/g,' ');
+  dpDomain.style.color = `rgb(${node.color.join(',')})`;
+  dpExplanation.textContent = node.explanation;
+  dpStatement.textContent = node.statement || '(no statement)';
+  const tactics = Object.entries(node.tactic_profile).map(([k,v])=>`${k}:${v}`).join(' ');
+  dpMeta.textContent = `depth ${node.depth} · ${node.consumers} consumers · ${node.kind}${tactics ? ' · ' + tactics : ''}${node.sorry ? ' · SORRY' : ''}`;
+
+  // Chain
+  dpChain.innerHTML = '';
+  if (node.chain && node.chain.length > 0) {
+    node.chain.forEach((c, i) => {
+      const span = document.createElement('span');
+      span.className = 'dp-chain-item';
+      span.textContent = c.name || c;
+      dpChain.appendChild(span);
+      // Animate chain items lighting up in sequence
+      setTimeout(() => span.classList.add('lit'), i * 89);
+    });
+  }
+
+  detail.classList.add('open');
+}
+
+document.getElementById('detail-close').addEventListener('click', () => {
+  detail.classList.remove('open');
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') detail.classList.remove('open');
+});
+
+// ── RENDER LOOP ──
+let lastTime = 0;
+const sorryPulseSpeed = 0.003;
+
+function render(time) {
+  requestAnimationFrame(render);
+  if (!loaded) return;
+  const dt = Math.min(time - lastTime, 50);
+  lastTime = time;
+
+  rotation += 0.0003 * dt;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Lerp alphas
+  for (let i = 0; i < nodes.length; i++) {
+    currentAlphas[i] += (targetAlphas[i] - currentAlphas[i]) * 0.04;
+  }
+
+  // Project all nodes
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    const p = project(n.ox, n.oy, n.oz, rotation);
+    n.px = p.x; n.py = p.y; n.pz = p.z; n.ps = p.s;
+  }
+
+  // Sort by z for painter's algorithm
+  const sorted = nodes.slice().sort((a,b) => a.pz - b.pz);
+
+  // Draw edges (very subtle)
+  ctx.lineWidth = 0.5;
+  for (const src of sorted) {
+    const alpha = currentAlphas[src.id];
+    if (alpha < 0.1) continue;
+    const targets = edgeMap[src.name];
+    if (!targets) continue;
+    for (let ti = 0; ti < Math.min(targets.length, 3); ti++) {
+      const tgt = findNode(targets[ti]);
+      if (!tgt) continue;
+      const tAlpha = currentAlphas[tgt.id];
+      const a = Math.min(alpha, tAlpha) * 0.04;
+      if (a < 0.005) continue;
+      ctx.strokeStyle = `rgba(${src.color[0]},${src.color[1]},${src.color[2]},${a})`;
+      ctx.beginPath();
+      ctx.moveTo(src.px, src.py);
+      ctx.lineTo(tgt.px, tgt.py);
+      ctx.stroke();
+    }
+  }
+
+  // Draw nodes
+  const sorryGlow = 0.5 + 0.5 * Math.sin(time * sorryPulseSpeed);
+  for (const n of sorted) {
+    const alpha = currentAlphas[n.id];
+    if (alpha < 0.01) continue;
+
+    const depthFade = (n.pz + 1) / 2; // 0=far, 1=near
+    const size = n.baseSize * (0.6 + depthFade * 0.6);
+    const r = n.color[0], g = n.color[1], b = n.color[2];
+
+    // Glow for hovered node
+    const isHovered = hoveredNode && hoveredNode.id === n.id;
+
+    if (isHovered) {
+      ctx.beginPath();
+      ctx.arc(n.px, n.py, size * 6, 0, Math.PI * 2);
+      const grad = ctx.createRadialGradient(n.px, n.py, 0, n.px, n.py, size * 6);
+      grad.addColorStop(0, `rgba(${r},${g},${b},0.3)`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+
+    // Sorry node breathes red
+    if (n.sorry) {
+      ctx.beginPath();
+      ctx.arc(n.px, n.py, size * 4, 0, Math.PI * 2);
+      const grad = ctx.createRadialGradient(n.px, n.py, 0, n.px, n.py, size * 4);
+      grad.addColorStop(0, `rgba(228,88,88,${0.15 * sorryGlow * alpha})`);
+      grad.addColorStop(1, 'rgba(228,88,88,0)');
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+
+    // Outer glow
+    if (alpha > 0.3 && size > 2) {
+      ctx.beginPath();
+      ctx.arc(n.px, n.py, size * 2.5, 0, Math.PI * 2);
+      const grad = ctx.createRadialGradient(n.px, n.py, 0, n.px, n.py, size * 2.5);
+      grad.addColorStop(0, `rgba(${r},${g},${b},${0.08 * alpha})`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+
+    // Core dot
+    ctx.beginPath();
+    ctx.arc(n.px, n.py, size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${r},${g},${b},${alpha * (0.5 + depthFade * 0.5)})`;
+    ctx.fill();
+  }
+
+  // Draw hover line from text to node
+  if (hoveredNode && hoverLine) {
+    const n = hoveredNode;
+    ctx.strokeStyle = `rgba(212,175,55,0.25)`;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(hoverLine.x, hoverLine.y);
+    ctx.lineTo(n.px, n.py);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+requestAnimationFrame(render);
+
+// ── CANVAS CLICK ──
+canvas.addEventListener('click', e => {
+  if (!loaded) return;
+  const mx = e.clientX, my = e.clientY;
+  let closest = null, closestDist = 20;
+  for (const n of nodes) {
+    if (currentAlphas[n.id] < 0.2) continue;
+    const dx = n.px - mx, dy = n.py - my;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < closestDist) { closest = n; closestDist = dist; }
+  }
+  if (closest) showDetail(closest);
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!loaded) return;
+  const mx = e.clientX, my = e.clientY;
+  let closest = null, closestDist = 16;
+  for (const n of nodes) {
+    if (currentAlphas[n.id] < 0.2) continue;
+    const dx = n.px - mx, dy = n.py - my;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < closestDist) { closest = n; closestDist = dist; }
+  }
+  canvas.style.cursor = closest ? 'pointer' : 'default';
+});
+
+})();
 </script>
 </body>
 </html>
