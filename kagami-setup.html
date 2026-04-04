@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setting Up Claude Code — The Builder's Guide</title>
+    <meta name="description" content="How to set up Claude Code on a Mac. A practical guide for Robert — The Builder.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+/* ═══════════════════════════════════════════════════════════════════════════════
+   CLAUDE CODE SETUP GUIDE — For Robert "The Builder" Jacoby
+   Awkronos, Inc. — April 2026
+
+   Light, clean, high-contrast. Readable at arm's length.
+   Microdelights: scroll reveals, step completion, progress bar, hover states.
+═══════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+    --bg: #FAFAF8;
+    --bg-code: #F0EFEB;
+    --bg-card: #FFFFFF;
+    --text: #1A1A1A;
+    --text-dim: #5A5A5A;
+    --text-light: #8A8A8A;
+    --accent: #0D9488;
+    --accent-hover: #0F766E;
+    --accent-light: #CCFBF1;
+    --accent-glow: rgba(13, 148, 136, 0.12);
+    --border: #E5E5E0;
+    --success: #16A34A;
+    --success-light: #F0FDF4;
+    --warning: #CA8A04;
+    --warning-light: #FEFCE8;
+    --error: #DC2626;
+    --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', 'Menlo', monospace;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html {
+    scroll-behavior: smooth;
+    font-size: 18px;
+}
+
+body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+    background: var(--accent-light);
+    color: var(--text);
+}
+
+/* ═══════════════════ Progress Bar ═══════════════════ */
+.progress-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    background: var(--accent);
+    z-index: 1000;
+    transition: width 0.15s linear;
+    will-change: width;
+}
+
+.progress-bar::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 80px;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, var(--accent-light));
+    opacity: 0.6;
+}
+
+/* ═══════════════════ Layout ═══════════════════ */
+.container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+/* ═══════════════════ Scroll Reveals ═══════════════════ */
+.reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out);
+}
+
+.reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Stagger children */
+.reveal-stagger > .reveal:nth-child(1) { transition-delay: 0ms; }
+.reveal-stagger > .reveal:nth-child(2) { transition-delay: 60ms; }
+.reveal-stagger > .reveal:nth-child(3) { transition-delay: 120ms; }
+.reveal-stagger > .reveal:nth-child(4) { transition-delay: 180ms; }
+.reveal-stagger > .reveal:nth-child(5) { transition-delay: 240ms; }
+.reveal-stagger > .reveal:nth-child(6) { transition-delay: 300ms; }
+
+/* ═══════════════════ Header ═══════════════════ */
+header {
+    padding: 5rem 0 3rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 3rem;
+}
+
+header h1 {
+    font-size: 2.4rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--text) 0%, var(--accent-hover) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+header .subtitle {
+    font-size: 1.05rem;
+    color: var(--text-dim);
+    font-weight: 400;
+}
+
+header .updated {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    margin-top: 1.25rem;
+    font-family: var(--font-mono);
+    letter-spacing: 0.02em;
+}
+
+header .updated::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+    animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* ═══════════════════ Sections ═══════════════════ */
+section {
+    margin-bottom: 3.5rem;
+}
+
+h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin-bottom: 1rem;
+    padding-top: 1rem;
+    color: var(--text);
+}
+
+h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: var(--text);
+}
+
+p {
+    margin-bottom: 1rem;
+    color: var(--text);
+}
+
+p.dim {
+    color: var(--text-dim);
+}
+
+/* ═══════════════════ Step Cards ═══════════════════ */
+.step {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.step:hover {
+    border-color: rgba(13, 148, 136, 0.3);
+    box-shadow: 0 2px 12px var(--accent-glow);
+}
+
+.step.completed {
+    border-color: var(--success);
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--success-light) 100%);
+}
+
+.step-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    min-width: 2rem;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: background 0.3s, transform 0.3s var(--ease-spring);
+}
+
+.step.completed .step-number {
+    background: var(--success);
+    transform: scale(1.05);
+}
+
+.step.completed .step-number::after {
+    content: '';
+    position: absolute;
+    width: 0.5rem;
+    height: 0.3rem;
+    border-left: 2px solid white;
+    border-bottom: 2px solid white;
+    transform: rotate(-45deg) translate(1px, -1px);
+}
+
+.step h3 {
+    margin-bottom: 0;
+    line-height: 2rem;
+}
+
+.step p {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+}
+
+/* ═══════════════════ Code Blocks ═══════════════════ */
+pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    margin: 0.75rem 0 1rem;
+    position: relative;
+    transition: border-color 0.2s;
+}
+
+pre:hover {
+    border-color: rgba(13, 148, 136, 0.3);
+}
+
+code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: var(--bg-code);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+}
+
+pre code {
+    background: none;
+    padding: 0;
+    font-size: 1em;
+}
+
+/* ═══════════════════ Copy Button ═══════════════════ */
+.copy-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.3rem 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s var(--ease-out);
+    opacity: 0;
+    transform: translateY(2px);
+}
+
+pre:hover .copy-btn {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.copy-btn:hover {
+    background: var(--accent-light);
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.copy-btn.copied {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    transform: scale(0.95) translateY(0);
+}
+
+/* ═══════════════════ Callouts ═══════════════════ */
+.callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-light);
+    padding: 1rem 1.25rem;
+    border-radius: 0 8px 8px 0;
+    margin: 1rem 0;
+    font-size: 0.95rem;
+}
+
+.callout.warning {
+    border-left-color: var(--warning);
+    background: var(--warning-light);
+}
+
+.callout.success {
+    border-left-color: var(--success);
+    background: var(--success-light);
+}
+
+.callout strong {
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+/* ═══════════════════ Checklist ═══════════════════ */
+.checklist {
+    list-style: none;
+    padding: 0;
+}
+
+.checklist li {
+    padding: 0.6rem 0;
+    padding-left: 2.2rem;
+    position: relative;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.2s;
+    border-radius: 4px;
+    user-select: none;
+}
+
+.checklist li:last-child {
+    border-bottom: none;
+}
+
+.checklist li:hover {
+    background: rgba(13, 148, 136, 0.03);
+}
+
+.checklist li::before {
+    content: '';
+    position: absolute;
+    left: 0.25rem;
+    top: 0.85rem;
+    width: 1.2rem;
+    height: 1.2rem;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.25s var(--ease-spring);
+}
+
+.checklist li.checked {
+    color: var(--text-dim);
+}
+
+.checklist li.checked::before {
+    background: var(--accent);
+    border-color: var(--accent);
+    transform: scale(1.05);
+}
+
+.checklist li.checked::after {
+    content: '';
+    position: absolute;
+    left: 0.6rem;
+    top: 0.95rem;
+    width: 0.5rem;
+    height: 0.3rem;
+    border-left: 2px solid white;
+    border-bottom: 2px solid white;
+    transform: rotate(-45deg);
+    animation: check-pop 0.3s var(--ease-spring);
+}
+
+@keyframes check-pop {
+    0% { transform: rotate(-45deg) scale(0); opacity: 0; }
+    50% { transform: rotate(-45deg) scale(1.3); }
+    100% { transform: rotate(-45deg) scale(1); opacity: 1; }
+}
+
+/* ═══════════════════ Table ═══════════════════ */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+}
+
+th, td {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+th {
+    font-weight: 600;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Plan highlight */
+tr.recommended {
+    background: var(--accent-light);
+}
+
+tr.recommended td:first-child::after {
+    content: ' recommended';
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    font-weight: 600;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+}
+
+/* ═══════════════════ Tips List ═══════════════════ */
+.tips-list {
+    list-style: none;
+    padding: 0;
+}
+
+.tips-list li {
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    transition: all 0.25s var(--ease-out);
+}
+
+.tips-list li:hover {
+    background: var(--bg-card);
+    border-color: var(--border);
+    transform: translateX(4px);
+}
+
+.tips-list li strong {
+    color: var(--accent-hover);
+}
+
+/* ═══════════════════ Footer ═══════════════════ */
+footer {
+    padding: 3rem 0 4rem;
+    border-top: 1px solid var(--border);
+    margin-top: 4rem;
+    text-align: center;
+    color: var(--text-light);
+    font-size: 0.85rem;
+}
+
+footer a {
+    color: var(--accent);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+footer a:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+.footer-sig {
+    margin-top: 1.5rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    color: var(--text-light);
+    opacity: 0.6;
+    transition: opacity 0.5s;
+}
+
+.footer-sig:hover {
+    opacity: 1;
+}
+
+/* ═══════════════════ Links ═══════════════════ */
+a {
+    color: var(--accent);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+a:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+/* ═══════════════════ Responsive ═══════════════════ */
+@media (max-width: 640px) {
+    html { font-size: 16px; }
+    .container { padding: 0 1.25rem; }
+    header { padding: 3rem 0 2rem; }
+    header h1 { font-size: 1.8rem; }
+    .step { padding: 1.25rem 1.5rem; }
+    pre { font-size: 0.8rem; padding: 0.75rem 1rem; }
+    .copy-btn { opacity: 1; transform: translateY(0); }
+    .tips-list li:hover { transform: none; }
+}
+
+/* ═══════════════════ Print ═══════════════════ */
+@media print {
+    body { font-size: 12pt; }
+    .copy-btn, .progress-bar { display: none; }
+    pre { border: 1px solid #ccc; }
+    .step { break-inside: avoid; }
+    .reveal { opacity: 1; transform: none; }
+    header h1 { background: none; -webkit-text-fill-color: var(--text); }
+}
+
+/* ═══════════════════ Completion Toast ═══════════════════ */
+.toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(120%);
+    background: var(--text);
+    color: var(--bg);
+    padding: 0.75rem 1.5rem;
+    border-radius: 100px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    z-index: 1001;
+    transition: transform 0.4s var(--ease-spring), opacity 0.4s;
+    opacity: 0;
+    pointer-events: none;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+
+.toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+    </style>
+</head>
+<body>
+    <!-- Progress bar -->
+    <div class="progress-bar" id="progress-bar"></div>
+
+    <!-- Completion toast -->
+    <div class="toast" id="toast"></div>
+
+    <div class="container">
+        <header class="reveal">
+            <h1>Setting Up Claude Code on a Mac</h1>
+            <p class="subtitle">A practical guide for getting an AI engineering partner in your terminal.</p>
+            <div class="updated">Last updated April 4, 2026</div>
+        </header>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <section class="reveal">
+            <h2>What Is Claude Code?</h2>
+            <p>
+                Claude Code is an AI assistant that lives in your terminal. It can read and write files,
+                run commands, search the web, analyze images, and help with just about any project on your computer.
+                Think of it as a very capable partner who never sleeps and knows a lot about engineering.
+            </p>
+            <p class="dim">
+                It's made by Anthropic (the company behind Claude AI). Tim uses it as the foundation
+                for his company's work at <a href="https://awkronos.com">Awkronos</a> &mdash; all the mathematical
+                proof work, the website, the business operations. Same tool, different configuration.
+            </p>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <section class="reveal">
+            <h2>What You Need</h2>
+            <ul class="checklist" id="checklist">
+                <li>A Mac (any recent model &mdash; M1/M2/M3/M4 all great, Intel works too)</li>
+                <li>macOS Sequoia or later (15.0+) &mdash; probably already installed</li>
+                <li>An internet connection</li>
+                <li>A credit card for the Claude subscription ($20/month for Pro)</li>
+                <li>About 15 minutes</li>
+            </ul>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <section class="reveal">
+            <h2>Which Plan?</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Plan</th>
+                        <th>Price</th>
+                        <th>Best For</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="recommended">
+                        <td><strong>Pro</strong></td>
+                        <td>$20/mo</td>
+                        <td>Personal projects, learning, moderate use. Start here.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Max 5x</strong></td>
+                        <td>$100/mo</td>
+                        <td>Heavy daily use, longer conversations, more context.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Max 20x</strong></td>
+                        <td>$200/mo</td>
+                        <td>Professional all-day use. Practically unlimited. Tim uses this one.</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="callout">
+                <strong>Start with Pro.</strong>
+                You can upgrade anytime if you hit limits.
+                If you find yourself using it every day, Max 5x is the sweet spot.
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <section class="reveal-stagger">
+            <h2 class="reveal">Setup</h2>
+
+            <div class="step reveal" data-step="1">
+                <div class="step-header">
+                    <div class="step-number">1</div>
+                    <h3>Create a Claude Account</h3>
+                </div>
+                <p>
+                    Go to <a href="https://claude.ai" target="_blank">claude.ai</a> and sign up.
+                    You can use your Google account or create one with email.
+                    Subscribe to the Pro plan ($20/mo) to get access to Claude Code.
+                </p>
+            </div>
+
+            <div class="step reveal" data-step="2">
+                <div class="step-header">
+                    <div class="step-number">2</div>
+                    <h3>Open Terminal</h3>
+                </div>
+                <p>
+                    Press <code>Cmd + Space</code> to open Spotlight, type <code>Terminal</code>, hit Enter.
+                    This opens the command line &mdash; where Claude Code lives.
+                </p>
+                <div class="callout">
+                    <strong>First time?</strong>
+                    Terminal might feel unfamiliar. That's okay &mdash; Claude Code itself
+                    will help you learn it. You type, it types. You'll pick it up fast.
+                </div>
+            </div>
+
+            <div class="step reveal" data-step="3">
+                <div class="step-header">
+                    <div class="step-number">3</div>
+                    <h3>Install Node.js</h3>
+                </div>
+                <p>
+                    Claude Code needs Node.js (a programming runtime) to run.
+                    Copy and paste this into Terminal and hit Enter:
+                </p>
+                <pre><code># Install Homebrew (Mac's package manager) if you don't have it
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Then install Node.js
+brew install node</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+                <p>
+                    It'll ask for your Mac login password.
+                    Takes a few minutes. When done, verify:
+                </p>
+                <pre><code>node --version</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+                <p>
+                    Should print something like <code>v24.x.x</code>. Any version 18+ works.
+                </p>
+            </div>
+
+            <div class="step reveal" data-step="4">
+                <div class="step-header">
+                    <div class="step-number">4</div>
+                    <h3>Install Claude Code</h3>
+                </div>
+                <pre><code>npm install -g @anthropic-ai/claude-code</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+                <p>
+                    Installs globally on your Mac. About 30 seconds.
+                </p>
+            </div>
+
+            <div class="step reveal" data-step="5">
+                <div class="step-header">
+                    <div class="step-number">5</div>
+                    <h3>Launch It</h3>
+                </div>
+                <pre><code>claude</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+                <p>
+                    First time: a browser window opens to log in with your Claude account.
+                    Once authenticated, you're in.
+                </p>
+                <div class="callout success">
+                    <strong>That's it.</strong>
+                    You now have an AI engineering partner in your terminal.
+                    Type a question, describe what you want to build, or paste an error &mdash;
+                    it'll figure out the rest.
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <section class="reveal">
+            <h2>First Things to Try</h2>
+            <div class="reveal-stagger">
+                <div class="step reveal">
+                    <h3>"Help me organize my Documents folder"</h3>
+                    <p>
+                        Claude can look at your files, suggest a structure, and move things around.
+                        It'll ask before doing anything destructive.
+                    </p>
+                </div>
+
+                <div class="step reveal">
+                    <h3>"Read this PDF and summarize it"</h3>
+                    <p>
+                        Tell Claude the filename. It reads PDFs, images, spreadsheets &mdash; most file types.
+                    </p>
+                </div>
+
+                <div class="step reveal">
+                    <h3>"Build me a simple website for [project]"</h3>
+                    <p>
+                        Describe what you want. Claude creates the files, writes the code,
+                        and tells you how to open it. No coding knowledge needed.
+                    </p>
+                </div>
+
+                <div class="step reveal">
+                    <h3>"What's using all the space on my Mac?"</h3>
+                    <p>
+                        Claude runs system commands, analyzes disk usage, finds large files,
+                        and helps clean up. A tech-savvy friend on call.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <section class="reveal">
+            <h2>Making It Your Own</h2>
+            <p>
+                Out of the box, Claude Code is general-purpose. But you can teach it
+                about your projects, preferences, and workflows. This is what Tim does
+                to turn Claude Code into the system that runs Awkronos.
+            </p>
+
+            <h3>The CLAUDE.md File</h3>
+            <p>
+                Create a file called <code>CLAUDE.md</code> in any project folder. Claude reads this
+                every time you start a conversation there. Like a briefing document:
+            </p>
+            <pre><code># My Workshop Projects
+
+I'm Robert. I work on woodworking, electronics, and home improvement.
+
+## Preferences
+- Explain things in practical terms, not academic ones
+- I'm comfortable with basic terminal commands
+- Include specific product names when recommending tools
+- Step-by-step instructions with verification at each step
+
+## Current Projects
+- Building a CNC router from a kit
+- Home automation with Home Assistant
+- Workshop dust collection system redesign</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+            <p class="dim">
+                Update it as your projects change. Claude adapts immediately.
+            </p>
+
+            <h3>Memory</h3>
+            <p>
+                Claude has a built-in memory system. When you tell it something important
+                ("I use metric, not imperial" or "my router is a Shapeoko 4"), it remembers
+                across sessions. Just say "remember that."
+            </p>
+
+            <h3>Hooks and Rules</h3>
+            <p>
+                For deeper customization: <strong>rules</strong> (behavioral guidelines)
+                and <strong>hooks</strong> (automated actions on events). Tim's setup has
+                18 rules files and 9 hooks. You won't need these to start, but they're
+                there when you want them.
+            </p>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <section class="reveal">
+            <h2>How Tim Uses It</h2>
+            <p>
+                Tim's setup is Claude Code with heavy custom configuration layered on top.
+                Same base tool, configured to:
+            </p>
+            <ul style="padding-left: 1.5rem; margin-bottom: 1rem; line-height: 2;">
+                <li>Write and verify mathematical proofs in Lean 4</li>
+                <li>Manage the Awkronos website and business operations</li>
+                <li>Check email and draft responses</li>
+                <li>Run a background process that continuously works on proofs</li>
+                <li>Coordinate multiple AI agents working in parallel</li>
+                <li>Track patents, consulting, and corporate compliance</li>
+            </ul>
+            <p class="dim">
+                You don't need any of that. The base tool is powerful on its own.
+                Start simple, add configuration as you discover what you need.
+            </p>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <section class="reveal">
+            <h2>Alternative: Desktop App</h2>
+            <p>
+                Prefer a regular app window over the terminal? Claude Code has a desktop app too.
+                Same capabilities, friendlier interface.
+            </p>
+            <pre><code># Install the desktop app
+brew install --cask claude-code</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+            <p class="dim">
+                Or download from <a href="https://claude.ai/download" target="_blank">claude.ai/download</a>.
+                Both versions share the same account and configuration.
+            </p>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <section class="reveal">
+            <h2>Tips from The Builder's Son</h2>
+            <ul class="tips-list">
+                <li>
+                    <strong>Be specific.</strong> "Help me design a dust collection system for a 20x24 shop
+                    with a table saw, planer, and bandsaw" beats "help with dust collection."
+                </li>
+                <li>
+                    <strong>Show it things.</strong> Take a photo and ask "what's wrong with this joint?"
+                    or "identify this connector." It can see images.
+                </li>
+                <li>
+                    <strong>Let it run commands.</strong> It asks permission first.
+                    Not sure? Say no &mdash; it'll explain what it was trying to do.
+                </li>
+                <li>
+                    <strong>Give context.</strong> "I'm working on my CNC project"
+                    orients it immediately. CLAUDE.md makes this automatic.
+                </li>
+                <li>
+                    <strong>Trust but verify.</strong> Very good but not perfect.
+                    Double-check measurements and safety-critical specs independently.
+                </li>
+            </ul>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <section class="reveal">
+            <h2>Troubleshooting</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Problem</th>
+                        <th>Fix</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>command not found: brew</code></td>
+                        <td>Close Terminal, reopen, try the install command again.</td>
+                    </tr>
+                    <tr>
+                        <td><code>command not found: node</code></td>
+                        <td>Close Terminal, reopen. Still broken? <code>brew install node</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>command not found: claude</code></td>
+                        <td>Close Terminal, reopen. Still broken? <code>npm install -g @anthropic-ai/claude-code</code></td>
+                    </tr>
+                    <tr>
+                        <td>Login page won't open</td>
+                        <td>Check internet. Try <code>claude --login</code></td>
+                    </tr>
+                    <tr>
+                        <td>"Usage limit reached"</td>
+                        <td>Wait a few hours, or upgrade your plan.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <section class="reveal">
+            <h2>Keyboard Shortcuts</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Shortcut</th>
+                        <th>What It Does</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>Cmd + Space</code></td>
+                        <td>Open Spotlight (to find Terminal)</td>
+                    </tr>
+                    <tr>
+                        <td><code>Cmd + T</code></td>
+                        <td>New Terminal tab</td>
+                    </tr>
+                    <tr>
+                        <td><code>Cmd + K</code></td>
+                        <td>Clear the terminal screen</td>
+                    </tr>
+                    <tr>
+                        <td><code>Ctrl + C</code></td>
+                        <td>Cancel whatever's running</td>
+                    </tr>
+                    <tr>
+                        <td><code>Escape</code></td>
+                        <td>In Claude Code: cancel current action</td>
+                    </tr>
+                    <tr>
+                        <td><code>/help</code></td>
+                        <td>In Claude Code: show help menu</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <footer class="reveal">
+            <p>
+                Made with care by Tim &mdash;
+                <a href="https://awkronos.com">Awkronos, Inc.</a>
+            </p>
+            <p style="margin-top: 0.5rem;">
+                Questions? Text me. Or better yet &mdash; ask Claude.
+            </p>
+            <p class="footer-sig">awkronos.com</p>
+        </footer>
+    </div>
+
+    <script>
+    /* ═══════════════════════════════════════════════════════════════════
+       MICRODELIGHTS
+       - Scroll progress bar
+       - Intersection observer reveals
+       - Copy-to-clipboard with feedback
+       - Persistent checklist
+       - Step completion on checklist progress
+       - Toast notifications
+    ═══════════════════════════════════════════════════════════════════ */
+
+    // 1. Scroll progress bar
+    const progressBar = document.getElementById('progress-bar');
+    function updateProgress() {
+        const scrolled = window.scrollY;
+        const total = document.documentElement.scrollHeight - window.innerHeight;
+        const pct = total > 0 ? (scrolled / total) * 100 : 0;
+        progressBar.style.width = pct + '%';
+    }
+    window.addEventListener('scroll', updateProgress, { passive: true });
+    updateProgress();
+
+    // 2. Intersection observer for scroll reveals
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+            }
+        });
+    }, {
+        threshold: 0.1,
+        rootMargin: '0px 0px -40px 0px'
+    });
+
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    // 3. Copy-to-clipboard
+    function copyCode(btn) {
+        const pre = btn.parentElement;
+        const code = pre.querySelector('code').textContent;
+        navigator.clipboard.writeText(code).then(() => {
+            const orig = btn.textContent;
+            btn.textContent = 'Copied';
+            btn.classList.add('copied');
+            showToast('Copied to clipboard');
+            setTimeout(() => {
+                btn.textContent = orig;
+                btn.classList.remove('copied');
+            }, 2000);
+        });
+    }
+
+    // 4. Toast notifications
+    const toast = document.getElementById('toast');
+    let toastTimeout;
+    function showToast(msg) {
+        clearTimeout(toastTimeout);
+        toast.textContent = msg;
+        toast.classList.add('show');
+        toastTimeout = setTimeout(() => toast.classList.remove('show'), 2000);
+    }
+
+    // 5. Interactive checklist with persistence
+    const checklist = document.getElementById('checklist');
+    if (checklist) {
+        const items = checklist.querySelectorAll('li');
+        const key = 'claude-setup-checklist';
+        const saved = JSON.parse(localStorage.getItem(key) || '[]');
+
+        function updateChecklist() {
+            const checked = [];
+            items.forEach((it, j) => { if (it.classList.contains('checked')) checked.push(j); });
+            localStorage.setItem(key, JSON.stringify(checked));
+
+            // Show encouragement
+            const total = items.length;
+            const done = checked.length;
+            if (done === total) {
+                showToast('All set \u2014 ready to install');
+            } else if (done > 0) {
+                showToast(done + ' of ' + total + ' ready');
+            }
+        }
+
+        items.forEach((item, i) => {
+            if (saved.includes(i)) item.classList.add('checked');
+            item.addEventListener('click', () => {
+                item.classList.toggle('checked');
+                updateChecklist();
+            });
+        });
+    }
+
+    // 6. Keyboard: Escape to scroll to top
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    });
+
+    // 7. Console greeting (for Robert, if he looks)
+    console.log(
+        '%c\u2699\uFE0F The Builder\'s Guide %c\n' +
+        'You found the console. That\'s a good sign.\n' +
+        'Type %cclaude%c in Terminal to get started.\n\n' +
+        'With love from Tim \u2014 Awkronos, Inc.',
+        'color: #0D9488; font-size: 16px; font-weight: bold;',
+        '',
+        'color: #0D9488; font-weight: bold; background: #CCFBF1; padding: 2px 6px; border-radius: 3px;',
+        ''
+    );
+    </script>
+</body>
+</html>
