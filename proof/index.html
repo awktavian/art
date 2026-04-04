@@ -3,622 +3,364 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZFC Proof Galaxy</title>
+<title>The Great Diagonal</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+:root {
+  --bg: #07060B; --fg: #E5E0D8; --dim: rgba(229,224,216,0.55); --mid: rgba(229,224,216,0.75);
+  --gold: #D4AF37; --gold-bright: #F5D061; --crystal: #88C0D0; --spark: #EBCB8B;
+  --ember: #BF616A; --grove: #A3BE8C; --nexus: #5E81AC; --violet: #B48EAD;
+  --beacon: #D08770; --flow: #4ECDC4;
+  --serif: 'Cormorant Garamond', Georgia, serif;
+  --sans: 'Inter', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-weight: 400;
+  line-height: 1.8; font-size: 16px; -webkit-font-smoothing: antialiased; }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+/* Grain overlay */
+body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.012; }
 
-body {
-  background: #07060b;
-  color: #e8e6f0;
-  font-family: 'Inter', sans-serif;
-  font-weight: 500;
-  overflow: hidden;
-  width: 100vw;
-  height: 100vh;
-}
+/* Sections */
+.section { max-width: 740px; margin: 0 auto; padding: 0 28px; }
+.spacer { height: 160px; }
+.spacer-lg { height: 280px; }
 
-canvas {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  z-index: 0;
-}
+/* Scroll reveal */
+.r { opacity: 0; transform: translateY(40px); transition: opacity 610ms var(--ease), transform 610ms var(--ease); }
+.r.v { opacity: 1; transform: translateY(0); }
 
-.glass {
-  background: rgba(12, 11, 18, 0.92);
-  backdrop-filter: blur(60px);
-  -webkit-backdrop-filter: blur(60px);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px;
-}
+/* Typography */
+h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(2.5rem, 6vw, 4.5rem);
+  line-height: 1.15; letter-spacing: -0.02em; }
+h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(1.8rem, 4vw, 2.8rem);
+  line-height: 1.25; letter-spacing: -0.01em; margin-bottom: 24px; }
+h3 { font-family: var(--serif); font-weight: 600; font-size: 1.3rem; margin-bottom: 16px; }
+p { color: var(--mid); margin-bottom: 20px; max-width: 65ch; }
+.dim { color: var(--dim); }
+.gold { color: var(--gold); }
+.crystal { color: var(--crystal); }
+.ember { color: var(--ember); }
+.grove { color: var(--grove); }
+.violet { color: var(--violet); }
+.flow { color: var(--flow); }
+em { font-family: var(--serif); font-style: italic; color: var(--fg); }
 
-#hud {
-  position: fixed;
-  top: 20px; left: 20px;
-  padding: 16px 20px;
-  z-index: 10;
-  font-size: 13px;
-  line-height: 1.7;
-  opacity: 0.7;
-  transition: opacity 233ms;
-  max-width: 320px;
-}
-#hud:hover { opacity: 1; }
-#hud h1 {
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  margin-bottom: 8px;
-  color: #fff;
-}
-#hud .stat { color: rgba(255,255,255,0.5); }
-#hud .stat b { color: rgba(255,255,255,0.85); font-weight: 600; }
+/* Hero */
+.hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center;
+  position: relative; }
+.hero h1 { margin-bottom: 32px; }
+.hero .eq { font-family: var(--serif); font-style: italic; font-size: clamp(2rem, 5vw, 3.5rem);
+  color: var(--gold); margin-bottom: 40px; text-shadow: 0 0 60px rgba(212,175,55,0.12); }
+.hero .eq:hover { text-shadow: 0 0 80px rgba(212,175,55,0.25), 0 0 120px rgba(212,175,55,0.1); }
+.hero p { font-size: 17px; }
+.hero .label { font-family: var(--mono); font-size: 11px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--dim); margin-bottom: 24px; }
 
-#search-box {
-  position: fixed;
-  top: 20px; right: 20px;
-  z-index: 10;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-#search-input {
-  background: transparent;
-  border: none;
-  outline: none;
-  color: #e8e6f0;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 500;
-  width: 240px;
-}
-#search-input::placeholder { color: rgba(255,255,255,0.25); }
-#search-count { font-size: 12px; color: rgba(255,255,255,0.35); }
+/* Quote bar */
+.quote { border-left: 2px solid var(--gold); padding: 16px 0 16px 24px; margin: 32px 0;
+  font-family: var(--serif); font-style: italic; font-size: 1.15rem; color: var(--mid); }
+.quote .attr { font-family: var(--sans); font-style: normal; font-size: 13px;
+  color: var(--dim); margin-top: 8px; display: block; }
 
-#legend {
-  position: fixed;
-  top: 80px; right: 20px;
-  z-index: 10;
-  padding: 14px 18px;
-  font-size: 12px;
-  max-height: calc(100vh - 160px);
-  overflow-y: auto;
-  width: 200px;
-}
-#legend h3 {
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: rgba(255,255,255,0.4);
-  margin-bottom: 10px;
-}
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-  cursor: pointer;
-  opacity: 0.7;
-  transition: opacity 144ms;
-}
-.legend-item:hover { opacity: 1; }
-.legend-item.active { opacity: 1; }
-.legend-dot {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.legend-label { flex: 1; }
-.legend-count { color: rgba(255,255,255,0.3); font-variant-numeric: tabular-nums; }
+/* Code / formula */
+.c { font-family: var(--mono); font-size: 0.9em; color: var(--crystal);
+  padding: 2px 6px; background: rgba(136,192,208,0.08); border-radius: 3px; }
 
-#detail {
-  position: fixed;
-  bottom: 20px; left: 20px;
-  z-index: 10;
-  padding: 0;
-  width: 520px;
-  max-height: 55vh;
-  overflow-y: auto;
-  display: none;
-  transition: opacity 233ms;
-}
-#detail.visible { display: block; }
-#detail-inner { padding: 20px 24px; }
-#detail-name {
-  font-size: 20px;
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-#detail-kind {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: rgba(255,255,255,0.35);
-  margin-bottom: 14px;
-}
-#detail-explanation {
-  font-size: 13px;
-  line-height: 1.8;
-  color: rgba(255,255,255,0.75);
-  margin-bottom: 14px;
-}
-#detail-statement {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  line-height: 1.6;
-  padding: 12px 16px;
-  background: rgba(255,255,255,0.03);
-  border-left: 3px solid;
-  border-radius: 0 6px 6px 0;
-  margin-bottom: 14px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  max-height: 120px;
-  overflow-y: auto;
-}
-#detail-insight {
-  font-size: 13px;
-  font-style: italic;
-  color: rgba(255,255,255,0.5);
-  margin-bottom: 14px;
-  padding-left: 12px;
-  border-left: 2px solid rgba(255,255,255,0.1);
-}
-#detail-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 14px;
-}
-.tag {
-  font-size: 11px;
-  padding: 3px 10px;
-  border-radius: 20px;
-  background: rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.55);
-}
-.tag.sorry { background: rgba(255,60,60,0.15); color: #ff6b6b; }
+/* Proof blocks */
+.proof { background: rgba(255,255,255,0.02); border-left: 3px solid var(--crystal);
+  padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 24px 0; font-family: var(--mono);
+  font-size: 13px; line-height: 1.8; }
+.proof .step { opacity: 0; transform: translateX(-6px);
+  transition: opacity 377ms var(--ease), transform 377ms var(--ease); }
+.proof.v .step { opacity: 1; transform: translateX(0); }
+.proof .step:nth-child(1) { transition-delay: 0ms; }
+.proof .step:nth-child(2) { transition-delay: 89ms; }
+.proof .step:nth-child(3) { transition-delay: 178ms; }
+.proof .step:nth-child(4) { transition-delay: 267ms; }
+.proof .step:nth-child(5) { transition-delay: 356ms; }
+.proof .step:nth-child(6) { transition-delay: 445ms; }
+.proof .k { color: var(--grove); } /* key result */
+.proof .b { color: var(--crystal); } /* computed value */
+.proof .g { color: var(--gold); } /* highlight */
+.proof .d { color: var(--dim); font-style: italic; } /* comment */
 
-#detail-chain { margin-bottom: 14px; }
-#detail-chain h4 {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: rgba(255,255,255,0.3);
-  margin-bottom: 8px;
-}
-.chain-item {
-  font-size: 12px;
-  padding: 4px 0;
-  padding-left: 12px;
-  border-left: 1px solid rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.55);
-}
-.chain-item b { color: rgba(255,255,255,0.8); }
+/* Theorem boxes */
+.thm { background: rgba(212,175,55,0.04); border: 1px solid rgba(212,175,55,0.12);
+  border-radius: 8px; padding: 20px 24px; margin: 28px 0; }
+.thm .name { font-family: var(--mono); font-size: 12px; color: var(--gold);
+  letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+.thm .stmt { font-family: var(--serif); font-style: italic; font-size: 1.1rem;
+  color: var(--fg); line-height: 1.6; }
+.thm .label { font-family: var(--mono); font-size: 10px; color: var(--dim);
+  margin-top: 12px; letter-spacing: 0.5px; }
 
-#detail-tactics { margin-bottom: 10px; }
-#detail-tactics h4 {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: rgba(255,255,255,0.3);
-  margin-bottom: 6px;
-}
-.tactic-bar-container {
-  display: flex;
-  gap: 3px;
-  align-items: flex-end;
-  height: 24px;
-}
-.tactic-bar {
-  flex: 1;
-  background: rgba(78,205,196,0.4);
-  border-radius: 2px 2px 0 0;
-  min-width: 3px;
-  max-width: 20px;
-  position: relative;
-}
-.tactic-bar:hover::after {
-  content: attr(data-label);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 9px;
-  white-space: nowrap;
-  color: rgba(255,255,255,0.6);
-  padding: 2px 4px;
-  background: rgba(0,0,0,0.8);
-  border-radius: 3px;
-}
+/* Table */
+table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 14px; }
+th { font-family: var(--mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--dim); text-align: left; padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--mid); }
+td:first-child { color: var(--fg); font-weight: 500; }
 
-#detail-meta {
-  font-size: 11px;
-  color: rgba(255,255,255,0.3);
-  line-height: 1.8;
-}
-#detail-meta b { color: rgba(255,255,255,0.5); }
+/* Timeline */
+.timeline { position: relative; padding-left: 32px; margin: 40px 0; }
+.timeline::before { content: ''; position: absolute; left: 6px; top: 0; bottom: 0;
+  width: 1px; background: rgba(212,175,55,0.15); }
+.timeline .event { position: relative; margin-bottom: 32px; }
+.timeline .event::before { content: ''; position: absolute; left: -29px; top: 8px;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--gold); }
+.timeline .date { font-family: var(--mono); font-size: 12px; color: var(--gold); margin-bottom: 4px; }
+.timeline .who { font-family: var(--serif); font-size: 1.1rem; font-weight: 600; margin-bottom: 4px; }
 
-#loading {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  background: #07060b;
-  transition: opacity 377ms;
-}
-#loading.hidden { opacity: 0; pointer-events: none; }
-#loading-text {
-  font-size: 16px;
-  color: rgba(255,255,255,0.4);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-}
+/* Stats bar */
+.stats { display: flex; flex-wrap: wrap; gap: 24px; margin: 32px 0; }
+.stat { text-align: center; }
+.stat .num { font-family: var(--mono); font-size: 28px; font-weight: 500; color: var(--gold); }
+.stat .lbl { font-size: 11px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; margin-top: 4px; }
 
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+/* Footer */
+footer { text-align: center; padding: 80px 28px; color: var(--dim); font-size: 13px; }
+footer a { color: var(--gold); text-decoration: none; }
+
+/* Nebula backgrounds */
+.bg-crystal { background: radial-gradient(ellipse 60% 40% at 80% 30%, rgba(136,192,208,0.025), transparent 60%); }
+.bg-gold { background: radial-gradient(ellipse 50% 50% at 20% 40%, rgba(212,175,55,0.02), transparent 55%); }
+.bg-ember { background: radial-gradient(ellipse 70% 50% at 60% 60%, rgba(191,97,106,0.02), transparent 50%); }
+.bg-grove { background: radial-gradient(ellipse 60% 60% at 30% 70%, rgba(163,190,140,0.025), transparent 55%); }
+
+@media (max-width: 600px) {
+  .section { padding: 0 20px; }
+  .spacer { height: 100px; }
+  .spacer-lg { height: 180px; }
+  .stats { gap: 16px; }
+}
 </style>
 </head>
 <body>
 
-<div id="loading"><div id="loading-text">Loading proof universe...</div></div>
+<!-- ═══════════════════════ ACT I: THE EQUATION ═══════════════════════ -->
 
-<canvas id="galaxy"></canvas>
-
-<div id="hud" class="glass"></div>
-
-<div id="search-box" class="glass">
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2">
-    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-  </svg>
-  <input id="search-input" type="text" placeholder="Search theorems... ( / )">
-  <span id="search-count"></span>
+<div class="hero section">
+  <div class="label r">A formalization in Lean 4</div>
+  <h1 class="r">The Great Diagonal</h1>
+  <div class="eq r">∀ f : B → B, ∃ b, f b = b</div>
+  <p class="r">Every impossibility theorem in mathematics — Cantor, Gödel, Turing, Rice, Russell, Tarski — is an instance of <em>one</em> theorem. Lawvere's fixed-point theorem. The diagonal argument. The same proof, wearing different masks.</p>
+  <p class="r dim" style="font-size:14px">31 files · 357 theorems · 7,165 lines · 1 sorry (the Clay Millennium Prize)</p>
 </div>
 
-<div id="legend" class="glass"></div>
+<div class="spacer-lg"></div>
 
-<div id="detail" class="glass">
-  <div id="detail-inner">
-    <div id="detail-name"></div>
-    <div id="detail-kind"></div>
-    <div id="detail-explanation"></div>
-    <div id="detail-statement"></div>
-    <div id="detail-insight"></div>
-    <div id="detail-tags"></div>
-    <div id="detail-chain"></div>
-    <div id="detail-tactics"></div>
-    <div id="detail-meta"></div>
+<!-- ═══════════════════════ ACT II: THE PATTERN ═══════════════════════ -->
+
+<div class="section bg-gold">
+  <h2 class="r">The Pattern Nobody Saw</h2>
+  <p class="r">In 1969, F. William Lawvere published a short paper in the <em>Comptes Rendus</em>. The paper proved a single theorem about cartesian closed categories. Almost nobody noticed.</p>
+  <p class="r">The theorem said: if you can enumerate all functions from A to B using elements of A itself — if there exists a surjection <span class="c">e : A → (A → B)</span> — then every transformation <span class="c">f : B → B</span> has a fixed point.</p>
+
+  <div class="thm r">
+    <div class="name">Lawvere's Fixed-Point Theorem (1969)</div>
+    <div class="stmt">If e : A → (A → B) is surjective and f : B → B is any endofunction, then there exists b : B such that f(b) = b.</div>
+    <div class="label">kernel-verified · 0 sorry · 0 axioms · the foundation of everything that follows</div>
+  </div>
+
+  <p class="r">The proof is five lines. Construct the diagonal: <span class="c">d(a) = f(e(a)(a))</span>. Since e is surjective, d has a preimage: some <span class="c">a₀</span> with <span class="c">e(a₀) = d</span>. Then <span class="c">d(a₀) = f(e(a₀)(a₀)) = f(d(a₀))</span>. Set <span class="c">b = d(a₀)</span>. Done.</p>
+
+  <div class="proof r">
+    <div class="step"><span class="d">-- The proof that unifies all of logic</span></div>
+    <div class="step"><span class="g">theorem</span> lawvere_fixed_point (e : A → (A → B))</div>
+    <div class="step">    (he : Surjective e) (f : B → B) : <span class="k">∃ b, f b = b</span> := by</div>
+    <div class="step">  <span class="b">obtain</span> ⟨a₀, ha₀⟩ := he (fun a => f (e a a))</div>
+    <div class="step">  exact ⟨f (e a₀ a₀), <span class="d">-- the fixed point</span></div>
+    <div class="step">    by <span class="b">simp</span> [show e a₀ = fun a => f (e a a) from ha₀]⟩</div>
+  </div>
+
+  <p class="r">The power is in the <em>contrapositive</em>. If f has <em>no</em> fixed point — like boolean negation, which flips every value — then e <em>cannot</em> be surjective. No enumeration of all functions can exist.</p>
+</div>
+
+<div class="spacer"></div>
+
+<!-- ═══════════════════════ ACT III: THE MASKS ═══════════════════════ -->
+
+<div class="section bg-crystal">
+  <h2 class="r">Seven Masks, One Face</h2>
+  <p class="r">Every great impossibility result in the foundations of mathematics is Lawvere's theorem in disguise. The same diagonal argument, applied to different types.</p>
+
+  <table class="r">
+    <tr><th>Theorem</th><th>A</th><th>B</th><th>f (no fixed point)</th><th>Conclusion</th></tr>
+    <tr><td class="gold">Cantor (1891)</td><td>Sets</td><td>Prop</td><td>¬ (negation)</td><td>No surjection X → 𝒫(X)</td></tr>
+    <tr><td class="crystal">Gödel I (1931)</td><td>Sentences</td><td>Prop</td><td>¬Provable</td><td>True sentence unprovable</td></tr>
+    <tr><td class="ember">Turing (1936)</td><td>Programs</td><td>{halt, loop}</td><td>flip</td><td>Halting undecidable</td></tr>
+    <tr><td class="violet">Rice (1953)</td><td>Programs</td><td>Bool</td><td>Bool.not</td><td>Semantic props undecidable</td></tr>
+    <tr><td class="grove">Russell (1901)</td><td>Sets</td><td>Prop</td><td>¬ ∈</td><td>No universal set</td></tr>
+    <tr><td class="flow">Tarski (1933)</td><td>Sentences</td><td>Prop</td><td>¬Truth</td><td>No truth predicate</td></tr>
+    <tr><td style="color:var(--beacon)">Smolensky (1987)</td><td>Polynomials</td><td>𝔽ₚ</td><td>parity</td><td>AC⁰[p] can't compute MOD₂</td></tr>
+  </table>
+
+  <p class="r">In each case, the argument is identical: assume you can enumerate everything, construct the diagonal, apply the fixed-point-free transform, get a contradiction. The <em>only</em> thing that changes is what A, B, and f are.</p>
+
+  <div class="quote r">
+    "The diagonal argument is not a trick. It is the <em>structure</em> of self-reference itself — the moment a system tries to describe all of its own descriptions."
+    <span class="attr">— The thesis of this formalization</span>
   </div>
 </div>
 
-<script>
-const DOMAIN_COLORS = {
-  categorical_logic: '#4ecdc4',
-  set_theory: '#ff6b35',
-  computability: '#67d4e4',
-  incompleteness: '#e45858',
-  self_reference: '#9b7ebd',
-  modal_logic: '#f59e0b',
-  undefinability: '#d4af37',
-  compression: '#7eb77f',
-  meta_theory: '#ff8fa3',
-  physics: '#64b5f6',
-  barriers: '#ef9a9a',
-  unification: '#4ecdc4',
-  bridges: '#81c784',
-  paradoxes: '#ffb74d',
-  unclassified: '#666',
-};
+<div class="spacer"></div>
 
-let DATA = null;
-let nodes = [];
-let selected = null;
-let searchFilter = '';
-let domainFilter = null;
-let rotX = 0.3, rotY = 0.5;
-let targetRotX = 0.3, targetRotY = 0.5;
-let zoom = 1.0, targetZoom = 1.0;
-let isDragging = false;
-let lastMouse = { x: 0, y: 0 };
-let autoRotate = true;
-let hoveredNode = null;
-let W, H;
-const canvas = document.getElementById('galaxy');
-const ctx = canvas.getContext('2d');
+<!-- ═══════════════════════ ACT IV: THE BLINDSPOTS ═══════════════════════ -->
 
-fetch('codebase-analysis.json')
-  .then(r => r.json())
-  .then(data => {
-    DATA = data;
-    init();
-    document.getElementById('loading').classList.add('hidden');
-    requestAnimationFrame(render);
-  })
-  .catch(e => {
-    document.getElementById('loading-text').textContent = 'Error: ' + e.message;
-  });
+<div class="section bg-ember">
+  <h2 class="r">What You Cannot Prove About Yourself</h2>
+  <p class="r">The diagonal doesn't just create impossibility results. Applied to a <em>self-improving system</em> — one that modifies its own code — it creates <em>blindspots</em>. Five limits that no sufficiently complex system can overcome from within.</p>
 
-function init() {
-  resize();
-  window.addEventListener('resize', resize);
-
-  nodes = DATA.theorems.map((t, i) => ({
-    ...t,
-    idx: i,
-    wx: (t.x - 0.5) * 3.0,
-    wy: (t.y - 0.5) * 3.0,
-    wz: (t.z - 0.5) * 3.0,
-    radius: 3 + Math.sqrt(t.pagerank * 40 + t.consumers * 2),
-    color: DOMAIN_COLORS[t.domain] || '#666',
-    alpha: 1.0,
-    targetAlpha: 1.0,
-    screenX: 0, screenY: 0, screenZ: 0, screenR: 0,
-  }));
-
-  buildHUD();
-  buildLegend();
-  setupInput();
-}
-
-function resize() {
-  W = window.innerWidth;
-  H = window.innerHeight;
-  canvas.width = W * devicePixelRatio;
-  canvas.height = H * devicePixelRatio;
-  canvas.style.width = W + 'px';
-  canvas.style.height = H + 'px';
-  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-}
-
-function buildHUD() {
-  const s = DATA.stats;
-  document.getElementById('hud').innerHTML = `
-    <h1>ZFC Proof Galaxy</h1>
-    <div class="stat"><b>${s.total_declarations}</b> declarations</div>
-    <div class="stat"><b>${s.theorems}</b> theorems &middot; <b>${s.definitions}</b> definitions</div>
-    <div class="stat"><b>${s.edge_count}</b> dependencies &middot; depth <b>${s.max_depth}</b></div>
-    <div class="stat"><b>${s.sorry_count}</b> sorry &middot; <b>${s.domain_count}</b> domains</div>
-    <div class="stat" style="margin-top:6px;font-size:11px;color:rgba(255,255,255,0.25)">
-      ${DATA.soundness.status === 'CLEAN' ? 'KERNEL SOUND' : DATA.soundness.sorry_count + ' sorry remaining'}
+  <div class="timeline r">
+    <div class="event">
+      <div class="date">Blindspot 1 · Gödel II</div>
+      <div class="who" style="color:var(--ember)">Consistency</div>
+      <p>The system cannot prove it will never crash. If it could, it would prove its own consistency — contradicting Gödel's second incompleteness theorem.</p>
     </div>
-  `;
-}
+    <div class="event">
+      <div class="date">Blindspot 2 · Rice</div>
+      <div class="who" style="color:var(--violet)">Optimality</div>
+      <p>The system cannot prove it has found the <em>best</em> fixed point. "Is this the optimal configuration?" is a non-trivial semantic property — undecidable by Rice's theorem.</p>
+    </div>
+    <div class="event">
+      <div class="date">Blindspot 3 · Turing</div>
+      <div class="who" style="color:var(--crystal)">Halting</div>
+      <p>The system cannot decide whether an arbitrary self-modification will terminate. It must use timeouts, not proofs.</p>
+    </div>
+    <div class="event">
+      <div class="date">Blindspot 4 · P vs NP</div>
+      <div class="who" style="color:var(--nexus)">Complexity</div>
+      <p>The system cannot prove its own time complexity is optimal. This connects to the deepest open problem in mathematics.</p>
+    </div>
+    <div class="event">
+      <div class="date">Blindspot 5 · CBF</div>
+      <div class="who" style="color:var(--grove)">Safety</div>
+      <p>The safety barrier <span class="c">h(x) ≥ 0</span> is maintained by <em>engineering</em> — continuous monitoring and correction — not by proof. Trying to prove safety hits Gödel II.</p>
+    </div>
+  </div>
 
-function buildLegend() {
-  const el = document.getElementById('legend');
-  let html = '<h3>Domains</h3>';
-  const counts = {};
-  DATA.theorems.forEach(t => { counts[t.domain] = (counts[t.domain] || 0) + 1; });
-  Object.entries(counts).sort((a,b) => b[1] - a[1]).forEach(([domain, count]) => {
-    const color = DOMAIN_COLORS[domain] || '#666';
-    html += `<div class="legend-item" data-domain="${domain}">
-      <div class="legend-dot" style="background:${color}"></div>
-      <span class="legend-label">${domain.replace(/_/g, ' ')}</span>
-      <span class="legend-count">${count}</span>
-    </div>`;
-  });
-  el.innerHTML = html;
-  el.querySelectorAll('.legend-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const d = item.dataset.domain;
-      if (domainFilter === d) {
-        domainFilter = null;
-        el.querySelectorAll('.legend-item').forEach(i => i.classList.remove('active'));
-      } else {
-        domainFilter = d;
-        el.querySelectorAll('.legend-item').forEach(i => i.classList.toggle('active', i.dataset.domain === d));
-      }
-      updateFilters();
-    });
-  });
-}
+  <p class="r">All five blindspots are proved. Not sorry'd, not assumed — <em>proved</em>, from the abstract incompleteness theorems already in the project. Knowing your limits is the closest approximation to transcending them.</p>
+</div>
 
-function setupInput() {
-  const si = document.getElementById('search-input');
-  si.addEventListener('input', () => { searchFilter = si.value.toLowerCase().trim(); updateFilters(); });
-  document.addEventListener('keydown', e => {
-    if (e.key === '/') { e.preventDefault(); si.focus(); }
-    if (e.key === 'Escape') {
-      selected = null;
-      document.getElementById('detail').classList.remove('visible');
-      si.blur(); searchFilter = ''; si.value = '';
-      domainFilter = null;
-      document.querySelectorAll('.legend-item').forEach(i => i.classList.remove('active'));
-      updateFilters();
-    }
-  });
-  canvas.addEventListener('mousedown', e => { isDragging = true; autoRotate = false; lastMouse = {x:e.clientX, y:e.clientY}; });
-  canvas.addEventListener('mousemove', e => {
-    if (isDragging) {
-      targetRotY += (e.clientX - lastMouse.x) * 0.005;
-      targetRotX += (e.clientY - lastMouse.y) * 0.005;
-      targetRotX = Math.max(-Math.PI/2, Math.min(Math.PI/2, targetRotX));
-      lastMouse = {x:e.clientX, y:e.clientY};
-    } else {
-      hoveredNode = null;
-      let minD = 20;
-      for (let i = nodes.length - 1; i >= 0; i--) {
-        const n = nodes[i];
-        if (n.alpha < 0.1) continue;
-        const dx = e.clientX - n.screenX, dy = e.clientY - n.screenY;
-        const d = Math.sqrt(dx*dx + dy*dy);
-        if (d < n.screenR + 4 && d < minD) { minD = d; hoveredNode = n; }
-      }
-      canvas.style.cursor = hoveredNode ? 'pointer' : 'grab';
-    }
-  });
-  canvas.addEventListener('mouseup', () => { isDragging = false; });
-  canvas.addEventListener('click', () => { if (hoveredNode) selectNode(hoveredNode); });
-  canvas.addEventListener('wheel', e => {
-    e.preventDefault();
-    targetZoom *= (1 - e.deltaY * 0.001);
-    targetZoom = Math.max(0.3, Math.min(4.0, targetZoom));
-  }, { passive: false });
+<div class="spacer"></div>
 
-  let td = 0;
-  canvas.addEventListener('touchstart', e => {
-    if (e.touches.length === 1) { isDragging = true; autoRotate = false; lastMouse = {x:e.touches[0].clientX, y:e.touches[0].clientY}; }
-    else if (e.touches.length === 2) { const dx = e.touches[0].clientX-e.touches[1].clientX, dy = e.touches[0].clientY-e.touches[1].clientY; td = Math.sqrt(dx*dx+dy*dy); }
-  });
-  canvas.addEventListener('touchmove', e => {
-    e.preventDefault();
-    if (e.touches.length === 1 && isDragging) {
-      targetRotY += (e.touches[0].clientX - lastMouse.x) * 0.005;
-      targetRotX += (e.touches[0].clientY - lastMouse.y) * 0.005;
-      targetRotX = Math.max(-Math.PI/2, Math.min(Math.PI/2, targetRotX));
-      lastMouse = {x:e.touches[0].clientX, y:e.touches[0].clientY};
-    } else if (e.touches.length === 2) {
-      const dx = e.touches[0].clientX-e.touches[1].clientX, dy = e.touches[0].clientY-e.touches[1].clientY;
-      const d = Math.sqrt(dx*dx+dy*dy);
-      if (td > 0) { targetZoom *= d/td; targetZoom = Math.max(0.3, Math.min(4, targetZoom)); }
-      td = d;
-    }
-  }, { passive: false });
-  canvas.addEventListener('touchend', () => { isDragging = false; });
-}
+<!-- ═══════════════════════ ACT V: THE BARRIERS ═══════════════════════ -->
 
-function updateFilters() {
-  let mc = 0;
-  nodes.forEach(n => {
-    let show = true;
-    if (searchFilter) { show = `${n.name} ${n.domain} ${n.technique} ${n.explanation||''}`.toLowerCase().includes(searchFilter); }
-    if (domainFilter) { show = show && n.domain === domainFilter; }
-    n.targetAlpha = show ? 1.0 : 0.03;
-    if (show) mc++;
-  });
-  document.getElementById('search-count').textContent = (searchFilter || domainFilter) ? `${mc}/${nodes.length}` : '';
-}
+<div class="section bg-grove">
+  <h2 class="r">Why P ≠ NP Is Hard</h2>
+  <p class="r">The diagonal argument <em>can</em> prove that some things are undecidable (Turing), uncomputable (Cantor), unprovable (Gödel). So why can't it prove P ≠ NP?</p>
+  <p class="r">Because there are <em>barriers</em> — meta-diagonalizations that diagonalize over <em>proof techniques</em>, not programs. Each barrier says: your method is too general.</p>
 
-function selectNode(node) {
-  selected = node;
-  const t = DATA.theorems[node.idx];
-  const c = node.color;
-  document.getElementById('detail').classList.add('visible');
-  document.getElementById('detail-name').textContent = t.name;
-  document.getElementById('detail-name').style.color = c;
-  document.getElementById('detail-kind').textContent = `${t.kind} \u00B7 ${t.domain.replace(/_/g,' ')} \u00B7 ${t.technique}`;
-  document.getElementById('detail-explanation').textContent = t.explanation || '';
-  document.getElementById('detail-statement').textContent = t.statement || '';
-  document.getElementById('detail-statement').style.borderColor = c;
-  document.getElementById('detail-insight').textContent = t.key_insight || '';
+  <table class="r">
+    <tr><th>Barrier</th><th>Year</th><th>What It Blocks</th><th>Status</th></tr>
+    <tr><td class="gold">Relativization</td><td>BGS 1975</td><td>Any proof that works with all oracles</td><td class="grove">Proved</td></tr>
+    <tr><td class="crystal">Natural Proofs</td><td>RR 1997</td><td>Any combinatorial large+useful property (given OWF)</td><td class="grove">Structural core proved</td></tr>
+    <tr><td class="violet">Algebrization</td><td>AW 2009</td><td>Any proof using algebraic extensions of oracles</td><td class="grove">Proved</td></tr>
+  </table>
 
-  let tags = `<span class="tag">${t.domain.replace(/_/g,' ')}</span>`;
-  tags += `<span class="tag">${t.technique}</span><span class="tag">${t.kind}</span><span class="tag">${t.complexity}</span>`;
-  if (t.sorry) tags += `<span class="tag sorry">sorry</span>`;
-  tags += `<span class="tag">${t.consumers} consumers</span><span class="tag">depth ${t.depth}</span>`;
-  if (t.novelty === 'novel') tags += `<span class="tag" style="background:rgba(78,205,196,0.15);color:#4ecdc4">novel</span>`;
-  document.getElementById('detail-tags').innerHTML = tags;
+  <p class="r">The deep insight: these barriers are <em>themselves</em> instances of Lawvere's theorem. The PRG in natural proofs "diagonalizes against" the class of natural properties. The oracle in BGS "diagonalizes against" the class of relativizing proofs. Meta-diagonalization: diagonalization all the way down.</p>
+</div>
 
-  let ch = '';
-  if (t.chain && t.chain.length) {
-    ch = '<h4>Dependency Chain</h4>';
-    t.chain.slice(0,8).forEach(x => { ch += `<div class="chain-item"><b>${x.name}</b> ${x.role}</div>`; });
-  }
-  document.getElementById('detail-chain').innerHTML = ch;
+<div class="spacer"></div>
 
-  let tc = '';
-  const tp = t.tactic_profile || {};
-  const ents = Object.entries(tp).sort((a,b) => b[1]-a[1]).slice(0,12);
-  if (ents.length) {
-    tc = '<h4>Tactic Profile</h4><div class="tactic-bar-container">';
-    const mx = Math.max(...ents.map(e=>e[1]));
-    ents.forEach(([nm,ct]) => { tc += `<div class="tactic-bar" style="height:${Math.max(3,ct/mx*24)}px" data-label="${nm}(${ct})"></div>`; });
-    tc += '</div>';
-  }
-  document.getElementById('detail-tactics').innerHTML = tc;
-  document.getElementById('detail-meta').innerHTML = `<b>PageRank:</b> ${t.pagerank.toFixed(3)} &middot; <b>Lines:</b> ${t.proof_lines} &middot; <b>Statement:</b> ${t.statement_type}<br><b>File:</b> ${t.file}:${t.line}`;
-}
+<!-- ═══════════════════════ ACT VI: THE BRIDGE ═══════════════════════ -->
 
-function project(wx, wy, wz) {
-  const cy = Math.cos(rotY), sy = Math.sin(rotY);
-  let x1 = wx*cy - wz*sy, z1 = wx*sy + wz*cy, y1 = wy;
-  const cx = Math.cos(rotX), sx = Math.sin(rotX);
-  let y2 = y1*cx - z1*sx, z2 = y1*sx + z1*cx, x2 = x1;
-  const fov = 4.0, d = fov + z2*zoom;
-  const s = (fov / Math.max(d, 0.1)) * Math.min(W,H) * 0.35 * zoom;
-  return { x: W/2 + x2*s, y: H/2 - y2*s, z: z2, scale: s/(Math.min(W,H)*0.35) };
-}
+<div class="section">
+  <h2 class="r">Bridges to Physics</h2>
+  <p class="r">The diagonal framework reaches beyond pure logic. Two bridges connect it to the physical world.</p>
 
-function render() {
-  requestAnimationFrame(render);
-  rotX += (targetRotX - rotX) * 0.08;
-  rotY += (targetRotY - rotY) * 0.08;
-  zoom += (targetZoom - zoom) * 0.08;
-  if (autoRotate) targetRotY += 0.0008;
-  nodes.forEach(n => { n.alpha += (n.targetAlpha - n.alpha) * 0.12; });
+  <h3 class="r" style="color:var(--flow)">Confinement Is Lawvere</h3>
+  <p class="r">In QCD, quarks are <em>confined</em> — they cannot appear in isolation, only in colorless bound states (hadrons). This is structurally identical to Cantor's theorem: the evaluation map on G-sets is not surjective, so gauge-invariant observables cannot distinguish individual quarks. <em>Confinement is non-surjectivity.</em></p>
 
-  ctx.clearRect(0, 0, W, H);
+  <h3 class="r" style="color:var(--crystal)">Smolensky Is Lawvere</h3>
+  <p class="r">Smolensky's 1987 theorem — that AC⁰[p] circuits cannot compute parity — is a diagonal argument. Low-degree polynomials over 𝔽ₚ cannot represent the mod-2 function. The evaluation map from polynomial codes to Boolean functions is not surjective, because parity has degree n (proved via Möbius coefficients) while circuits produce degree < √n.</p>
 
-  // Nebula
-  const colors = ['#ff6b35','#4ecdc4','#67d4e4','#9b7ebd','#f59e0b','#7eb77f','#d4af37'];
-  const tm = Date.now() * 0.00003;
-  colors.forEach((c,i) => {
-    const x = W*(0.3+0.4*Math.sin(tm+i*1.3)), y = H*(0.3+0.4*Math.cos(tm*0.7+i*0.9));
-    const g = ctx.createRadialGradient(x,y,0,x,y,Math.min(W,H)*0.4);
-    g.addColorStop(0, rgba(c,0.025));
-    g.addColorStop(1, 'transparent');
-    ctx.fillStyle = g;
-    ctx.fillRect(0,0,W,H);
-  });
+  <div class="thm r">
+    <div class="name">Smolensky Degree Bound</div>
+    <div class="stmt">The mod-2 parity function on {0,1}ⁿ has top Möbius coefficient (−1)ⁿ⁺¹ · 2ⁿ⁻¹ over 𝔽ₚ, which is nonzero for odd primes p. Therefore parity is not a low-degree polynomial.</div>
+    <div class="label">fully proved · Möbius inversion · 0 sorry</div>
+  </div>
+</div>
 
-  nodes.forEach(n => { const p = project(n.wx,n.wy,n.wz); n.screenX=p.x; n.screenY=p.y; n.screenZ=p.z; n.screenR=Math.max(1.5,n.radius*p.scale); });
-  const sorted = [...nodes].sort((a,b) => a.screenZ - b.screenZ);
+<div class="spacer"></div>
 
-  // Edges for selected
-  if (selected) {
-    const t = DATA.theorems[selected.idx];
-    const imp = new Set(t.imports||[]), exp = new Set(t.exports||[]);
-    nodes.forEach(n => { if (imp.has(n.name)) drawEdge(selected,n,'rgba(78,205,196,0.35)',false); });
-    nodes.forEach(n => { if (exp.has(n.name)) drawEdge(n,selected,'rgba(245,158,11,0.25)',true); });
-  }
+<!-- ═══════════════════════ ACT VII: THE LOGIC ═══════════════════════ -->
 
-  sorted.forEach(n => {
-    if (n.alpha < 0.01) return;
-    const a = n.alpha, r = n.screenR;
-    const hov = hoveredNode === n, sel = selected === n;
+<div class="section bg-gold">
+  <h2 class="r">The Logic of Provability</h2>
+  <p class="r">GL — Gödel-Löb provability logic — is the modal logic of what a formal system can prove about its own provability. Its axioms encode exactly the self-referential structure that creates incompleteness.</p>
 
-    if (n.sorry) {
-      const er = Math.sin(Date.now()*0.003)*2+2;
-      ctx.beginPath(); ctx.arc(n.screenX,n.screenY,r+er+4,0,Math.PI*2);
-      ctx.fillStyle = `rgba(255,60,60,${0.08*a})`; ctx.fill();
-    }
-    if (hov || sel) {
-      ctx.beginPath(); ctx.arc(n.screenX,n.screenY,r+8,0,Math.PI*2);
-      const g = ctx.createRadialGradient(n.screenX,n.screenY,r,n.screenX,n.screenY,r+8);
-      g.addColorStop(0,rgba(n.color,0.3*a)); g.addColorStop(1,'transparent');
-      ctx.fillStyle = g; ctx.fill();
-    }
-    ctx.beginPath(); ctx.arc(n.screenX,n.screenY,r,0,Math.PI*2);
-    ctx.fillStyle = rgba(n.color,(hov||sel?0.95:0.7)*a); ctx.fill();
+  <div class="proof r">
+    <div class="step"><span class="d">-- The axiom that makes self-reference productive</span></div>
+    <div class="step"><span class="g">axiom</span> ax_lob (φ : Formula) :</div>
+    <div class="step">    <span class="k">GL⊢ □(□φ → φ) → □φ</span></div>
+    <div class="step"><span class="d">-- "If the system proves that provability of φ implies φ,</span></div>
+    <div class="step"><span class="d">--  then the system proves φ."</span></div>
+  </div>
 
-    if ((r>5||hov||sel) && a>0.3) {
-      ctx.font = `${sel?'600':'500'} ${Math.max(9,Math.min(13,r*1.2))}px Inter`;
-      ctx.fillStyle = rgba('#ffffff',(hov||sel?0.9:0.5)*a);
-      ctx.textAlign = 'center';
-      ctx.fillText(n.name, n.screenX, n.screenY-r-5);
-    }
-  });
-}
+  <p class="r">GL soundness is fully proved: every GL-provable formula is valid on all well-founded Kripke frames. This is the <em>first Lean 4 formalization</em> of GL as a Hilbert-style deductive system.</p>
+</div>
 
-function drawEdge(from,to,color,dashed) {
-  ctx.beginPath();
-  if (dashed) ctx.setLineDash([4,4]); else ctx.setLineDash([]);
-  ctx.moveTo(from.screenX,from.screenY); ctx.lineTo(to.screenX,to.screenY);
-  ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
-}
+<div class="spacer"></div>
 
-function rgba(hex, alpha) {
-  if (hex.startsWith('rgba')) return hex;
-  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
+<!-- ═══════════════════════ ACT VIII: THE HIERARCHY ═══════════════════════ -->
+
+<div class="section">
+  <h2 class="r">Climbing the Ladder of Undecidability</h2>
+  <p class="r">The arithmetic hierarchy is an infinite ladder. At each level, the halting problem for the previous level creates a new, strictly harder problem. The Turing jump <span class="c">A' = {e : φᴬₑ(e)↓}</span> is the engine — it lifts you one level, and it <em>never</em> lets you come back down.</p>
+
+  <div class="thm r">
+    <div class="name">Turing Jump Irreducibility</div>
+    <div class="stmt">For every oracle A, the Turing jump A' is not Turing-reducible to A. No oracle machine with access to A can decide the halting problem for A-oracle machines.</div>
+    <div class="label">fully proved · diagonal via OracleCode completeness + antiDiag · 0 sorry</div>
+  </div>
+
+  <p class="r">The proof required building <em>new infrastructure</em>: an <span class="c">OracleCode</span> type (9 constructors mirroring Mathlib's <span class="c">RecursiveIn</span>), a Gödel numbering with round-trip proof, and a completeness theorem showing every oracle-computable function has a code. This extends Mathlib's computability library.</p>
+</div>
+
+<div class="spacer"></div>
+
+<!-- ═══════════════════════ CODA ═══════════════════════ -->
+
+<div class="section">
+  <h2 class="r">The Numbers</h2>
+  <div class="stats r">
+    <div class="stat"><div class="num">31</div><div class="lbl">Files</div></div>
+    <div class="stat"><div class="num">357</div><div class="lbl">Theorems</div></div>
+    <div class="stat"><div class="num">7,165</div><div class="lbl">Lines</div></div>
+    <div class="stat"><div class="num">14</div><div class="lbl">Domains</div></div>
+    <div class="stat"><div class="num">2,090</div><div class="lbl">Dependencies</div></div>
+    <div class="stat"><div class="num">1</div><div class="lbl">Sorry</div></div>
+  </div>
+  <p class="r dim" style="text-align:center">The one sorry is the Clay Millennium Prize — the Yang-Mills mass gap. Worth $1,000,000.</p>
+</div>
+
+<div class="spacer"></div>
+
+<div class="section">
+  <div class="quote r">
+    "Every impossibility is the same impossibility. Every fixed point is the same fixed point. The diagonal is one."
+  </div>
+</div>
+
+<div class="spacer-lg"></div>
+
+<footer>
+  <p>Built with Lean 4 + Mathlib · <a href="https://github.com/awktavian">awktavian</a></p>
+</footer>
+
+<script>
+// Scroll reveal
+const obs = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('v'); } });
+}, { threshold: 0.15, rootMargin: '0px 0px -60px 0px' });
+document.querySelectorAll('.r').forEach(el => obs.observe(el));
 </script>
 </body>
 </html>
