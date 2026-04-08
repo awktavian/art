@@ -3201,6 +3201,7 @@
                 </div>
                 <span class="stat-pill stat-pill-connectivity" id="connectivity-stat" style="display:none"><span>🔗</span><span class="stat-val" id="edge-count">—</span><span class="stat-muted">edges</span></span>
                 <span class="stat-pill stat-pill-health" id="health-stat" style="display:none" title="Average colony health"><span class="stat-health-dot" id="health-dot"></span><span class="stat-val" id="health-score">—</span></span>
+                <span class="stat-pill" id="provably-stat" style="display:none" title="Z3-proven functions via provably"><span style="color:#6bcb77">✓</span><span class="stat-val" id="provably-count">—</span><span class="stat-muted">proved</span></span>
                 <span class="stat-pill"><span>Updated</span><span class="stat-val" id="generated-at">—</span></span>
             </div>
         </header>
@@ -6779,6 +6780,19 @@
                         .map(([id, c]) => `${c.symbol} ${c.name}: ${Math.round(c.healthScore)}%`)
                         .join('\n');
             }
+
+            // Provably verified stats
+            const provably = state.data?.provably;
+            const provablyStat = document.getElementById('provably-stat');
+            const provablyCountEl = document.getElementById('provably-count');
+            if (provably && provably.totalVerified > 0 && provablyStat) {
+                provablyStat.style.display = '';
+                if (provablyCountEl) provablyCountEl.textContent = provably.totalVerified;
+                provablyStat.title = `Z3 Verified Functions: ${provably.totalVerified}/${provably.totalFunctions}\n` +
+                    `Coverage: ${(provably.coverageRatio * 100).toFixed(2)}%\n` +
+                    `Files with proofs: ${provably.filesWithVerified}\n` +
+                    (provably.verifiedFunctions || []).slice(0, 10).map(f => `  ✓ ${f.name} (${f.file.split('/').pop()})`).join('\n');
+            }
         }
         
         function animateNumber(el, targetValue) {
@@ -7704,11 +7718,25 @@
                 <div class="panel-list">
                     ${file.functionComplexity.slice(0, 5).map(fc => {
                         const fcColor = fc.cognitive > 30 ? '#ff6b6b' : fc.cognitive > 15 ? '#ffd93d' : '#6bcb77';
+                        const verifiedBadge = fc.verified ? '<span style="color:#6bcb77;font-size:9px;margin-right:4px;" title="Z3 proved">✓</span>' : '';
                         return `<div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 0;">
-                            <code class="panel-code" style="flex: 1;">${escapeHtml(fc.name)}</code>
+                            ${verifiedBadge}<code class="panel-code" style="flex: 1;">${escapeHtml(fc.name)}</code>
                             <span style="color: ${fcColor}; font-size: 11px; font-weight: 600; margin-left: 8px;">🧠 ${fc.cognitive}</span>
                         </div>`;
                     }).join('')}
+                </div>` : ''}
+
+                <!-- Provably Verified Functions -->
+                ${file.verifiedFunctions && file.verifiedFunctions.length > 0 ? `
+                <div class="section-title">Z3 Verified <span class="section-count" style="background: rgba(107,203,119,0.2); color: #6bcb77;">${file.verifiedFunctions.length}</span></div>
+                <div class="panel-list">
+                    ${file.verifiedFunctions.slice(0, 8).map(fn =>
+                        `<div style="display: flex; align-items: center; padding: 2px 0;">
+                            <span style="color: #6bcb77; font-size: 10px; margin-right: 6px;">✓ proved</span>
+                            <code class="panel-code" style="flex: 1;">${escapeHtml(fn)}</code>
+                        </div>`
+                    ).join('')}
+                    ${file.verifiedFunctions.length > 8 ? `<span class="panel-more">+${file.verifiedFunctions.length - 8} more</span>` : ''}
                 </div>` : ''}
 
                 <!-- Warnings -->

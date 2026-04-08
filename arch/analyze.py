@@ -18,11 +18,7 @@ from pathlib import Path
 from typing import Any
 
 # Configuration
-KAGAMI_ROOT = Path(__file__).parent.parent.parent.parent / ".claude-squad/worktrees/analysis_188a2ff8efc63c10"
-if not KAGAMI_ROOT.exists():
-    KAGAMI_ROOT = Path.home() / ".claude-squad/worktrees/analysis_188a2ff8efc63c10"
-if not KAGAMI_ROOT.exists():
-    KAGAMI_ROOT = Path(__file__).parent.parent.parent  # Fallback
+KAGAMI_ROOT = Path(os.environ.get("KAGAMI_ROOT", str(Path.home() / "projects" / "kagami")))
 
 PACKAGES_DIR = KAGAMI_ROOT / "packages"
 APPS_DIR = KAGAMI_ROOT / "apps"
