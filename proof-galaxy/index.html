@@ -1073,28 +1073,72 @@ function stateColor(state) {
 
 let currentView = 'colony';
 
+// ─── CELEBRATION STATE (for realtime streaming) ────────────────────────────
+const celebrations = {}; // idx -> { startTime, duration }
+
 function updatePenguinMatrices(t) {
+  const camPos = camera.position;
+
   for (let i = 0; i < activePenguinCount; i++) {
     const p = penguins[i];
-    const terrainY = getTerrainHeight(
-      clamp(p.x, -TERRAIN_HALF, TERRAIN_HALF),
-      clamp(p.z, -TERRAIN_HALF, TERRAIN_HALF)
-    );
+    const cx = clamp(p.x, -TERRAIN_HALF, TERRAIN_HALF);
+    const cz = clamp(p.z, -TERRAIN_HALF, TERRAIN_HALF);
+    const terrainY = getTerrainHeight(cx, cz);
 
     // Ground clamp: penguin feet on terrain surface
-    // penguin.glb origin is at feet, so terrainY + 0 = feet on ground
     dummy.position.set(p.x, terrainY, p.z);
 
-    // Per-state animation
+    // ── LOD: camera distance ──
+    const distToCam = Math.hypot(camPos.x - p.x, camPos.y - terrainY, camPos.z - p.z);
+    let lodScale = 1.0;
+    let lodDarken = 1.0;
+    if (distToCam > 50) {
+      lodScale = 0.5;
+      lodDarken = 0.6;
+    } else if (distToCam > 25) {
+      lodScale = 0.8;
+      lodDarken = 0.85;
+    }
+
+    // ── Terrain-aware tilt ──
+    const slopeX = (getTerrainHeight(cx + 0.5, cz) - getTerrainHeight(cx - 0.5, cz)) / 1.0;
+    const slopeZ = (getTerrainHeight(cx, cz + 0.5) - getTerrainHeight(cx, cz - 0.5)) / 1.0;
+    const terrainTiltX = -slopeZ * 0.3; // lean into slope
+    const terrainTiltZ = slopeX * 0.3;
+
+    // ── Per-state animation ──
+    let animTiltX = 0;
+    let animTiltZ = 0;
+    let animRotY = p.rotY;
+    let breathScaleY = 1.0;
+
     const rockZ = Math.sin(t * 5 + p.phase) * p.speed * 0.08;
-    const tiltX = (p.state === 'sorry' || p.state === 'false')
-      ? -0.12 + Math.sin(t * 0.5 + p.phase) * 0.06
-      : 0;
+
+    if (p.state === 'proven') {
+      // Gentle idle breathing: scale.y oscillation +/-2% at 0.5Hz per-phase
+      breathScaleY = 1.0 + Math.sin(t * Math.PI + p.phase) * 0.02;
+    } else if (p.state === 'sorry' || p.state === 'false') {
+      // Base tilt for sorry/false
+      animTiltX = -0.12 + Math.sin(t * 0.5 + p.phase) * 0.06;
+      // Periodic shiver: 8Hz rapid oscillation, triggers every 3-5s for 0.5s
+      const shiverCycle = Math.sin(t * 0.3 + p.phase);
+      if (shiverCycle > 0.85) {
+        animTiltZ += Math.sin(t * 8 * Math.PI * 2 + p.phase * 3) * 0.04;
+      }
+    } else if (p.state === 'keystone') {
+      // Proud sway: slow majestic rotation.y oscillation +/-0.1 rad at 0.3Hz
+      animRotY += Math.sin(t * 0.3 * Math.PI * 2 + p.phase) * 0.1;
+    }
+
     dummy.position.y += Math.sin(t * 10 + p.phase) * p.speed * 0.01;
 
-    dummy.rotation.set(tiltX, p.rotY, rockZ);
+    dummy.rotation.set(
+      animTiltX + terrainTiltX,
+      animRotY,
+      rockZ + animTiltZ + terrainTiltZ
+    );
 
-    // Scale — calibrate so penguins are ~3-4 units tall
+    // ── Scale ──
     let s = 3.5 * p.scale;
     if (p.state === 'keystone') s *= 1.25;
 
@@ -1105,15 +1149,31 @@ function updatePenguinMatrices(t) {
       s *= 1.0 + (p.cascade / maxCascade) * 1.5;
     }
 
-    dummy.scale.setScalar(s);
+    // Celebration pulse (sorry->proven transition)
+    const celeb = celebrations[i];
+    if (celeb) {
+      const elapsed = t - celeb.startTime;
+      if (elapsed < celeb.duration) {
+        const pulse = 1.0 + 0.5 * Math.sin(elapsed / celeb.duration * Math.PI);
+        s *= pulse;
+      } else {
+        delete celebrations[i];
+      }
+    }
+
+    // Apply LOD scale
+    s *= lodScale;
+
+    dummy.scale.set(s, s * breathScaleY, s);
     dummy.updateMatrix();
     penguinInstances.setMatrixAt(i, dummy.matrix);
 
-    // Color tint
+    // Color tint with LOD darkening
     _color.setHex(stateColor(p.state));
     if (currentView === 'sorry' && p.state === 'proven') {
       _color.multiplyScalar(0.3);
     }
+    _color.multiplyScalar(lodDarken);
     penguinInstances.setColorAt(i, _color);
   }
   penguinInstances.instanceMatrix.needsUpdate = true;
@@ -1843,11 +1903,96 @@ function animate(time) {
   // ── Labels (every 3 frames) ──
   if (frameCount % 3 === 0) updateLabels();
 
+  // ── Realtime state polling (every 30s) ──
+  if (t - lastPollTime > POLL_INTERVAL) {
+    lastPollTime = t;
+    pollProofState(t);
+  }
+
   // ── Camera ──
   controls.update();
 
   // ── Render with post-processing ──
   composer.render();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYSTEM 9: REALTIME STATE STREAMING (poll for proof state changes)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let lastPollTime = 0;
+const POLL_INTERVAL = 30; // seconds
+let prevSorryCount = DATA.meta.sorry_total;
+
+function emitCelebration(px, py, pz) {
+  // 20 green sparkles burst
+  for (let k = 0; k < 20; k++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.1 + Math.random() * 0.15;
+    emitParticle(
+      px + (Math.random() - 0.5) * 1.5,
+      py + 2 + Math.random() * 2,
+      pz + (Math.random() - 0.5) * 1.5,
+      Math.cos(angle) * speed,
+      0.15 + Math.random() * 0.1,
+      Math.sin(angle) * speed,
+      0.29, 0.87, 0.5,  // green
+      2.0, 2.5
+    );
+  }
+}
+
+async function pollProofState(t) {
+  try {
+    const resp = await fetch('proof-galaxy.json', { cache: 'no-cache' });
+    const newData = await resp.json();
+
+    const newSorryTotal = newData.meta.sorry_total;
+    const sorryClosed = prevSorryCount - newSorryTotal;
+
+    if (sorryClosed > 0) {
+      // Find sorry penguins that might have been closed
+      // Build a set of still-sorry FQNs from new data
+      const stillSorrySet = new Set();
+      (newData.sorry_nodes || []).forEach(sn => {
+        if (sn.fqn) stillSorrySet.add(sn.fqn);
+      });
+
+      // Check existing sorry penguins — if their FQN is no longer sorry, transition
+      let transitioned = 0;
+      for (let i = 0; i < activePenguinCount && transitioned < sorryClosed; i++) {
+        const p = penguins[i];
+        if ((p.state === 'sorry' || p.state === 'false' || p.state === 'contaminated')
+            && p.fqn && !stillSorrySet.has(p.fqn)) {
+          // Transition to proven
+          p.state = 'proven';
+          transitioned++;
+
+          // Celebration burst at this penguin
+          const ty = getTerrainHeight(
+            clamp(p.x, -TERRAIN_HALF, TERRAIN_HALF),
+            clamp(p.z, -TERRAIN_HALF, TERRAIN_HALF)
+          );
+          emitCelebration(p.x, ty, p.z);
+
+          // Scale pulse over 1 second
+          celebrations[i] = { startTime: t, duration: 1.0 };
+        }
+      }
+    }
+
+    // Update stats header
+    prevSorryCount = newSorryTotal;
+    document.getElementById('sd').textContent = activePenguinCount;
+    document.getElementById('ss').textContent = newSorryTotal;
+    document.getElementById('sc').textContent = newData.meta.declarations - newSorryTotal;
+
+    // Update DATA meta for future polls
+    DATA.meta.sorry_total = newSorryTotal;
+    DATA.meta.declarations = newData.meta.declarations;
+  } catch (e) {
+    // Silent fail — will retry next interval
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
