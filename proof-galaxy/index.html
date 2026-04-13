@@ -1,0 +1,1876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aurora — Proof Galaxy</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Space+Grotesk:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  overflow: hidden;
+  background: #0F0D2E;
+  font-family: 'Space Grotesk', sans-serif;
+  color: #FAFAF8;
+  cursor: grab;
+}
+body.grabbing { cursor: grabbing; }
+body.hovering { cursor: pointer; }
+
+canvas#c {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 0;
+}
+
+/* Film grain overlay */
+.grain {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0.015;
+}
+.grain svg { width: 100%; height: 100%; }
+
+/* Header */
+#hdr {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px;
+  background: rgba(15, 13, 46, 0.65);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border-bottom: 1px solid rgba(250, 250, 248, 0.08);
+  z-index: 20;
+  font-size: 13px;
+}
+.logo {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 300;
+  font-size: 20px;
+  letter-spacing: 0.06em;
+  color: #FAFAF8;
+  margin-right: 12px;
+  user-select: none;
+}
+.logo-icon {
+  display: inline-block;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: #1E1B4B;
+  border: 1.5px solid #D97706;
+  vertical-align: middle;
+  margin-right: 6px;
+  position: relative;
+  top: -1px;
+}
+.tabs {
+  display: flex;
+  gap: 2px;
+  background: rgba(250, 250, 248, 0.05);
+  border-radius: 6px;
+  padding: 2px;
+}
+.tab {
+  background: none;
+  border: none;
+  color: rgba(250, 250, 248, 0.45);
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: lowercase;
+}
+.tab:hover { color: rgba(250, 250, 248, 0.7); }
+.tab.active {
+  background: rgba(250, 250, 248, 0.1);
+  color: #FAFAF8;
+}
+.stats {
+  margin-left: auto;
+  display: flex;
+  gap: 16px;
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  color: rgba(250, 250, 248, 0.5);
+}
+.stats b { color: #FAFAF8; font-weight: 700; }
+.sorry-stat b { color: #D97706; }
+
+/* Info panel */
+.panel {
+  position: fixed;
+  top: 48px;
+  right: -340px;
+  width: 320px;
+  height: calc(100vh - 48px);
+  background: rgba(15, 13, 46, 0.78);
+  backdrop-filter: blur(60px);
+  -webkit-backdrop-filter: blur(60px);
+  border-left: 1px solid rgba(250, 250, 248, 0.08);
+  padding: 24px 20px;
+  overflow-y: auto;
+  z-index: 15;
+  transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.panel.open { right: 0; }
+#panel-close {
+  position: absolute;
+  top: 12px; right: 12px;
+  background: none;
+  border: 1px solid rgba(250, 250, 248, 0.15);
+  color: rgba(250, 250, 248, 0.6);
+  width: 28px; height: 28px;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+#panel-close:hover {
+  background: rgba(250, 250, 248, 0.08);
+  color: #FAFAF8;
+}
+.panel h2 {
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #FAFAF8;
+  margin-bottom: 20px;
+  padding-right: 36px;
+  word-break: break-all;
+  line-height: 1.5;
+}
+.field {
+  margin-bottom: 14px;
+}
+.field label {
+  display: block;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(250, 250, 248, 0.35);
+  margin-bottom: 3px;
+}
+.field span {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  color: rgba(250, 250, 248, 0.85);
+  word-break: break-all;
+}
+.field .state-sorry { color: #D97706; }
+.field .state-proven { color: #4ade80; }
+.field .state-keystone { color: #F59E0B; }
+.field .state-false { color: #ef4444; }
+.field .state-contaminated { color: #888; }
+.cascade-bar {
+  height: 4px;
+  background: rgba(250, 250, 248, 0.08);
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+.cascade-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #D97706, #F59E0B);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+/* Legend */
+#legend {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  gap: 14px;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: rgba(250, 250, 248, 0.4);
+  z-index: 15;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.legend-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+}
+.legend-dot.proven { background: #4ade80; }
+.legend-dot.sorry { background: #D97706; }
+.legend-dot.keystone { background: #F59E0B; box-shadow: 0 0 6px #F59E0B; }
+.legend-dot.false { background: #ef4444; }
+.legend-dot.contaminated { background: #888; }
+
+/* Loading */
+#loading {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #0F0D2E;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: opacity 0.8s;
+}
+#loading.done { opacity: 0; pointer-events: none; }
+#loading h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 300;
+  font-size: 32px;
+  letter-spacing: 0.1em;
+  color: #FAFAF8;
+  margin-bottom: 12px;
+}
+#loading p {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  color: rgba(250, 250, 248, 0.4);
+}
+.load-bar {
+  width: 200px;
+  height: 2px;
+  background: rgba(250, 250, 248, 0.08);
+  border-radius: 1px;
+  margin-top: 20px;
+  overflow: hidden;
+}
+.load-fill {
+  height: 100%;
+  background: #D97706;
+  width: 0%;
+  transition: width 0.3s;
+  border-radius: 1px;
+}
+
+/* Waddle labels */
+.waddle-label {
+  position: absolute;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: rgba(250, 250, 248, 0.5);
+  text-transform: lowercase;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+  white-space: nowrap;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  z-index: 5;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  #hdr { padding: 0 10px; gap: 8px; }
+  .stats { gap: 8px; }
+  .panel { width: 100vw; right: -100vw; }
+  .panel.open { right: 0; }
+  #legend { gap: 8px; font-size: 9px; }
+}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <h1>Aurora</h1>
+  <p id="load-msg">loading proof galaxy...</p>
+  <div class="load-bar"><div class="load-fill" id="load-fill"></div></div>
+</div>
+
+<header id="hdr">
+  <span class="logo"><span class="logo-icon"></span>Aurora</span>
+  <div class="tabs">
+    <button class="tab active" data-v="colony">colony</button>
+    <button class="tab" data-v="sorry">sorry</button>
+    <button class="tab" data-v="cascade">cascade</button>
+  </div>
+  <div class="stats">
+    <span><b id="sd">0</b> penguins</span>
+    <span class="sorry-stat"><b id="ss">0</b> sorry</span>
+    <span><b id="sc">0</b> proven</span>
+  </div>
+</header>
+
+<div id="panel" class="panel">
+  <button id="panel-close">&times;</button>
+  <h2 id="pn">--</h2>
+  <div class="field"><label>project</label><span id="pp">--</span></div>
+  <div class="field"><label>module</label><span id="pm">--</span></div>
+  <div class="field"><label>state</label><span id="ps">--</span></div>
+  <div class="field">
+    <label>cascade impact</label>
+    <span id="pc">--</span>
+    <div class="cascade-bar"><div class="cascade-fill" id="pcb"></div></div>
+  </div>
+  <div class="field"><label>content hash</label><span id="ph">--</span></div>
+  <div class="field"><label>line</label><span id="pl">--</span></div>
+</div>
+
+<div id="legend">
+  <div class="legend-item"><div class="legend-dot proven"></div>proven</div>
+  <div class="legend-item"><div class="legend-dot sorry"></div>sorry</div>
+  <div class="legend-item"><div class="legend-dot keystone"></div>keystone</div>
+  <div class="legend-item"><div class="legend-dot false"></div>false</div>
+  <div class="legend-item"><div class="legend-dot contaminated"></div>contaminated</div>
+</div>
+
+<div class="grain">
+  <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+    <filter id="grainF"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/></filter>
+    <rect width="100%" height="100%" filter="url(#grainF)" opacity="1"/>
+  </svg>
+</div>
+
+<canvas id="c"></canvas>
+
+<div id="labels-container" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5;"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+// ═══════════════════════════════════════════════════════════════════════════════
+// AURORA — Proof Galaxy Visualization
+// Each penguin IS a theorem. 21,287 across 17 Lean 4 projects.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+
+// ─── CONSTANTS ───────────────────────────────────────────────────────────────
+const TERRAIN_SIZE   = 160;
+const TERRAIN_SEGS   = 128;
+const TERRAIN_HALF   = TERRAIN_SIZE / 2;
+const GRID_DIM       = TERRAIN_SEGS + 1;
+const MAX_PENGUINS   = 600;
+const MAX_PARTICLES  = 4000;
+const SNOW_COUNT     = 600;
+const STAR_COUNT     = 800;
+const PHYSICS_HZ     = 30;
+const CELL_SIZE      = 3.5;
+const WADDLE_ARC_R   = 30;
+
+// Brand
+const COL_SKY        = 0x0F0D2E;
+const COL_PROVEN     = 0x4ade80;
+const COL_SORRY      = 0xD97706;
+const COL_KEYSTONE   = 0xF59E0B;
+const COL_FALSE      = 0xef4444;
+const COL_CONTAM     = 0x888888;
+
+// ─── UTILITY FUNCTIONS ───────────────────────────────────────────────────────
+function smoothstep(edge0, edge1, x) {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+function mix(a, b, t) { return a + (b - a) * t; }
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// Simple deterministic 2D noise (no external deps)
+function noise2D(x, y, seed) {
+  const n = Math.sin(x * 12.9898 + y * 78.233 + seed) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+function fbm(x, y, seed, octaves) {
+  octaves = octaves || 4;
+  let val = 0, amp = 1, freq = 0.02, max = 0;
+  for (let o = 0; o < octaves; o++) {
+    val += amp * (noise2D(x * freq, y * freq, seed + o * 100) * 2 - 1);
+    max += amp;
+    amp *= 0.5;
+    freq *= 2;
+  }
+  return val / max;
+}
+
+// ─── LOADING OVERLAY ─────────────────────────────────────────────────────────
+const loadEl   = document.getElementById('loading');
+const loadFill = document.getElementById('load-fill');
+const loadMsg  = document.getElementById('load-msg');
+function setLoad(pct, msg) {
+  loadFill.style.width = pct + '%';
+  if (msg) loadMsg.textContent = msg;
+}
+
+// ─── FETCH DATA ──────────────────────────────────────────────────────────────
+setLoad(5, 'fetching proof galaxy data...');
+let DATA;
+try {
+  const resp = await fetch('proof-galaxy.json');
+  DATA = await resp.json();
+} catch (e) {
+  // Fallback minimal data
+  DATA = {
+    meta: { declarations: 0, sorry_total: 0, projects_count: 0, edges: 0, modules_count: 0 },
+    projects: {}, sorry_nodes: [], keystones: [], raft_edges: [], clusters: [],
+  };
+  console.warn('Could not load proof-galaxy.json:', e);
+}
+setLoad(15, 'data loaded (' + DATA.meta.declarations + ' declarations)');
+
+// ─── URL PARAMS ──────────────────────────────────────────────────────────────
+const urlParams = new URLSearchParams(window.location.search);
+const filterWaddle = urlParams.get('waddle');
+
+// ─── RENDERER ────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const dpr = Math.min(window.devicePixelRatio, 2);
+
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: false,
+  powerPreference: 'high-performance',
+});
+renderer.setPixelRatio(dpr);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.5;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(COL_SKY, 0.003);
+
+// Gradient sky dome — indigo zenith fading to dark teal at horizon
+const skyGeo = new THREE.SphereGeometry(200, 32, 16);
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide,
+  depthWrite: false,
+  uniforms: {},
+  vertexShader: `
+    varying vec3 vPos;
+    void main() {
+      vPos = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    varying vec3 vPos;
+    void main() {
+      float h = normalize(vPos).y;
+      // Zenith: deep indigo (0.04, 0.03, 0.12)
+      // Horizon: dark teal-purple (0.06, 0.07, 0.15)
+      vec3 zenith  = vec3(0.04, 0.03, 0.12);
+      vec3 horizon = vec3(0.07, 0.08, 0.18);
+      vec3 col = mix(horizon, zenith, smoothstep(0.0, 0.6, h));
+      // Below horizon: dark
+      col = mix(vec3(0.03, 0.03, 0.06), col, smoothstep(-0.1, 0.05, h));
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `,
+});
+const skyDome = new THREE.Mesh(skyGeo, skyMat);
+scene.add(skyDome);
+
+// ─── CAMERA + CONTROLS ──────────────────────────────────────────────────────
+const camera = new THREE.PerspectiveCamera(
+  55, window.innerWidth / window.innerHeight, 0.5, 500
+);
+camera.position.set(0, 22, 42);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.15;
+controls.minDistance = 8;
+controls.maxDistance = 120;
+controls.maxPolarAngle = Math.PI * 0.47;
+controls.target.set(0, 5, -5);
+
+// ─── WADDLE LAYOUT ───────────────────────────────────────────────────────────
+const waddleCenters = {};
+let projectNames = Object.keys(DATA.projects);
+if (filterWaddle && DATA.projects[filterWaddle]) {
+  projectNames = [filterWaddle];
+}
+projectNames.sort((a, b) => (DATA.projects[b].decls || 0) - (DATA.projects[a].decls || 0));
+
+projectNames.forEach((name, i) => {
+  const angle = (i / Math.max(projectNames.length, 1)) * Math.PI * 1.5 - Math.PI * 0.75;
+  const r = filterWaddle ? 0 : WADDLE_ARC_R;
+  const proj = DATA.projects[name];
+  waddleCenters[name] = {
+    x: Math.sin(angle) * r,
+    z: Math.cos(angle) * r * 0.65,
+    radius: 8 + Math.sqrt(proj.decls || 1) * 0.12,
+    plateauHeight: 0.08 + (i % 3) * 0.04,
+    name,
+    decls: proj.decls || 0,
+    sorry: proj.sorry || 0,
+  };
+});
+
+const wcArray = Object.values(waddleCenters);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYSTEM 1: PROCEDURAL ICE TERRAIN
+// ═══════════════════════════════════════════════════════════════════════════════
+setLoad(20, 'generating ice terrain...');
+
+const terrainGeo = new THREE.PlaneGeometry(
+  TERRAIN_SIZE, TERRAIN_SIZE, TERRAIN_SEGS, TERRAIN_SEGS
+);
+terrainGeo.rotateX(-Math.PI / 2);
+
+const terrainPos  = terrainGeo.attributes.position;
+const terrainGrid = new Float32Array(GRID_DIM * GRID_DIM);
+
+// Vertex colors for ice surface variation
+const terrainColors = new Float32Array(terrainPos.count * 3);
+
+for (let i = 0; i < terrainPos.count; i++) {
+  const x = terrainPos.getX(i);
+  const z = terrainPos.getZ(i);
+
+  // FLAT ICE SHELF — very gentle rolling, max 0.3 units
+  let h = 0;
+  h += Math.sin(x * 0.02) * Math.cos(z * 0.015) * 0.15;
+  h += Math.sin(x * 0.05 + z * 0.03) * 0.08;
+  h += fbm(x, z, 42) * 0.12; // subtle texture only
+
+  // Slight raised areas at waddle centers (barely perceptible)
+  for (let w = 0; w < wcArray.length; w++) {
+    const wc = wcArray[w];
+    const d = Math.hypot(x - wc.x, z - wc.z);
+    if (d < 20) h += 0.1 * Math.max(0, 1 - d / 20);
+  }
+
+  // Subtle cracks (visual only, vertex color darkening)
+  const crackNoise = fbm(x * 3, z * 3, 271, 2);
+  const isCrack = Math.abs(crackNoise) < 0.03;
+  if (isCrack) h -= 0.04; // barely dipped
+
+  // Ice color: warm white base with blue-gray variation
+  const snowCover = 0.85 + fbm(x * 0.5, z * 0.5, 99, 2) * 0.15;
+  terrainColors[i * 3]     = isCrack ? 0.6 : snowCover * 0.91;  // R
+  terrainColors[i * 3 + 1] = isCrack ? 0.65 : snowCover * 0.93; // G
+  terrainColors[i * 3 + 2] = isCrack ? 0.7 : snowCover * 0.95;  // B
+
+  terrainPos.setY(i, h);
+
+  // Store into grid for fast ground-clamp lookup
+  const gx = Math.round((x + TERRAIN_HALF) / TERRAIN_SIZE * TERRAIN_SEGS);
+  const gz = Math.round((z + TERRAIN_HALF) / TERRAIN_SIZE * TERRAIN_SEGS);
+  const ci = clamp(gz, 0, TERRAIN_SEGS) * GRID_DIM + clamp(gx, 0, TERRAIN_SEGS);
+  terrainGrid[ci] = h;
+}
+
+terrainGeo.setAttribute('color', new THREE.BufferAttribute(terrainColors, 3));
+terrainGeo.computeVertexNormals();
+
+// Bilinear terrain height lookup (no raycasting)
+function getTerrainHeight(wx, wz) {
+  const gx = (wx + TERRAIN_HALF) / TERRAIN_SIZE * TERRAIN_SEGS;
+  const gz = (wz + TERRAIN_HALF) / TERRAIN_SIZE * TERRAIN_SEGS;
+  const ix = Math.floor(gx), iz = Math.floor(gz);
+  const fx = gx - ix, fz = gz - iz;
+  const i00 = clamp(ix,     0, TERRAIN_SEGS);
+  const i10 = clamp(ix + 1, 0, TERRAIN_SEGS);
+  const j00 = clamp(iz,     0, TERRAIN_SEGS);
+  const j10 = clamp(iz + 1, 0, TERRAIN_SEGS);
+  const h00 = terrainGrid[j00 * GRID_DIM + i00];
+  const h10 = terrainGrid[j00 * GRID_DIM + i10];
+  const h01 = terrainGrid[j10 * GRID_DIM + i00];
+  const h11 = terrainGrid[j10 * GRID_DIM + i10];
+  return h00 * (1 - fx) * (1 - fz)
+       + h10 * fx * (1 - fz)
+       + h01 * (1 - fx) * fz
+       + h11 * fx * fz;
+}
+
+// Ice: matte snow-covered surface. Antarctica, not a mirror.
+const iceMat = new THREE.MeshStandardMaterial({
+  color: 0xC8D0D8,       // blue-gray ice (darker so penguins stand out)
+  roughness: 0.8,         // matte snow
+  metalness: 0.0,
+  vertexColors: true,     // crack + snow variation
+  envMapIntensity: 0.2,
+});
+
+const terrainMesh = new THREE.Mesh(terrainGeo, iceMat);
+scene.add(terrainMesh);
+
+// Edge skirt cylinder (hides terrain boundary)
+const skirtGeo = new THREE.CylinderGeometry(
+  TERRAIN_HALF * 1.05, TERRAIN_HALF * 1.05, 6, 64, 1, true
+);
+const skirtMat = new THREE.MeshStandardMaterial({
+  color: 0xCCD4DD, roughness: 0.8, metalness: 0, side: THREE.BackSide,
+});
+const skirt = new THREE.Mesh(skirtGeo, skirtMat);
+skirt.position.y = -3;
+scene.add(skirt);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LIGHTING (bright — penguins must be clearly visible)
+// ═══════════════════════════════════════════════════════════════════════════════
+setLoad(25, 'setting up lights...');
+
+// National Geographic antarctic twilight lighting
+// Penguins should be the BRIGHTEST things in the scene
+
+// National Geographic antarctic twilight — penguins must POP
+
+// Antarctic twilight — dark enough for aurora, bright enough for penguins
+
+// Hemisphere: twilight sky, dark ground
+const hemi = new THREE.HemisphereLight(0x6677aa, 0x334455, 1.8);
+scene.add(hemi);
+
+// Key moonlight from front-above (illuminates penguin faces)
+const moon = new THREE.DirectionalLight(0xddeeff, 3.0);
+moon.position.set(10, 35, 25);
+scene.add(moon);
+
+// Ambient fill — enough to kill pure black, not enough to wash out
+const ambient = new THREE.AmbientLight(0x556677, 1.0);
+scene.add(ambient);
+
+// Warm belly fill (golden warmth on penguin bellies + beaks)
+const warmFill = new THREE.PointLight(0xffd699, 1.0, 80);
+warmFill.position.set(0, 3, 15);
+scene.add(warmFill);
+
+// Cool rim from behind (silhouette separation against aurora)
+const coolRim = new THREE.DirectionalLight(0x5577aa, 1.2);
+coolRim.position.set(-12, 15, -20);
+scene.add(coolRim);
+
+// Camera-right fill (prevents flat look)
+const sideFill = new THREE.DirectionalLight(0x8899bb, 0.7);
+sideFill.position.set(25, 18, 10);
+scene.add(sideFill);
+
+// Aurora emissive lights — cast colored light onto ice and penguins
+const auroraLightColors = [0x0D9488, 0x7C3AED, 0x22C55E, 0x14B8A6];
+const auroraLights = auroraLightColors.map((c, i) => {
+  const l = new THREE.PointLight(c, 1.0, 100);
+  l.position.set(Math.sin(i * 1.6) * 40, 40, -40 + i * 12);
+  scene.add(l);
+  return l;
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYSTEM 4: AURORA BOREALIS
+// 4 ShaderMaterial ribbon planes with curtain waves and emissive lighting
+// ═══════════════════════════════════════════════════════════════════════════════
+setLoad(30, 'weaving aurora borealis...');
+
+const auroraVertShader = `
+  uniform float uTime;
+  varying vec2 vUv;
+  varying float vDisp;
+
+  void main() {
+    vUv = uv;
+    vec3 p = position;
+
+    // Multi-frequency curtain wave
+    float wave1 = sin(p.x * 0.04 + uTime * 0.5) * 6.0;
+    float wave2 = sin(p.x * 0.08 - uTime * 0.3) * 3.0;
+    float wave3 = sin(p.x * 0.15 + uTime * 0.7) * 1.5;
+    p.y += wave1 + wave2 + wave3;
+
+    // Lateral swing
+    p.z += sin(p.x * 0.025 + uTime * 0.2) * 10.0;
+
+    vDisp = (wave1 + wave2) / 9.0;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+  }
+`;
+
+const auroraFragShader = `
+  uniform float uTime;
+  uniform float uHue;
+  uniform float uOpacity;
+  varying vec2 vUv;
+  varying float vDisp;
+
+  vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+  }
+
+  void main() {
+    // Curtain streaks — vertical rays of light
+    float curtain = pow(abs(sin(vUv.x * 40.0 + vDisp * 6.0 + uTime * 0.3)), 2.0);
+    curtain = 0.4 + 0.6 * curtain;
+
+    // Edge fade
+    float yEdge = smoothstep(0.0, 0.15, vUv.y) * smoothstep(1.0, 0.5, vUv.y);
+    float xEdge = smoothstep(0.0, 0.1, vUv.x) * smoothstep(1.0, 0.9, vUv.x);
+
+    // Shimmer
+    float shimmer = 0.7 + 0.3 * sin(vUv.x * 80.0 + uTime * 2.5);
+
+    // Color: vivid hue shifts across ribbon
+    float hShift = vUv.x * 0.12 + sin(vUv.x * 3.0 + uTime * 0.12) * 0.06;
+    vec3 col = hsv2rgb(vec3(uHue + hShift, 0.85, 1.0));
+
+    // Strong bottom glow (spills light downward onto scene)
+    float bottomGlow = smoothstep(0.6, 0.0, vUv.y) * 0.7;
+    col += bottomGlow * hsv2rgb(vec3(uHue + 0.06, 0.6, 1.0));
+
+    // Boost overall brightness
+    col *= 1.3;
+
+    float alpha = yEdge * xEdge * uOpacity * curtain * shimmer;
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
+// Aurora BEHIND the colony — dominant sky feature, bright and visible
+const auroraConfigs = [
+  { y: 38, z: -35, hue: 0.47, opacity: 0.55 },  // teal, closest + brightest
+  { y: 48, z: -45, hue: 0.35, opacity: 0.45 },  // green
+  { y: 42, z: -30, hue: 0.55, opacity: 0.40 },  // cyan, very close
+  { y: 55, z: -50, hue: 0.75, opacity: 0.35 },  // violet
+  { y: 45, z: -55, hue: 0.42, opacity: 0.30 },  // teal-green, furthest
+];
+
+const auroras = auroraConfigs.map(cfg => {
+  const geo = new THREE.PlaneGeometry(280, 35, 120, 1);
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime:    { value: 0 },
+      uHue:     { value: cfg.hue },
+      uOpacity: { value: cfg.opacity },
+    },
+    vertexShader:   auroraVertShader,
+    fragmentShader: auroraFragShader,
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(0, cfg.y, cfg.z);
+  scene.add(mesh);
+  return mesh;
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYSTEM 5A: STARS (twinkling on upper hemisphere)
+// ═══════════════════════════════════════════════════════════════════════════════
+setLoad(35, 'placing stars...');
+
+const starPositions = new Float32Array(STAR_COUNT * 3);
+const starPhases    = new Float32Array(STAR_COUNT);
+const starSizes     = new Float32Array(STAR_COUNT);
+
+for (let i = 0; i < STAR_COUNT; i++) {
+  const theta = Math.random() * Math.PI * 0.45;
+  const phi   = Math.random() * Math.PI * 2;
+  const r     = 180;
+  starPositions[i * 3]     = r * Math.sin(theta) * Math.cos(phi);
+  starPositions[i * 3 + 1] = r * Math.cos(theta);
+  starPositions[i * 3 + 2] = r * Math.sin(theta) * Math.sin(phi);
+  starPhases[i] = Math.random() * Math.PI * 2;
+  starSizes[i]  = 0.4 + Math.random() * 0.5;
+}
+
+const starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+starGeo.setAttribute('aPhase',   new THREE.BufferAttribute(starPhases, 1));
+starGeo.setAttribute('aSize',    new THREE.BufferAttribute(starSizes, 1));
+
+const starMat = new THREE.ShaderMaterial({
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  uniforms: { uTime: { value: 0 } },
+  vertexShader: `
+    attribute float aPhase;
+    attribute float aSize;
+    uniform float uTime;
+    varying float vAlpha;
+    void main() {
+      vAlpha = 0.3 + 0.7 * (0.5 + 0.5 * sin(uTime * 0.5 + aPhase));
+      vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+      gl_PointSize = aSize * (200.0 / -mvPos.z);
+      gl_Position = projectionMatrix * mvPos;
+    }
+  `,
+  fragmentShader: `
+    varying float vAlpha;
+    void main() {
+      float d = length(gl_PointCoord - 0.5);
+      if (d > 0.5) discard;
+      float glow = smoothstep(0.5, 0.0, d);
+      gl_FragColor = vec4(1.0, 0.98, 0.95, vAlpha * glow);
+    }
+  `,
+});
+
+const starPoints = new THREE.Points(starGeo, starMat);
+starPoints.frustumCulled = false;
+scene.add(starPoints);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYSTEM 5B: SNOW (canvas-generated snowflake texture, 1000 particles)
+// ═══════════════════════════════════════════════════════════════════════════════
+setLoad(38, 'generating snowflakes...');
+
+function makeSnowflakeTexture() {
+  const size = 32;
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, size, size);
+  const cx = size / 2, cy = size / 2;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.2;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2 - Math.PI / 2;
+    const len = size * 0.38;
+    const ex = cx + Math.cos(angle) * len;
+    const ey = cy + Math.sin(angle) * len;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
+    // Branches
+    const bLen = len * 0.4;
+    const bStart = 0.55;
+    const bx = cx + Math.cos(angle) * len * bStart;
+    const by = cy + Math.sin(angle) * len * bStart;
+    for (const dir of [-1, 1]) {
+      const ba = angle + dir * Math.PI * 0.35;
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(bx + Math.cos(ba) * bLen, by + Math.sin(ba) * bLen);
+      ctx.stroke();
+    }
+  }
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(cx, cy, 1.5, 0, Math.PI * 2); ctx.fill();
+  const tex = new THREE.CanvasTexture(c);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+const snowTex = makeSnowflakeTexture();
+const snowPositionsArr = new Float32Array(SNOW_COUNT * 3);
+const snowData = [];
+
+for (let i = 0; i < SNOW_COUNT; i++) {
+  snowPositionsArr[i * 3]     = (Math.random() - 0.5) * 140;
+  snowPositionsArr[i * 3 + 1] = Math.random() * 60 + 5;
+  snowPositionsArr[i * 3 + 2] = (Math.random() - 0.5) * 140;
+  snowData.push({
+    speed: 0.02 + Math.random() * 0.04,
+    phase: Math.random() * Math.PI * 2,
+    sway:  0.1  + Math.random() * 0.15,
+  });
+}
+
+const snowGeo = new THREE.BufferGeometry();
+snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPositionsArr, 3));
+
+const snowMat = new THREE.PointsMaterial({
+  map: snowTex,
+  size: 0.6,
+  sizeAttenuation: true,
+  transparent: true,
+  opacity: 0.7,
+  depthWrite: false,
+  color: 0xFFFFFF,
+});
+
+const snowPoints = new THREE.Points(snowGeo, snowMat);
+snowPoints.frustumCulled = false;
+scene.add(snowPoints);
+
+function updateSnow(dt, t) {
+  const pos = snowGeo.attributes.position;
+  for (let i = 0; i < SNOW_COUNT; i++) {
+    const sd = snowData[i];
+    let x = pos.getX(i);
+    let y = pos.getY(i);
+    let z = pos.getZ(i);
+
+    y -= sd.speed * 60 * dt;
+    x += Math.sin(t * 0.3 + sd.phase) * sd.sway * dt * 2;
+    z += Math.cos(t * 0.25 + sd.phase * 1.3) * sd.sway * dt * 1.5;
+
+    // Reset at ground level
+    const groundY = getTerrainHeight(
+      clamp(x, -TERRAIN_HALF, TERRAIN_HALF),
+      clamp(z, -TERRAIN_HALF, TERRAIN_HALF)
+    );
+    if (y < groundY + 0.2) {
+      y = 40 + Math.random() * 25;
+      x = (Math.random() - 0.5) * 140;
+      z = (Math.random() - 0.5) * 140;
+    }
+
+    pos.setXYZ(i, x, y, z);
+  }
+  pos.needsUpdate = true;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYSTEM 2: LOAD PENGUIN GLB + INSTANCED MESH
+// ═══════════════════════════════════════════════════════════════════════════════
+setLoad(42, 'loading penguin model...');
+
+const gltfLoader = new GLTFLoader();
+let penguinGeo, penguinMat;
+
+try {
+  const gltf = await gltfLoader.loadAsync('penguin.glb');
+  gltf.scene.traverse(child => {
+    if (child.isMesh && !penguinGeo) {
+      penguinGeo = child.geometry;
+      penguinMat = child.material.clone();
+    }
+  });
+  penguinMat.roughness = 0.55;
+  penguinMat.metalness = 0.02;
+  penguinMat.emissive = new THREE.Color(0x334466);
+  penguinMat.emissiveIntensity = 0.3;
+  if (penguinMat.map) penguinMat.map.colorSpace = THREE.SRGBColorSpace;
+} catch (e) {
+  console.warn('penguin.glb failed to load, using fallback capsule:', e);
+  penguinGeo = new THREE.CapsuleGeometry(0.3, 0.6, 8, 12);
+  penguinMat = new THREE.MeshPhysicalMaterial({ color: 0x1E1B4B, roughness: 0.5, metalness: 0.02 });
+}
+
+setLoad(55, 'penguin model loaded');
+
+// ─── POPULATE PENGUIN ARRAY ──────────────────────────────────────────────────
+setLoad(58, 'populating colony...');
+
+const penguins = [];
+let maxCascade = 1;
+
+DATA.sorry_nodes.forEach(sn => {
+  if (sn.cascade > maxCascade) maxCascade = sn.cascade;
+});
+
+// Sorry + keystone penguins (from data, each one IS a theorem)
+DATA.sorry_nodes.forEach(sn => {
+  if (filterWaddle && sn.project !== filterWaddle) return;
+  const wc = waddleCenters[sn.project];
+  if (!wc) return;
+  const angle = sn.phase || Math.random() * Math.PI * 2;
+  const dist  = wc.radius * 0.8 + Math.random() * wc.radius * 0.4;
+  penguins.push({
+    x: wc.x + Math.cos(angle) * dist,
+    z: wc.z + Math.sin(angle) * dist,
+    vx: 0, vz: 0,
+    rotY: angle + Math.PI,
+    speed: 0,
+    state:   sn.state   || 'sorry',
+    project: sn.project,
+    fqn:     sn.fqn     || null,
+    name:    sn.name    || null,
+    cascade: sn.cascade || 0,
+    hash:    sn.hash    || '',
+    module:  sn.module  || '',
+    line:    sn.line    || 0,
+    phase:   sn.phase   || Math.random() * Math.PI * 2,
+    scale:   sn.scale   || 1.0,
+    tint:    sn.tint    || 0,
+    isData: true,
+  });
+});
+
+// Proven penguins (sampled proportionally per project)
+const maxProven  = Math.min(400, MAX_PENGUINS - penguins.length);
+const totalDecls = Math.max(1, DATA.meta.declarations - DATA.meta.sorry_total);
+
+projectNames.forEach(pname => {
+  const proj = DATA.projects[pname];
+  if (!proj) return;
+  const provenCount = (proj.decls || 0) - (proj.sorry || 0);
+  if (provenCount <= 0) return;
+  const sampleN = clamp(Math.round((provenCount / totalDecls) * maxProven), 3, 60);
+  const wc = waddleCenters[pname];
+  if (!wc) return;
+  for (let i = 0; i < sampleN; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist  = Math.random() * wc.radius * 0.7;
+    penguins.push({
+      x: wc.x + Math.cos(angle) * dist,
+      z: wc.z + Math.sin(angle) * dist,
+      vx: 0, vz: 0,
+      rotY: Math.random() * Math.PI * 2,
+      speed: 0,
+      state: 'proven', project: pname,
+      fqn: null, name: null,
+      cascade: 0, hash: '', module: '', line: 0,
+      phase: Math.random() * Math.PI * 2,
+      scale: 0.9 + Math.random() * 0.2,
+      tint: 0,
+      isData: false,
+    });
+  }
+});
+
+const activePenguinCount = Math.min(penguins.length, MAX_PENGUINS);
+
+// Update header stats
+document.getElementById('sd').textContent = activePenguinCount;
+document.getElementById('ss').textContent = DATA.meta.sorry_total;
+document.getElementById('sc').textContent = DATA.meta.declarations - DATA.meta.sorry_total;
+
+// ─── CREATE INSTANCED MESH ───────────────────────────────────────────────────
+setLoad(62, 'creating instanced mesh...');
+
+const penguinInstances = new THREE.InstancedMesh(penguinGeo, penguinMat, MAX_PENGUINS);
+penguinInstances.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+// Per-instance color for state tinting
+const instanceColors = new Float32Array(MAX_PENGUINS * 3).fill(1);
+penguinInstances.instanceColor = new THREE.InstancedBufferAttribute(instanceColors, 3);
+penguinInstances.instanceColor.setUsage(THREE.DynamicDrawUsage);
+penguinInstances.count = activePenguinCount;
+scene.add(penguinInstances);
+
+const dummy  = new THREE.Object3D();
+const _color = new THREE.Color();
+
+function stateColor(state) {
+  switch (state) {
+    case 'sorry':        return 0xFFCCCC;
+    case 'keystone':     return 0xFFDD88;
+    case 'contaminated': return 0xCCCCCC;
+    case 'false':        return 0xFF8888;
+    default:             return 0xFFFFFF; // proven: no tint
+  }
+}
+
+let currentView = 'colony';
+
+function updatePenguinMatrices(t) {
+  for (let i = 0; i < activePenguinCount; i++) {
+    const p = penguins[i];
+    const terrainY = getTerrainHeight(
+      clamp(p.x, -TERRAIN_HALF, TERRAIN_HALF),
+      clamp(p.z, -TERRAIN_HALF, TERRAIN_HALF)
+    );
+
+    // Ground clamp: penguin feet on terrain surface
+    // penguin.glb origin is at feet, so terrainY + 0 = feet on ground
+    dummy.position.set(p.x, terrainY, p.z);
+
+    // Per-state animation
+    const rockZ = Math.sin(t * 5 + p.phase) * p.speed * 0.08;
+    const tiltX = (p.state === 'sorry' || p.state === 'false')
+      ? -0.12 + Math.sin(t * 0.5 + p.phase) * 0.06
+      : 0;
+    dummy.position.y += Math.sin(t * 10 + p.phase) * p.speed * 0.01;
+
+    dummy.rotation.set(tiltX, p.rotY, rockZ);
+
+    // Scale — calibrate so penguins are ~3-4 units tall
+    let s = 3.5 * p.scale;
+    if (p.state === 'keystone') s *= 1.25;
+
+    // View-mode adjustments
+    if (currentView === 'sorry' && p.state === 'proven') {
+      s *= 0.5;
+    } else if (currentView === 'cascade' && p.cascade > 0) {
+      s *= 1.0 + (p.cascade / maxCascade) * 1.5;
+    }
+
+    dummy.scale.setScalar(s);
+    dummy.updateMatrix();
+    penguinInstances.setMatrixAt(i, dummy.matrix);
+
+    // Color tint
+    _color.setHex(stateColor(p.state));
+    if (currentView === 'sorry' && p.state === 'proven') {
+      _color.multiplyScalar(0.3);
+    }
+    penguinInstances.setColorAt(i, _color);
+  }
+  penguinInstances.instanceMatrix.needsUpdate = true;
+  if (penguinInstances.instanceColor) penguinInstances.instanceColor.needsUpdate = true;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYSTEM 3: SOCIAL FORCE CROWD SIMULATION (Helbing model + spatial hash)
+// ═══════════════════════════════════════════════════════════════════════════════
+setLoad(68, 'initializing crowd simulation...');
+
+let spatialGrid = {};
+
+function rebuildGrid() {
+  spatialGrid = {};
+  for (let i = 0; i < activePenguinCount; i++) {
+    const p = penguins[i];
+    const key = (Math.floor(p.x / CELL_SIZE)) + ',' + (Math.floor(p.z / CELL_SIZE));
+    if (!spatialGrid[key]) spatialGrid[key] = [];
+    spatialGrid[key].push(i);
+  }
+}
+
+function getNeighborIndices(x, z, radius) {
+  const result = [];
+  const cr = Math.ceil(radius / CELL_SIZE);
+  const cx = Math.floor(x / CELL_SIZE);
+  const cz = Math.floor(z / CELL_SIZE);
+  for (let dx = -cr; dx <= cr; dx++) {
+    for (let dz = -cr; dz <= cr; dz++) {
+      const cell = spatialGrid[(cx + dx) + ',' + (cz + dz)];
+      if (cell) {
+        for (let k = 0; k < cell.length; k++) result.push(cell[k]);
+      }
+    }
+  }
+  return result;
+}
+
+function updatePhysics(dt, t) {
+  rebuildGrid();
+
+  for (let i = 0; i < activePenguinCount; i++) {
+    const p  = penguins[i];
+    const wc = waddleCenters[p.project];
+    if (!wc) continue;
+
+    let fx = 0, fz = 0;
+
+    // 1. Drive force toward target
+    let tx, tz;
+    if (p.state === 'proven') {
+      // Proven: seek waddle center
+      tx = wc.x; tz = wc.z;
+    } else {
+      // Sorry/keystone/false/contaminated: orbit at edge
+      const baseAngle = Math.atan2(p.z - wc.z, p.x - wc.x) || p.phase;
+      const drift = Math.sin(t * 0.1 + p.phase) * 0.3;
+      tx = wc.x + Math.cos(baseAngle + drift) * wc.radius;
+      tz = wc.z + Math.sin(baseAngle + drift) * wc.radius;
+    }
+
+    const ddx = tx - p.x;
+    const ddz = tz - p.z;
+    const dd  = Math.hypot(ddx, ddz) || 1;
+    const desiredSpeed = Math.min(dd, 0.4);
+    const dvx = (ddx / dd) * desiredSpeed - p.vx;
+    const dvz = (ddz / dd) * desiredSpeed - p.vz;
+    fx += dvx / 0.5;  // relaxation tau = 0.5s
+    fz += dvz / 0.5;
+
+    // 2. Agent-agent repulsion (Helbing exponential)
+    const A = 3.0, B = 0.3, R = 1.5;
+    const neighbors = getNeighborIndices(p.x, p.z, 5.0);
+    for (let ni = 0; ni < neighbors.length; ni++) {
+      const j = neighbors[ni];
+      if (j === i) continue;
+      const q  = penguins[j];
+      const sx = p.x - q.x, sz = p.z - q.z;
+      const sd = Math.hypot(sx, sz);
+      if (sd < 0.01 || sd > 5.0) continue;
+      const force = A * Math.exp((R - sd) / B);
+      fx += (sx / sd) * force;
+      fz += (sz / sd) * force;
+    }
+
+    // 3. Wander noise
+    fx += Math.sin(t * 0.3 + p.phase * 7)  * 0.12;
+    fz += Math.cos(t * 0.25 + p.phase * 11) * 0.12;
+
+    // 4. Boundary containment
+    const distFromCenter = Math.hypot(p.x, p.z);
+    if (distFromCenter > 65) {
+      const pushBack = (distFromCenter - 65) * 0.08;
+      fx -= (p.x / distFromCenter) * pushBack;
+      fz -= (p.z / distFromCenter) * pushBack;
+    }
+
+    // 5. Integrate
+    p.vx += fx * dt;
+    p.vz += fz * dt;
+    p.vx *= 0.93;
+    p.vz *= 0.93;
+    const speed = Math.hypot(p.vx, p.vz);
+    if (speed > 0.5) {
+      p.vx *= 0.5 / speed;
+      p.vz *= 0.5 / speed;
+    }
+    p.x += p.vx * dt;
+    p.z += p.vz * dt;
+    p.speed = Math.hypot(p.vx, p.vz);
+
+    // 6. Face direction (smooth lerp)
+    if (p.speed > 0.01) {
+      const targetRot = Math.atan2(p.vx, p.vz);
+      let diff = targetRot - p.rotY;
+      while (diff >  Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      p.rotY += diff * 0.06;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYSTEM 6: PARTICLE STATE EFFECTS (8000 particle pool, additive blending)
+// ═══════════════════════════════════════════════════════════════════════════════
+setLoad(72, 'initializing particle system...');
+
+const pPositions = new Float32Array(MAX_PARTICLES * 3);
+const pColors    = new Float32Array(MAX_PARTICLES * 3);
+const pSizes     = new Float32Array(MAX_PARTICLES);
+const pAlphas    = new Float32Array(MAX_PARTICLES);
+
+const particlePool = new Array(MAX_PARTICLES);
+for (let i = 0; i < MAX_PARTICLES; i++) {
+  particlePool[i] = {
+    active: false,
+    x: 0, y: 0, z: 0,
+    vx: 0, vy: 0, vz: 0,
+    r: 1, g: 1, b: 1,
+    age: 0, maxAge: 1,
+    size: 1,
+  };
+}
+let particleCount = 0;
+
+const particleGeo = new THREE.BufferGeometry();
+particleGeo.setAttribute('position',    new THREE.BufferAttribute(pPositions, 3));
+particleGeo.setAttribute('customColor', new THREE.BufferAttribute(pColors, 3));
+particleGeo.setAttribute('size',        new THREE.BufferAttribute(pSizes, 1));
+particleGeo.setAttribute('alpha',       new THREE.BufferAttribute(pAlphas, 1));
+
+const particleMat = new THREE.ShaderMaterial({
+  uniforms: {},
+  vertexShader: `
+    attribute float size;
+    attribute float alpha;
+    attribute vec3 customColor;
+    varying float vAlpha;
+    varying vec3 vColor;
+    void main() {
+      vAlpha = alpha;
+      vColor = customColor;
+      vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+      gl_PointSize = size * (120.0 / -mvPos.z);
+      gl_Position = projectionMatrix * mvPos;
+    }
+  `,
+  fragmentShader: `
+    varying float vAlpha;
+    varying vec3 vColor;
+    void main() {
+      float d = length(gl_PointCoord - 0.5);
+      if (d > 0.5) discard;
+      float glow = smoothstep(0.5, 0.0, d);
+      gl_FragColor = vec4(vColor, vAlpha * glow * glow);
+    }
+  `,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
+
+const particlePoints = new THREE.Points(particleGeo, particleMat);
+particlePoints.frustumCulled = false;
+scene.add(particlePoints);
+
+function emitParticle(x, y, z, vx, vy, vz, r, g, b, maxAge, size) {
+  for (let i = 0; i < MAX_PARTICLES; i++) {
+    const pp = particlePool[i];
+    if (!pp.active) {
+      pp.active = true;
+      pp.x = x; pp.y = y; pp.z = z;
+      pp.vx = vx; pp.vy = vy; pp.vz = vz;
+      pp.r = r; pp.g = g; pp.b = b;
+      pp.age = 0; pp.maxAge = maxAge;
+      pp.size = size;
+      return;
+    }
+  }
+}
+
+function updateParticles(dt, t) {
+  // Emit per penguin state
+  for (let i = 0; i < activePenguinCount; i++) {
+    const p  = penguins[i];
+    const ty = getTerrainHeight(
+      clamp(p.x, -TERRAIN_HALF, TERRAIN_HALF),
+      clamp(p.z, -TERRAIN_HALF, TERRAIN_HALF)
+    ) + 3.5;
+
+    if (p.state === 'proven') {
+      // 1-2 green sparkles per second (subtle, not blinding)
+      if (Math.random() < 0.003 * dt * 60) {
+        emitParticle(
+          p.x + (Math.random() - 0.5) * 1.5, ty + Math.random() * 2,
+          p.z + (Math.random() - 0.5) * 1.5,
+          (Math.random() - 0.5) * 0.05, 0.1 + Math.random() * 0.05,
+          (Math.random() - 0.5) * 0.05,
+          0.29, 0.87, 0.5,
+          2.5, 1.0
+        );
+      }
+    } else if (p.state === 'sorry') {
+      // Amber ? glyph, 0.5/sec
+      if (Math.random() < 0.004 * dt * 60) {
+        emitParticle(
+          p.x + (Math.random() - 0.5) * 0.8, ty + 1.5, p.z + (Math.random() - 0.5) * 0.8,
+          (Math.random() - 0.5) * 0.03, 0.06, (Math.random() - 0.5) * 0.03,
+          0.85, 0.47, 0.02,
+          3.5, 1.5
+        );
+      }
+    } else if (p.state === 'keystone') {
+      // Diamond orbit glow, continuous but restrained
+      if (Math.random() < 0.025 * dt * 60) {
+        const a2 = t * 1.5 + p.phase + Math.random() * 0.3;
+        const or2 = 1.5 + Math.random() * 0.5;
+        emitParticle(
+          p.x + Math.cos(a2) * or2, ty + 0.5 + Math.random() * 3,
+          p.z + Math.sin(a2) * or2,
+          Math.cos(a2 + 1.57) * 0.06, 0.015, Math.sin(a2 + 1.57) * 0.06,
+          0.96, 0.62, 0.04,
+          4.0, 1.8
+        );
+      }
+    } else if (p.state === 'false') {
+      // Occasional red sparks
+      if (Math.random() < 0.008 * dt * 60) {
+        emitParticle(
+          p.x + (Math.random() - 0.5), ty + 1.5,
+          p.z + (Math.random() - 0.5),
+          (Math.random() - 0.5) * 0.2, 0.15 + Math.random() * 0.1,
+          (Math.random() - 0.5) * 0.2,
+          0.94, 0.27, 0.27,
+          1.5, 1.5
+        );
+      }
+    } else if (p.state === 'contaminated') {
+      // Rare gray wisps
+      if (Math.random() < 0.002 * dt * 60) {
+        emitParticle(
+          p.x + (Math.random() - 0.5) * 0.5, ty + 0.5, p.z + (Math.random() - 0.5) * 0.5,
+          (Math.random() - 0.5) * 0.02, 0.03, (Math.random() - 0.5) * 0.02,
+          0.53, 0.53, 0.53,
+          4.0, 1.2
+        );
+      }
+    }
+  }
+
+  // Update particle physics + upload to GPU
+  particleCount = 0;
+  for (let i = 0; i < MAX_PARTICLES; i++) {
+    const pp = particlePool[i];
+    if (!pp.active) continue;
+
+    pp.age += dt;
+    if (pp.age >= pp.maxAge) { pp.active = false; continue; }
+
+    pp.x += pp.vx * dt;
+    pp.y += pp.vy * dt;
+    pp.z += pp.vz * dt;
+    pp.vy -= 0.01 * dt; // light gravity
+
+    const life   = 1.0 - pp.age / pp.maxAge;
+    const fadeIn = Math.min(pp.age * 5, 1.0);
+    const idx    = particleCount;
+
+    pPositions[idx * 3]     = pp.x;
+    pPositions[idx * 3 + 1] = pp.y;
+    pPositions[idx * 3 + 2] = pp.z;
+    pColors[idx * 3]        = pp.r;
+    pColors[idx * 3 + 1]    = pp.g;
+    pColors[idx * 3 + 2]    = pp.b;
+    pSizes[idx]             = pp.size * (0.5 + life * 0.5);
+    pAlphas[idx]            = life * fadeIn;
+    particleCount++;
+  }
+
+  particleGeo.attributes.position.needsUpdate    = true;
+  particleGeo.attributes.customColor.needsUpdate  = true;
+  particleGeo.attributes.size.needsUpdate         = true;
+  particleGeo.attributes.alpha.needsUpdate        = true;
+  particleGeo.setDrawRange(0, particleCount);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SORRY MARKERS (? sprites) + KEYSTONE DIAMONDS
+// ═══════════════════════════════════════════════════════════════════════════════
+setLoad(76, 'adding sorry markers...');
+
+// Canvas-rendered ? texture
+function makeQuestionTex() {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, 64, 64);
+  ctx.font = 'bold 48px "Space Grotesk", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = '#D97706';
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = '#D97706';
+  ctx.fillText('?', 32, 30);
+  const tex = new THREE.CanvasTexture(c);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+const questionTex     = makeQuestionTex();
+const questionSprites = [];
+
+for (let i = 0; i < activePenguinCount; i++) {
+  const p = penguins[i];
+  if (p.state !== 'sorry' && p.state !== 'false') continue;
+
+  const sMat = new THREE.SpriteMaterial({
+    map: questionTex,
+    transparent: true,
+    depthWrite: false,
+    opacity: 0.5,
+    sizeAttenuation: true,
+  });
+  if (p.state === 'false') sMat.color.setHex(0xFF4444);
+  const sprite = new THREE.Sprite(sMat);
+  sprite.scale.set(1.5, 1.5, 1);
+  sprite.userData.idx = i;
+  scene.add(sprite);
+  questionSprites.push(sprite);
+}
+
+// Diamond mesh for keystones
+const diamondGeo = new THREE.OctahedronGeometry(0.6, 0);
+const diamondMat = new THREE.MeshPhysicalMaterial({
+  color: 0xF59E0B,
+  emissive: 0xF59E0B,
+  emissiveIntensity: 0.6,
+  roughness: 0.2,
+  metalness: 0.3,
+  transparent: true,
+  opacity: 0.85,
+});
+
+const keystoneDiamonds = [];
+for (let i = 0; i < activePenguinCount; i++) {
+  const p = penguins[i];
+  if (p.state !== 'keystone') continue;
+  const diamond = new THREE.Mesh(diamondGeo.clone(), diamondMat.clone());
+  diamond.userData.idx = i;
+  scene.add(diamond);
+  keystoneDiamonds.push(diamond);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BESPOKE PENGUIN BILLBOARDS — per-theorem renders for keystones
+// 19 pre-generated images in bespoke/ directory, loaded as billboard sprites
+// ═══════════════════════════════════════════════════════════════════════════════
+const bespokeSprites = [];
+const bespokeLoader = new THREE.TextureLoader();
+
+// Map keystone FQNs to bespoke image files
+const bespokeMap = {
+  'fermat': 'fermat-last-theorem.png',
+  'fermat-mazur': 'fermat-mazur.png',
+  'reality-yang-mills': 'reality-yang-mills.png',
+  'reality-confinement': 'reality-confinement-lawvere.png',
+  'quantum-grover': 'quantum-grover.png',
+  'quantum-qsvt': 'quantum-qsvt.png',
+  'npnep-mcsp': 'npnep-mcsp.png',
+  'hong-tamari': 'hong-tamari.png',
+  'jill-brilliance': 'jill-brilliance-fire.png',
+  'jill-separation': 'jill-separation.png',
+  'becky-prospect': 'becky-prospect-theory.png',
+  'becky-compound': 'becky-compound-growth.png',
+  'robert-merge': 'robert-merge-assoc.png',
+  'kristi-christofides': 'kristi-christofides.png',
+  'audrey-hertz': 'audrey-hertz-contact.png',
+  'audrey-late-curl': 'audrey-late-curl.png',
+  'tao-green-tao': 'tao-green-tao.png',
+  'katie-five-habits': 'katie-five-habits.png',
+  'meta-sorry': 'meta-sorry-closing.png',
+};
+
+// Match keystones to bespoke images by project name prefix
+for (let i = 0; i < activePenguinCount; i++) {
+  const p = penguins[i];
+  if (p.state !== 'keystone') continue;
+
+  // Try to find a matching bespoke image
+  let bespokeFile = null;
+  for (const [key, file] of Object.entries(bespokeMap)) {
+    if (p.project === key.split('-')[0] || (p.name && p.name.toLowerCase().includes(key.split('-').slice(1).join('-')))) {
+      bespokeFile = file;
+      break;
+    }
+  }
+  if (!bespokeFile) {
+    // Fallback: use project-named file if it exists
+    bespokeFile = Object.values(bespokeMap).find(f => f.startsWith(p.project + '-'));
+  }
+  if (!bespokeFile) continue;
+
+  try {
+    const tex = bespokeLoader.load('bespoke/' + bespokeFile);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.SpriteMaterial({
+      map: tex,
+      transparent: true,
+      opacity: 0.0, // fade in when close
+      depthWrite: false,
+      sizeAttenuation: true,
+    });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(4, 4, 1);
+    sprite.userData.idx = i;
+    sprite.userData.bespokeFile = bespokeFile;
+    scene.add(sprite);
+    bespokeSprites.push(sprite);
+  } catch (e) {
+    // Image not available, skip
+  }
+}
+
+function updateMarkers(t) {
+  for (let si = 0; si < questionSprites.length; si++) {
+    const sprite = questionSprites[si];
+    const idx = sprite.userData.idx;
+    if (idx >= activePenguinCount) continue;
+    const p = penguins[idx];
+    const ty = getTerrainHeight(
+      clamp(p.x, -TERRAIN_HALF, TERRAIN_HALF),
+      clamp(p.z, -TERRAIN_HALF, TERRAIN_HALF)
+    );
+    sprite.position.set(p.x, ty + 5 + Math.sin(t * 2 + p.phase) * 0.2, p.z);
+  }
+  for (let di = 0; di < keystoneDiamonds.length; di++) {
+    const diamond = keystoneDiamonds[di];
+    const idx = diamond.userData.idx;
+    if (idx >= activePenguinCount) continue;
+    const p = penguins[idx];
+    const ty = getTerrainHeight(
+      clamp(p.x, -TERRAIN_HALF, TERRAIN_HALF),
+      clamp(p.z, -TERRAIN_HALF, TERRAIN_HALF)
+    );
+    const oa = t * 1.5 + p.phase;
+    diamond.position.set(
+      p.x + Math.cos(oa) * 2,
+      ty + 4.5 + Math.sin(t * 2 + p.phase) * 0.3,
+      p.z + Math.sin(oa) * 2
+    );
+    diamond.rotation.set(t * 0.8, t * 1.2, t * 0.5);
+  }
+
+  // Bespoke billboards: show when camera is close, fade with distance
+  for (let bi = 0; bi < bespokeSprites.length; bi++) {
+    const sprite = bespokeSprites[bi];
+    const idx = sprite.userData.idx;
+    if (idx >= activePenguinCount) continue;
+    const p = penguins[idx];
+    const ty = getTerrainHeight(
+      clamp(p.x, -TERRAIN_HALF, TERRAIN_HALF),
+      clamp(p.z, -TERRAIN_HALF, TERRAIN_HALF)
+    );
+    sprite.position.set(p.x, ty + 6, p.z);
+    // Fade in when camera within 25 units, full at 12
+    const dist = camera.position.distanceTo(sprite.position);
+    sprite.material.opacity = clamp(1.0 - (dist - 12) / 15, 0, 0.85);
+    sprite.visible = dist < 30;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WADDLE LABELS (HTML overlay projected from 3D)
+// ═══════════════════════════════════════════════════════════════════════════════
+setLoad(80, 'adding waddle labels...');
+
+const labelsContainer = document.getElementById('labels-container');
+const labelEls = {};
+const _labelVec = new THREE.Vector3();
+
+projectNames.forEach(name => {
+  const el = document.createElement('div');
+  el.className = 'waddle-label';
+  const proj = DATA.projects[name];
+  const s = proj.sorry || 0;
+  const d = proj.decls || 0;
+  el.textContent = name + ' (' + (d - s) + '/' + d + ')';
+  labelsContainer.appendChild(el);
+  labelEls[name] = el;
+});
+
+function updateLabels() {
+  for (let ni = 0; ni < projectNames.length; ni++) {
+    const name = projectNames[ni];
+    const wc = waddleCenters[name];
+    const el = labelEls[name];
+    if (!wc || !el) continue;
+
+    _labelVec.set(wc.x, getTerrainHeight(wc.x, wc.z) + 7, wc.z);
+    _labelVec.project(camera);
+
+    if (_labelVec.z > 1) { el.style.display = 'none'; continue; }
+
+    const sx = ( _labelVec.x * 0.5 + 0.5) * window.innerWidth;
+    const sy = (-_labelVec.y * 0.5 + 0.5) * window.innerHeight;
+
+    if (sx < -100 || sx > window.innerWidth + 100 || sy < -50 || sy > window.innerHeight + 50) {
+      el.style.display = 'none';
+    } else {
+      el.style.display = 'block';
+      el.style.left = sx + 'px';
+      el.style.top  = sy + 'px';
+      el.style.transform = 'translate(-50%, -100%)';
+      const dist = camera.position.distanceTo(new THREE.Vector3(wc.x, 0, wc.z));
+      el.style.opacity = clamp(1.0 - (dist - 30) / 70, 0.15, 0.8).toString();
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYSTEM 7: POST-PROCESSING (bloom + FXAA)
+// ═══════════════════════════════════════════════════════════════════════════════
+setLoad(85, 'configuring post-processing...');
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  0.6,   // strength
+  0.5,   // radius — wider glow spread
+  0.8    // threshold — aurora and keystones glow
+);
+composer.addPass(bloomPass);
+
+const fxaaPass = new ShaderPass(FXAAShader);
+fxaaPass.uniforms['resolution'].value.set(
+  1 / (window.innerWidth * dpr),
+  1 / (window.innerHeight * dpr)
+);
+composer.addPass(fxaaPass);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYSTEM 8: INTERACTION (raycaster + info panel + tabs + keyboard)
+// ═══════════════════════════════════════════════════════════════════════════════
+setLoad(90, 'wiring interaction...');
+
+const raycaster = new THREE.Raycaster();
+const mouse     = new THREE.Vector2();
+let hoveredInstance = -1;
+
+// Panel DOM refs
+const panel      = document.getElementById('panel');
+const panelClose = document.getElementById('panel-close');
+const pnEl       = document.getElementById('pn');
+const ppEl       = document.getElementById('pp');
+const pmEl       = document.getElementById('pm');
+const psEl       = document.getElementById('ps');
+const pcEl       = document.getElementById('pc');
+const pcbEl      = document.getElementById('pcb');
+const phEl       = document.getElementById('ph');
+const plEl       = document.getElementById('pl');
+
+panelClose.addEventListener('click', () => panel.classList.remove('open'));
+
+function showPenguinInfo(idx) {
+  const p = penguins[idx];
+  if (!p) return;
+
+  pnEl.textContent = p.name || p.fqn || '(proven penguin)';
+  ppEl.textContent = p.project;
+  pmEl.textContent = p.module || '--';
+  psEl.textContent = p.state;
+  psEl.className   = 'state-' + p.state;
+  pcEl.textContent = p.cascade > 0 ? p.cascade + ' downstream' : '--';
+  pcbEl.style.width = (maxCascade > 0 ? (p.cascade / maxCascade) * 100 : 0) + '%';
+  phEl.textContent = p.hash || '--';
+  plEl.textContent = p.line > 0 ? 'line ' + p.line : '--';
+
+  panel.classList.add('open');
+}
+
+canvas.addEventListener('mousemove', e => {
+  mouse.x =  (e.clientX / window.innerWidth)  * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+});
+
+canvas.addEventListener('click', () => {
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObject(penguinInstances);
+  if (hits.length > 0 && hits[0].instanceId !== undefined) {
+    const idx = hits[0].instanceId;
+    if (idx < activePenguinCount) showPenguinInfo(idx);
+  }
+});
+
+// Cursor states
+canvas.addEventListener('mousedown', () => document.body.classList.add('grabbing'));
+canvas.addEventListener('mouseup',   () => document.body.classList.remove('grabbing'));
+
+// View tabs
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentView = btn.dataset.v;
+  });
+});
+
+// Hover detection (throttled to every 6 frames)
+let hoverTimer = 0;
+function checkHover() {
+  hoverTimer++;
+  if (hoverTimer < 6) return;
+  hoverTimer = 0;
+
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObject(penguinInstances);
+  if (hits.length > 0 && hits[0].instanceId !== undefined && hits[0].instanceId < activePenguinCount) {
+    hoveredInstance = hits[0].instanceId;
+    document.body.classList.add('hovering');
+  } else {
+    hoveredInstance = -1;
+    document.body.classList.remove('hovering');
+  }
+}
+
+// ─── RESIZE HANDLER ──────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+  bloomPass.setSize(window.innerWidth, window.innerHeight);
+  fxaaPass.uniforms['resolution'].value.set(
+    1 / (window.innerWidth * dpr),
+    1 / (window.innerHeight * dpr)
+  );
+});
+
+// ─── KEYBOARD SHORTCUTS ──────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') panel.classList.remove('open');
+  if (e.key === '1') document.querySelector('[data-v="colony"]').click();
+  if (e.key === '2') document.querySelector('[data-v="sorry"]').click();
+  if (e.key === '3') document.querySelector('[data-v="cascade"]').click();
+  if (e.key === 'r' || e.key === 'R') {
+    camera.position.set(0, 22, 42);
+    controls.target.set(0, 1, 0);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN ANIMATION LOOP
+// ═══════════════════════════════════════════════════════════════════════════════
+setLoad(95, 'starting render loop...');
+
+let lastTime = 0;
+let physicsAccum = 0;
+let frameCount = 0;
+
+function animate(time) {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min((time - lastTime) / 1000, 0.05);
+  lastTime = time;
+  const t = time * 0.001;
+  frameCount++;
+
+  // ── Physics at fixed 30Hz ──
+  physicsAccum += dt;
+  while (physicsAccum >= 1 / PHYSICS_HZ) {
+    updatePhysics(1 / PHYSICS_HZ, t);
+    physicsAccum -= 1 / PHYSICS_HZ;
+  }
+
+  // ── Penguin instances ──
+  updatePenguinMatrices(t);
+
+  // ── Aurora uniforms + emissive lights ──
+  for (let i = 0; i < auroras.length; i++) {
+    auroras[i].material.uniforms.uTime.value = t;
+  }
+  for (let i = 0; i < auroraLights.length; i++) {
+    const al = auroraLights[i];
+    al.position.x = Math.sin(t * 0.1 + i * 1.6) * 40;
+    al.position.z = -35 + Math.sin(t * 0.07 + i * 1.3) * 15;
+    al.intensity   = 0.8 + 0.5 * Math.sin(t * 0.2 + i * 1.7);
+  }
+
+  // ── Stars ──
+  starMat.uniforms.uTime.value = t;
+
+  // ── Snow ──
+  updateSnow(dt, t);
+
+  // ── Particles ──
+  updateParticles(dt, t);
+
+  // ── Markers (? sprites + diamonds) ──
+  updateMarkers(t);
+
+  // ── Hover ──
+  checkHover();
+
+  // ── Labels (every 3 frames) ──
+  if (frameCount % 3 === 0) updateLabels();
+
+  // ── Camera ──
+  controls.update();
+
+  // ── Render with post-processing ──
+  composer.render();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAUNCH
+// ═══════════════════════════════════════════════════════════════════════════════
+setLoad(100, 'colony is alive');
+
+setTimeout(() => {
+  loadEl.classList.add('done');
+  setTimeout(() => loadEl.remove(), 1000);
+}, 400);
+
+requestAnimationFrame(animate);
+
+console.log(
+  '%cAurora — Proof Galaxy\n' +
+  '%c' + DATA.meta.declarations + ' declarations across ' + DATA.meta.projects_count + ' projects\n' +
+  DATA.meta.sorry_total + ' sorry nodes, ' + activePenguinCount + ' penguins rendered\n' +
+  DATA.meta.edges + ' dependency edges',
+  'font-size: 14px; font-weight: bold; color: #D97706;',
+  'font-size: 11px; color: #888;'
+);
+
+</script>
+</body>
+</html>
