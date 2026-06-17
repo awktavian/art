@@ -5,11 +5,14 @@ Extracts git commits since Friday 5 PM and categorizes them into 6 narrative arc
 """
 
 import json
+import logging
 import re
 import subprocess
 from datetime import datetime
 from pathlib import Path
 from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
 # Configuration
 REPO_PATH = Path.home() / "projects" / "kagami"
@@ -187,8 +190,8 @@ def parse_commits():
                         "additions": additions,
                         "deletions": deletions
                     })
-                except ValueError:
-                    pass
+                except ValueError as exc:
+                    logger.debug("ignoring malformed git numstat line %r: %s", line, exc)
     
     # Don't forget the last commit
     if current_commit:

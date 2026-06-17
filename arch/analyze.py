@@ -9,6 +9,7 @@ Usage:
 
 import ast
 import json
+import logging
 import os
 import re
 import sys
@@ -16,6 +17,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # Configuration
 KAGAMI_ROOT = Path(os.environ.get("KAGAMI_ROOT", str(Path.home() / "projects" / "kagami")))
@@ -145,8 +148,8 @@ def extract_python_imports(file_path: Path) -> list[str]:
             # Fallback to regex
             for match in re.finditer(r"^(?:from|import)\s+([\w.]+)", content, re.MULTILINE):
                 imports.append(match.group(1).split(".")[0])
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("failed to extract Python imports from %s: %s", file_path, exc)
     return imports
 
 
@@ -162,8 +165,8 @@ def extract_rust_imports(file_path: Path) -> list[str]:
         # extern crate
         for match in re.finditer(r"extern\s+crate\s+(kagami[\w_]*)", content):
             imports.append(match.group(1))
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("failed to extract Rust imports from %s: %s", file_path, exc)
     return imports
 
 
@@ -175,8 +178,8 @@ def extract_swift_imports(file_path: Path) -> list[str]:
             content = f.read()
         for match in re.finditer(r"import\s+(Kagami\w*)", content):
             imports.append(match.group(1).lower().replace("kagami", "kagami_"))
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("failed to extract Swift imports from %s: %s", file_path, exc)
     return imports
 
 
@@ -189,8 +192,8 @@ def extract_kotlin_imports(file_path: Path) -> list[str]:
         for match in re.finditer(r"import\s+(?:com\.kagami|io\.kagami)\.([\w.]+)", content):
             pkg = match.group(1).split(".")[0]
             imports.append(f"kagami_{pkg}")
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("failed to extract Kotlin imports from %s: %s", file_path, exc)
     return imports
 
 
@@ -221,16 +224,16 @@ def analyze_packages() -> list[Package]:
                 match = re.search(r'description\s*=\s*"([^"]+)"', content)
                 if match:
                     description = match.group(1)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("failed to read pyproject description from %s: %s", pyproject, exc)
         elif cargo.exists():
             try:
                 content = cargo.read_text()
                 match = re.search(r'description\s*=\s*"([^"]+)"', content)
                 if match:
                     description = match.group(1)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("failed to read Cargo description from %s: %s", cargo, exc)
 
         # Count modules for Python packages
         modules = []
@@ -319,8 +322,8 @@ def analyze_core_modules() -> list[Package]:
                 match = re.search(r'^"""([^"]+)"""', content, re.DOTALL)
                 if match:
                     description = match.group(1).strip().split("\n")[0]
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("failed to read core module description from %s: %s", init_file, exc)
 
         mod = Package(
             id=mod_path.name,

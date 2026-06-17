@@ -114,7 +114,7 @@ export class GalleryLoader {
         this.scene = scene;
         this.loadedArtworks = new Map();
         this.infoPanel = new InfoPanel();
-        /** @type {Array<{ patent: object, colony: string, position: THREE.Vector3, rotationY: number, placeholder: THREE.Group }>} */
+        /** @type {Array<{ patent: object, colony: string, position: THREE.Vector3, rotationY: number, loadingSlot: THREE.Group }>} */
         this.pendingArtworks = [];
         this.loadedColonies = new Set();
 
@@ -143,7 +143,7 @@ export class GalleryLoader {
     }
     
     /**
-     * Load all galleries: P1 immediately, P2/P3 as placeholders to load when visitor approaches wing
+     * Load all galleries: P1 immediately, P2/P3 as loading slots to load when visitor approaches wing
      */
     loadAllGalleries() {
         const artworkGroup = new THREE.Group();
@@ -164,22 +164,22 @@ export class GalleryLoader {
             });
         });
         
-        // P2/P3: add placeholders and register pending loads by wing
-        this.addTemplatePlaceholders(artworkGroup);
+        // P2/P3: add loading slots and register pending loads by wing
+        this.addTemplateLoadingSlots(artworkGroup);
         
         this.scene.add(artworkGroup);
         this.artworkGroup = artworkGroup;
 
-        // Instanced pedestals for all slots (P1 + placeholders)
+        // Instanced pedestals for all slots (P1 + deferred loading slots)
         artworkGroup.updateMatrixWorld(true);
         const positions = collectArtworkPositions(this.loadedArtworks);
-        const placeholderPositions = [];
+        const loadingSlotPositions = [];
         this.pendingArtworks.forEach((p) => {
             const v = new THREE.Vector3();
-            p.placeholder.getWorldPosition(v);
-            placeholderPositions.push(v);
+            p.loadingSlot.getWorldPosition(v);
+            loadingSlotPositions.push(v);
         });
-        const allPositions = [...positions, ...placeholderPositions];
+        const allPositions = [...positions, ...loadingSlotPositions];
         if (allPositions.length > 0) {
             const instancedPedestals = createInstancedPedestals(allPositions);
             artworkGroup.add(instancedPedestals);
@@ -191,9 +191,9 @@ export class GalleryLoader {
     }
     
     /**
-     * Add placeholder nodes for P2/P3 and register pending loads by colony
+     * Add loading-slot nodes for P2/P3 and register pending loads by colony
      */
-    addTemplatePlaceholders(group) {
+    addTemplateLoadingSlots(group) {
         const templatePatents = PATENTS.filter(p => 
             (p.priority === 'P2' || p.priority === 'P3') && 
             !this.loadedArtworks.has(p.id)
@@ -225,30 +225,30 @@ export class GalleryLoader {
                 const z = baseZ + Math.sin(perpAngle) * lateralOffset;
                 const rotationY = -wingAngle + (side > 0 ? 0 : Math.PI);
                 
-                const placeholder = this.createShimmerPlaceholder(patent.id);
-                placeholder.position.set(x, 0, z);
-                placeholder.rotation.y = rotationY;
-                group.add(placeholder);
+                const loadingSlot = this.createDeferredLoadingSlot(patent.id);
+                loadingSlot.position.set(x, 0, z);
+                loadingSlot.rotation.y = rotationY;
+                group.add(loadingSlot);
                 
                 this.pendingArtworks.push({
                     patent,
                     colony,
                     position: new THREE.Vector3(x, 0, z),
                     rotationY,
-                    placeholder
+                    loadingSlot
                 });
             });
         });
     }
     
     /**
-     * Simple shimmer placeholder (small box) until artwork loads
+     * Simple shimmer loading slot (small box) until artwork loads
      */
-    createShimmerPlaceholder(patentId) {
+    createDeferredLoadingSlot(patentId) {
         const group = new THREE.Group();
-        group.name = `placeholder-${patentId}`;
+        group.name = `loading-slot-${patentId}`;
         group.userData.patentId = patentId;
-        group.userData.placeholder = true;
+        group.userData.loadingSlot = true;
         const geo = new THREE.BoxGeometry(1.2, 0.5, 1.2);
         const mat = new THREE.MeshStandardMaterial({
             color: 0x1a1a2e,
@@ -273,7 +273,7 @@ export class GalleryLoader {
         if (toLoad.length === 0) return 0;
         
         let added = 0;
-        toLoad.forEach(({ patent, position, rotationY, placeholder }) => {
+        toLoad.forEach(({ patent, position, rotationY, loadingSlot }) => {
             let artwork = null;
             try {
                 artwork = createP2Artwork(patent.id);
@@ -301,14 +301,13 @@ export class GalleryLoader {
             artwork.userData.patentId = patent.id;
             artwork.userData.interactive = true;
             
-            const idx = this.artworkGroup.children.indexOf(placeholder);
             this.artworkGroup.add(artwork);
-            this.artworkGroup.remove(placeholder);
-            if (placeholder.userData._shimmerMesh?.geometry) placeholder.userData._shimmerMesh.geometry.dispose();
-            if (placeholder.userData._shimmerMesh?.material) placeholder.userData._shimmerMesh.material.dispose();
+            this.artworkGroup.remove(loadingSlot);
+            if (loadingSlot.userData._shimmerMesh?.geometry) loadingSlot.userData._shimmerMesh.geometry.dispose();
+            if (loadingSlot.userData._shimmerMesh?.material) loadingSlot.userData._shimmerMesh.material.dispose();
             
             this.loadedArtworks.set(patent.id, artwork);
-            this.pendingArtworks = this.pendingArtworks.filter(p => p.placeholder !== placeholder);
+            this.pendingArtworks = this.pendingArtworks.filter(p => p.loadingSlot !== loadingSlot);
             hideOriginalPedestals(artwork);
             added++;
         });

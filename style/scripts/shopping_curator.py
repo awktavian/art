@@ -881,8 +881,8 @@ async def main() -> int:
             sys.path.insert(0, str(Path.home() / "projects/kagami/packages"))
             from kagami.core.security import get_secret
             api_key = get_secret("gemini_api_key")
-        except:
-            pass
+        except Exception as exc:
+            logger.debug("could not load Gemini API key from Kagami secrets: %s", exc)
     
     if args.command in ("verify", "fix-images", "audit") and not api_key:
         print("❌ Gemini API key required for image verification.")
