@@ -6774,21 +6774,21 @@ class MiniGlobe {
         
         // Day texture (Blue Marble)
         const earthTexture = textureLoader.load(
-            'https://unpkg.com/three-globe@2.24.13/example/img/earth-blue-marble.jpg',
+            'assets/globe/earth-blue-marble.jpg',
             () => console.log('%c🌍 Earth day texture loaded', 'color: #4CAF50;')
         );
         earthTexture.anisotropy = 16;
         
         // Night texture (city lights)
         const nightTexture = textureLoader.load(
-            'https://unpkg.com/three-globe@2.24.13/example/img/earth-night.jpg',
+            'assets/globe/earth-night.jpg',
             () => console.log('%c🌃 Earth night texture loaded', 'color: #9C27B0;')
         );
         nightTexture.anisotropy = 16;
         
         // Bump map for terrain
         const bumpTexture = textureLoader.load(
-            'https://unpkg.com/three-globe@2.24.13/example/img/earth-topology.png'
+            'assets/globe/earth-topology.png'
         );
         
         // Main globe with day texture - lit by directional sun light
@@ -6831,7 +6831,7 @@ class MiniGlobe {
         
         // Cloud layer
         const cloudTexture = textureLoader.load(
-            'https://unpkg.com/three-globe@2.24.13/example/img/earth-clouds.png'
+            'assets/globe/earth-clouds.png'
         );
         const cloudGeometry = new THREE.SphereGeometry(1.012, 64, 64);
         const cloudMaterial = new THREE.MeshPhongMaterial({
@@ -9258,7 +9258,7 @@ if (scrollIndicator) {
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
+        navigator.serviceWorker.register('./sw.js')
             .then((registration) => {
                 console.log('%c[PWA] Service worker registered', 'color: #4ECB71;', registration.scope);
 

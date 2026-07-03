@@ -1171,19 +1171,133 @@
             }
         });
 
-        // === FILM VIDEO GRACEFUL DEGRADATION ===
-        // The source .mp4 is intentionally gitignored (hosted separately);
-        // on a deploy where it 404s, hide the player and show a quiet caption.
+        // === FILM: KEN BURNS STILLS PLAYER ===
+        // The source .mp4 is intentionally gitignored (hosted separately).
+        // When it 404s, the nine Genesis renders become the film: a slow
+        // Ken Burns sequence with act labels. Note: <source> errors do NOT
+        // bubble to <video>, so we listen on the source element itself.
+        const FILM_FRAMES = [
+            { src: 'assets/act1_opening.png',   act: 'I',   shot: 'The Kubrick Corridor' },
+            { src: 'assets/act1_approach.png',  act: 'I',   shot: 'The Approach' },
+            { src: 'assets/act2_rackfocus.png', act: 'II',  shot: 'Rack Focus' },
+            { src: 'assets/act3_vertigo.png',   act: 'III', shot: 'Vertigo' },
+            { src: 'assets/act3_collapse.png',  act: 'III', shot: 'First Fall' },
+            { src: 'assets/act4_steadicam.png', act: 'IV',  shot: 'Steadicam' },
+            { src: 'assets/act4_chaos.png',     act: 'IV',  shot: 'Controlled Chaos' },
+            { src: 'assets/act5_arc.png',       act: 'V',   shot: 'The Arc' },
+            { src: 'assets/act5_finale.png',    act: 'V',   shot: 'Rest' }
+        ];
+
+        function mountStillsFilm() {
+            const container = document.getElementById('film-video-container');
+            const caption = document.getElementById('film-video-caption');
+            if (!container || container.dataset.stillsFilm) return;
+            container.dataset.stillsFilm = '1';
+
+            const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            const HOLD = 3777, FADE = reduced ? 987 : 610;
+
+            const css = document.createElement('style');
+            css.textContent = `
+                .stills-film { position: relative; width: 100%; aspect-ratio: 16/9;
+                    overflow: hidden; background: #000; cursor: pointer; }
+                .stills-film img { position: absolute; inset: 0; width: 100%; height: 100%;
+                    object-fit: cover; opacity: 0; transform-origin: center;
+                    transition: opacity ${FADE}ms cubic-bezier(0.22, 1, 0.36, 1); will-change: opacity, transform; }
+                .stills-film img.on { opacity: 1; }
+                .stills-film img.kb { transition: opacity ${FADE}ms cubic-bezier(0.22, 1, 0.36, 1),
+                    transform ${HOLD + FADE}ms linear; }
+                .stills-film .film-chip { position: absolute; left: 16px; bottom: 14px;
+                    font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em;
+                    text-transform: uppercase; color: rgba(255,255,255,0.82);
+                    background: rgba(0,0,0,0.45); backdrop-filter: blur(12px);
+                    border: 1px solid rgba(255,255,255,0.12); border-radius: 4px;
+                    padding: 6px 10px; pointer-events: none;
+                    transition: opacity ${FADE}ms ease; }
+                .stills-film .film-dots { position: absolute; right: 16px; bottom: 18px;
+                    display: flex; gap: 6px; pointer-events: none; }
+                .stills-film .film-dots i { width: 4px; height: 4px; border-radius: 50%;
+                    background: rgba(255,255,255,0.25); transition: background 233ms ease, transform 233ms ease; }
+                .stills-film .film-dots i.on { background: rgba(212,168,75,0.95); transform: scale(1.4); }
+                .stills-film .film-paused { position: absolute; inset: 0; display: none;
+                    align-items: center; justify-content: center; pointer-events: none; }
+                .stills-film.paused .film-paused { display: flex; }
+                .stills-film .film-paused span { font-family: 'IBM Plex Mono', monospace;
+                    font-size: 11px; letter-spacing: 0.2em; color: rgba(255,255,255,0.85);
+                    background: rgba(0,0,0,0.5); backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; padding: 8px 14px; }
+            `;
+            document.head.appendChild(css);
+
+            const stage = document.createElement('div');
+            stage.className = 'stills-film';
+            stage.setAttribute('role', 'img');
+            stage.setAttribute('aria-label', 'The Symmetry of Collapse — nine-frame film sequence');
+            const imgs = FILM_FRAMES.map((f, i) => {
+                const im = document.createElement('img');
+                im.src = f.src; im.alt = `Act ${f.act} — ${f.shot}`;
+                im.decoding = 'async'; im.loading = i === 0 ? 'eager' : 'lazy';
+                stage.appendChild(im); return im;
+            });
+            const chip = document.createElement('div'); chip.className = 'film-chip';
+            const dots = document.createElement('div'); dots.className = 'film-dots';
+            const dotEls = FILM_FRAMES.map(() => { const d = document.createElement('i'); dots.appendChild(d); return d; });
+            const pausedBadge = document.createElement('div');
+            pausedBadge.className = 'film-paused'; pausedBadge.innerHTML = '<span>PAUSED</span>';
+            stage.appendChild(chip); stage.appendChild(dots); stage.appendChild(pausedBadge);
+            container.replaceChildren(stage);
+            if (caption) caption.textContent = 'Nine frames \u00b7 Genesis RayTracer \u00b7 128 SPP \u00b7 OIDN Denoised';
+
+            let idx = -1, timer = null, playing = true;
+            function show(next) {
+                const prev = idx; idx = next;
+                imgs.forEach((im, i) => {
+                    im.classList.toggle('on', i === idx);
+                    if (i === idx && !reduced) {
+                        im.classList.remove('kb');
+                        const zoomIn = idx % 2 === 0;
+                        const drift = (idx % 3 - 1) * 2.2;
+                        im.style.transform = zoomIn
+                            ? 'scale(1.0) translateX(0)'
+                            : `scale(1.08) translateX(${drift}%)`;
+                        requestAnimationFrame(() => requestAnimationFrame(() => {
+                            im.classList.add('kb');
+                            im.style.transform = zoomIn
+                                ? `scale(1.08) translateX(${drift}%)`
+                                : 'scale(1.0) translateX(0)';
+                        }));
+                    }
+                });
+                dotEls.forEach((d, i) => d.classList.toggle('on', i === idx));
+                const f = FILM_FRAMES[idx];
+                chip.textContent = `ACT ${f.act} \u00b7 ${f.shot}`;
+                if (prev === FILM_FRAMES.length - 1 && idx === 0) stage.dispatchEvent(new Event('filmloop'));
+            }
+            function tick() { show((idx + 1) % FILM_FRAMES.length); timer = setTimeout(tick, HOLD + FADE); }
+            function toggle() {
+                playing = !playing;
+                stage.classList.toggle('paused', !playing);
+                if (playing) tick(); else { clearTimeout(timer); timer = null; }
+            }
+            stage.addEventListener('click', toggle);
+            stage.tabIndex = 0;
+            stage.addEventListener('keydown', (e) => {
+                if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(); }
+            });
+            tick();
+        }
+
         const filmVideo = document.getElementById('film-video');
         if (filmVideo) {
-            filmVideo.addEventListener('error', () => {
-                const container = document.getElementById('film-video-container');
-                const caption = document.getElementById('film-video-caption');
-                const fallback = document.getElementById('film-video-fallback');
-                if (container) container.style.display = 'none';
-                if (caption) caption.style.display = 'none';
-                if (fallback) fallback.style.display = 'block';
-            });
+            const filmSource = filmVideo.querySelector('source');
+            if (filmSource) filmSource.addEventListener('error', mountStillsFilm);
+            filmVideo.addEventListener('error', mountStillsFilm);
+            // The 404 can fire before these listeners attach (fast local
+            // errors race the end-of-body script). NETWORK_NO_SOURCE means
+            // every <source> already failed — mount immediately.
+            if (filmVideo.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) {
+                mountStillsFilm();
+            }
         }
     </script>
 
