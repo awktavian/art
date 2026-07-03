@@ -1,7 +1,11 @@
+// PROVENANCE: mirror of ~/projects/awkronos/patents/lib/debug-system.js (byte-identical as of 2026-07-02).
+// awkronos/patents is the brand-owned canonical copy — edit there first, then port changes here.
+// This site (art/patent-portfolio) deploys independently and can't import cross-repo, hence the mirror.
+
 /**
  * Professional Debug System for Patent Museum
  * ============================================
- * 
+ *
  * Inspired by:
  * - Unreal Engine stat commands
  * - Unity Profiler
