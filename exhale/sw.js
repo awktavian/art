@@ -3,18 +3,16 @@
  * Provides offline support for the January 24-25, 2026 development session page
  */
 
-const CACHE_NAME = 'exhale-v1';
+const CACHE_NAME = 'exhale-v2';
 const ASSETS = [
-    '/',
-    '/index.html',
-    '/manifest.json',
-    '/icon.svg',
-    '/data/commits.json',
-    '/data/metrics.json',
-    '/data/arcs.json',
-    '/data/files.json',
-    // Google Fonts (IBM Plex)
-    'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap'
+    './',
+    './index.html',
+    './manifest.json',
+    './icon.svg',
+    './data/commits.json',
+    './data/metrics.json',
+    './data/arcs.json',
+    './data/files.json'
 ];
 
 // Install: cache assets
@@ -36,7 +34,7 @@ self.addEventListener('activate', (event) => {
             .then((cacheNames) => {
                 return Promise.all(
                     cacheNames
-                        .filter((name) => name !== CACHE_NAME)
+                        .filter((name) => name.startsWith('exhale-') && name !== CACHE_NAME)
                         .map((name) => {
                             console.log('[SW] Removing old cache:', name);
                             return caches.delete(name);

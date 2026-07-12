@@ -7,20 +7,22 @@
  * h(x) >= 0
  */
 
-const CACHE_NAME = 'weather-celestial-v1';
-const STATIC_CACHE = 'weather-static-v1';
-const DYNAMIC_CACHE = 'weather-dynamic-v1';
+const STATIC_CACHE = 'weather-static-v2';
+const DYNAMIC_CACHE = 'weather-dynamic-v2';
 
 // Static assets to cache immediately
 const STATIC_ASSETS = [
-    '/',
-    '/index.html',
-    '/styles.css',
-    '/main.js',
-    '/i18n.js',
-    '/favicon.svg',
-    '/manifest.webmanifest'
+    './',
+    './index.html',
+    './styles.css',
+    './main.js',
+    './i18n.js',
+    './favicon.svg',
+    './manifest.webmanifest'
 ];
+const STATIC_PATHS = new Set(
+    STATIC_ASSETS.map(asset => new URL(asset, self.location.href).pathname)
+);
 
 // External resources (fonts, CDNs)
 const EXTERNAL_ASSETS = [
@@ -115,7 +117,7 @@ self.addEventListener('fetch', (event) => {
     }
 
     // Static assets - cache first
-    if (STATIC_ASSETS.some(asset => url.pathname.endsWith(asset.replace('/', '')))) {
+    if (url.origin === self.location.origin && STATIC_PATHS.has(url.pathname)) {
         event.respondWith(cacheFirst(request));
         return;
     }
@@ -231,11 +233,11 @@ self.addEventListener('push', (event) => {
     const data = event.data.json();
     const options = {
         body: data.body || 'Weather update available',
-        icon: '/favicon.svg',
-        badge: '/favicon.svg',
+        icon: new URL('./favicon.svg', self.registration.scope).href,
+        badge: new URL('./favicon.svg', self.registration.scope).href,
         vibrate: [100, 50, 100],
         data: {
-            url: data.url || '/'
+            url: data.url ? new URL(data.url, self.registration.scope).href : self.registration.scope
         }
     };
 
