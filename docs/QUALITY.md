@@ -11,17 +11,31 @@ Run the same gate as CI before committing:
 npm test
 ```
 
-The dependency-free checker validates every tracked HTML document outside the
-separate `medverify` repository. It rejects:
+The static half is dependency-free and validates every tracked HTML document
+outside the separate `medverify` repository. It rejects:
 
 - root-relative links and assets that escape the `/art/` deployment base;
 - local links, scripts, styles, images, posters, and form actions without a
   static target;
-- documents without language, title, or responsive viewport metadata.
+- documents without language, title, or responsive viewport metadata;
 - directory totals or section badges that disagree with the published cards;
 - invalid or out-of-scope PWA manifests and service-worker asset paths;
 - service workers whose activation can delete caches owned by sibling apps.
 
-GitHub Actions runs the gate on every push and pull request. The branch tree is
-still the deployed artifact; CI verifies it and does not perform a manual
-deployment.
+The browser half uses one pinned dependency, Playwright, and one Chromium
+project. It mounts the checkout at `/art/`, matching the GitHub Pages project
+URL, then checks the directory's keyboard search, accessible names, live count,
+and 108-card inventory. It also opens representative interactive routes and
+fails on uncaught exceptions or failed same-origin resources. The collapse
+film must mount its tracked nine-frame player and remain keyboard operable.
+
+For a fresh checkout, install the browser once before running the full gate:
+
+```bash
+npm ci
+npx playwright install chromium
+npm test
+```
+
+GitHub Actions runs both halves on every push and pull request. The branch tree
+is still the deployed artifact; this workflow verifies it and does not deploy.

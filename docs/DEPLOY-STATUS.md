@@ -2,12 +2,16 @@
 
 ## Canonical home
 
-**https://awktavian.github.io/art/** — GitHub Pages, served from `main` at path `/`.
+**https://awktavian.github.io/art/** — GitHub Pages project site.
 
 This is the single canonical URL for the portfolio. Do not configure a custom
 domain for this repo.
 
-## GitHub Pages configuration (intended state)
+The Pages source setting is branch `main`, folder `/`. Here `/` means the root
+of the repository branch; it does **not** mean the web-origin root. The public
+URL prefix is `/art/`, so internal static URLs must be document-relative.
+
+## GitHub Pages configuration (verified 2026-07-11)
 
 - Repo: `awktavian/art` (public), `has_pages = true`.
 - Source: **Deploy from a branch** → branch `main`, path `/`.
@@ -16,6 +20,22 @@ domain for this repo.
   is required; the branch tree IS the site.
 - No `CNAME` file (must stay absent — a CNAME would redirect Pages away from
   the `github.io` URL).
+- HTTPS enforcement is enabled and the repository is public.
+
+The pre-browser-canary verification baseline was commit `c31c589` via successful
+`pages-build-deployment` run `29179038123`. A post-deploy canary read the live
+directory, confirmed the corrected 108-work inventory, and received HTTP 200
+from the directory, shared accessibility script, `gen/`, `collapse/`, `home/`,
+two PWA manifests, and the Exhale service worker.
+
+Every later `main` push must pass `Static site quality`, including the local
+`/art/` Chromium canary, before its deployment is treated as healthy.
+
+GitHub's legacy `GET /repos/awktavian/art/pages/builds/latest` record reported
+`errored` for the same SHA while the generated Actions deployment completed
+successfully and the live files matched that SHA. Treat the completed Actions
+deployment plus live canary as operational evidence; do not infer an outage
+from that legacy status field alone.
 
 ## Feb–Jul 2026 outage: root cause (verified)
 
@@ -54,16 +74,14 @@ The `main` tree already contains the July portfolio `index.html` and `.nojekyll`
 so once the Checkout step succeeds, deploy-from-branch republishes the current
 portfolio.
 
-## `/medverify` sub-app (separate repo — follow-up)
+## `/medverify` sub-app (separate repo; not published here)
 
-The portfolio `index.html` links `href="/medverify"`. `medverify` is its own
-repository (`git@github.com:awktavian/medverify.git`), not part of this repo. It
-was never actually served here — the gitlink pointed at a commit the Pages
-builder cannot fetch. Restoring the portfolio does **not** serve `/medverify`;
-publishing that sub-app is a separate task (deploy `awktavian/medverify` on its
-own, or vendor its built static output into this repo as regular files under
-`medverify/`). Until then, the `/medverify` link 404s while the rest of the
-portfolio serves normally.
+`medverify` is its own ignored repository, not a published directory in this
+project site. It was never actually served here: the former gitlink pointed at
+a commit the Pages builder could not fetch. The dead MedVerify directory card
+was removed from `index.html`; the visible total is now 108 and the site does
+not advertise `/medverify`. Re-add it only after the separate app has a verified
+public URL, or after tracked static output is intentionally vendored here.
 
 ## art.awkronos.com — DEPRECATED
 
