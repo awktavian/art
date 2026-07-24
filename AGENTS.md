@@ -1,10 +1,9 @@
 # CLAUDE.md — Art Portfolio & Tools
 
-@~/.claude/rules/theory-of-mind.md
 @./.claude/rules/art-creation.md
 @./.claude/rules/vercel-deployment.md
 
-Multi-project portfolio containing interactive web apps, enterprise systems, and shared libraries. Deployed to Vercel as static site with satellite services on Fly.io.
+Multi-project portfolio of interactive web apps and shared libraries. Canonical deployment is GitHub Pages (`https://awktavian.github.io/art/`); a realtime voice proxy runs on Fly.io. Full deployment record: `docs/DEPLOY-STATUS.md`.
 
 ## Key Projects
 
@@ -18,29 +17,39 @@ Multi-project portfolio containing interactive web apps, enterprise systems, and
 | **collapse/** | Domino cascade film gallery | `index.html` | static |
 | **gen/** | Generative art gallery | `index.html` | static |
 | **patent-portfolio/** | 3D patent museum (Three.js) | `index.html` | static |
-| **medverify/** | Physician verification platform | `api/server.ts` | 3001 |
 | **realtime-proxy/** | OpenAI Realtime relay | `server.js` | 8766 |
 
-## Vercel Deployment System
+(`medverify/` is a separate repository living inside this tree; it is ignored
+here and not published with the portfolio — see `docs/DEPLOY-STATUS.md`.)
+
+## Deployment
 
 ### Architecture
 
 ```
-Static Portfolio (Vercel)          Satellite Services (Fly.io)
-├── 50+ HTML entry points    ───→  medverify.fly.dev (physician verification)
-├── Generative art (gen/)    ───→  realtime-proxy.fly.dev (OpenAI voice relay)
+Static Portfolio (GitHub Pages)      Satellite Services (Fly.io)
+├── 108-work inventory         ───→  realtime-proxy.fly.dev (OpenAI voice relay)
+├── Generative art (gen/)
 ├── 3D experiences (Three.js)
 ├── Games & puzzles
 ├── Voice-enabled interfaces
 └── Curated galleries
 ```
 
-**Vercel Project**: `kagami-art`
-**Team**: `timothyjacoby-9338s-projects` (`team_LRfTyFRIUR6SN3FFcYjqqBij`)
-**Framework**: Static (no build step, vanilla JS)
-**Config**: `vercel.json` — clean URLs, trailing slash off, intelligent cache headers
+**Canonical site**: `https://awktavian.github.io/art/` (GitHub Pages, branch
+`main`, folder `/`, `.nojekyll`; verified 2026-07-11 — see
+`docs/DEPLOY-STATUS.md`). The branch tree IS the site; no build step.
+`medverify/` is a separate ignored repository and is not published here.
 
-### Vercel MCP Tools — Full Capability Map
+**Quality gate**: `npm test` runs the same static + Chromium checks as CI
+(link/asset targets, metadata, directory totals, PWA manifests, service
+workers). See `docs/QUALITY.md`.
+
+**Vercel**: `vercel.json` remains for incidental preview usage only; it is not
+the canonical deployment. Do not configure a custom domain for this repo.
+The cache and routing tables below describe that legacy Vercel config.
+
+### Vercel MCP Tools — Capability Map (preview deploys only)
 
 Claude has direct access to the Vercel platform via MCP. Use these tools for all deployment operations.
 
@@ -86,16 +95,14 @@ Claude has direct access to the Vercel platform via MCP. Use these tools for all
 
 ```
 1. DEVELOP  → Edit files locally (vanilla JS, no build step)
-2. VALIDATE → Test in browser, check accessibility, verify WCAG 2.1 AA
-3. DEPLOY   → deploy_to_vercel (triggers from project root)
-4. VERIFY   → get_deployment → check state === "READY"
-             → get_deployment_build_logs → scan for warnings
-             → web_fetch_vercel_url → smoke test key pages
-5. MONITOR  → get_runtime_logs (filter: level=["error"], since="1h")
-6. ITERATE  → list_toolbar_threads → review feedback → resolve threads
+2. VALIDATE → npm test (static gate + Chromium canary; same as CI)
+3. DEPLOY   → push to main — GitHub Pages deploys the branch tree as-is
+4. VERIFY   → check the pages-build-deployment Action, then canary the live
+             pages under https://awktavian.github.io/art/
+5. ITERATE  → fix forward on main
 ```
 
-### Cache Strategy (vercel.json)
+### Cache Strategy (vercel.json — previews only)
 
 | Asset Type | Cache Rule | Rationale |
 |-----------|-----------|-----------|
@@ -106,12 +113,12 @@ Claude has direct access to the Vercel platform via MCP. Use these tools for all
 | Other CSS | `max-age=86400` | Project CSS — 1 day cache |
 | Assets (svg/png/jpg/woff2/mid) | `max-age=31536000, immutable` | Binary assets — content-addressed, never change |
 
-### Routing
+### Routing (vercel.json)
 
-- `/apps` → `/apps/index.html` (rewrite)
+- `/apps` → `/apps/index.html`, `/showcase` → `/home/index.html` (rewrites)
 - `/medverify` → `https://medverify.fly.dev` (redirect, non-permanent)
 - `/realtime-proxy` → `https://realtime-proxy.fly.dev` (redirect, non-permanent)
-- `ignoreCommand` skips deploy when only medverify/ or realtime-proxy/ changed
+- `ignoreCommand` skips preview deploys when only medverify/ or realtime-proxy/ changed
 
 ## Creative Technology Stack
 
@@ -233,26 +240,26 @@ start_code_task(
 
 ## MCP Servers
 
-Claude sessions in this project have access to:
+Claude sessions in this project may have access to the following servers
+(the `mcp__<hash>__*` tool prefixes are per-install; check the live session):
 
-| Server | Access Pattern | Use |
-|--------|---------------|-----|
-| **vercel** | `mcp__3ea67e58__*` | Deploy, monitor, manage Vercel deployments |
-| **context7** | `mcp__context7__*` | Current library/framework docs |
-| **memory** | `mcp__memory__*` | Persistent semantic graph |
-| **github** | `mcp__github__*` | Issues, PRs, file access |
-| **docker** | `mcp__docker__*` | Container operations |
-| **playwright** | `mcp__playwright__*` | Browser automation & E2E testing |
-| **sequential-thinking** | `mcp__sequential-thinking__*` | Multi-step reasoning |
-| **computer-use** | `mcp__computer-use__*` | Desktop/screenshot control |
-| **figma** | `mcp__0ba887fc__*` | Design system, screenshots, diagrams |
-| **huggingface** | `mcp__2d752728__*` | Model hub, papers, docs |
+| Server | Use |
+|--------|-----|
+| **vercel** | Deploy, monitor, manage Vercel previews |
+| **context7** | Current library/framework docs |
+| **memory** | Persistent semantic graph |
+| **github** | Issues, PRs, file access |
+| **docker** | Container operations |
+| **playwright** | Browser automation & E2E testing |
+| **figma** | Design system, screenshots, diagrams |
+| **huggingface** | Model hub, papers, docs |
 
 All MCP tools allowed via `mcp__*` in `.claude/settings.json`. Full Kagami hook chain active.
 
 ## MedVerify specifics
 
-See `medverify/CLAUDE.md` for full documentation. Key points:
+MedVerify is a separate repository (`medverify/`, ignored here). See
+`medverify/CLAUDE.md` for full documentation. Key points:
 - TypeScript strict, ESM with `.js` extensions
 - Express + GraphQL + WebSocket on port 3001
 - Hono alternative server at `src/server.ts`
