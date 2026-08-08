@@ -15,11 +15,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  integrity:
+  static:
+    name: Static integrity
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install pinned test dependency
+        run: npm ci
+      - name: Verify tracked links, metadata, and directory totals
+        run: npm run test:static
+
+  browser:
+    name: Browser canary
+    runs-on: ubuntu-latest
+    needs: static
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 24
           cache: npm
@@ -27,5 +45,5 @@ jobs:
         run: npm ci
       - name: Install Chromium for the browser canary
         run: npx playwright install --with-deps chromium
-      - name: Verify static integrity and representative browser behavior
-        run: npm test
+      - name: Verify representative browser behavior under /art/
+        run: npm run test:browser

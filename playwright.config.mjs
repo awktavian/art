@@ -13,8 +13,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command:
-      "python3 -m http.server 4173 --bind 127.0.0.1 --directory ..",
+    command: "node scripts/pages-server.mjs",
     url: "http://127.0.0.1:4173/art/",
     reuseExistingServer: !process.env.CI,
     timeout: 15_000,

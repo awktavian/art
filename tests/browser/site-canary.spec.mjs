@@ -32,8 +32,8 @@ test("directory is keyboard-operable and exposes named controls", async ({ page 
 
   await expect(page).toHaveTitle(/The Art Directory/);
   await expect(page.getByRole("main")).toBeVisible();
-  await expect(page.getByRole("status")).toHaveText("108 apps");
-  await expect(page.locator("a.card")).toHaveCount(108);
+  const cardCount = await page.locator("a.card").count();
+  await expect(page.getByRole("status")).toHaveText(`${cardCount} apps`);
   await expect(page.locator("img:not([alt])")).toHaveCount(0);
 
   const unnamedControls = await page
@@ -63,10 +63,11 @@ test("directory is keyboard-operable and exposes named controls", async ({ page 
   expect(unnamedControls).toEqual([]);
 
   const filter = page.getByRole("searchbox", { name: "Filter apps by name or description" });
+  const initialStatus = `${cardCount} apps`;
   await page.keyboard.press("/");
   await expect(filter).toBeFocused();
   await filter.fill("catastrophe");
-  await expect(page.getByRole("status")).not.toHaveText("108 apps");
+  await expect(page.getByRole("status")).not.toHaveText(initialStatus);
   await page.keyboard.press("ArrowDown");
   await expect(page.locator("a.card:visible").first()).toBeFocused();
   assertRuntimeClean();

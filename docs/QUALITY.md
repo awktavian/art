@@ -23,9 +23,9 @@ outside the separate `medverify` repository. It rejects:
 - service workers whose activation can delete caches owned by sibling apps.
 
 The browser half uses one pinned dependency, Playwright, and one Chromium
-project. It mounts the checkout at `/art/`, matching the GitHub Pages project
-URL, then checks the directory's keyboard search, accessible names, live count,
-and 108-card inventory. It also opens representative interactive routes and
+project. A small Node server mounts the checkout at `/art/`, matching the GitHub
+Pages project URL, then checks the directory's keyboard search, accessible names,
+live count, and card inventory. It also opens representative interactive routes and
 fails on uncaught exceptions or failed same-origin resources. The collapse
 film must mount its tracked nine-frame player and remain keyboard operable.
 
