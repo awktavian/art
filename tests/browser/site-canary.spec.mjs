@@ -31,9 +31,12 @@ test("directory is keyboard-operable and exposes named controls", async ({ page 
   await page.goto("/art/", { waitUntil: "load" });
 
   await expect(page).toHaveTitle(/The Art Directory/);
+  await expect(page.locator("html")).toHaveAttribute("lang", /.+/);
+  await expect(page.getByRole("link", { name: "Skip to apps" })).toHaveAttribute("href", /.+/);
   await expect(page.getByRole("main")).toBeVisible();
   const cardCount = await page.locator("a.card").count();
   await expect(page.getByRole("status")).toHaveText(`${cardCount} apps`);
+  await expect(page.locator("footer")).toContainText(`${cardCount} works`);
   await expect(page.locator("img:not([alt])")).toHaveCount(0);
 
   const unnamedControls = await page
@@ -75,7 +78,7 @@ test("directory is keyboard-operable and exposes named controls", async ({ page 
 
 test("representative interactive routes load without local runtime failures", async ({ page }) => {
   const assertRuntimeClean = monitorRuntime(page);
-  for (const path of ["/art/gen/", "/art/figma/", "/art/weather/"]) {
+  for (const path of ["/art/gen/", "/art/figma/", "/art/weather/", "/art/weekend-metamorphosis/"]) {
     const response = await page.goto(path, { waitUntil: "load" });
     expect(response?.status(), path).toBe(200);
     await expect(page.locator("body"), path).toBeVisible();

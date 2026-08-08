@@ -17,7 +17,8 @@ outside the separate `medverify` repository. It rejects:
 - root-relative links and assets that escape the `/art/` deployment base;
 - local links, scripts, styles, images, posters, and form actions without a
   static target;
-- documents without language, title, or responsive viewport metadata;
+- documents without language, title, responsive viewport metadata, or (on the
+  directory) a skip link and main landmark;
 - directory totals or section badges that disagree with the published cards;
 - invalid or out-of-scope PWA manifests and service-worker asset paths;
 - service workers whose activation can delete caches owned by sibling apps.
