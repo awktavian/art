@@ -31,53 +31,6 @@ test("directory is keyboard-operable and exposes named controls", async ({ page 
   await page.goto("/art/", { waitUntil: "load" });
 
   await expect(page).toHaveTitle(/The Art Directory/);
-<<<<<<< HEAD
-  await expect(page.getByRole("main")).toBeVisible();
-  await expect(page.getByRole("status")).toHaveText("108 apps");
-  await expect(page.locator("a.card")).toHaveCount(108);
-  await expect(page.locator("img:not([alt])")).toHaveCount(0);
-
-  const unnamedControls = await page
-    .locator("a, button, input, select, textarea")
-    .evaluateAll((elements) =>
-      elements
-        .filter((element) => {
-          if (element.hidden || element.getAttribute("aria-hidden") === "true") return false;
-          const labelledBy = element.getAttribute("aria-labelledby");
-          const labelledText = labelledBy
-            ? labelledBy
-                .split(/\s+/)
-                .map((id) => document.getElementById(id)?.textContent ?? "")
-                .join(" ")
-            : "";
-          const name =
-            element.getAttribute("aria-label") ||
-            labelledText ||
-            element.textContent ||
-            element.getAttribute("title") ||
-            element.getAttribute("placeholder") ||
-            element.getAttribute("alt");
-          return !name?.trim();
-        })
-        .map((element) => element.outerHTML.slice(0, 160)),
-    );
-  expect(unnamedControls).toEqual([]);
-
-  const filter = page.getByRole("searchbox", { name: "Filter apps by name or description" });
-  await page.keyboard.press("/");
-  await expect(filter).toBeFocused();
-  await filter.fill("catastrophe");
-  await expect(page.getByRole("status")).not.toHaveText("108 apps");
-  await page.keyboard.press("ArrowDown");
-  await expect(page.locator("a.card:visible").first()).toBeFocused();
-  assertRuntimeClean();
-});
-
-test("representative interactive routes load without local runtime failures", async ({ page }) => {
-  const assertRuntimeClean = monitorRuntime(page);
-  for (const path of ["/art/gen/", "/art/figma/", "/art/weather/"]) {
-||||||| a04dee5
-=======
   await expect(page.locator("html")).toHaveAttribute("lang", /.+/);
   await expect(page.getByRole("link", { name: "Skip to apps" })).toHaveAttribute("href", /.+/);
   await expect(page.getByRole("main")).toBeVisible();
@@ -126,7 +79,6 @@ test("representative interactive routes load without local runtime failures", as
 test("representative interactive routes load without local runtime failures", async ({ page }) => {
   const assertRuntimeClean = monitorRuntime(page);
   for (const path of ["/art/gen/", "/art/figma/", "/art/weather/", "/art/weekend-metamorphosis/"]) {
->>>>>>> origin/main
     const response = await page.goto(path, { waitUntil: "load" });
     expect(response?.status(), path).toBe(200);
     await expect(page.locator("body"), path).toBeVisible();

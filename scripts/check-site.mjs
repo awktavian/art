@@ -107,10 +107,10 @@ function verifyDirectoryCounts(file, source) {
   let total = 0;
 
   for (const match of source.matchAll(
-    /<section id=["']([^"']+)["'][\s\S]*?<span class=["']cnt["']>(\d+)<\/span>[\s\S]*?<ul class=["']grid["'][^>]*>([\s\S]*?)<\/ul><\/section>/g,
+    /<section id=["']([^"']+)["'][\s\S]*?<span class=["']cnt["']>(\d+)<\/span>[\s\S]*?<ul class=["']grid["'][^>]*>([\s\S]*?)<\/ul>\s*<\/section>/g,
   )) {
     const [, id, displayedCount, cards] = match;
-    const actualCount = (cards.match(/<li>/g) ?? []).length;
+    const actualCount = (cards.match(/<li\b/g) ?? []).length;
     total += actualCount;
     if (Number(displayedCount) !== actualCount) {
       fail(file, `${id} heading says ${displayedCount}, but contains ${actualCount} cards`);
@@ -126,7 +126,7 @@ function verifyDirectoryCounts(file, source) {
   const totalClaims = [
     ["description", /directory of (\d+) small interactive works/i],
     ["filter status", /<p id=["']count["'][^>]*>(\d+) apps<\/p>/i],
-    ["footer", /<div class=["']wrap["']>(\d+) works\b/i],
+    ["footer", /<div class=["']wrap["']>\s*(\d+) works\b/i],
   ];
   for (const [label, pattern] of totalClaims) {
     const claimed = source.match(pattern)?.[1];
@@ -150,19 +150,20 @@ for (const file of htmlFiles) {
   if (!/<meta\b[^>]*\bname=["']viewport["']/i.test(source)) {
     fail(file, "missing the responsive viewport meta tag");
   }
-<<<<<<< HEAD
-  if (file === "index.html") verifyDirectoryCounts(file, publishedSource);
-||||||| a04dee5
-=======
   if (file === "index.html") {
     verifyDirectoryCounts(file, publishedSource);
-    if (!/<a\b[^>]*\bclass=["'][^"']*\bskip\b[^"']*["'][^>]*\bhref=["']#[^"']+["']/i.test(publishedSource)) {
+    const hasSkipLink = [...publishedSource.matchAll(/<a\b[^>]*>/gi)].some(
+      ([tag]) =>
+        /\bclass=["'][^"']*\bskip\b[^"']*["']/i.test(tag) &&
+        /\bhref=["']#[^"']+["']/i.test(tag),
+    );
+    if (!hasSkipLink) {
       fail(file, "missing a skip link to in-page content");
     }
     if (!/<main\b/i.test(publishedSource)) {
       fail(file, "missing a main landmark");
     }
-    for (const match of publishedSource.matchAll(/<a class="card"\b[^>]*>/g)) {
+    for (const match of publishedSource.matchAll(/<a\b[^>]*\bclass=["'][^"']*\bcard\b[^"']*["'][^>]*>/gi)) {
       const tag = match[0];
       if (!/\bhref=["'][^"']+["']/.test(tag)) {
         fail(file, "directory card is missing an href");
@@ -172,7 +173,6 @@ for (const file of htmlFiles) {
       }
     }
   }
->>>>>>> origin/main
 
   for (const match of publishedSource.matchAll(
     /(?:^|[\s<])(href|src|poster|action)=["']([^"'<>]+)["']/gi,
