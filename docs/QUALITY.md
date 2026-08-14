@@ -17,6 +17,7 @@ outside the separate `medverify` repository. It rejects:
 - root-relative links and assets that escape the `/art/` deployment base;
 - local links, scripts, styles, images, posters, and form actions without a
   static target;
+<<<<<<< HEAD
 - documents without language, title, or responsive viewport metadata;
 - directory totals or section badges that disagree with the published cards;
 - invalid or out-of-scope PWA manifests and service-worker asset paths;
@@ -26,6 +27,19 @@ The browser half uses one pinned dependency, Playwright, and one Chromium
 project. It mounts the checkout at `/art/`, matching the GitHub Pages project
 URL, then checks the directory's keyboard search, accessible names, live count,
 and 108-card inventory. It also opens representative interactive routes and
+||||||| a04dee5
+=======
+- documents without language, title, responsive viewport metadata, or (on the
+  directory) a skip link and main landmark;
+- directory totals or section badges that disagree with the published cards;
+- invalid or out-of-scope PWA manifests and service-worker asset paths;
+- service workers whose activation can delete caches owned by sibling apps.
+
+The browser half uses one pinned dependency, Playwright, and one Chromium
+project. A small Node server mounts the checkout at `/art/`, matching the GitHub
+Pages project URL, then checks the directory's keyboard search, accessible names,
+live count, and card inventory. It also opens representative interactive routes and
+>>>>>>> origin/main
 fails on uncaught exceptions or failed same-origin resources. The collapse
 film must mount its tracked nine-frame player and remain keyboard operable.
 

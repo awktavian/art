@@ -150,7 +150,29 @@ for (const file of htmlFiles) {
   if (!/<meta\b[^>]*\bname=["']viewport["']/i.test(source)) {
     fail(file, "missing the responsive viewport meta tag");
   }
+<<<<<<< HEAD
   if (file === "index.html") verifyDirectoryCounts(file, publishedSource);
+||||||| a04dee5
+=======
+  if (file === "index.html") {
+    verifyDirectoryCounts(file, publishedSource);
+    if (!/<a\b[^>]*\bclass=["'][^"']*\bskip\b[^"']*["'][^>]*\bhref=["']#[^"']+["']/i.test(publishedSource)) {
+      fail(file, "missing a skip link to in-page content");
+    }
+    if (!/<main\b/i.test(publishedSource)) {
+      fail(file, "missing a main landmark");
+    }
+    for (const match of publishedSource.matchAll(/<a class="card"\b[^>]*>/g)) {
+      const tag = match[0];
+      if (!/\bhref=["'][^"']+["']/.test(tag)) {
+        fail(file, "directory card is missing an href");
+      }
+      if (!/\bdata-s=["'][^"']+["']/.test(tag)) {
+        fail(file, "directory card is missing a searchable data-s attribute");
+      }
+    }
+  }
+>>>>>>> origin/main
 
   for (const match of publishedSource.matchAll(
     /(?:^|[\s<])(href|src|poster|action)=["']([^"'<>]+)["']/gi,
