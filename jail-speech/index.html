@@ -89,6 +89,22 @@
             text-transform: uppercase;
         }
         
+        body.archive-mode .controls .btn,
+        body.archive-mode .progress-area,
+        body.archive-mode .vol { display: none !important; }
+        body.archive-mode .video-layer { object-fit: cover; width: 100%; height: 100%; }
+        .archive-chips { position: absolute; left: 50%; transform: translateX(-50%);
+            bottom: 96px; display: flex; gap: 14px; align-items: center; z-index: 30; }
+        .archive-note { font-size: 10px; letter-spacing: 0.18em; color: var(--text-dim);
+            text-transform: uppercase; }
+        .archive-group { display: flex; gap: 4px; background: rgba(255,248,240,0.06);
+            backdrop-filter: blur(16px); border: 1px solid rgba(255,248,240,0.12);
+            border-radius: 8px; padding: 3px; }
+        .archive-chip { font: 500 11px/1 'Inter', system-ui, sans-serif; letter-spacing: 0.06em;
+            color: var(--text-dim); background: transparent; border: 0; border-radius: 6px;
+            padding: 7px 12px; cursor: pointer; transition: color 144ms ease, background 144ms ease; }
+        .archive-chip:hover { color: var(--text); }
+        .archive-chip.active { color: #0a0806; background: var(--accent); }
         .loading-progress {
             margin-top: 0.6rem;
             font-family: 'JetBrains Mono', monospace;
@@ -1049,27 +1065,38 @@
         videoJA.volume = vol;
         volSlider.value = 70;
 
-        // Load all videos
+        // Load all videos. Every video gets an error path and a hard
+        // timeout — the old loader awaited canplaythrough on four remote
+        // files with no failure handling, so a single dead URL froze the
+        // page at "PRESERVING TIME 0%" forever.
         const allVideos = [videoOriginal, videoEN, videoES, videoJA];
         let loaded = 0;
 
-        await Promise.all(allVideos.map(v => 
-            new Promise(resolve => {
-                if (v.readyState >= 3) {
-                    loaded++;
-                    loadProgress.textContent = Math.round((loaded / 4) * 100) + '%';
-                    resolve();
-                } else {
-                    v.addEventListener('canplaythrough', () => {
-                        loaded++;
-                        loadProgress.textContent = Math.round((loaded / 4) * 100) + '%';
-                        resolve();
-                    }, { once: true });
-                    v.load();
-                }
-            })
-        ));
-        
+        const settle = (v) => new Promise(resolve => {
+            let done = false;
+            const ok = () => { if (done) return; done = true; loaded++;
+                loadProgress.textContent = Math.round((loaded / 4) * 100) + '%';
+                resolve(true); };
+            const fail = () => { if (done) return; done = true; resolve(false); };
+            if (v.readyState >= 3) return ok();
+            v.addEventListener('canplaythrough', ok, { once: true });
+            v.addEventListener('error', fail, { once: true });
+            const srcEl = v.querySelector('source');
+            if (srcEl) srcEl.addEventListener('error', fail, { once: true });
+            setTimeout(fail, 10000);
+            v.load();
+        });
+        const results = await Promise.all(allVideos.map(settle));
+
+        if (!results.some(Boolean)) {
+            // Full footage unreachable — fall back to the archive stills
+            // comparator instead of an infinite spinner.
+            enterArchiveMode();
+            setTimeout(() => loading.classList.add('hidden'), 300);
+            setupEvents();
+            return;
+        }
+
         // CRITICAL: Force all videos to time 0 and wait for seek
         await Promise.all(allVideos.map(v => 
             new Promise(resolve => {
@@ -1159,6 +1186,69 @@
         videoEN.style.clipPath = clip;
         videoES.style.clipPath = clip;
         videoJA.style.clipPath = clip;
+        document.querySelectorAll('.archive-enhanced').forEach(el => { el.style.clipPath = clip; });
+    }
+
+    // === ARCHIVE MODE ===
+    // When the hosted footage is unreachable, the app becomes a stills
+    // comparator over the locally-committed restoration frames — the same
+    // divider-drag interaction, zero network dependencies.
+    const ARCHIVE_FRAMES = {
+        realesrgan: { '3': 'comparison_frames/realesrgan_3s.png', '8': 'comparison_frames/realesrgan_8s.png' },
+        topaz:      { '3': 'comparison_frames/topaz_3s.png',      '8': 'comparison_frames/topaz_8s.png' },
+        source:     { '3': 'comparison_frames/source_3s.png',     '8': 'comparison_frames/source_8s.png' }
+    };
+    let archiveState = { model: 'realesrgan', t: '8' };
+
+    function enterArchiveMode() {
+        document.body.classList.add('archive-mode');
+        [videoOriginal, videoEN, videoES, videoJA].forEach(v => { v.remove(); });
+
+        const base = document.createElement('img');
+        base.className = 'video-layer archive-base';
+        base.alt = 'Original VHS frame';
+        const enh = document.createElement('img');
+        enh.className = 'video-layer enhanced-layer archive-enhanced';
+        enh.alt = 'Restored frame';
+        const frame = document.getElementById('videoFrame');
+        frame.prepend(enh); frame.prepend(base);
+
+        const chips = document.createElement('div');
+        chips.className = 'archive-chips';
+        chips.innerHTML = `
+            <span class="archive-note">ARCHIVE STILLS — full footage returns soon</span>
+            <div class="archive-group" role="group" aria-label="Frame time">
+                <button class="archive-chip" data-t="3">0:03</button>
+                <button class="archive-chip active" data-t="8">0:08</button>
+            </div>
+            <div class="archive-group" role="group" aria-label="Restoration model">
+                <button class="archive-chip active" data-model="realesrgan">Real-ESRGAN</button>
+                <button class="archive-chip" data-model="topaz">Topaz</button>
+            </div>`;
+        document.getElementById('player').appendChild(chips);
+        chips.addEventListener('click', e => {
+            const b = e.target.closest('.archive-chip');
+            if (!b) return;
+            if (b.dataset.t) { archiveState.t = b.dataset.t;
+                chips.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('active', x === b)); }
+            if (b.dataset.model) { archiveState.model = b.dataset.model;
+                chips.querySelectorAll('[data-model]').forEach(x => x.classList.toggle('active', x === b)); }
+            applyArchiveFrames();
+        });
+
+        function applyArchiveFrames() {
+            base.src = ARCHIVE_FRAMES.source[archiveState.t];
+            enh.src = ARCHIVE_FRAMES[archiveState.model][archiveState.t];
+            enh.style.clipPath = `inset(0 0 0 ${blendPos}%)`;
+        }
+        applyArchiveFrames();
+
+        const enhancedLabel = document.getElementById('enhancedLabel');
+        if (enhancedLabel) enhancedLabel.textContent = 'RESTORED · STILL';
+        const langSwitcher = document.getElementById('langSwitcher');
+        if (langSwitcher) langSwitcher.style.display = 'none';
+        const subtitleLine = document.getElementById('subtitleLine');
+        if (subtitleLine) subtitleLine.textContent = '"The Jail Speech" — restoration archive';
     }
 
     function endDrag() {

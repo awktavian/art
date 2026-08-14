@@ -5,14 +5,14 @@
    h(x) ≥ 0
 ═══════════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'design-intelligence-v1';
+const CACHE_NAME = 'design-intelligence-v2';
 const ASSETS = [
-    '/',
-    '/index.html',
-    '/styles.css',
-    '/app.js',
-    '/favicon.svg',
-    '/manifest.webmanifest'
+    './',
+    './index.html',
+    './styles.css',
+    './app.js',
+    './favicon.svg',
+    './manifest.webmanifest'
 ];
 
 // Install event — cache core assets
@@ -37,7 +37,7 @@ self.addEventListener('activate', (event) => {
             .then((cacheNames) => {
                 return Promise.all(
                     cacheNames
-                        .filter((name) => name !== CACHE_NAME)
+                        .filter((name) => name.startsWith('design-intelligence-') && name !== CACHE_NAME)
                         .map((name) => {
                             console.log('[SW] Deleting old cache:', name);
                             return caches.delete(name);
@@ -85,7 +85,7 @@ self.addEventListener('fetch', (event) => {
                     .catch(() => {
                         // Network failed, return offline page if available
                         if (event.request.mode === 'navigate') {
-                            return caches.match('/index.html');
+                            return caches.match('./index.html');
                         }
                         return new Response('Offline', {
                             status: 503,

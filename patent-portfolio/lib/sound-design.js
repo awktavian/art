@@ -885,4 +885,4 @@ export class SoundDesignManager {
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-export { COLONY_AUDIO, INTERACTION_SOUNDS, SoundDesignManager };
+export { COLONY_AUDIO, INTERACTION_SOUNDS };
