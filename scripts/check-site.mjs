@@ -256,6 +256,30 @@ for (const file of serviceWorkerFiles) {
   }
 }
 
+// Corpus statistics gate. `wiles/index.html` published four hand-typed
+// numbers about the hong Lean corpus and all four had drifted, including a
+// "13 sorry" tile over a corpus that is sorry-free with 45 open scientific
+// goals. The numbers are generated now; this makes the page unable to
+// disagree with the compiler without failing the build. Where no proof report
+// exists (CI, fresh clone) the child prints SKIPPED and exits 0 — an absence
+// of evidence, which reads as such in the log, not as a pass.
+{
+  const { spawnSync } = await import("node:child_process");
+  const gate = spawnSync(
+    process.execPath,
+    [new URL("./sync-corpus-stats.mjs", import.meta.url).pathname, "--check"],
+    { encoding: "utf8" },
+  );
+  if (gate.stdout) process.stdout.write(gate.stdout);
+  if (gate.status !== 0) {
+    if (gate.stderr) process.stderr.write(gate.stderr);
+    failures.push(
+      "wiles/index.html: corpus statistics disagree with /tmp/proof-report.json " +
+        "(fix: node scripts/sync-corpus-stats.mjs)",
+    );
+  }
+}
+
 if (failures.length > 0) {
   console.error(
     `site integrity: ${failures.length} failure(s) across ${htmlFiles.length} HTML files:`,
