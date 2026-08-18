@@ -1,3 +1,7 @@
+// PROVENANCE: mirror of ~/projects/awkronos/patents/tests/basic.spec.js (byte-identical as of 2026-08-18).
+// awkronos/patents is the brand-owned canonical copy — edit there first, then port changes here.
+// This site (art/patent-portfolio) deploys independently and can't import cross-repo, hence the mirror.
+
 /**
  * Basic Tests
  * ===========
