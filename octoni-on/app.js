@@ -65,7 +65,8 @@
         milestones: [],
         s15Count: 0,
         s7Count: 0,
-        experimentData: null  // Will hold loaded experiment results
+        experimentData: null,  // Will hold loaded experiment results
+        experimentDataError: null  // Named reason the results could not be read
     };
     
     // =========================================================================
@@ -73,21 +74,46 @@
     // =========================================================================
     
     async function loadExperimentData() {
+        // The old handler logged "using placeholder" and returned. There was no
+        // placeholder: the stat elements simply kept their "—" and the CSV
+        // button went on producing a file. A failure that leaves the page
+        // looking merely unloaded is a failure nobody sees. Name it on the page.
+        const SOURCE = 'octoni-on/data/experiment_results.json';
         try {
             const response = await fetch('data/experiment_results.json');
             if (!response.ok) {
-                console.warn('No experiment data found, using placeholder');
+                reportDataUnavailable(`${SOURCE} returned HTTP ${response.status} ${response.statusText}`);
                 return;
             }
-            
+
             state.experimentData = await response.json();
-            console.log('Loaded experiment data:', state.experimentData);
-            
+
             // Populate the page with real data
             populateExperimentData();
-            
+
         } catch (error) {
-            console.warn('Could not load experiment data:', error);
+            reportDataUnavailable(`${SOURCE} could not be read — ${error.message}`);
+        }
+    }
+
+    /**
+     * Surface a named unavailability instead of leaving em-dashes that read as
+     * "still loading". Also disables the CSV download, which otherwise emits a
+     * file that looks like data and contains none.
+     */
+    function reportDataUnavailable(detail) {
+        console.warn(`octoni-on: ${detail}`);
+        state.experimentDataError = detail;
+
+        document.querySelectorAll('[id^="s7-"], [id^="s15-"], #welch-t, #welch-p, #cohens-d, ' +
+            '#effect-magnitude, #ci-lower, #ci-upper, #percent-improvement, #sig-status')
+            .forEach(el => { el.textContent = 'unavailable'; el.title = detail; });
+
+        const downloadBtn = document.getElementById('download-csv');
+        if (downloadBtn) {
+            downloadBtn.disabled = true;
+            downloadBtn.title = detail;
+            downloadBtn.textContent = 'Raw data unavailable';
         }
     }
     
@@ -922,19 +948,23 @@
             let csvContent = 'Condition,Seed,Recon_Loss,KL_Loss,Total_Loss,Training_Time_Sec\n';
             
             // Use real data if available, otherwise fallback
-            if (state.experimentData) {
-                const allResults = [
-                    ...(state.experimentData.s7_results || []),
-                    ...(state.experimentData.s15_results || [])
-                ];
-                
-                allResults.forEach(r => {
-                    csvContent += `${r.condition},${r.seed},${r.final_recon_loss.toFixed(6)},${r.final_kl_loss.toFixed(6)},${r.final_total_loss.toFixed(6)},${r.training_time_seconds.toFixed(1)}\n`;
-                });
-            } else {
-                // Fallback placeholder
-                csvContent += 'No experiment data loaded - run the experiment first\n';
+            if (!state.experimentData) {
+                // Refuse to emit a .csv at all rather than hand over a one-line
+                // file whose only content is an apology. The button is already
+                // disabled by reportDataUnavailable(); this is the guard for
+                // any path that reaches here first.
+                console.error(`octoni-on: no experiment data — ${state.experimentDataError || 'not loaded yet'}`);
+                downloadBtn.textContent = 'Raw data unavailable';
+                return;
             }
+
+            const allResults = [
+                ...(state.experimentData.s7_results || []),
+                ...(state.experimentData.s15_results || [])
+            ];
+            allResults.forEach(r => {
+                csvContent += `${r.condition},${r.seed},${r.final_recon_loss.toFixed(6)},${r.final_kl_loss.toFixed(6)},${r.final_total_loss.toFixed(6)},${r.training_time_seconds.toFixed(1)}\n`;
+            });
             
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
