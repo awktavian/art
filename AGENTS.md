@@ -41,7 +41,8 @@ Static Portfolio (GitHub Pages)      Satellite Services (Fly.io)
 `docs/DEPLOY-STATUS.md`). The branch tree IS the site; no build step.
 `medverify/` is a separate ignored repository and is not published here.
 
-**Quality gate**: `npm test` runs the same static + Chromium checks as CI
+**Quality gate**: `npm test` runs `test:unit` (node --test over `tests/unit/`, offline,
+no credentials) then the same static + Chromium checks as CI
 (link/asset targets, metadata, directory totals, PWA manifests, service
 workers). See `docs/QUALITY.md`.
 
@@ -149,15 +150,29 @@ Claude has direct access to the Vercel platform via MCP. Use these tools for all
 Browser (any art project)
   └── VoiceOverlay.init({ project, tools, onFunctionCall })
         └── RealtimeVoice client (lib/realtime-voice.js)
-              └── WebSocket → realtime-proxy/:8766?project=X&colony=Y
+              └── resolveRealtimeEndpoint('voice')  (lib/realtime-endpoint.js)
+                    └── WebSocket → realtime-proxy?project=X&colony=Y  (both required)
                     └── WebSocket → wss://api.openai.com/v1/realtime
 ```
 
-**Model**: `gpt-4o-realtime-preview` (default; override via `REALTIME_MODEL` env var)
-**Proxy**: `realtime-proxy/server.js` — token bucket rate limiting (10 msg/s, burst 30), per-session cost caps ($2 default), max 5 concurrent sessions
+**Model**: required via `REALTIME_MODEL` — there is no default. `realtime-proxy/fly.toml`
+sets `gpt-realtime` together with its four `REALTIME_PRICE_*_PER_MTOK` values
+(source: https://developers.openai.com/api/docs/pricing, read 2026-09-04). The former
+built-in default `gpt-4o-realtime-preview` is no longer on that page, which is why the
+default was removed rather than updated.
+
+**Proxy**: `realtime-proxy/server.js` — token bucket rate limiting (10 msg/s, burst 30),
+per-session cost caps ($2 default), max 5 concurrent sessions. Cost is metered from the
+`usage` block on OpenAI's `response.done`, never estimated per message; `/stats` rows
+carry `metered: false` until the first response is billed, so a zero there means
+"nothing charged yet" and not "measured as free". The `project` and `colony` query
+params are required — a connection missing either is closed with 4400.
 
 **Shared libraries** (lib/):
-- `realtime-voice.js` — Push-to-talk mic capture (PCM16 24kHz), audio playback, function call routing
+- `realtime-endpoint.js` — the ONE place a proxy URL is decided; no silent localhost
+  default, throws `RealtimeEndpointUnavailable` naming the service when none exists
+- `realtime-voice.js` — Push-to-talk mic capture (PCM16 24kHz), audio playback, function
+  call routing. `proxyUrl` and `voice` are required constructor options
 - `kagami-voices.js` — Colony→voice→personality mapping (7 colonies + orchestrator, EFE weights, catastrophe types)
 - `voice-overlay.js` — Drop-in voice UI (floating toggle + transcript panel). Key V to toggle, hold Space to talk
 
@@ -197,8 +212,15 @@ Every voice-enabled project provides two tool categories:
 
 ```bash
 cd realtime-proxy
-OPENAI_API_KEY=sk-... npm start
+OPENAI_API_KEY=sk-... \
+REALTIME_MODEL=gpt-realtime \
+REALTIME_PRICE_TEXT_IN_PER_MTOK=4 REALTIME_PRICE_TEXT_OUT_PER_MTOK=24 \
+REALTIME_PRICE_AUDIO_IN_PER_MTOK=32 REALTIME_PRICE_AUDIO_OUT_PER_MTOK=64 \
+npm start
 ```
+
+The proxy refuses to start without all six, naming each missing one. The claude
+scene director additionally requires `CLAUDE_DIRECTOR_MODEL`.
 
 Health: `http://localhost:8766/health`
 Stats: `http://localhost:8766/stats`
