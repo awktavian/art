@@ -1160,6 +1160,15 @@
             font-weight: 600;
         }
 
+        .webxr-note {
+            margin: 12px auto 0;
+            max-width: 44ch;
+            font-size: 13px;
+            line-height: 1.5;
+            opacity: 0.66;
+            text-align: center;
+        }
+
         .webxr-canvas {
             aspect-ratio: 1;
             background: radial-gradient(ellipse at center, var(--carbon) 0%, var(--void) 100%);
@@ -1749,7 +1758,14 @@
                     <div class="webxr-feature">Educational annotations</div>
                 </div>
 
-                <button class="cta-primary" id="enterVR">Enter VR Experience</button>
+                <!-- The anatomy viewer below is a 2D canvas (getContext('2d')),
+                     not a WebGL scene, so there is no renderer a WebXR session
+                     could draw into. The button used to probe
+                     isSessionSupported() and then alert "Implementation coming
+                     soon." — a promise attached to work nobody had planned. It
+                     now reports what this page actually offers. -->
+                <button class="cta-primary" id="enterVR" aria-describedby="enterVR-note">Check VR support</button>
+                <p class="webxr-note" id="enterVR-note">This page renders a 2D anatomy canvas; immersive VR is not implemented here.</p>
             </div>
 
             <div class="webxr-canvas reveal">
@@ -2343,13 +2359,23 @@
     });
 
     document.getElementById('enterVR').addEventListener('click', () => {
-        if (navigator.xr) {
-            navigator.xr.isSessionSupported('immersive-vr').then(ok => {
-                alert(ok ? 'VR mode supported! Implementation coming soon.' : 'VR headset not detected.');
-            });
-        } else {
-            alert('WebXR not supported. Use Chrome or Edge.');
+        const note = document.getElementById('enterVR-note');
+        const say = (text) => { note.textContent = text; };
+
+        if (!navigator.xr) {
+            say('This browser exposes no navigator.xr, so WebXR is unavailable here. ' +
+                'The anatomy viewer below is a 2D canvas and runs regardless.');
+            return;
         }
+        navigator.xr.isSessionSupported('immersive-vr').then(ok => {
+            say(ok
+                ? 'Your browser and headset support immersive-vr, but this page has no ' +
+                  'WebGL scene to present — the anatomy viewer is a 2D canvas. Nothing to enter.'
+                : 'No immersive-vr device is available to this browser. The anatomy viewer ' +
+                  'below is a 2D canvas and runs regardless.');
+        }).catch(err => {
+            say(`WebXR support check failed: ${err.message}`);
+        });
     });
 
     animate();

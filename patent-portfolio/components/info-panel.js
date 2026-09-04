@@ -1400,7 +1400,12 @@ export class InfoPanel {
                 break;
             }
             default:
-                this._showToast('Coming soon.');
+                // Every rendered data-action ('code', 'prior-art', 'demo',
+                // 'export-journey') is handled above, so reaching here is a
+                // dispatch bug. "Coming soon." advertised a feature that was
+                // never planned and hid the bug; name the action instead.
+                console.error(`InfoPanel: unhandled action "${action}"`);
+                this._showToast(`Unhandled action "${action}" — this is a bug, not a pending feature.`);
         }
     }
 
