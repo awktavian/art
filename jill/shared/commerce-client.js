@@ -1,20 +1,34 @@
 /**
- * Commerce Client — API Integration for Jill's Galleries
+ * Commerce Client — wishlist and orders for Jill's galleries
  *
- * Provides a unified interface for commerce operations:
- * - Wishlist (hearts/favorites)
- * - Orders
- * - Sync with backend
+ * STORE OF RECORD: localStorage. Not a fallback — the declared source.
  *
- * Falls back to localStorage when API is unavailable.
+ * This file used to hardcode `https://api.kagami.ai/api/commerce` and treat
+ * localStorage as what it degraded to when that host failed. Measured
+ * 2026-09-04: api.kagami.ai serves no such vhost (TLS handshake fails,
+ * "tlsv1 unrecognized name") and resolves to the same parked addresses as
+ * via.placeholder.com. There is no commerce backend. So every page load ran a
+ * doomed 5s fetch, swallowed the failure, printed "🔌 Commerce: Offline mode",
+ * and carried a `_isOnline` flag that could never become true — and every
+ * write silently accumulated in a sync queue nothing would ever drain.
+ *
+ * The remote layer is now OPT-IN and named. Set, before this script loads:
+ *
+ *   <script>window.KAGAMI_COMMERCE_API = 'https://commerce.example/api/commerce';</script>
+ *
+ * With no base configured, `remoteStatus()` reports `not_configured` and no
+ * network call is attempted. With one configured, a failure reports
+ * `unreachable` with the error text and the URL that was tried — it does not
+ * silently pretend the write landed.
  *
  * Created: January 20, 2026
  * Author: Kagami (鏡)
  */
 
 const CommerceClient = (() => {
-  // Configuration
-  const API_BASE = 'https://api.kagami.ai/api/commerce';
+  // Configuration. No default host: a hardcoded one that answers nothing is
+  // worse than none, because it looks like the feature exists.
+  const API_BASE = (typeof window !== 'undefined' && window.KAGAMI_COMMERCE_API) || null;
   const IDENTITY_ID = 'jill';
   const TIMEOUT_MS = 5000;
 
@@ -25,6 +39,11 @@ const CommerceClient = (() => {
 
   // State
   let _isOnline = false;
+  // 'not_configured' | 'unreachable' | 'online'; plus the last failure text.
+  let _remoteStatus = API_BASE ? 'unreachable' : 'not_configured';
+  let _remoteDetail = API_BASE
+    ? 'no request attempted yet'
+    : 'window.KAGAMI_COMMERCE_API is unset — localStorage is the store of record';
   let _hearts = new Set();
   let _orders = [];
   let _syncQueue = [];
@@ -37,22 +56,39 @@ const CommerceClient = (() => {
   async function initialize() {
     if (_initialized) return;
 
-    // Load from localStorage first (instant)
+    // localStorage is the store of record, so it is read first and always.
     _loadFromLocalStorage();
 
-    // Try to sync with API
-    try {
-      const state = await _fetchWithTimeout(`${API_BASE}/sync/state?identity_id=${IDENTITY_ID}`);
-      if (state && state.wishlist) {
-        _hearts = new Set(state.wishlist.map(w => w.product_id));
-        _orders = state.orders || [];
-        _isOnline = true;
-        _saveToLocalStorage();
-        console.log('✅ Commerce: Synced with API');
-      }
-    } catch (e) {
-      console.log('🔌 Commerce: Offline mode (localStorage)');
+    if (!API_BASE) {
+      // Not a degraded mode: no backend was ever configured. Say so once,
+      // truthfully, instead of printing "Offline mode" about a service that
+      // does not exist.
       _isOnline = false;
+      _remoteStatus = 'not_configured';
+      _remoteDetail = 'window.KAGAMI_COMMERCE_API is unset — localStorage is the store of record';
+    } else {
+      const url = `${API_BASE}/sync/state?identity_id=${IDENTITY_ID}`;
+      try {
+        const state = await _fetchWithTimeout(url);
+        if (state && state.wishlist) {
+          _hearts = new Set(state.wishlist.map(w => w.product_id));
+          _orders = state.orders || [];
+          _isOnline = true;
+          _remoteStatus = 'online';
+          _remoteDetail = API_BASE;
+          _saveToLocalStorage();
+        } else {
+          _isOnline = false;
+          _remoteStatus = 'unreachable';
+          _remoteDetail = `${url} answered without a wishlist field`;
+          console.warn(`Commerce: ${_remoteDetail}`);
+        }
+      } catch (e) {
+        _isOnline = false;
+        _remoteStatus = 'unreachable';
+        _remoteDetail = `${url} — ${e.message}`;
+        console.warn(`Commerce: backend unreachable — ${_remoteDetail}`);
+      }
     }
 
     // Process any queued operations
@@ -150,7 +186,10 @@ const CommerceClient = (() => {
         _saveToLocalStorage();
         return _orders;
       } catch (e) {
-        console.warn('Failed to fetch orders from API');
+        _isOnline = false;
+        _remoteStatus = 'unreachable';
+        _remoteDetail = `${API_BASE}/orders — ${e.message}`;
+        console.warn(`Commerce: order fetch failed, serving the local store — ${_remoteDetail}`);
       }
     }
     return _orders;
@@ -193,14 +232,19 @@ const CommerceClient = (() => {
   // =========================================================================
 
   async function syncToBackend() {
+    if (!API_BASE) {
+      return { success: false, reason: 'not_configured', detail: _remoteDetail };
+    }
     if (!_isOnline) {
       try {
         const response = await _fetchWithTimeout(`${API_BASE}/sync/state?identity_id=${IDENTITY_ID}`);
         if (response) {
           _isOnline = true;
         }
-      } catch {
-        return { success: false, reason: 'offline' };
+      } catch (e) {
+        _remoteStatus = 'unreachable';
+        _remoteDetail = `${API_BASE}/sync/state — ${e.message}`;
+        return { success: false, reason: 'unreachable', detail: _remoteDetail };
       }
     }
 
@@ -223,6 +267,7 @@ const CommerceClient = (() => {
   }
 
   async function hydrateFromBackend() {
+    if (!API_BASE) return null;
     try {
       const data = await _fetchWithTimeout(
         `${API_BASE}/sync/hydrate?identity_id=${IDENTITY_ID}&gallery=${window.location.pathname.split('/').pop()}`
@@ -270,6 +315,11 @@ const CommerceClient = (() => {
   }
 
   function _queueOperation(op) {
+    // Queueing against a backend that was never configured grows an unbounded
+    // localStorage list nothing can ever drain — the write is already durable
+    // in the local store, which is the store of record. Only queue when there
+    // is a configured base that a later sync could actually reach.
+    if (!API_BASE) return;
     op.queued_at = Date.now();
     _syncQueue.push(op);
     _saveToLocalStorage();
@@ -344,7 +394,14 @@ const CommerceClient = (() => {
     hydrateFromBackend,
     // State
     isOnline: () => _isOnline,
-    getState: () => ({ hearts: [..._hearts], orders: _orders, online: _isOnline }),
+    /** Typed backend availability — never a bare boolean that hides WHY. */
+    remoteStatus: () => ({ base: API_BASE, status: _remoteStatus, detail: _remoteDetail }),
+    getState: () => ({
+      hearts: [..._hearts],
+      orders: _orders,
+      online: _isOnline,
+      remote: { base: API_BASE, status: _remoteStatus, detail: _remoteDetail },
+    }),
   };
 })();
 

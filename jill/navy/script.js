@@ -18,6 +18,30 @@
 (function() {
     'use strict';
 
+// ═══════════════════════════════════════════════════════════════
+// MISSING IMAGE HANDLING
+// ═══════════════════════════════════════════════════════════════
+//
+// Three <img onerror> handlers used to swap in a picture from
+// https://via.placeholder.com. That service was shut down and the host now
+// resolves to a parked address (verified 2026-09-04: the TLS connection is
+// refused outright), so the "fallback" produced a second broken image and hid
+// which local file was actually missing. All seven navy products currently
+// resolve against jill/navy/images/, so this path is unreached today — it
+// exists so that a future missing asset is NAMED rather than papered over.
+function showMissingImage(img) {
+    img.onerror = null;
+    const missing = img.getAttribute('src');
+    const label = img.getAttribute('alt') || 'image unavailable';
+    const box = document.createElement('div');
+    box.className = 'image-missing';
+    box.textContent = label;
+    box.title = `missing asset: ${missing}`;
+    img.replaceWith(box);
+    console.warn(`navy: missing image asset "${missing}" — showing the item name instead`);
+}
+window.showMissingImage = showMissingImage;
+
     // HEARTS PERSISTENCE
     const HEARTS_KEYS = {
         navy: 'jill_navy_hearts',
@@ -205,7 +229,7 @@
                      aria-label="${product.brand} ${product.name}, ${product.price_display}">
                 <div class="product-image-wrap">
                     <img class="product-image" src="images/${product.local_image}" alt="${product.brand} ${product.name}"
-                         loading="lazy" onerror="this.src='https://via.placeholder.com/400x500/E0E5EC/415A77?text=Navy'">
+                         loading="lazy" onerror="showMissingImage(this)">
                     ${product.badge ? `<span class="product-badge ${badgeClass}">${product.badge}</span>` : ''}
                     <button class="heart-button ${hearted ? 'active' : ''}" data-product-id="${product.id}"
                             aria-label="${hearted ? 'Remove from favorites' : 'Add to favorites'}">
@@ -262,7 +286,7 @@
                     <h3 class="outfit-name">${outfit.name}</h3>
                     <p class="outfit-description">${outfit.description}</p>
                     <div class="outfit-products">
-                        ${products.map(p => `<img class="outfit-product-thumb" src="images/${p.local_image}" alt="${p.name}" title="${p.brand} ${p.name}" onerror="this.src='https://via.placeholder.com/60x60/E0E5EC/415A77?text=N'">`).join('')}
+                        ${products.map(p => `<img class="outfit-product-thumb" src="images/${p.local_image}" alt="${p.name}" title="${p.brand} ${p.name}" onerror="showMissingImage(this)">`).join('')}
                     </div>
                 </div>`;
         }).join('');
@@ -331,7 +355,7 @@
         }
         content.innerHTML = heartedProducts.map(p => `
             <div class="drawer-item">
-                <img class="drawer-item-image" src="images/${p.local_image}" alt="${p.name}" onerror="this.src='https://via.placeholder.com/70x70/E0E5EC/415A77?text=N'">
+                <img class="drawer-item-image" src="images/${p.local_image}" alt="${p.name}" onerror="showMissingImage(this)">
                 <div class="drawer-item-info">
                     <p class="drawer-item-brand">${p.brand}</p>
                     <p class="drawer-item-name">${p.name}</p>

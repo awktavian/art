@@ -370,11 +370,19 @@
                 if (!CommerceClient.isWishlisted(productId)) {
                     // Find product data
                     const product = gallery?.products?.find(p => p.id === productId);
+                    if (!product) {
+                        // `brand: 'Unknown'` wrote a fabricated brand into the
+                        // wishlist that then rendered as if it were real. A
+                        // heart whose product has left the gallery is skipped
+                        // and named, not migrated as a fiction.
+                        console.warn(`Commerce: skipping heart "${productId}" — no such product in this gallery`);
+                        continue;
+                    }
                     await CommerceClient.addToWishlist({
                         product_id: productId,
-                        brand: product?.brand || 'Unknown',
-                        name: product?.name || productId,
-                        price: product?.price,
+                        brand: product.brand,
+                        name: product.name,
+                        price: product.price,
                         source_gallery: 'evening',
                     });
                 }
