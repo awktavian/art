@@ -1641,15 +1641,6 @@ self.onmessage = function(e) {
 
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 7. PRESETS — Empty placeholder; real games loaded from data.js via API
-// ═══════════════════════════════════════════════════════════════════════════
-
-const Presets = {
-    empty: { stones: [], description: 'Empty sheet' },
-};
-
-
-// ═══════════════════════════════════════════════════════════════════════════
 // EXPORTS (global namespace for vanilla JS)
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1661,7 +1652,6 @@ window.CurlingEngine = {
     ShotGenerator,
     ShotEvaluator,
     WorkerPool,
-    Presets,
     Stone,
     dist,
     distToButton,
