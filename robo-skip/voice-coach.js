@@ -15,9 +15,6 @@
 'use strict';
 
 (function () {
-  const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-  const PROXY_BASE = isLocal ? 'ws://localhost:8766' : 'wss://kagami-realtime-proxy.fly.dev';
-
   const toggleBtn = document.getElementById('voice-toggle');
   const statusEl = document.getElementById('voice-status');
   const transcriptEl = document.getElementById('voice-transcript');
@@ -25,7 +22,9 @@
 
   if (!toggleBtn || !window.RealtimeVoice) return;
 
-  const config = window.buildVoiceConfig ? window.buildVoiceConfig('robo-skip') : null;
+  // No `|| null` slide into a generic coach: if kagami-voices.js is missing the
+  // persona, the overlay must say so rather than speak as a default assistant.
+  const config = typeof window.buildVoiceConfig === 'function' ? window.buildVoiceConfig('robo-skip') : null;
 
   let voice = null;
   let connected = false;
@@ -320,15 +319,26 @@
   // ═══════════════════════════════════════════════════════════════════════
 
   async function connect() {
-    const colony = config?.colony;
-    const proxyUrl = new URL(PROXY_BASE);
-    proxyUrl.searchParams.set('project', 'robo-skip');
-    if (colony) proxyUrl.searchParams.set('colony', colony.colony.toLowerCase());
+    if (typeof window.resolveRealtimeEndpoint !== 'function') {
+      throw new Error(
+        'VoiceCoach: lib/realtime-endpoint.js is not loaded — refusing to guess a proxy URL.'
+      );
+    }
+    if (!config || !config.voice || !config.instructions) {
+      throw new Error(
+        'VoiceCoach: project "robo-skip" has no voice persona in lib/kagami-voices.js ' +
+          '(PROJECT_VOICES). Refusing to substitute a generic coach.'
+      );
+    }
+    const colony = config.colony;
+    const proxyUrl = window.resolveRealtimeEndpoint('voice', {
+      params: { project: 'robo-skip', colony: colony?.colony?.toLowerCase() },
+    });
 
     voice = new RealtimeVoice({
-      proxyUrl: proxyUrl.toString(),
-      voice: config?.voice || 'echo',
-      instructions: config?.instructions || 'You are a curling strategy coach.',
+      proxyUrl,
+      voice: config.voice,
+      instructions: config.instructions,
       tools,
       onTranscript: appendTranscript,
       onFunctionCall: handleFunctionCall,
@@ -362,7 +372,14 @@
   toggleBtn.addEventListener('click', async () => {
     if (connected) { disconnect(); } else {
       statusEl.textContent = 'Connecting...';
-      try { await connect(); } catch { statusEl.textContent = 'Failed'; addLine('Proxy unreachable at :8766', 'error'); }
+      try { await connect(); } catch (err) {
+        statusEl.textContent = 'Failed';
+        // ':8766' was wrong on every published page. Name the real endpoint.
+        const where = window.describeRealtimeEndpoint
+          ? window.describeRealtimeEndpoint('voice', { params: { project: 'robo-skip' } })
+          : '(lib/realtime-endpoint.js not loaded)';
+        addLine((err?.message || 'Connection failed') + ' — endpoint: ' + where, 'error');
+      }
     }
   });
 
