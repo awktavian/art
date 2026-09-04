@@ -212,6 +212,13 @@ class PatentMuseum {
             this.reinitializeAudio();
         });
         
+        // 'usePlaceholder' had no listener at all, so a resource that failed
+        // five retries vanished without a trace. Surface it in the debug
+        // console the museum already ships, without killing the visit.
+        this.stateMachine.on('resourceUnavailable', ({ type, error }) => {
+            console.error(`[Museum] resource unavailable (${type}):`, error);
+        });
+
         this.stateMachine.on('showErrorScreen', ({ type, error }) => {
             this.showErrorScreen(type, error);
         });

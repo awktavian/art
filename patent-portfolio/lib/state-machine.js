@@ -97,7 +97,10 @@ const ERROR_RECOVERY = {
         maxRetries: 5,
         baseDelay: 500,
         strategy: 'exponential_backoff',
-        fallback: 'use_placeholder'
+        // Was 'use_placeholder'. No placeholder was ever built, and nothing in
+        // the app listened for the 'usePlaceholder' event it emitted, so five
+        // retries against a genuinely missing resource ended in total silence.
+        fallback: 'report_missing_resource'
     },
     [ErrorType.WEBGL_CONTEXT_LOST]: {
         maxRetries: 2,
@@ -388,8 +391,15 @@ export class MuseumStateMachine {
                 this.emit('showErrorScreen', { type, error: this.lastError });
                 break;
                 
-            case 'use_placeholder':
-                this.emit('usePlaceholder', { type });
+            case 'report_missing_resource':
+                // Named, logged, and emitted under a listened-for event. The
+                // museum keeps running — a missing exhibit asset is not fatal —
+                // but the failure is no longer invisible.
+                console.error(
+                    `[StateMachine] resource load failed after ${this.errorCounts.get(type) ?? 0} ` +
+                    `retries: ${this.lastError?.message ?? this.lastError ?? 'no error recorded'}`
+                );
+                this.emit('resourceUnavailable', { type, error: this.lastError });
                 break;
                 
             case 'continue_desktop':
