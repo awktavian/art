@@ -11,8 +11,9 @@
  *   Server sends: { type: "beat_complete", scene_beat }
  *
  * Environment:
- *   ANTHROPIC_API_KEY — required
- *   CLAUDE_PROXY_PORT — default 8767
+ *   ANTHROPIC_API_KEY    — required
+ *   CLAUDE_DIRECTOR_MODEL — required; the exact Anthropic model id to direct with
+ *   CLAUDE_PROXY_PORT    — default 8767
  */
 
 import { createServer } from 'http';
@@ -25,9 +26,18 @@ import Anthropic from '@anthropic-ai/sdk';
 
 const PORT = parseInt(process.env.CLAUDE_PROXY_PORT || '8767', 10);
 const API_KEY = process.env.ANTHROPIC_API_KEY;
+// No default model id. The literal 'claude-sonnet-4-20250514' was pinned in the
+// API call below; model ids retire, and a hardcoded one silently keeps a
+// deployed director on a snapshot nobody chose. It comes from the environment
+// alongside the credential it is used with.
+const MODEL = process.env.CLAUDE_DIRECTOR_MODEL;
 
-if (!API_KEY) {
-  console.error('ANTHROPIC_API_KEY is required');
+const missing = [];
+if (!API_KEY) missing.push('ANTHROPIC_API_KEY');
+if (!MODEL) missing.push('CLAUDE_DIRECTOR_MODEL (exact Anthropic model id, e.g. from the Anthropic models API)');
+if (missing.length > 0) {
+  console.error('claude-proxy: refusing to start — missing required configuration:');
+  for (const m of missing) console.error(`  - ${m}`);
   process.exit(1);
 }
 
@@ -169,7 +179,7 @@ async function handleSceneTick(ws, msg, history) {
   try {
     // Stream response from Claude
     const stream = anthropic.messages.stream({
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL,
       max_tokens: 500,
       system: DIRECTOR_SYSTEM,
       messages: history
@@ -252,6 +262,7 @@ process.on('SIGTERM', shutdown);
 
 httpServer.listen(PORT, () => {
   console.log(`Claude Scene Director Proxy listening on :${PORT}`);
+  console.log(`  Model: ${MODEL}`);
   console.log(`  Health: http://localhost:${PORT}/health`);
   console.log(`  Connect via WebSocket for scene direction`);
 });

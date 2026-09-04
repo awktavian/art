@@ -19,11 +19,18 @@
  *   RATE_TOKENS_PER_SEC  — token bucket refill rate (default 10)
  *   RATE_BUCKET_MAX      — max burst tokens (default 30)
  *   ALLOWED_ORIGINS      — comma-separated origins (default: all)
- *   REALTIME_MODEL       — default gpt-4o-realtime-preview
+ *   REALTIME_MODEL       — required; the exact OpenAI Realtime model id
+ *   REALTIME_PRICE_*     — required; USD per 1M tokens for that model, four
+ *                          values: TEXT_IN, TEXT_OUT, AUDIO_IN, AUDIO_OUT.
+ *                          Set from OpenAI's published price for REALTIME_MODEL.
+ *
+ * Cost accounting is metered from the `usage` block OpenAI returns on
+ * `response.done`, never estimated per message. See CostMeter below.
  */
 
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
+import { CostMeter } from './cost-meter.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIG
@@ -38,13 +45,48 @@ const RATE_BUCKET_MAX = parseInt(process.env.RATE_BUCKET_MAX || '30', 10);
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
   : null; // null = allow all
-const REALTIME_MODEL = process.env.REALTIME_MODEL || 'gpt-4o-realtime-preview';
+const REALTIME_MODEL = process.env.REALTIME_MODEL;
 const OPENAI_REALTIME_URL = `wss://api.openai.com/v1/realtime?model=${REALTIME_MODEL}`;
 
-if (!OPENAI_API_KEY) {
-  console.error('OPENAI_API_KEY is required');
-  process.exit(1);
+// Prices are per 1,000,000 tokens, in USD, for REALTIME_MODEL specifically.
+// They are deliberately NOT defaulted: a stale built-in price table silently
+// mis-meters every session and the cost cap stops meaning what it says. The
+// model id and its prices must travel together (see fly.toml [env]).
+const PRICE_ENV = {
+  textIn: 'REALTIME_PRICE_TEXT_IN_PER_MTOK',
+  textOut: 'REALTIME_PRICE_TEXT_OUT_PER_MTOK',
+  audioIn: 'REALTIME_PRICE_AUDIO_IN_PER_MTOK',
+  audioOut: 'REALTIME_PRICE_AUDIO_OUT_PER_MTOK',
+};
+
+function requireConfig() {
+  const missing = [];
+  if (!OPENAI_API_KEY) missing.push('OPENAI_API_KEY (the upstream credential)');
+  if (!REALTIME_MODEL) {
+    missing.push(
+      'REALTIME_MODEL (the exact OpenAI Realtime model id; no default — a stale ' +
+        'built-in name silently pins every session to a retired model)'
+    );
+  }
+  const prices = {};
+  for (const [key, envName] of Object.entries(PRICE_ENV)) {
+    const raw = process.env[envName];
+    const value = Number(raw);
+    if (raw === undefined || raw === '' || !Number.isFinite(value) || value < 0) {
+      missing.push(`${envName} (USD per 1M tokens for ${REALTIME_MODEL || 'REALTIME_MODEL'})`);
+      continue;
+    }
+    prices[key] = value;
+  }
+  if (missing.length > 0) {
+    console.error('realtime-proxy: refusing to start — missing required configuration:');
+    for (const m of missing) console.error(`  - ${m}`);
+    process.exit(1);
+  }
+  return prices;
 }
+
+const PRICES = requireConfig();
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TOKEN BUCKET RATE LIMITER
@@ -95,14 +137,20 @@ function getSessionStats() {
       origin: s.origin,
       project: s.projectId,
       colony: s.colonyId,
-      costCents: Math.round(s.cost * 100) / 100,
+      costCents: Math.round(s.meter.cents * 100) / 100,
+      // `metered: false` means no response has been billed yet, so costCents 0
+      // is "nothing charged", NOT "measured as free". Consumers must not read
+      // an unmetered zero as a measurement.
+      metered: s.meter.metered,
+      billedResponses: s.meter.responses,
+      tokens: { ...s.meter.tokens },
       messagesIn: s.messagesIn,
       messagesOut: s.messagesOut,
       created: s.created,
       durationSec: Math.round((Date.now() - s.created) / 1000),
     };
     active.push(info);
-    totalCost += s.cost;
+    totalCost += s.meter.cents;
 
     byProject[s.projectId] = (byProject[s.projectId] || 0) + 1;
     byColony[s.colonyId] = (byColony[s.colonyId] || 0) + 1;
@@ -112,35 +160,12 @@ function getSessionStats() {
     active,
     total: sessionCounter,
     maxSessions: MAX_SESSIONS,
+    model: REALTIME_MODEL,
+    pricesUsdPerMTok: PRICES,
     totalCostCents: Math.round(totalCost * 100) / 100,
     byProject,
     byColony,
   };
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// COST ESTIMATION (approximate based on OpenAI Realtime pricing)
-// ═══════════════════════════════════════════════════════════════════════════
-
-function estimateCostCents(msg) {
-  // Rough heuristic: audio input ~$0.06/min, audio output ~$0.24/min
-  // Text: ~$0.005/1K tokens input, ~$0.02/1K tokens output
-  // We approximate per-message: ~0.1 cents for text, ~0.5 cents for audio
-  try {
-    const parsed = JSON.parse(msg);
-    if (parsed.type === 'response.audio.delta' || parsed.type === 'response.audio_transcript.delta') {
-      return 0.3; // audio output fragment
-    }
-    if (parsed.type === 'input_audio_buffer.append') {
-      return 0.1; // audio input fragment
-    }
-    if (parsed.type === 'response.text.delta') {
-      return 0.05; // text output
-    }
-    return 0.02; // control messages
-  } catch {
-    return 0.02;
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -193,13 +218,33 @@ const httpServer = createServer((req, res) => {
 const wss = new WebSocketServer({ server: httpServer });
 
 wss.on('connection', (clientWs, req) => {
-  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
-  const origin = req.headers.origin || 'unknown';
+  // `null`, not the string 'unknown': a session with no Origin header and one
+  // from a client that literally sent Origin: unknown must stay distinguishable
+  // in /stats. Absent is a value; a stand-in string is not.
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || null;
+  const origin = req.headers.origin ?? null;
 
-  // Parse project/colony metadata from query params (e.g., ws://localhost:8766?project=robo-skip&colony=forge)
+  // Parse project/colony metadata from query params
+  // (e.g., ws://localhost:8766?project=robo-skip&colony=forge)
+  //
+  // These used to default to 'unknown' and 'kagami'. Both are lies in the stats
+  // table: 'unknown' is a project name no page ever sends, and 'kagami' silently
+  // attributed every unlabelled session to the orchestrator colony, inflating
+  // its byColony count with sessions that belong to someone else. The client
+  // always has both values (lib/realtime-endpoint.js sets them), so a missing
+  // one is a client bug and is reported as such rather than papered over.
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const projectId = url.searchParams.get('project') || 'unknown';
-  const colonyId = url.searchParams.get('colony') || 'kagami';
+  const projectId = url.searchParams.get('project');
+  const colonyId = url.searchParams.get('colony');
+  if (!projectId || !colonyId) {
+    const absent = [!projectId && 'project', !colonyId && 'colony'].filter(Boolean).join(' and ');
+    console.warn(
+      `[reject] ${ip ?? '(no client address)'} (${origin ?? '(no Origin header)'}) ` +
+        `omitted required query param(s): ${absent}`
+    );
+    clientWs.close(4400, `Missing required query parameter(s): ${absent}`);
+    return;
+  }
 
   // Origin check
   if (ALLOWED_ORIGINS && !ALLOWED_ORIGINS.includes(origin)) {
@@ -215,8 +260,12 @@ wss.on('connection', (clientWs, req) => {
 
   const sessionId = `s-${++sessionCounter}`;
   const bucket = new TokenBucket();
+  const meter = new CostMeter(PRICES);
 
-  console.log(`[${sessionId}] Client connected from ${ip} (${origin}) — project:${projectId} colony:${colonyId}`);
+  console.log(
+    `[${sessionId}] Client connected from ${ip ?? '(no client address)'} ` +
+      `(${origin ?? '(no Origin header)'}) — project:${projectId} colony:${colonyId}`
+  );
 
   // Open upstream connection to OpenAI
   const upstreamWs = new WebSocket(OPENAI_REALTIME_URL, {
@@ -230,7 +279,7 @@ wss.on('connection', (clientWs, req) => {
     clientWs,
     upstreamWs,
     bucket,
-    cost: 0,
+    meter,
     messagesIn: 0,
     messagesOut: 0,
     created: Date.now(),
@@ -258,18 +307,31 @@ wss.on('connection', (clientWs, req) => {
     if (clientWs.readyState !== WebSocket.OPEN) return;
 
     const msg = data.toString();
-    session.cost += estimateCostCents(msg);
     session.messagesOut++;
 
-    // Cost cap check
-    if (session.cost >= SESSION_COST_CAP) {
+    // Meter from the upstream `response.done` usage block. Messages without
+    // usage cost nothing here because nothing has been billed for them yet.
+    let parsed = null;
+    try { parsed = JSON.parse(msg); } catch { /* non-JSON frame: not billable */ }
+    if (parsed && meter.record(parsed)) {
       clientWs.send(JSON.stringify({
-        type: 'proxy.session.cost_limit',
-        cost_cents: Math.round(session.cost),
+        type: 'proxy.session.cost',
+        cost_cents: Math.round(meter.cents * 100) / 100,
         limit_cents: SESSION_COST_CAP,
+        billed_responses: meter.responses,
+        tokens: { ...meter.tokens },
       }));
-      cleanup(sessionId, 4028, 'Session cost limit reached');
-      return;
+
+      // Cost cap check — now against a metered number, not an invented one.
+      if (meter.cents >= SESSION_COST_CAP) {
+        clientWs.send(JSON.stringify({
+          type: 'proxy.session.cost_limit',
+          cost_cents: Math.round(meter.cents * 100) / 100,
+          limit_cents: SESSION_COST_CAP,
+        }));
+        cleanup(sessionId, 4028, 'Session cost limit reached');
+        return;
+      }
     }
 
     clientWs.send(msg);
@@ -299,10 +361,9 @@ wss.on('connection', (clientWs, req) => {
     }
 
     session.messagesIn++;
-    const msg = data.toString();
-    session.cost += estimateCostCents(msg);
-
-    upstreamWs.send(msg);
+    // Client frames are not billed here: the upstream `response.done` usage
+    // block already accounts for the input tokens they produced.
+    upstreamWs.send(data.toString());
   });
 
   clientWs.on('close', () => {
@@ -327,7 +388,10 @@ function cleanup(sessionId, code = 1000, reason = 'Session ended') {
   sessions.delete(sessionId);
 
   const duration = Math.round((Date.now() - session.created) / 1000);
-  console.log(`[${sessionId}] Session ended — ${duration}s, ${session.messagesIn}↑ ${session.messagesOut}↓, ~${Math.round(session.cost)}¢`);
+  const cost = session.meter.metered
+    ? `${(Math.round(session.meter.cents * 100) / 100).toFixed(2)}¢ metered over ${session.meter.responses} response(s)`
+    : 'nothing billed (no response.done usage received)';
+  console.log(`[${sessionId}] Session ended — ${duration}s, ${session.messagesIn}↑ ${session.messagesOut}↓, ${cost}`);
 
   try {
     if (session.upstreamWs.readyState === WebSocket.OPEN) {
@@ -366,6 +430,7 @@ process.on('SIGTERM', shutdown);
 httpServer.listen(PORT, () => {
   console.log(`OpenAI Realtime Proxy listening on :${PORT}`);
   console.log(`  Model: ${REALTIME_MODEL}`);
+  console.log(`  Prices (USD/1M tok): text ${PRICES.textIn}/${PRICES.textOut}, audio ${PRICES.audioIn}/${PRICES.audioOut}`);
   console.log(`  Max sessions: ${MAX_SESSIONS}`);
   console.log(`  Cost cap: ${SESSION_COST_CAP}¢/session`);
   console.log(`  Rate limit: ${RATE_TOKENS_PER_SEC} msg/s (burst: ${RATE_BUCKET_MAX})`);
