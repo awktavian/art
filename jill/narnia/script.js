@@ -452,15 +452,22 @@
      */
     async function toggleHeart(productId) {
         const product = gallery?.products?.find(p => p.id === productId);
-        
+
         if (useCommerceClient) {
+            // A heart can only originate from a rendered card, so a missing
+            // product is a data bug. `brand: 'Unknown'` stored that bug as a
+            // real-looking record in the wishlist and the drawer rendered it.
+            if (!product) {
+                console.error(`narnia: refusing to heart "${productId}" — no such product in gallery.json`);
+                return getHeartedItems().has(productId);
+            }
             const wasHearted = CommerceClient.isWishlisted(productId);
             await CommerceClient.toggleWishlist({
                 product_id: productId,
-                brand: product?.brand || 'Unknown',
-                name: product?.name || productId,
-                price: product?.price,
-                product_url: product?.product_url,
+                brand: product.brand,
+                name: product.name,
+                price: product.price,
+                product_url: product.product_url,
                 source_gallery: 'evening',
             });
             

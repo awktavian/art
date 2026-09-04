@@ -266,10 +266,24 @@ function openProductModal(productId) {
         imgContainer.alt = '';
     }
     
-    // Meta
-    modal.querySelector('.modal-maker').innerHTML = `<strong>Maker:</strong> ${product.maker || 'Unknown'}`;
-    modal.querySelector('.modal-material').innerHTML = `<strong>Material:</strong> ${product.material || 'N/A'}`;
-    modal.querySelector('.modal-size').innerHTML = `<strong>Size Required:</strong> ${product.size_required || 'Check listing'}`;
+    // Meta. 'Unknown' / 'N/A' rendered a fabricated VALUE for an absent field —
+    // indistinguishable, on the page, from a maker actually named "Unknown".
+    // An absent detail simply has no row. All 14 amelie products carry maker,
+    // material and name today, so this only guards future data.
+    const setMeta = (selector, label, value) => {
+        const el = modal.querySelector(selector);
+        if (!el) return;
+        if (value === undefined || value === null || value === '') {
+            el.innerHTML = '';
+            el.hidden = true;
+            return;
+        }
+        el.hidden = false;
+        el.innerHTML = `<strong>${label}:</strong> ${value}`;
+    };
+    setMeta('.modal-maker', 'Maker', product.maker);
+    setMeta('.modal-material', 'Material', product.material);
+    setMeta('.modal-size', 'Size Required', product.size_required);
     
     // Badges
     const badgesContainer = modal.querySelector('.modal-badges');

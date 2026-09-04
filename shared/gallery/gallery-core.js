@@ -56,8 +56,20 @@ class KagamiGallery {
         this.initializeScrollReveal();
         this.updateFooterStats();
 
-        console.log(`🎨 Kagami Gallery initialized: ${this.data?.meta?.name || 'Unknown'}`);
-        console.log(`   ${this.data?.products?.length || 0} products for ${this.data?.meta?.recipient || 'Unknown'}`);
+        // `|| 'Unknown'` here hid a genuinely malformed gallery.json behind a
+        // line that looked like a successful init. Say which field is missing.
+        const meta = this.data?.meta;
+        if (!meta?.name || !meta?.recipient) {
+            console.error(
+                `Kagami Gallery: ${this.config.dataUrl} is missing meta.` +
+                  (!meta?.name ? 'name' : 'recipient') +
+                  ' — the gallery rendered, but its identity is unset.'
+            );
+        }
+        console.log(
+            `🎨 Kagami Gallery initialized: ${meta?.name ?? '(meta.name missing)'} — ` +
+              `${this.data?.products?.length ?? 0} products for ${meta?.recipient ?? '(meta.recipient missing)'}`
+        );
     }
 
     // === Data Loading ===
@@ -431,9 +443,18 @@ class KagamiGallery {
         }
 
         // Meta
+        // 'N/A' rendered a fabricated VALUE for an absent field, which on the
+        // page is indistinguishable from a real one. An absent detail has no row.
         const setMeta = (selector, label, value) => {
             const el = modal.querySelector(selector);
-            if (el) el.innerHTML = `<strong>${label}:</strong> ${value || 'N/A'}`;
+            if (!el) return;
+            if (value === undefined || value === null || value === '') {
+                el.innerHTML = '';
+                el.hidden = true;
+                return;
+            }
+            el.hidden = false;
+            el.innerHTML = `<strong>${label}:</strong> ${value}`;
         };
 
         setMeta('.modal-maker', 'Maker', product.maker);

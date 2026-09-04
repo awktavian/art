@@ -170,16 +170,23 @@
         if (!results || !Array.isArray(results) || results.length === 0) {
           return { available: false, analyzing: !!s.analyzing, message: s.analyzing ? 'Analysis in progress...' : 'No analysis results. Call run_analysis first.' };
         }
+        // These values go straight into the AI's perception of the sheet, so a
+        // substituted number is a lie the model then reasons from. `wp_after`
+        // defaulted to 0.5 — telling the coach a shot leaves the game at exactly
+        // even odds whenever the engine reported nothing — and `wp_delta` to 0,
+        // i.e. "this shot changes nothing". Absent is now null, which the model
+        // can see is absent.
+        const round3 = (v) => (Number.isFinite(v) ? +v.toFixed(3) : null);
         return {
           available: true,
           shots: results.slice(0, 5).map((r, i) => ({
             rank: i + 1,
-            type: r.type || r.shotType || 'unknown',
-            wp_delta: +(r.wpDelta || 0).toFixed(3),
-            wp_after: +(r.wpAfter || 0.5).toFixed(3),
+            type: r.type ?? r.shotType ?? null,
+            wp_delta: round3(r.wpDelta),
+            wp_after: round3(r.wpAfter),
             target: r.target ? { x: +r.target.x.toFixed(3), y: +r.target.y.toFixed(3) } : null,
-            handle: r.handle || r.turn || 'unknown',
-            description: r.description || '',
+            handle: r.handle ?? r.turn ?? null,
+            description: r.description ?? null,
           })),
         };
       }
@@ -233,7 +240,7 @@
           return { status: 'no_results', message: 'Run analysis first.' };
         }
         document.dispatchEvent(new KeyboardEvent('keydown', { key: String(rank), bubbles: true }));
-        return { status: 'executing', rank, shot: s.analysisResults[rank - 1]?.type || 'unknown' };
+        return { status: 'executing', rank, shot: s.analysisResults[rank - 1]?.type ?? null };
       }
 
       case 'place_stone': {
