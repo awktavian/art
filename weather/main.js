@@ -172,7 +172,7 @@ const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'Ar
 const SECRET_LOCATIONS = {
     home: {
         name: 'Green Lake',
-        address: '7331 W Green Lake Dr N',
+        address: 'Green Lake Park',
         city: 'Seattle',
         postcode: '98103',
         country: 'USA',
