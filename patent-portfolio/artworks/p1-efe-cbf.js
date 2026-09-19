@@ -1,3 +1,6 @@
+// PROVENANCE: mirror of ~/projects/awkronos/patents/artworks/p1-efe-cbf.js (content-identical as of 2026-09-19).
+// awkronos/patents is the brand-owned canonical copy — edit there first, then port changes here.
+// This site (art/patent-portfolio) deploys independently and can't import cross-repo, hence the mirror.
 /**
  * P1-001: EFE-CBF Safety Optimizer Artwork
  * ========================================
