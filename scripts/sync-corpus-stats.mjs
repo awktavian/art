@@ -22,6 +22,19 @@
  * `--check` runs inside `scripts/check-site.mjs`. Where no proof report exists
  * (CI, a fresh clone) it prints SKIPPED and renders no verdict -- deliberately
  * distinct from passing.
+ *
+ * UNMEASURED IS NOT ZERO AND NOT NaN. The schema-v4 proof report (2026-09 kagami
+ * refactor) carries files/lines/sorry_count on each project row but may omit the
+ * theorem and scientific-open-goal counts entirely -- and while its native
+ * declaration inventory is still resolving it publishes no numbers for them at
+ * all. A missing field used to reach `Number(undefined)`: the sync path would
+ * have published a literal "NaN" tile and the gate would have claimed a
+ * "0 sorry" closure for a residual that was merely unmeasured. Both are
+ * fabrications of exactly the shape this file exists to prevent, so an absent
+ * count now renders no verdict: the tile is left unchanged and named on an
+ * UNMEASURED line, and only the tiles the report actually measured are
+ * compared. The residual tile additionally refuses to collapse to "0 sorry"
+ * unless the open-goal count was also measured at zero.
  */
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve, dirname, relative } from "node:path";
@@ -71,15 +84,27 @@ function loadRows() {
 
 const fmt = (n) => Number(n).toLocaleString("en-US");
 
+/** A measured count, or null when the report carries no number for it.
+ *  null is "unmeasured": it renders no verdict and publishes no digit. */
+function countOrNull(v) {
+  if (typeof v === "boolean" || v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 /**
  * The residual tile. `sorry` alone understates a corpus whose open work has
  * moved into named scientific goals, so the label follows the residual that
- * actually exists rather than the one the page was built around.
+ * actually exists rather than the one the page was built around. Returns null
+ * when the report does not measure the residual: "no open-goal count" is not
+ * evidence of closure, so no tile is rendered.
  */
 function residual(row) {
-  const sorries = Number(row.sorry_count ?? 0);
+  const sorries = countOrNull(row.sorry_count);
+  if (sorries === null) return null;
   if (sorries > 0) return { value: fmt(sorries), label: "sorry" };
-  const open = Number(row.scientific_open_count ?? 0);
+  const open = countOrNull(row.scientific_open_count);
+  if (open === null) return null;
   if (open > 0) return { value: fmt(open), label: open === 1 ? "open goal" : "open goals" };
   return { value: "0", label: "sorry" };
 }
@@ -93,16 +118,26 @@ function setTile(html, label, value, file) {
 }
 
 function render(html, row, file) {
+  const unmeasured = [];
+  for (const tile of ["files", "lines", "theorems"]) {
+    const n = countOrNull(row[tile]);
+    if (n === null) {
+      unmeasured.push(tile);
+      continue;
+    }
+    html = setTile(html, tile, fmt(n), file);
+  }
   const res = residual(row);
-  html = setTile(html, "files", fmt(row.files), file);
-  html = setTile(html, "lines", fmt(row.lines), file);
-  html = setTile(html, "theorems", fmt(row.theorems), file);
-  // The residual tile's LABEL is generated too, so it cannot keep saying
-  // "sorry" over a number that is no longer a sorry count.
-  const resRe = /(<div class="arch-stat-val">)[^<]*(<\/div><div class="arch-stat-label">)(?:sorry|open goals?)(<\/div>)/;
-  if (!resRe.test(html)) throw new Error(`${file}: could not locate the residual tile`);
-  html = html.replace(resRe, (_m, a, b, c) => `${a}${res.value}${b}${res.label}${c}`);
-  return html;
+  if (res === null) {
+    unmeasured.push("residual");
+  } else {
+    // The residual tile's LABEL is generated too, so it cannot keep saying
+    // "sorry" over a number that is no longer a sorry count.
+    const resRe = /(<div class="arch-stat-val">)[^<]*(<\/div><div class="arch-stat-label">)(?:sorry|open goals?)(<\/div>)/;
+    if (!resRe.test(html)) throw new Error(`${file}: could not locate the residual tile`);
+    html = html.replace(resRe, (_m, a, b, c) => `${a}${res.value}${b}${res.label}${c}`);
+  }
+  return { html, unmeasured };
 }
 
 function run(check) {
@@ -119,15 +154,25 @@ function run(check) {
   }
 
   let drifted = false;
+  let hadUnmeasured = false;
   for (const { file, project } of PAGES) {
     const path = resolve(REPO, file);
     const current = readFileSync(path, "utf8");
-    let expected;
+    let expected, unmeasured;
     try {
-      expected = render(current, rows.get(project), file);
+      ({ html: expected, unmeasured } = render(current, rows.get(project), file));
     } catch (e) {
       console.error(`corpus stats: FAIL — ${e.message}`);
       return 1;
+    }
+    if (unmeasured.length > 0) {
+      hadUnmeasured = true;
+      // stdout, like SKIPPED: check-site forwards the child's stdout even when
+      // the gate passes, so the no-verdict line stays visible in the build log.
+      console.log(
+        `corpus stats: UNMEASURED in ${file}: ${unmeasured.join(", ")} — the live report carries ` +
+          `no number for these tiles; they are left unchanged and compared against nothing.`,
+      );
     }
     if (!check) {
       if (expected !== current) {
@@ -151,7 +196,10 @@ function run(check) {
 
   if (!check) return 0;
   if (!drifted) {
-    console.log("corpus stats: PASS — the pages match the live proof report");
+    console.log(
+      "corpus stats: PASS — the pages match the live proof report" +
+        (hadUnmeasured ? " for every measured tile (see UNMEASURED above)" : ""),
+    );
     return 0;
   }
   console.error("  fix: node scripts/sync-corpus-stats.mjs");

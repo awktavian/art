@@ -262,7 +262,11 @@ for (const file of serviceWorkerFiles) {
 // goals. The numbers are generated now; this makes the page unable to
 // disagree with the compiler without failing the build. Where no proof report
 // exists (CI, fresh clone) the child prints SKIPPED and exits 0 — an absence
-// of evidence, which reads as such in the log, not as a pass.
+// of evidence, which reads as such in the log, not as a pass. Where the report
+// exists but carries no number for a tile (schema-v4 rows may omit theorem and
+// open-goal counts while the native inventory resolves), the child prints
+// UNMEASURED, leaves that tile alone, and gates only the measured tiles — a
+// missing count never becomes a published NaN or a fabricated "0 sorry".
 {
   const { spawnSync } = await import("node:child_process");
   const gate = spawnSync(
