@@ -8,11 +8,13 @@
 
 import * as THREE from 'three';
 import { COLONY_DATA, COLONY_ORDER, DIMENSIONS } from './architecture.js';
+import { COLONY_COLORS as DESIGN_COLONY_COLORS } from '../../lib/design-tokens.js';
 
-const COLONY_COLORS = {
-    spark: 0xFF6B35, forge: 0xD4AF37, flow: 0x4ECDC4, nexus: 0x9B7EBD,
-    beacon: 0xF59E0B, grove: 0x7EB77F, crystal: 0x67D4E4
-};
+// DERIVED from art/lib/design-tokens.js (single waddle mirror) —
+// identity-coherence.test.mjs bans re-inlined colony hexes here (DICT-B 2026-09-29).
+const COLONY_COLORS = Object.fromEntries(
+    Object.entries(DESIGN_COLONY_COLORS).map(([colony, t]) => [colony, t.num])
+);
 
 function kelvinToHex(k) {
     const t = k / 100;
@@ -29,15 +31,16 @@ function kelvinToHex(k) {
     return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
 }
 
-// Per-wing lighting programs
+// Per-wing lighting programs — colors DERIVED from art/lib/design-tokens.js
+// (DICT-B sweep 2026-09-29; zero value change, literals removed).
 const WING_PROFILES = {
-    spark:   { color: 0xFF6B35, kelvin: 5000, cycleSec: 90,  amount: 0.03, character: 'dynamic' },
-    forge:   { color: 0xD4AF37, kelvin: 2700, cycleSec: 120, amount: 0.025, character: 'warm' },
-    flow:    { color: 0x4ECDC4, kelvin: 4000, cycleSec: 75,  amount: 0.04, character: 'dappled' },
-    nexus:   { color: 0x9B7EBD, kelvin: 6500, cycleSec: 100, amount: 0.03, character: 'pulse' },
-    beacon:  { color: 0xF59E0B, kelvin: 3000, cycleSec: 60,  amount: 0.035, character: 'sweep' },
-    grove:   { color: 0x7EB77F, kelvin: 3500, cycleSec: 110, amount: 0.025, character: 'canopy' },
-    crystal: { color: 0x67D4E4, kelvin: 7500, cycleSec: 80,  amount: 0.03, character: 'cold' }
+    spark:   { color: COLONY_COLORS.spark,   kelvin: 5000, cycleSec: 90,  amount: 0.03, character: 'dynamic' },
+    forge:   { color: COLONY_COLORS.forge,   kelvin: 2700, cycleSec: 120, amount: 0.025, character: 'warm' },
+    flow:    { color: COLONY_COLORS.flow,    kelvin: 4000, cycleSec: 75,  amount: 0.04, character: 'dappled' },
+    nexus:   { color: COLONY_COLORS.nexus,   kelvin: 6500, cycleSec: 100, amount: 0.03, character: 'pulse' },
+    beacon:  { color: COLONY_COLORS.beacon,  kelvin: 3000, cycleSec: 60,  amount: 0.035, character: 'sweep' },
+    grove:   { color: COLONY_COLORS.grove,   kelvin: 3500, cycleSec: 110, amount: 0.025, character: 'canopy' },
+    crystal: { color: COLONY_COLORS.crystal, kelvin: 7500, cycleSec: 80,  amount: 0.03, character: 'cold' }
 };
 
 export class TurrellLighting {

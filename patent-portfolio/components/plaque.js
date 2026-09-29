@@ -9,17 +9,16 @@
  */
 
 import * as THREE from 'three';
+import { COLONY_COLORS as DESIGN_COLONY_COLORS } from '../../lib/design-tokens.js';
 
-// Colony color mapping
-const COLONY_COLORS = {
-    spark:   0xFF6B35,
-    forge:   0xD4AF37,
-    flow:    0x4ECDC4,
-    nexus:   0x9B7EBD,
-    beacon:  0xF59E0B,
-    grove:   0x7EB77F,
-    crystal: 0x67D4E4
-};
+// Colony color mapping — DERIVED from art/lib/design-tokens.js (the single
+// mirror of waddle tokens.json). Do not re-inline palette literals here:
+// tests/unit/identity-coherence.test.mjs fails on any canonical colony hex
+// declared inside a COLONY_COLORS block outside the owner (swept 2026-09-29,
+// lane DICT-B).
+const COLONY_COLORS = Object.fromEntries(
+    Object.entries(DESIGN_COLONY_COLORS).map(([colony, t]) => [colony, t.num])
+);
 
 const PRIORITY_COLORS = {
     P1: 0xFFD700,

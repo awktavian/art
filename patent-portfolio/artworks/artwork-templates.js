@@ -11,20 +11,17 @@
 import * as THREE from 'three';
 import { createPlaque } from '../components/plaque.js';
 import { getCanvasFont, setupHiDPICanvas } from '../lib/typography.js';
+import { COLONY_COLORS as DESIGN_COLONY_COLORS } from '../../lib/design-tokens.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// COLONY COLORS
+// COLONY COLORS — DERIVED from art/lib/design-tokens.js (single waddle
+// mirror); identity-coherence.test.mjs bans re-inlined colony hexes here
+// (DICT-B sweep 2026-09-29).
 // ═══════════════════════════════════════════════════════════════════════════
 
-const COLONY_COLORS = {
-    spark:   0xFF6B35,
-    forge:   0xD4AF37,
-    flow:    0x4ECDC4,
-    nexus:   0x9B7EBD,
-    beacon:  0xF59E0B,
-    grove:   0x7EB77F,
-    crystal: 0x67D4E4
-};
+const COLONY_COLORS = Object.fromEntries(
+    Object.entries(DESIGN_COLONY_COLORS).map(([colony, t]) => [colony, t.num])
+);
 
 const CATEGORY_VISUALS = {
     // Math - Geometric structures

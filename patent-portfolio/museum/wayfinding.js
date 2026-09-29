@@ -13,22 +13,29 @@ import * as THREE from 'three';
 import { getCanvasFont, SIZES } from '../lib/typography.js';
 import { DIMENSIONS } from './architecture.js';
 import { isInLineOfSight } from '../lib/culling-system.js';
+import { COLONY_COLORS as DESIGN_COLONY_COLORS } from '../../lib/design-tokens.js';
 function shouldShowReturnToRotunda(journeyTracker) {
     if (!journeyTracker) return false;
     const zone = journeyTracker.currentZone || 'rotunda';
     return zone !== 'rotunda';
 }
 
-// Colony colors for consistent wayfinding
-const COLONY_COLORS = {
-    spark: { hex: 0xFF6B35, name: 'Spark', icon: '🔥' },
-    forge: { hex: 0xFFD700, name: 'Forge', icon: '⚒️' },
-    flow: { hex: 0x4ECDC4, name: 'Flow', icon: '🌊' },
-    nexus: { hex: 0x9B7EBD, name: 'Nexus', icon: '🔗' },
-    beacon: { hex: 0x45B7D1, name: 'Beacon', icon: '🗼' },
-    grove: { hex: 0x7EB77F, name: 'Grove', icon: '🌿' },
-    crystal: { hex: 0x67D4E4, name: 'Crystal', icon: '💎' }
+// Colony colors for consistent wayfinding — DERIVED from
+// art/lib/design-tokens.js (DICT-B sweep 2026-09-29). Two drifted hexes
+// retired: forge 0xFFD700→0xD4AF37, beacon 0x45B7D1→0xF59E0B (signage colors
+// align to the waddle canonical; museum visual pass pending).
+const COLONY_META = {
+    spark:   { name: 'Spark',   icon: '🔥' },
+    forge:   { name: 'Forge',   icon: '⚒️' },
+    flow:    { name: 'Flow',    icon: '🌊' },
+    nexus:   { name: 'Nexus',   icon: '🔗' },
+    beacon:  { name: 'Beacon',  icon: '🗼' },
+    grove:   { name: 'Grove',   icon: '🌿' },
+    crystal: { name: 'Crystal', icon: '💎' }
 };
+const COLONY_COLORS = Object.fromEntries(
+    Object.entries(DESIGN_COLONY_COLORS).map(([colony, t]) => [colony, { hex: t.num, ...COLONY_META[colony] }])
+);
 
 const COLONY_ORDER = ['spark', 'forge', 'flow', 'nexus', 'beacon', 'grove', 'crystal'];
 

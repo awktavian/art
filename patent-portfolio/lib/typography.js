@@ -1,6 +1,15 @@
 // PROVENANCE: mirror of ~/projects/awkronos/patents/lib/typography.js (byte-identical as of 2026-08-18).
 // awkronos/patents is the brand-owned canonical copy — edit there first, then port changes here.
 // This site (art/patent-portfolio) deploys independently and can't import cross-repo, hence the mirror.
+// DIVERGED 2026-09-29 (lane DICT-B): COLONY_COLORS below is now DERIVED from
+// art/lib/design-tokens.js instead of inlining a drifted table; port this
+// change to the canonical copy in awkronos/patents (resolve its own token
+// owner there before copying the import path). Drifted hexes retired here:
+// forge F7931E→D4AF37, flow 7ECFC0→4ECDC4, nexus E8D44D→9B7EBD,
+// beacon C78FFF→F59E0B, grove 95E17B→7EB77F (canvas text colors shift to the
+// waddle canonical; museum visual pass pending — DEBT-design-tokens.md).
+
+import { COLONY_COLORS as DESIGN_COLONY_COLORS } from '../../lib/design-tokens.js';
 
 /**
  * Unified Typography System for Kagami Patent Museum
@@ -173,15 +182,15 @@ export function measureText(ctx, text, size, variant = 'sans') {
 // COLONY COLOR UTILITIES
 // ============================================================================
 
-export const COLONY_COLORS = {
-    spark: { hex: 0xFF6B35, rgb: [255, 107, 53], name: 'Spark' },
-    forge: { hex: 0xF7931E, rgb: [247, 147, 30], name: 'Forge' },
-    flow: { hex: 0x7ECFC0, rgb: [126, 207, 192], name: 'Flow' },
-    nexus: { hex: 0xE8D44D, rgb: [232, 212, 77], name: 'Nexus' },
-    beacon: { hex: 0xC78FFF, rgb: [199, 143, 255], name: 'Beacon' },
-    grove: { hex: 0x95E17B, rgb: [149, 225, 123], name: 'Grove' },
-    crystal: { hex: 0x67D4E4, rgb: [103, 212, 228], name: 'Crystal' }
-};
+// DERIVED from art/lib/design-tokens.js (the single mirror of waddle
+// tokens.json) — see tests/unit/identity-coherence.test.mjs. Previously this
+// table carried five drifted hexes vs the canonical (DICT-B sweep 2026-09-29).
+export const COLONY_COLORS = Object.fromEntries(
+    Object.entries(DESIGN_COLONY_COLORS).map(([colony, t]) => [
+        colony,
+        { hex: t.num, rgb: [...t.rgb], name: colony[0].toUpperCase() + colony.slice(1) }
+    ])
+);
 
 /**
  * Convert colony hex to CSS color string
