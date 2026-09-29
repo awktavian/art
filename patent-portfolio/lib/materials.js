@@ -14,6 +14,7 @@
  */
 
 import * as THREE from 'three';
+import { COLONY_COLORS as DESIGN_COLONY_COLORS } from '../../lib/design-tokens.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MATERIAL QUALITY SETTINGS
@@ -76,15 +77,12 @@ export function getMaterialQuality() {
 // COLONY COLORS
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const COLONY_COLORS = {
-    spark:   0xFF6B35,
-    forge:   0xD4AF37,
-    flow:    0x4ECDC4,
-    nexus:   0x9B7EBD,
-    beacon:  0xF59E0B,
-    grove:   0x7EB77F,
-    crystal: 0x67D4E4
-};
+// DERIVED from art/lib/design-tokens.js (the single mirror of waddle
+// tokens.json) — see tests/unit/identity-coherence.test.mjs. Swept 2026-09-29,
+// lane DICT-B; do not re-inline palette literals here.
+export const COLONY_COLORS = Object.fromEntries(
+    Object.entries(DESIGN_COLONY_COLORS).map(([colony, t]) => [colony, t.num])
+);
 
 export const COLONY_ORDER = ['spark', 'forge', 'flow', 'nexus', 'beacon', 'grove', 'crystal'];
 
@@ -232,13 +230,13 @@ export function createGradientEnvironmentMap(renderer) {
     
     // Add subtle accent lights to the environment
     const accentColors = [
-        { color: 0xFF6B35, pos: [200, 50, 0] },    // Spark
-        { color: 0xD4AF37, pos: [141, 50, 141] },  // Forge
-        { color: 0x4ECDC4, pos: [0, 50, 200] },    // Flow
-        { color: 0x9B7EBD, pos: [-141, 50, 141] }, // Nexus
-        { color: 0xF59E0B, pos: [-200, 50, 0] },   // Beacon
-        { color: 0x7EB77F, pos: [-141, 50, -141] }, // Grove
-        { color: 0x67D4E4, pos: [0, 50, -200] }    // Crystal
+        { color: COLONY_COLORS.spark,   pos: [200, 50, 0] },
+        { color: COLONY_COLORS.forge,   pos: [141, 50, 141] },
+        { color: COLONY_COLORS.flow,    pos: [0, 50, 200] },
+        { color: COLONY_COLORS.nexus,   pos: [-141, 50, 141] },
+        { color: COLONY_COLORS.beacon,  pos: [-200, 50, 0] },
+        { color: COLONY_COLORS.grove,   pos: [-141, 50, -141] },
+        { color: COLONY_COLORS.crystal, pos: [0, 50, -200] }
     ];
     
     accentColors.forEach(({ color, pos }) => {

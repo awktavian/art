@@ -173,7 +173,7 @@ params are required — a connection missing either is closed with 4400.
   default, throws `RealtimeEndpointUnavailable` naming the service when none exists
 - `realtime-voice.js` — Push-to-talk mic capture (PCM16 24kHz), audio playback, function
   call routing. `proxyUrl` and `voice` are required constructor options
-- `kagami-voices.js` — Colony→voice→personality mapping (7 colonies + orchestrator, EFE weights, catastrophe types)
+- `kagami-voices.js` — Colony→voice→personality mapping (7 colonies + orchestrator, catastrophe types); colors and the header Fano table are pinned to the genome by `tests/unit/identity-coherence.test.mjs`
 - `voice-overlay.js` — Drop-in voice UI (floating toggle + transcript panel). Key V to toggle, hold Space to talk
 
 ## AI-Centric Tool Design
@@ -200,13 +200,13 @@ Every voice-enabled project provides two tool categories:
 | Colony | Character | Catastrophe | Voice | Color |
 |--------|-----------|-------------|-------|-------|
 | Spark | Miss Scarlet | Fold (A₂) | alloy | #dc143c |
-| Forge | Col. Mustard | Cusp (A₃) | echo | #e6b800 |
+| Forge | Colonel Mustard | Cusp (A₃) | echo | #e6b800 |
 | Flow | Mrs. White | Swallowtail (A₄) | shimmer | #f5f5f5 |
 | Nexus | Mr. Green | Butterfly (A₅) | fable | #228b22 |
-| Beacon | Prof. Plum | Hyperbolic (D₄⁺) | onyx | #8e4585 |
+| Beacon | Professor Plum | Hyperbolic (D₄⁺) | onyx | #8e4585 |
 | Grove | The Motorist | Elliptic (D₄⁻) | sage | #2d5a27 |
 | Crystal | Mrs. Peacock | Parabolic (D₅) | coral | #00ced1 |
-| Kagami | Wadsworth | Observer | alloy | #c9a227 |
+| Kagami | Wadsworth | The Observer | alloy | #c9a227 |
 
 ## Running the proxy
 
@@ -227,9 +227,8 @@ Stats: `http://localhost:8766/stats`
 
 ## Other Shared Libraries (lib/)
 
-- `design-tokens.js` — Design system tokens (snapshot from Kagami upstream)
+- `design-tokens.js` — Design system tokens (mirror of waddle `packages/design-tokens/tokens.json` `colors.colony`; Fano lines from the Kagami genome `colonies.py`; both machine-pinned by `tests/unit/identity-coherence.test.mjs`)
 - `kagami-sounds.js` + `kagami-sounds-data.js` — Audio engine
-- `kagami-visuals.js` — Visual effects
 - `kagami-xr.js` — XR features
 - `slide-controls.js` — Presentation controller
 
@@ -245,7 +244,17 @@ Stats: `http://localhost:8766/stats`
 ## Kagami Ecosystem Integration
 
 ### Design Tokens
-`lib/design-tokens.js` is a **snapshot** copied from `packages/kagami-design-tokens/tokens.json` in the Kagami repo. SSOT is Kagami. When tokens change upstream, re-export and replace. Never define parallel tokens here.
+`lib/design-tokens.js` mirrors the shared design-token master
+(`projects/awkronos-waddle/packages/design-tokens/tokens.json`, `colors.colony` +
+`colors.highContrast`), whose seven colony hexes are value-identical to the
+palette tier of `packages/kagami-design-tokens/tokens.json` in the Kagami repo.
+The Fano line geometry is not a token export at all: it comes from the genome
+(`packages/kagami/core/prompts/colonies.py`, per-colony "## Fano Lines" blocks).
+Both pins are machine-checked by `tests/unit/identity-coherence.test.mjs`
+(`npm run test:unit`) — a prose "snapshot" note is no longer the only defense
+against drift. When tokens change upstream, re-export and replace. Never define
+parallel tokens here: any second `COLONY_COLORS = {…}` literal outside
+`lib/design-tokens.js` is a fork and the checker rejects it.
 
 ### Colony System
 The `/kagami` skill routes tasks through the 7-colony Fano plane via EFE minimization. Colony→voice mapping in `lib/kagami-voices.js` is the art-project surface of that system. Tasks may arrive with `colony=Y` query param identifying which Fano colony owns the work.

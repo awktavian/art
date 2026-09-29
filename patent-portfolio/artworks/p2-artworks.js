@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { createPlaque } from '../components/plaque.js';
 import { PATENTS } from '../components/info-panel.js';
+import { COLONY_COLORS as DESIGN_COLONY_COLORS } from '../../lib/design-tokens.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SHARED UTILITIES
@@ -20,16 +21,10 @@ function getPatent(id) {
     return PATENTS.find(p => p.id === id);
 }
 
-// Colony colors
-const COLONY_COLORS = {
-    spark:   0xFF6B35,
-    forge:   0xD4AF37,
-    flow:    0x4ECDC4,
-    nexus:   0x9B7EBD,
-    beacon:  0xF59E0B,
-    grove:   0x7EB77F,
-    crystal: 0x67D4E4
-};
+// Colony colors — DERIVED from art/lib/design-tokens.js (DICT-B sweep 2026-09-29).
+const COLONY_COLORS = Object.fromEntries(
+    Object.entries(DESIGN_COLONY_COLORS).map(([colony, t]) => [colony, t.num])
+);
 
 /**
  * Create a floating canvas-based text label for educational content.
