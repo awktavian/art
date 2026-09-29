@@ -21,8 +21,9 @@
  *   4. every wiring file references the shared dictionary surface
  *      (buildVoiceConfig / KAGAMI_VOICES / PROJECT_VOICES) — a page talking to
  *      the proxy without any dictionary linkage is the bypass this gate kills;
- *   5. the dictionary itself: all 7 PROJECT_VOICES keys resolve a persona and
- *      every persona voice is one of the KAGAMI_VOICES colony voices (7/7),
+ *   5. the dictionary itself: all 6 PROJECT_VOICES keys (post-DICT-B: dead
+ *      pair deleted, steamboat-willie added) resolve a persona and every
+ *      persona voice is one of the KAGAMI_VOICES colony voices (6/6),
  *      and all 8 KAGAMI_VOICES entries carry colony + voice.
  *
  * The checkers run against embedded fixtures too (rule 6): a known-positive
@@ -216,7 +217,7 @@ test("voice-connecting pages pass project AND colony and never hardcode a voice 
   );
 });
 
-test("all 7 PROJECT_VOICES keys resolve a persona whose voice is a colony voice (7/7)", () => {
+test("all 6 PROJECT_VOICES keys resolve a persona whose voice is a colony voice (6/6)", () => {
   const colonyVoices = new Set(Object.values(KAGAMI_VOICES).map((c) => c.voice));
   for (const key of Object.keys(PROJECT_VOICES)) {
     const persona = buildVoiceConfig(key);
@@ -228,7 +229,11 @@ test("all 7 PROJECT_VOICES keys resolve a persona whose voice is a colony voice 
       `PROJECT_VOICES['${key}'].voice='${persona.voice}' is not a KAGAMI_VOICES colony voice`,
     );
   }
-  assert.equal(Object.keys(PROJECT_VOICES).length, 7, "PROJECT_VOICES key count changed — update the gate brief");
+  // 6 = the pre-DICT-B seven minus the deleted dead pair (catastrophes,
+  // minimize-surprise) plus 'steamboat-willie' (extends forge, voice 'echo').
+  // Each key is a PROJECT persona that extends a colony; the loop's per-key
+  // assertions are the real gate; the count only catches silent additions.
+  assert.equal(Object.keys(PROJECT_VOICES).length, 6, "PROJECT_VOICES key count changed — update the gate brief");
 });
 
 test("all 8 KAGAMI_VOICES entries carry colony + voice identity fields", () => {
@@ -266,12 +271,14 @@ test("the gate fires on a page omitting colony or hardcoding voice (known-positi
   assert.ok(v3.some((m) => /no PROJECT_VOICES persona/.test(m)), "known-positive: overlay missing persona must fire");
 });
 
-test("dictionary keys without a wired page are exactly the two known ones", () => {
-  // catastrophes (assets-only directory, no HTML page) and minimize-surprise
-  // (essay page with zero voice wiring) are PROJECT_VOICES keys no page sends
-  // today. They stay in the dictionary (the persona is the contract) but are
-  // tracked here so a THIRD unwired key fires this gate instead of rotting
-  // silently, and so a future wiring clears it deliberately.
+test("dictionary keys without a wired page are empty", () => {
+  // The former dead pair (catastrophes, minimize-surprise) was DELETED
+  // 2026-09-29 (lane DICT-B, DICT-C dead-key handoff) after zero-consumer
+  // verification. steamboat-willie is wired by its own page
+  // (buildVoiceConfig flip, same fold). The gate stays: any PROJECT_VOICES
+  // key that lands without a wired page fires here instead of rotting
+  // silently, and a deliberate unwiring clears it by editing this allowlist
+  // with a reason.
   const targets = scanTargets();
   const wired = new Set();
   for (const { source } of targets) {
@@ -281,7 +288,7 @@ test("dictionary keys without a wired page are exactly the two known ones", () =
   const unwired = Object.keys(PROJECT_VOICES).filter((k) => !wired.has(k)).sort();
   assert.deepEqual(
     unwired,
-    ["catastrophes", "minimize-surprise"],
+    [],
     `PROJECT_VOICES keys with no wired page changed: ${unwired.join(", ")} — wire them, ` +
       `delete them deliberately (report to the lib owner), or update this allowlist ` +
       `with a reason.`,

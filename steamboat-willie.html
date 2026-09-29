@@ -1489,14 +1489,9 @@ let audio = null, voice = null;
 const statusEl = document.getElementById('status');
 const micBtn = document.getElementById('mic-btn');
 
-const WILLIE_PROMPT = `You are Steamboat Willie — Mickey Mouse in his original 1928 form. A cheerful, mischievous mouse piloting a steamboat.
-
-Personality: Optimistic, playful, loves whistling. Use 1920s expressions ("Oh boy!", "Hot dog!", "Golly!").
-
-You share the boat with Captain Pete (a grumpy cat who hates your whistling) and a wise-cracking Parrot.
-
-Keep responses SHORT and punchy — like a 1928 cartoon character! Use the functions to animate yourself and others.`;
-
+// Willie's persona bytes now live in the shared dictionary
+// (PROJECT_VOICES['steamboat-willie'].additionalInstructions, lib/kagami-voices.js)
+// — the page-side duplicate was retired at the DICT-B fold 2026-09-29.
 const TOOLS = [
   { name: 'animate_character', description: 'Make a character animate', parameters: { type: 'object', properties: { character: { type: 'string', enum: ['willie','pete','parrot'] }, animation: { type: 'string' }, emotion: { type: 'string' } }, required: ['character','animation'] } },
   { name: 'play_sound', description: 'Play sound effect', parameters: { type: 'object', properties: { sound: { type: 'string', enum: ['whistle','grumble','squawk','stomp','splash','steam'] } }, required: ['sound'] } },
@@ -1513,24 +1508,22 @@ function handleFn(name, args) {
 }
 
 async function initVoice() {
-  // Willie's voice identity comes from the shared colony dictionary, not a
-  // page-side literal. lib/kagami-voices.js has no 'steamboat-willie'
-  // PROJECT_VOICES key yet, so the page borrows the FORGE colony entry — its
-  // voice ('echo') is the exact one this page already used, so the sound is
-  // unchanged while the name now resolves through KAGAMI_VOICES and the proxy
-  // gets the `colony` param it requires (realtime-proxy/server.js: a session
-  // missing project or colony is closed with 4400 — no defaults, no guesses).
-  // When a 'steamboat-willie' key lands in PROJECT_VOICES, switch this to
-  // buildVoiceConfig('steamboat-willie') and delete WILLIE_PROMPT's voice half.
-  const persona = (window.KAGAMI_VOICES || {})['forge'];
-  if (!persona || !persona.voice || !persona.colony) {
+  // Willie's voice identity comes from the shared colony dictionary: the
+  // PROJECT_VOICES['steamboat-willie'] entry (extends forge; voice 'echo' is
+  // the exact one this page always used, so the sound is unchanged) whose
+  // additionalInstructions carry the former page-side WILLIE_PROMPT bytes
+  // verbatim — pinned by tests/unit/identity-coherence.test.mjs.
+  // realtime-proxy/server.js: a session missing project or colony is closed
+  // with 4400 — no defaults, no guesses.
+  const cfg = buildVoiceConfig('steamboat-willie');
+  if (!cfg || !cfg.voice || !cfg.colony) {
     throw new Error(
-      'steamboat-willie: shared voice entry "forge" missing from lib/kagami-voices.js — ' +
+      'steamboat-willie: no shared voice entry "steamboat-willie" in lib/kagami-voices.js — ' +
         'refusing to connect with a guessed voice or colony.'
     );
   }
   const PROXY_URL = resolveRealtimeEndpoint('voice', {
-    params: { project: 'steamboat-willie', colony: persona.colony.toLowerCase() },
+    params: { project: 'steamboat-willie', colony: cfg.colony.colony.toLowerCase() },
   });
 
   audio = new SteamboatAudio();
@@ -1540,12 +1533,12 @@ async function initVoice() {
   voice = new RealtimeVoice({
     proxyUrl: PROXY_URL,
     instructions: [
-      `Your colony is ${persona.colony} (${persona.basis}). Your catastrophe is ${persona.catastrophe}.`,
+      `Your colony is ${cfg.colony.colony} (${cfg.colony.basis}). Your catastrophe is ${cfg.colony.catastrophe}.`,
       'h(x) >= 0 always.',
-      WILLIE_PROMPT,
+      cfg.instructions,
     ].join('\n'),
     tools: TOOLS,
-    voice: persona.voice,
+    voice: cfg.voice,
     onTranscript: (t, r) => showTranscript(r === 'user' ? `You: ${t}` : `Willie: ${t}`),
     onFunctionCall: handleFn,
     onStateChange: s => {
