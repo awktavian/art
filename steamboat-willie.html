@@ -251,6 +251,7 @@
   <script src="lib/steamboat-audio.js"></script>
   <script src="lib/realtime-endpoint.js"></script>
   <script src="lib/realtime-voice.js"></script>
+  <script src="lib/kagami-voices.js"></script>
 
   <script>
 'use strict';
@@ -270,10 +271,11 @@ const DARK = '#181814';
 const MID = '#484840';
 const LIGHT = '#908880';
 
-// Resolved by lib/realtime-endpoint.js — this used to be a bare production
-// literal with no local branch, so `npm start` in realtime-proxy/ could never
-// be exercised from a locally served copy of this page.
-const PROXY_URL = resolveRealtimeEndpoint('voice', { params: { project: 'steamboat-willie' } });
+// The endpoint is resolved inside initVoice(), AFTER the shared colony persona
+// is verified — a top-level const here was how this page shipped a URL with no
+// `colony` param, and realtime-proxy/server.js closes such sessions with 4400.
+// Resolution still comes from lib/realtime-endpoint.js; this page never guesses
+// a proxy URL.
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -1338,19 +1340,6 @@ function drawParrot(w, h) {
 
   ctx.restore();
 }
-  ctx.moveTo(2, 18 + b);
-  ctx.lineTo(3, 25 + b);
-  ctx.stroke();
-
-  // Crest
-  ctx.fillStyle = MID;
-  ctx.beginPath();
-  ctx.moveTo(-3, -19 + b + head);
-  ctx.quadraticCurveTo(0, -30 + b + head, 3, -19 + b + head);
-  ctx.fill();
-
-  ctx.restore();
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PARTICLES & EFFECTS
@@ -1524,15 +1513,39 @@ function handleFn(name, args) {
 }
 
 async function initVoice() {
+  // Willie's voice identity comes from the shared colony dictionary, not a
+  // page-side literal. lib/kagami-voices.js has no 'steamboat-willie'
+  // PROJECT_VOICES key yet, so the page borrows the FORGE colony entry — its
+  // voice ('echo') is the exact one this page already used, so the sound is
+  // unchanged while the name now resolves through KAGAMI_VOICES and the proxy
+  // gets the `colony` param it requires (realtime-proxy/server.js: a session
+  // missing project or colony is closed with 4400 — no defaults, no guesses).
+  // When a 'steamboat-willie' key lands in PROJECT_VOICES, switch this to
+  // buildVoiceConfig('steamboat-willie') and delete WILLIE_PROMPT's voice half.
+  const persona = (window.KAGAMI_VOICES || {})['forge'];
+  if (!persona || !persona.voice || !persona.colony) {
+    throw new Error(
+      'steamboat-willie: shared voice entry "forge" missing from lib/kagami-voices.js — ' +
+        'refusing to connect with a guessed voice or colony.'
+    );
+  }
+  const PROXY_URL = resolveRealtimeEndpoint('voice', {
+    params: { project: 'steamboat-willie', colony: persona.colony.toLowerCase() },
+  });
+
   audio = new SteamboatAudio();
   await audio.init();
   audio.startAmbient();
 
   voice = new RealtimeVoice({
     proxyUrl: PROXY_URL,
-    instructions: WILLIE_PROMPT,
+    instructions: [
+      `Your colony is ${persona.colony} (${persona.basis}). Your catastrophe is ${persona.catastrophe}.`,
+      'h(x) >= 0 always.',
+      WILLIE_PROMPT,
+    ].join('\n'),
     tools: TOOLS,
-    voice: 'echo',
+    voice: persona.voice,
     onTranscript: (t, r) => showTranscript(r === 'user' ? `You: ${t}` : `Willie: ${t}`),
     onFunctionCall: handleFn,
     onStateChange: s => {
@@ -1756,7 +1769,15 @@ const startScreen = document.getElementById('start-screen');
 document.getElementById('start-btn').addEventListener('click', async () => {
   startScreen.classList.add('hidden');
   requestAnimationFrame(render);
-  await initVoice();
+  // The cartoon survives a missing voice persona; the status line names the
+  // failure instead of the scene silently dying with it.
+  try {
+    await initVoice();
+  } catch (e) {
+    console.error('[Voice]', e);
+    statusEl.textContent = 'offline';
+    statusEl.className = 'error';
+  }
 
   // START THE AUTONOMOUS SCENE - characters act on their own!
   startAutonomousScene();

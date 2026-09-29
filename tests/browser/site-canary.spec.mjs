@@ -110,7 +110,11 @@ test("voice-enabled pages resolve a real proxy endpoint with no localhost guess"
   // published origin. The server here is 127.0.0.1, so the LOCAL branch is the
   // correct answer — what is being checked is that the resolution happens at
   // all, from the shared module, and carries the project/colony the proxy now
-  // requires.
+  // requires. realtime-proxy/server.js closes any session missing either
+  // param with 4400; steamboat-willie shipped exactly that bug and lived
+  // outside this page list — the offline gate
+  // tests/unit/persona-integrity.test.mjs now enumerates voice-connecting
+  // pages by scan, so a future page cannot hide from either surface again.
   for (const [path, project] of [
     ["/art/clue/", "clue"],
     ["/art/skippy/", "skippy"],
@@ -121,19 +125,28 @@ test("voice-enabled pages resolve a real proxy endpoint with no localhost guess"
     const response = await page.goto(path, { waitUntil: "load" });
     expect(response?.status(), path).toBe(200);
 
-    const resolved = await page.evaluate(
-      (p) => window.resolveRealtimeEndpoint("voice", { params: { project: p } }),
+    // The colony each overlay/voice-coach will send for this project —
+    // derived from the dictionary, not hardcoded here, so a persona rewire
+    // fails this test instead of silently passing it.
+    const colony = await page.evaluate(
+      (p) => window.buildVoiceConfig(p).colony.colony.toLowerCase(),
       project,
     );
-    expect(resolved, path).toBe(`ws://127.0.0.1:8766/?project=${project}`);
+
+    const resolved = await page.evaluate(
+      ({ p, c }) => window.resolveRealtimeEndpoint("voice", { params: { project: p, colony: c } }),
+      { p: project, c: colony },
+    );
+    expect(resolved, path).toBe(`ws://127.0.0.1:8766/?project=${project}&colony=${colony}`);
 
     // A published origin must NOT silently become localhost.
-    const published = await page.evaluate((p) =>
-      window.resolveRealtimeEndpoint("voice", { hostname: "awktavian.github.io", params: { project: p } }),
-      project,
+    const published = await page.evaluate(
+      ({ p, c }) =>
+        window.resolveRealtimeEndpoint("voice", { hostname: "awktavian.github.io", params: { project: p, colony: c } }),
+      { p: project, c: colony },
     );
     expect(published, path).toBe(
-      `wss://kagami-realtime-proxy.fly.dev/?project=${project}`,
+      `wss://kagami-realtime-proxy.fly.dev/?project=${project}&colony=${colony}`,
     );
 
     // The scene director has no deployed proxy; asking for one off localhost
@@ -159,7 +172,58 @@ test("voice-enabled pages resolve a real proxy endpoint with no localhost guess"
     expect(persona, `${path} has no PROJECT_VOICES entry`).not.toBeNull();
     expect(persona.voice, path).toBeTruthy();
     expect(persona.instructions, path).toBeTruthy();
+
+    // Every PROJECT_VOICES key must resolve a persona (7/7), including the
+    // keys no page wires today — the dictionary is the contract for all of
+    // them (catastrophes and minimize-surprise are reported as page-unwired
+    // by the offline gate; they stay asserted here so a broken entry cannot
+    // hide behind an absent page).
+    const coverage = await page.evaluate(() =>
+      Object.keys(window.PROJECT_VOICES || {}).map(
+        (k) => [k, window.buildVoiceConfig(k) ? 1 : 0],
+      ),
+    );
+    expect(coverage.length, path).toBeGreaterThanOrEqual(7);
+    expect(
+      coverage.filter(([, ok]) => !ok).map(([k]) => k),
+      `${path}: PROJECT_VOICES keys with no resolvable persona`,
+    ).toEqual([]);
   }
+
+  assertRuntimeClean();
+});
+
+test("steamboat-willie connects with project AND colony from the shared dictionary", async ({ page }) => {
+  const assertRuntimeClean = monitorRuntime(page);
+
+  // This page hand-wires RealtimeVoice (no VoiceOverlay), so it is exactly
+  // the shape that can drift into the proxy's 4400 rejection: it must carry
+  // BOTH query params and take its voice from KAGAMI_VOICES — never a
+  // page-side string literal. lib/kagami-voices.js has no 'steamboat-willie'
+  // PROJECT_VOICES key yet; the page borrows the forge colony entry, whose
+  // voice ('echo') is the one the page has always used.
+  await page.goto("/art/steamboat-willie.html", { waitUntil: "load" });
+
+  const source = await page.content();
+  expect(source).not.toMatch(/voice\s*:\s*['"]echo['"]/);
+  expect(source, "steamboat-willie must load the shared dictionary").toContain("lib/kagami-voices.js");
+
+  const colony = await page.evaluate(
+    () => window.KAGAMI_VOICES.forge.colony.toLowerCase(),
+  );
+  expect(colony).toBe("forge");
+
+  // Live proof of what the page actually sends: clicking START runs
+  // initVoice(); CDP reports the WebSocket URL the moment the handshake is
+  // attempted, so this captures the params even though no proxy is running
+  // for the canary. A missing param here is a real 4400 in production.
+  const wsPromise = page.waitForEvent("websocket", { timeout: 15_000 });
+  await page.locator("#start-btn").click();
+  const ws = await wsPromise;
+  const url = new URL(ws.url());
+  expect(url.pathname + url.search, ws.url()).toContain("project=steamboat-willie");
+  expect(url.searchParams.get("project"), ws.url()).toBe("steamboat-willie");
+  expect(url.searchParams.get("colony"), ws.url()).toBe(colony);
 
   assertRuntimeClean();
 });
