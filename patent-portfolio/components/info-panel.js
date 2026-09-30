@@ -330,7 +330,7 @@ const P1_P2_PATENTS = [
         category: 'I',
         categoryName: 'Platform / Architecture',
         colony: 'forge',
-        description: '248 channels of meaning, routed through the densest lattice in existence. Every event finds its destination by semantic gravity, not arbitrary addresses.',
+        description: 'Channels of meaning organized by the 240-root partition of the E8 lattice — an infinite lattice whose root system has 240 vectors (248 is the Lie group dimension, not a channel count). Every event finds its destination by semantic gravity, not arbitrary addresses.',
         invented: '2026-01-18',
         novelty: 4,
         keyFeatures: ['248-channel event routing', 'Semantic addressing']
@@ -483,7 +483,7 @@ const GLOSSARY = {
     'CBF': 'Control Barrier Function — a mathematical function h(x) that guarantees safety: if h(x) ≥ 0, the system is in a safe state.',
     'RSSM': 'Recurrent State-Space Model — a neural architecture that maintains a latent world model, predicting future states from past observations.',
     'Fano plane': 'The smallest finite projective plane: 7 points and 7 lines, where every line contains 3 points and every point lies on 3 lines.',
-    'E8': 'The largest exceptional simple Lie group, with 248 dimensions and 240 root vectors forming the densest lattice packing in 8 dimensions.',
+    'E8': 'The largest exceptional simple Lie group — dimension 248. Distinct from the E8 lattice: an infinite 8D point set (D8 ∪ (D8 + ½·1⃗)) whose 240 shortest vectors are its roots; the lattice achieves the densest sphere packing in 8 dimensions.',
     'S15': 'The 15-dimensional sphere — a high-dimensional manifold used for encoding rich state representations via Hopf fibration.',
     'Hopf fibration': 'A way to decompose a higher-dimensional sphere into a base sphere and fiber circles, revealing hidden structure in state spaces.',
     'Lie algebra': 'The tangent space at the identity of a Lie group, capturing infinitesimal symmetries and used for smooth state evolution.',
@@ -533,7 +533,7 @@ const REAL_WORLD_EXAMPLES = {
     'P2-G1': 'Distinct sounds for every action — a gentle chime when lights adjust, a warm tone when temperature changes, a crisp click for confirmations. Eyes-free feedback.',
     'P2-H1': 'An AI that autonomously bids on freelance jobs: it evaluates risk, estimates effort, prices competitively, and manages multiple concurrent contracts.',
     'P2-H2': 'Every economic decision is scored by Expected Free Energy — balancing expected revenue against risk and information gain, like a financial advisor that uses physics.',
-    'P2-I1': 'Events flow through 248 channels organized by the E8 lattice — each event type finds its natural channel, enabling O(1) routing to the right handler.',
+    'P2-I1': 'Events flow through colony channels organized by the 240-root partition of the E8 lattice — each event type finds its natural channel, enabling O(1) routing to the right handler. (248 is the E8 Lie group dimension, not a channel count; the lattice itself is infinite.)',
     'P2-I2': 'Six independent judges evaluate every output across correctness, safety, privacy, craft, performance, and alignment. All must score ≥90/100 or the output is rejected.'
 };
 

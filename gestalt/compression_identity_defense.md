@@ -6,7 +6,7 @@
 
 ## Abstract
 
-A companion paper ("The Compression Identity: A Critical Evaluation") raises seven objections to the claim that `argmin K(x) subject to h(x) ≥ 0` unifies compression, perception, physics, and learning as a single operation. The objections are: (1) K(x) is uncomputable, (2) structural isomorphism does not establish identity, (3) universal principles are vacuous, (4) the FEP is a framework not a theory, (5) holography is unproven outside AdS, (6) E8 fails the chirality test, and (7) neural codes show low-dimensional topology, not S¹⁵. We respond to each. The defenses rest on five independent pillars: resource-bounded Kolmogorov complexity is computable and retains the core equivalences; ontic structural realism dissolves the isomorphism/identity distinction; the renormalization group establishes precedent for universal principles that are not vacuous; the Bekenstein bound is proven from QFT first principles without AdS assumptions; and E8's universal optimality is a Fields Medal theorem independent of gauge theory. We argue that the critical evaluation, while rigorous on specific predictions, systematically applies a stricter standard to the compression identity than to any accepted principle in physics.
+A companion paper ("The Compression Identity: A Critical Evaluation") raises seven objections to the claim that `argmin K(x) subject to h(x) ≥ 0` unifies compression, perception, physics, and learning as a single operation. The objections are: (1) K(x) is uncomputable, (2) structural isomorphism does not establish identity, (3) universal principles are vacuous, (4) the FEP is a framework not a theory, (5) holography is unproven outside AdS, (6) E8 fails the chirality test, and (7) neural codes show low-dimensional topology, not S¹⁵. We respond to each. The defenses rest on five independent pillars: resource-bounded Kolmogorov complexity is computable and retains the core equivalences; ontic structural realism dissolves the isomorphism/identity distinction; the renormalization group establishes precedent for universal principles that are not vacuous; the Bekenstein bound is proven from QFT first principles without AdS assumptions; and the E8 lattice's packing-density optimality (Viazovska — Fields Medal 2022) and CKMRV energy optimality are theorems independent of gauge theory — neither is a compression-optimality claim. We argue that the critical evaluation, while rigorous on specific predictions, systematically applies a stricter standard to the compression identity than to any accepted principle in physics.
 
 ---
 
@@ -231,9 +231,9 @@ The Distler-Garibaldi theorem proves: the adjoint representation of E8 cannot co
 
 - E8×E8 heterotic string theory, which achieves chirality via Calabi-Yau compactification (Candelas, Horowitz, Strominger & Witten, 1985). This is textbook physics.
 - E8 as experimentally confirmed symmetry in condensed matter (Coldea et al., *Science* 2010: eight quasi-particle excitations with E8 mass ratios in CoNb₂O₆, including the golden ratio between the two lightest).
-- E8 as optimal compression geometry, which is a mathematical theorem.
+- E8 as a quantizer lattice grounded in a mathematical theorem: the densest sphere packing in 8 dimensions (Viazovska 2016). That is a packing-density theorem, not a compression-optimality theorem — no compression-optimality theorem is known, and none is claimed here.
 
-The compression identity uses E8 as a LATTICE for vector quantization — the densest sphere packing in 8D (Viazovska 2016, Fields Medal 2022), universally optimal for all completely monotonic potential functions (Cohn, Kumar, Miller, Radchenko & Viazovska, *Annals of Mathematics* 2022). These are proven theorems. The chirality objection does not touch them. It addresses a gauge-theoretic question the compression identity does not ask.
+The compression identity uses E8 as a LATTICE for vector quantization: the infinite lattice D₈ ∪ (D₈ + ½·1⃗), decoded by exact nearest-lattice-point search (Conway–Sloane). Two literature theorems motivate that choice — the densest sphere packing in 8D (Viazovska 2016, Fields Medal 2022), and universal optimality of E8 for pair-energy sums under completely monotonic potentials of squared distance (Cohn, Kumar, Miller, Radchenko & Viazovska, *Annals of Mathematics* 2022). Both are proven theorems about packing density and potential energy; neither is, and neither is claimed to be, an optimality theorem for compression or quantization — mean-square/rate-distortion quantizer optimality is Gersho-conjecture territory, established only for restricted classes. The chirality objection does not touch any of these facts. It addresses a gauge-theoretic question the compression identity does not ask.
 
 ### 7.2 The Cayley-Dickson tower is mathematical necessity
 
@@ -241,7 +241,7 @@ Adams' theorem (1960): Hopf fibrations exist only in dimensions 1, 2, 4, 8 — c
 
 ### 7.3 Concession and restatement
 
-We concede: the specific prediction "BSM particles correspond to unobserved E8 roots" was stated too narrowly and is refuted in the Lisi sense. The corrected claim: **E8 is the optimal discrete compression geometry in 8 dimensions, and the octonionic Hopf fibration is the maximal sphere fibration. These mathematical facts constrain any system that compresses through these dimensions — including the Kagami encoder, string-theoretic compactifications, and condensed matter systems at criticality.** The connection to BSM particle physics is indirect (via string theory's E8×E8) rather than direct (via Lisi's 4D embedding).
+We concede: the specific prediction "BSM particles correspond to unobserved E8 roots" was stated too narrowly and is refuted in the Lisi sense. The corrected claim: **E8 gives the densest sphere packing in 8 dimensions — a packing-density theorem, not a compression theorem — and the octonionic Hopf fibration is the maximal sphere fibration. The Kagami encoder uses E8 as a vector-quantization lattice decoded by nearest-lattice-point search; that is a use of proven geometry, not a claim of compression or quantizer optimality. These mathematical facts constrain any system that compresses through these dimensions — including the Kagami encoder, string-theoretic compactifications, and condensed matter systems at criticality.** The connection to BSM particle physics is indirect (via string theory's E8×E8) rather than direct (via Lisi's 4D embedding).
 
 ---
 
@@ -323,7 +323,7 @@ The GodelLoop equation πt+1, It+1 = It(πt, It, rt, g) — where the interprete
 
 ### 9.6 The encoder architecture
 
-The Hopf fibration encoder (S⁷ → S¹⁵ → S⁸ → E8 VQ) provides a specific, implementable compression architecture with proven optimality properties. E8's universal optimality (Cohn et al. 2022) guarantees this is the best possible discrete encoding in 8 dimensions for any completely monotonic potential. This is a concrete engineering contribution derived directly from the mathematical content of the identity.
+The Hopf fibration encoder (S⁷ → S¹⁵ → S⁸ → E8 VQ) provides a specific, implementable compression architecture resting on proven geometry. E8's universal optimality (Cohn et al. 2022) is a theorem about pair-energy sums over completely monotonic potentials of squared distance — it does not guarantee a best possible discrete encoding, and no such encoding-optimality claim is made here. This is a concrete engineering contribution derived directly from the mathematical content of the identity.
 
 ### 9.7 The answer to "why something rather than nothing"
 
@@ -342,7 +342,7 @@ The seven objections, when examined carefully, reveal a common pattern: each app
 | Universal = vacuous | Thermodynamics, conservation laws |
 | Framework not theory | Quantum mechanics (needs Hamiltonian) |
 | Holography unproven in dS | Holography proven from QFT (Casini) |
-| E8 chirality problem | Applies to Lisi, not to lattice optimality |
+| E8 chirality problem | Applies to Lisi, not to the lattice's packing theorem |
 | Neural topology too low | Confuses data manifold with encoder |
 
 Three objections land genuine hits:
