@@ -333,7 +333,7 @@ const P1_P2_PATENTS = [
         description: 'Channels of meaning organized by the 240-root partition of the E8 lattice — an infinite lattice whose root system has 240 vectors (248 is the Lie group dimension, not a channel count). Every event finds its destination by semantic gravity, not arbitrary addresses.',
         invented: '2026-01-18',
         novelty: 4,
-        keyFeatures: ['248-channel event routing', 'Semantic addressing']
+        keyFeatures: ['240-root colony-channel routing', 'Semantic addressing']
     },
     {
         id: 'P2-I2',
@@ -572,9 +572,9 @@ export const EDUCATIONAL_CONTENT = {
             'Type a word or phrase to watch it get routed through the lattice as a semantic query',
             'Compare the lattice comparison panel: see how E8 (240 neighbors) dwarfs simpler lattices'
         ],
-        goDeeper: 'E8 is the largest exceptional simple Lie group. Its root system has 240 vectors in 8 dimensions: 112 from permutations of (±1, ±1, 0, 0, 0, 0, 0, 0) and 128 from (±½)⁸ with an even number of minus signs. The kissing number is 240 — each point touches exactly 240 neighbors, the maximum possible in 8D (proved by Viazovska, 2016 Fields Medal). For semantic routing, text is embedded into 8D space, and the nearest E8 root determines which colony handles the query — like a switchboard with 240 perfectly positioned operators.',
+        goDeeper: 'E8 is the largest exceptional simple Lie group. Its root system has 240 vectors in 8 dimensions: 112 from permutations of (±1, ±1, 0, 0, 0, 0, 0, 0) and 128 from (±½)⁸ with an even number of minus signs. The kissing number is 240 — each point touches exactly 240 neighbors, the maximum possible in 8D (kissing-number upper bound: Delsarte–Goethals–Seidel, 1977). Viazovska\'s theorem (Annals of Mathematics, 2017) concerns packing density, not the kissing number. For semantic routing, text is embedded into 8D space, and the nearest E8 root determines which colony handles the query — like a switchboard with 240 perfectly positioned operators.',
         realWorldAnalogy: 'When you say "dim the lights and play jazz," your words become a point in 8-dimensional meaning-space. The E8 lattice instantly finds the nearest root vector — which maps to the colony best equipped to handle your request. It\'s like GPS for meaning.',
-        factCheck: 'E8 root count (240), kissing number (240), and packing density (π⁴/384) are exact. Viazovska\'s 2016 proof confirmed E8 gives the densest sphere packing in 8D. The D8 definition (even-sum integer vectors) is standard. The semantic routing uses a toy embedding, not a learned model.'
+        factCheck: 'E8 root count (240), kissing number (240), and packing density (π⁴/384) are exact. Viazovska\'s proof (arXiv 2016; Annals of Mathematics 2017) confirmed E8 gives the densest sphere packing in 8D; her Fields Medal followed in 2022. The D8 definition (even-sum integer vectors) is standard. The semantic routing uses a toy embedding, not a learned model.'
     },
     'P1-004': {
         whatYoureLookingAt: 'The octonionic Hopf fibration: a 15-dimensional sphere decomposed into a base sphere (S⁸) threaded by seven fiber loops (S⁷). Each colored tube is one fiber — one colony\'s contribution to the whole. Click a fiber to ride it.',

@@ -4135,7 +4135,7 @@ export class AutonomousEconomicAgentArtwork extends THREE.Group {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // P2-I1: E8 UNIFIED EVENT BUS
-// 248-channel routing visualization
+// 240-root colony-channel routing visualization (248 is the Lie group dimension, not a channel count)
 // ═══════════════════════════════════════════════════════════════════════════
 
 export class E8EventBusArtwork extends THREE.Group {
@@ -4175,7 +4175,7 @@ export class E8EventBusArtwork extends THREE.Group {
         wireHub.position.y = 1.35;
         this.add(wireHub);
         
-        // === 248-channel representation ===
+        // === 240-root colony-channel representation ===
         // Show 3 concentric rings of channels (8 + 16 + 24 = 48, representing the layered routing)
         const layerSizes = [8, 16, 24];
         const layerRadii = [0.35, 0.55, 0.75];
@@ -4230,7 +4230,7 @@ export class E8EventBusArtwork extends THREE.Group {
         titleLabel.scale.set(1.5, 0.22, 1);
         this.add(titleLabel);
         
-        const dimLabel = createEducationalLabel('248 channels · 3 routing layers · Lattice-based dispatch', { fontSize: 16, maxWidth: 420 });
+        const dimLabel = createEducationalLabel('240-root partition · 3 routing layers · Lattice-based dispatch', { fontSize: 16, maxWidth: 420 });
         dimLabel.position.set(0, 0.5, 0);
         dimLabel.scale.set(2, 0.18, 1);
         this.add(dimLabel);
