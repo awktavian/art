@@ -173,17 +173,19 @@ test("voice-enabled pages resolve a real proxy endpoint with no localhost guess"
     expect(persona.voice, path).toBeTruthy();
     expect(persona.instructions, path).toBeTruthy();
 
-    // Every PROJECT_VOICES key must resolve a persona (7/7), including the
-    // keys no page wires today — the dictionary is the contract for all of
-    // them (catastrophes and minimize-surprise are reported as page-unwired
-    // by the offline gate; they stay asserted here so a broken entry cannot
-    // hide behind an absent page).
+    // Every PROJECT_VOICES key must resolve a persona (6/6). The former
+    // dead pair (catastrophes, minimize-surprise) was deleted 2026-09-29
+    // (lane DICT-B); steamboat-willie was added in the same fold. See
+    // tests/unit/persona-integrity.test.mjs "dictionary keys without a
+    // wired page are empty" — all 6 keys are wired today, but this count
+    // stays asserted here too so a broken entry cannot hide behind an
+    // absent page in the future.
     const coverage = await page.evaluate(() =>
       Object.keys(window.PROJECT_VOICES || {}).map(
         (k) => [k, window.buildVoiceConfig(k) ? 1 : 0],
       ),
     );
-    expect(coverage.length, path).toBeGreaterThanOrEqual(7);
+    expect(coverage.length, path).toBeGreaterThanOrEqual(6);
     expect(
       coverage.filter(([, ok]) => !ok).map(([k]) => k),
       `${path}: PROJECT_VOICES keys with no resolvable persona`,
