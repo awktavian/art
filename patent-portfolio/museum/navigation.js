@@ -6,6 +6,33 @@
  * teleportation, and VR locomotion support.
  * 
  * h(x) ≥ 0 always
+ *
+ * NEAR-DUPLICATE DECLARATION — this copy is CANONICAL (lane E-ARTNAVDEDUP-1026, measured 2026-10-26)
+ *
+ * A second copy of this module lives in another repository and is now 231 lines
+ * behind this one:
+ *
+ *   ~/projects/awkronos/patents/museum/navigation.js
+ *     repo 'patents' (origin ~/.local/git/projects-awkronos-patents.git, local-only)
+ *     its only commit 8293838 (2026-02-04) carries git blob d20f2aa3d96e…, which is
+ *     byte-identical to THIS file's blob at art commit da76faf (2026-02-07). It is a
+ *     snapshot taken out of this file's working tree and frozen there — not an
+ *     independent implementation, and it never received the later fixes.
+ *   Delta: 117 insertions / 231 deletions across 19 hunks
+ *     (here bd836bd — 1243 lines, 49959 B; there d20f2aa — 1129 lines, 45083 B).
+ *
+ * The fork predates and therefore lacks: DIMENSIONS-driven spawn and wing geometry,
+ * sprint + head bob, the 8-ray multi-ray slide collision, the cell-cached ground
+ * lookup with a persistent floor list, the 'galleries-loaded' collision rebuild with
+ * its dispose teardown, and the velocity magnitude clamp. It still carries two
+ * defects this file fixed: gravity is applied twice (its lines 725 and 796 subtract
+ * 20 and then 25 per deltaTime), and its hardcoded teleport table sends Crystal Wing
+ * to the same position as Vestibule.
+ *
+ * RULE — never edit both copies. Change navigation HERE, then port it whole to the
+ * fork or retire the fork's copy; see patent-portfolio/DEBT-museum-navigation-duplication.md.
+ * (Aside, verified with git grep in both repos: this.teleportPoints is dead data in
+ * both copies — assigned, read nowhere.)
  */
 
 import * as THREE from 'three';
