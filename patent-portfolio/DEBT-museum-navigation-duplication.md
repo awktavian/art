@@ -45,9 +45,13 @@ not lifted from the receipt, which is the same measurement one step upstream.
 The blobs differ, and they differ **only** in their leading provenance/doc header:
 `/usr/bin/diff` on the whole files returns exactly **5 hunks**, all inside it
 (`0a1,10`, `10c20,22`, `12,22c24,30`, `24,30c32,43`, `32,35c45,49`) — 37 added / 23 removed
-lines, and every one of those lines is a comment (filtering the changed lines for anything
-that is not `*`, `/*` or `//` returns empty). Below each file's own doc-comment close
-(`*/` at canonical line 36, mirror line 50) the bodies are **byte-identical**:
+lines. Composition of all 60 changed lines, counted: 50 doc-comment `*` lines, 9
+`// PROVENANCE` lines, 1 blank line inside that same header block — **zero executable
+statements**. Stronger than the prefix test, and the reason this note states it both ways:
+every changed line number lies above its own file's header close (highest changed line 35
+against `*/` at 36 on the canonical side, 49 against `*/` at 50 on the mirror side), so
+nothing past a header is in any hunk. Below each doc-comment close the bodies are
+**byte-identical**:
 
 | body | lines | bytes | sha256 |
 |-|-|-|-|
