@@ -21,6 +21,13 @@ the pre-port bytes, recoverable at blob `d20f2aa3d96e8d7496df53dd63aac9ac5105ff8
 the `art` canonical header is one port behind its own file, and the guard protecting the
 receipt is shipped but wired to nothing.
 
+> **Both halves of that sentence are the 2026-10-28 state. Re-measured 2026-10-30 by lane
+> `MUSEUM-NAVJS-1030`: the second is CLOSED** — the guard is now wired to a tracked
+> `.githooks/pre-commit` on `patents origin/main` (see the STATUS block under residual 2) —
+> **and the first stands**, but it is not a docs edit: taking it moves four files across two
+> repos and no ordering of the two pushes leaves the guard truthful in the interval (see the
+> STATUS block under residual 1 and the section at the foot of this note).
+
 Census row: `projects/art/patent-portfolio/museum/navigation.js` near_duplicate of a
 museum-side copy. **The census pointer was wrong** — `/Users/schizodactyl/museum`
 contains no `navigation.js` at all, by working tree (`find` + `grep -I` for
@@ -242,6 +249,13 @@ either lane.
 ## Residuals this close leaves open (recorded, not fixed — out of scope)
 
 ### 1. The `art` canonical header is one port behind
+
+> **STATUS 2026-10-30 (lane MUSEUM-NAVJS-1030): still open, re-measured, and NOT a docs edit —
+> see the foot of this note.** A lane bound to `patent-portfolio/museum/navigation.js` on the
+> same `near_duplicate` row re-ran the whole recipe at both repos' published tips. The pair is
+> still byte-clean, the false header prose is still there verbatim, and the reason this row was
+> not taken is recorded in "Residual 1, re-measured at the 2026-10-30 tips".
+
 The row is closed on the patents side and on the census side, and the `patents` mirror header
 is now honest about it. **The `art` canonical header is not.** At `d2e35c3` the CANONICAL
 block in `patent-portfolio/museum/navigation.js` still narrates the fork in the present tense
@@ -277,6 +291,26 @@ of one working tree and is not this published surface.
 
 ### 2. The guard that protects this row is shipped, but nothing runs it
 
+> **STATUS 2026-10-30 (lane MUSEUM-NAVJS-1030): this residual is CLOSED — the invocation this
+> section says does not exist now exists.** Lane
+> `PATENTS-GUARD-WIRE-1028` wired the census guard to a tracked `.githooks/pre-commit` in the
+> `patents` tree, folded as `1921ef6471377ed8d83b465cb2ca5d33e8112d91` (2026-10-28, 153 new
+> lines + this receipt's own invocation section). Re-measured today from `art`: the file is
+> present and executable at `patents origin/main` `c7b7ac1afdf1adaa7766fda807eac01c77a04281`
+> (`1921ef6` is an ancestor of it, `rc=0`), `git -C ~/projects/awkronos/patents config --get
+> core.hooksPath` → `.githooks`, and the guard run directly in that tree is green `6/6` at
+> `rc=0` unpiped. That green grades the published bytes, not a private tree: `museum/navigation.js`,
+> the receipt, the guard and the hook all carry the same blob at `1921ef6` (the checked-out tip) and
+> at `c7b7ac1` (`origin/main`), and `status --porcelain` in that checkout is 0 rows.
+> What was NOT re-measured here: a live firing. Demonstrating one requires
+> staging a watched path in the shared `patents` checkout, which this lane does not touch; that
+> proof is `PATENTS-GUARD-WIRE-1028`'s own (its fold message records staged-watched PASS,
+> planted-drift REFUSED `rc=1`, and a fresh-clone activation capturing both outcomes). The
+> per-clone caveat it ships with still stands and is why "wired" is not the same as "armed
+> everywhere": `core.hooksPath` is one config line per clone, git silently skips a `hooksPath`
+> target that a tree does not have, and the fold message names Studio as still owing
+> fold → fast-forward → activation, in that order.
+
 Measured at patents `8d3197a`, which is the tree that carries the receipt:
 
 - `git ls-tree -r --name-only 8d3197a | grep -iE 'workflows|\.ya?ml$'` → **empty**; there is
@@ -299,3 +333,177 @@ plus, to make it bite, something that runs it — out of this lane's scope on bo
 it is recorded here rather than edited there. The row's content claim does not depend on it:
 the `cmp` in the closure section is reproducible from four named blobs with the recipe in the
 receipt, and was re-run here at `d2e35c3` × `8d3197a` rather than inherited.
+
+## Residual 1, re-measured at the 2026-10-30 tips — the row is not consolidatable, and the header fix is a four-file cross-repo atomic change
+
+Lane `MUSEUM-NAVJS-1030` (forge) was bound to `patent-portfolio/museum/navigation.js` on a
+`code_map_rsi_targets` T0 row, `kind=near_duplicate`, `rankScore 7.396875`, generation
+`4f0a12eb52414c06a1e6d864587a2bed`. Admission was checked rather than assumed:
+`code_map_freshness` → headline `state=clean`, `generationCorrelation.verdict=clean`
+(slim and dense carry the same id), `denseServeAllowed=true`, manifest verified
+(`artifactCheck.status=ok`, 13 checked / 0 mismatches), encoder live (dim 896). One disclosure,
+non-blocking and recorded because it changes what the numbers describe: the generation was
+produced on `tims-mac-studio` and read here on `tims-macbook-pro-2`
+(`generationHost.verdict=host_foreign`, `hostCorrelation=split-brain`, `blocksServe=false`), so
+the row's census is Studio's, not this host's.
+
+The lane's two admissible outcomes were: consolidate if one copy is a stale derivative, or emit a
+typed absence with the diff that proves it. **Verdict: typed absence.** Nothing to consolidate,
+and the residual this note still owes cannot be taken from one repo.
+
+### The pair, re-measured from the object db at both published tips
+
+`git ls-remote origin refs/heads/main` on each tree, then `git cat-file` at those refs — not the
+working trees, which is how residual 2 of the `patents` receipt fooled an earlier reader.
+
+| | canonical (`art`) | mirror (`patents`) |
+|-|-|-|
+| published tip today | `7486a74308b0e829cf61ae99b45274f8bb4b1437` | `c7b7ac1afdf1adaa7766fda807eac01c77a04281` |
+| tip when the receipt was written | `d2e35c3875c7…` | `72faa4216619…` / `8d3197a489a5…` |
+| `navigation.js` git blob | `6567e4f71f87d6dc72b5840bd89354f5abc9b752` | `66dd3d5da57a6464e2e689abdfb763f896cbdeb8` |
+| sha256 / lines / bytes | `aba48a95050f8d94…` / 1270 / 51645 | `ecd1c2c3cd58d394…` / 1284 / 52982 |
+
+**Both tips moved; neither `navigation.js` byte did.** The `patents` pair of commits that landed
+since the receipt (`2bd79cc`, `c7b7ac1`) touch `artworks/p1-efe-cbf.js` and
+`lib/settings-menu.js`; `git rev-parse 1921ef6:museum/navigation.js` and
+`…origin/main:museum/navigation.js` return the same blob. Re-running the receipt's own recipe at
+today's tips reproduces every figure it records:
+
+- `tail -n +37` (canonical) against `tail -n +51` (mirror): 1234 lines / 49768 B **both sides**,
+  sha256 `1e2054a6b765ab682868986813090b392ab191ae01cdfd8a31c37c6130d64c7c` both sides,
+  `cmp` → **rc=0**.
+- Positive control on that instrument, because an identity check that cannot go red proves
+  nothing: one appended line to a copy of the mirror body → `cmp: EOF on …/canon_body.js`,
+  **rc=1**.
+- `/usr/bin/diff` on the whole files → 5 hunks (`0a1,10`, `10c20,22`, `12,22c24,30`,
+  `24,30c32,43`, `32,35c45,49`), 37 added / 23 removed — identical to the recorded hunk census.
+  Filtering all 60 changed lines for anything that is not a `*` / `//` / blank header line
+  returns **zero rows**: still no executable statement in the delta.
+- The `patents` guard, run read-only against its own tree: `node --test
+  tests/CENSUS-museum-navigation-mirror.check.mjs` → 6 pass / 0 fail, **rc=0 unpiped**. The first
+  reading of that rc came through `… | tail`, and zsh does not export bash's `PIPESTATUS`, so
+  what the shell reported was `tail`'s status, not the guard's. Re-run with the output redirected
+  and `$?` taken directly. An rc quoted from a pipe is not the instrument's rc.
+
+So neither copy is a stale derivative of the other: the pairing is declared in both headers, the
+bodies are byte-identical below them, and the claim is guarded. A shared module is not available
+at any price worth paying — it would mean the `patents` static site importing across origins from
+`awktavian.github.io` (no version pin, CORS, cache lifetime, and the two trees disagree on
+`architecture.js`, so the import would change behaviour rather than dedupe it) or vendoring a
+third copy under a new path, which is the silent-fork outcome this note exists to prevent. Each
+site imports its own local file: `main.js:24` here, `main.js:23` there.
+
+### The `chess-vision` twin family named by the row is not a twin
+
+`code_map_neighbors path=projects/art/patent-portfolio/museum/navigation.js`, top of the ranking:
+`projects/awkronos/patents/museum/navigation.js` **0.7966**, then `patents/main.js` 0.5666,
+`art/patent-portfolio/main.js` 0.5625, `chess-vision/public/js/viz/camera.js` 0.49,
+`patents/museum/wayfinding.js` 0.4863, `awkronos-waddle/apps/hub/public/chess/js/viz/camera.js`
+0.4858, `chess-vision/public/js/viz/main.js` 0.4388 (scores are anisotropy-corrected cosines over
+a corpus with baseline 0.2409; comparable within band only). The real pair sits a full 0.23 above
+everything else; the chess rows are third-tier.
+
+Measured directly, not by score: intersecting the unique lines of ≥25 characters of the canonical
+body (751 such lines) with each chess-vision file gives **0 shared lines, in both cases**.
+`viz/camera.js` is 65 lines / 2326 B and `viz/main.js` 595 lines / 26742 B, against 1270 / 51645
+here. There is no code in common; the embedding is scoring shared WebGL camera-control vocabulary.
+A future `near_duplicate` row on this file should expect same-name siblings in unrelated apps to
+appear in its neighbourhood — the row that matters is the repo-qualified one above, which is what
+the receipt's disambiguation pointer exists to say.
+
+### Estate-wide copy census — the question consolidation actually asks
+
+`find ~/projects -name navigation.js`, excluding `.git`, `node_modules` and `dist`: three paths,
+**two** content sets. `awkronos/patents/museum/navigation.js` and
+`awkronos/patents-wt-MUSEUM-NAV-DUP-1027/museum/navigation.js` are both `ecd1c2c3…`;
+`art/patent-portfolio/museum/navigation.js` reads `75f1b282…` (1243 lines / 49959 B). That last
+number is residual 2 of the receipt reproducing itself: the shared `art` checkout sits at
+`054c275`, three commits behind its own `origin/main` `7486a74`
+(`git rev-list --left-right --count HEAD...origin/main` → `0 3`, i.e. zero ahead / three behind),
+and `git status --porcelain` on that
+path is empty — stale by checkout, not dirty. A worktree laid out at `7486a74` gives blob
+`6567e4f…`, sha256 `aba48a95…`, 1270 lines: the published canonical bytes, which is what the
+receipt records and what this lane branched from. Anyone reading the shared checkout and
+concluding "`art` is behind" is reading a working tree, not the surface.
+
+`~/museum` (tip `801edf2f6c164dc009705cd5aeba2bed3dd8a499`) holds no `navigation.js` and never
+did: `git ls-files | grep -i navigation` → 0 rows, `git log --all -- '*navigation.js'` → 0 rows,
+worktree `find` → 0 hits, with `git log --all -- '*README.md'` → **13 rows** as the positive
+control on those probes (the receipt recorded 9 in October; museum history moved, the zero did
+not). No third copy exists to fold into either site.
+
+### What is actually still wrong, and why one repo cannot fix it
+
+The canonical header's declaration block (lines 9–35, `*/` at 36) still asserts, in the present
+tense, three things that are false at today's bytes:
+
+- *"A second copy of this module lives in another repository and is now 231 lines behind this
+  one"* — the bodies are `cmp`-identical.
+- *"Delta: 117 insertions / 231 deletions across 19 hunks (here `bd836bd` — 1243 lines, 49959 B;
+  there `d20f2aa` — 1129 lines, 45083 B)"* — both blobs superseded; and those two numbers are
+  themselves the pre-port bytes, which is why the stale shared checkout above matches them.
+- *"It still carries two defects this file fixed: gravity is applied twice … and its hardcoded
+  teleport table sends Crystal Wing to the same position as Vestibule"* — both measured gone by
+  this note's own closure section, and the mirror's header now says so in the past tense.
+
+Refreshing that prose changes `art`'s whole-file sha256. Four files then have to move together:
+
+1. `patent-portfolio/museum/navigation.js` here — and the replacement block must be **exactly 36
+   lines**, or the receipt's `tail -n +37` recipe and its "canonical from line 37" row both break.
+2. `museum/navigation.js` in `patents` — its `// PROVENANCE` lines 2–3 name `art`'s blob, sha256
+   **and tip** in the present tense ("CANONICAL navigation.js is …"), so they must follow; editing
+   them changes the mirror's own whole-file sha256.
+3. `tests/CENSUS-museum-navigation-mirror.md` — the pair table's **both** rows, both tips, the
+   line/byte counts and the hunk census are all a function of 1 and 2.
+4. `tests/CENSUS-museum-navigation-mirror.check.mjs` leg 4, which hardcodes `art`'s whole-file
+   sha256 `aba48a95050f8d94…`, `art`'s blob `6567e4f71f87…` and `art`'s tip `d2e35c3…`; after 1,
+   none of the three is `art`'s live value.
+
+The trap the receipt records about leg 6 generalises to leg 4, and bites harder there: leg 4 only
+tests that those literals appear **somewhere in its own repo's markdown**, and the guard reads no
+cross-repo bytes by design ("reads only THIS repository — no cross-repo reads, so its green is
+hermetic"). So **no ordering of the two pushes has a truthful intermediate state.** Land `art`
+alone and the receipt records an `art` sha that no longer exists while leg 4 keeps matching the
+dead hex and stays green — the instrument reads measured on a row it has just made false. Land
+`patents` alone and the receipt asserts an sha `art` has never carried. This lane's write scope is
+one path in one repo; being the first half of that change is how the guard gets defeated, so it
+declines 1–4 and says so here instead.
+
+The fold that takes it needs: both trees branched off their published tips, the four files staged
+as one set (the `patents` pre-commit hook grades the whole watched quartet and refuses on any
+unstaged slice — `git diff --name-only` across the watched paths must be empty), hashes computed
+from the final bytes before the commit, and **one fold landing both refs**, with the fold message
+naming the other ref. Leg 3 of the guard still requires the mirror to carry `6567e4f…` as its
+ported-from anchor, so that hex stays in the mirror header as history while the live `art` values
+are added beside it — and the receipt's own law then applies: a full sha256 in that file must be a
+live one, so `aba48a95…` leaves the table rather than being kept as a counterfactual.
+
+**The decoupling that would make residual 1 cheap, offered to the guard owner, not applied here.**
+Stop pinning `art` bytes inside `patents`: keep the live assertion hermetic (leg 6 against the
+mirror row, keyed to the table rather than grepped from the prose — the cure the receipt already
+names for leg 6), and demote leg 4's three `art` literals to a dated snapshot the receipt labels
+"art as measured at `d2e35c3`, 2026-10-28". Pinning `art`'s *repo tip* was already known to rot on
+its own: `d2e35c3` → `7486a74` is three commits in two days and not one of them touched
+`navigation.js`. A literal that changes whenever the other repo commits anything is a staleness
+generator wearing a guard's costume. With that change an `art` header refresh costs one `art`
+commit plus a receipt re-dating, and the guard stays honest if either half lands alone.
+
+### What this lane changed here, and what it ran
+
+- **Changed: this note, and only this note.** No byte of `museum/navigation.js` moved in either
+  repo, so every figure the receipt records stays live and the guard stays green — which is the
+  point of declining 1–4 rather than doing 1 alone.
+- `npm run test:unit` (`node --test tests/unit/*.test.mjs`), run in a worktree laid out at
+  `7486a74`: 40 tests, 0 fail, **rc=0**, before and after this edit.
+- `npm run test:static` (`node scripts/check-site.mjs`): **rc=1 — before and after, with the same
+  two lines of output**, so it is a pre-existing red at the branch base and not a product of this
+  edit. Its cause is host-local, not tree-local: it reads `/tmp/proof-report.json` on whatever
+  machine runs it and refuses to publish counts it cannot verify (`corpus "hong" is UNMEASURED`)
+  and reports `wiles/index.html: corpus statistics disagree with /tmp/proof-report.json`. The
+  cure it offers (`node scripts/sync-corpus-stats.mjs`) would rewrite `wiles/index.html` from this
+  satellite's sidecar; that is a content change to a published page driven by a host-local file,
+  owned by whoever holds the Studio-side proof report — recorded, not run.
+- `npm run test:browser` (playwright): **not run.** A lane that did not pay for a browser green
+  does not claim one.
+- `patents` guard `6/6` at `rc=0` unpiped, and `hooksPath=.githooks` with the hook file present at
+  mode `100755` on its published tip — see the residual-2 status above.
