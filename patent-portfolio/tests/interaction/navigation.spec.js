@@ -1,6 +1,8 @@
-// PROVENANCE: mirror of ~/projects/awkronos/patents/tests/interaction/navigation.spec.js (byte-identical as of 2026-08-18).
-// awkronos/patents is the brand-owned canonical copy — edit there first, then port changes here.
-// This site (art/patent-portfolio) deploys independently and can't import cross-repo, hence the mirror.
+// PROVENANCE: mirror of ~/projects/awkronos/patents/tests/interaction/navigation.spec.js — awkronos/patents is the brand-owned
+// canonical copy: edit there first, then port changes here. This site (art/patent-portfolio) deploys
+// independently and can't import cross-repo, hence the mirror. Identical BELOW this header; NOT byte-
+// identical as whole files — the header differs by design, and the previous one-line header claimed a
+// dated whole-file byte identity that was never true of these bytes. Pins: patent-portfolio/NEAR-DUPLICATE-TWINS.json id "spec.navigation.spec.js".
 
 /**
  * Interaction Tests - Navigation
