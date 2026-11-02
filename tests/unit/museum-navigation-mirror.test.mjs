@@ -38,13 +38,14 @@
  * art-side tripwire for that.
  *
  * Positive controls (why an identity check that cannot go red proves nothing):
- * two were run in a scratch copy of this file's own fake repo before committing
- * the expected constants. (1) Appending one token to the module body turned T1
- * and T2 red ("blob sha1 drifted", "body is 49774 B, expected 49768") — while
- * the SimHash body distance stayed 0. That second half of the observation is
- * why T5 records SimHash instead of asserting on it. (2) Pointing
- * ARTNAV_MIRROR_PATH at a doctored mirror copy turns T5's sha256 leg red. See
- * the lane receipts.
+ * three were run before this file was committed. (1) In a scratch copy of a
+ * minimal fake repo: appending one token to the module body turned T1 and T2
+ * red ("blob sha1 drifted", "body is 49774 B, expected 49768") — while the
+ * SimHash body distance stayed 0. That second half of the observation is why T5
+ * records SimHash instead of asserting on it. (2) In the seat itself, driving
+ * the mirror leg through ARTNAV_MIRROR_PATH at a full-size doctored copy of the
+ * mirror: T5's sha256 leg goes red ("mirror body diverged…"). (3) The same leg
+ * pointed at a nonexistent path: one honest skip, rc=0. See the lane receipts.
  *
  * Mirror path, overridable for host-local/known-positive runs (same convention
  * as tests/unit/identity-coherence.test.mjs's KAGAMI_COLONIES_PY /
