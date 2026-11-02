@@ -9,6 +9,7 @@
  */
 
 import * as THREE from 'three';
+import { setEnvIntensity } from './env-intensity.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // QUALITY PRESETS
@@ -632,9 +633,11 @@ export class PerformanceManager {
                 
                 // Reduce material quality for distant objects
                 if (obj.material && dist > distance * 0.5) {
-                    if (obj.material.envMapIntensity !== undefined) {
-                        obj.material.envMapIntensity = 0;
-                    }
+                    // V5-1102: scaled to 0 through the shared authority instead
+                    // of assigning `envMapIntensity = 0` outright — an absolute
+                    // write here was one of the four writers that erased what
+                    // the material's author asked for.
+                    setEnvIntensity(obj.material, 0);
                 }
             }
         });

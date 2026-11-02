@@ -15,6 +15,7 @@
 
 import * as THREE from 'three';
 import { COLONY_COLORS as DESIGN_COLONY_COLORS } from '../../lib/design-tokens.js';
+import { rememberAuthored, setEnvIntensity, setEnvPresetScale } from './env-intensity.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MATERIAL QUALITY SETTINGS
@@ -65,8 +66,15 @@ export const MATERIAL_QUALITY = {
 
 let currentQuality = MATERIAL_QUALITY.high;
 
+// Seed the shared authority with the default preset so a material that is
+// LOD-degraded before setMaterialQuality has run still composes against 'high'.
+setEnvPresetScale(currentQuality.envMapIntensity);
+
 export function setMaterialQuality(level) {
     currentQuality = MATERIAL_QUALITY[level] || MATERIAL_QUALITY.high;
+    // Keep the shared authority on the same preset the scene-wide pass uses,
+    // so LOD and distance degradation compose against it too.
+    setEnvPresetScale(currentQuality.envMapIntensity);
 }
 
 export function getMaterialQuality() {
@@ -283,6 +291,17 @@ export function createGradientEnvironmentMap(renderer) {
 /**
  * Apply environment map to all PBR materials in a scene
  * This is the key function for film-quality reflections
+ *
+ * V5-1102: `envMapIntensity` is no longer assigned absolutely. The authored
+ * value is the base and this call contributes a multiplier (global knob ×
+ * quality preset), so the E8 lattice's `1.5` is not silently lowered and the
+ * concrete's `0.3` is not silently raised — measured live at the Medium
+ * preset, the scene now carries 8 distinct authored values where one apply
+ * of the old line put all 905 env-mapped slots on the same 0.9. An authored
+ * `0` (createWallMaterial's default, :677 — reachable only through the
+ * uncalled MATERIAL_PRESETS table, so latent rather than observed) also
+ * survives every multiplier, which is the point of authoring it. See
+ * lib/env-intensity.js for the four-writer defect this closes.
  */
 export function applyEnvironmentMapToScene(scene, envMap = null, intensity = 1.0) {
     const map = envMap || globalEnvMap;
@@ -290,41 +309,45 @@ export function applyEnvironmentMapToScene(scene, envMap = null, intensity = 1.0
         console.warn('No environment map available');
         return 0;
     }
-    
+
+    const multiplier = intensity * currentQuality.envMapIntensity;
     let count = 0;
-    
+
     scene.traverse(object => {
         if (object.isMesh && object.material) {
             const materials = Array.isArray(object.material) ? object.material : [object.material];
-            
+
             materials.forEach(material => {
                 // Only apply to PBR materials
                 if (material.isMeshStandardMaterial || material.isMeshPhysicalMaterial) {
+                    // Capture-before-write: the live value is still the authored
+                    // one at this instant, and first touch wins forever.
+                    rememberAuthored(material);
                     material.envMap = map;
-                    material.envMapIntensity = intensity * currentQuality.envMapIntensity;
-                    material.needsUpdate = true;
+                    setEnvIntensity(material, multiplier);
                     count++;
                 }
             });
         }
     });
-    
+
     console.log(`🌍 Applied environment map to ${count} materials`);
     return count;
 }
 
 /**
  * Update environment map intensity based on quality settings
+ * V5-1102: `intensity` is the global knob, scaled against each material's
+ * authored base rather than replacing it.
  */
 export function updateEnvironmentMapIntensity(scene, intensity) {
     scene.traverse(object => {
         if (object.isMesh && object.material) {
             const materials = Array.isArray(object.material) ? object.material : [object.material];
-            
+
             materials.forEach(material => {
                 if (material.envMap && (material.isMeshStandardMaterial || material.isMeshPhysicalMaterial)) {
-                    material.envMapIntensity = intensity;
-                    material.needsUpdate = true;
+                    setEnvIntensity(material, intensity);
                 }
             });
         }
@@ -440,7 +463,11 @@ export function createGlassMaterial(options = {}) {
         opacity: currentQuality.transmission ? 1.0 : opacity,
         ior,
         envMap,
-        envMapIntensity: currentQuality.envMapIntensity
+        // V5-1102: authored RELATIVE weight, not preset-baked. The quality
+        // preset now enters exactly once, at resolution (lib/env-intensity.js)
+        // — previously it was multiplied in here AND again in
+        // applyEnvironmentMapToScene, giving preset² on these materials.
+        envMapIntensity: 1.0
     });
     
     // Attenuation for colored glass
@@ -477,7 +504,7 @@ export function createCrystalMaterial(options = {}) {
         transparent: true,
         opacity: currentQuality.transmission ? 1.0 : 0.9,
         envMap,
-        envMapIntensity: currentQuality.envMapIntensity
+        envMapIntensity: 1.0 // relative weight — preset enters at resolution
     });
 
     if (currentQuality.iridescence) {
@@ -511,7 +538,7 @@ export function createMetalMaterial(options = {}) {
         clearcoat: currentQuality.clearcoat ? clearcoat : 0,
         clearcoatRoughness: 0.1,
         envMap,
-        envMapIntensity: currentQuality.envMapIntensity * 1.2 // Metals reflect more
+        envMapIntensity: 1.2 // Metals reflect more (relative weight; preset enters at resolution)
     });
     
     // Brushed metal anisotropy
@@ -547,7 +574,7 @@ export function createBrushedMetalMaterial(options = {}) {
         clearcoat: currentQuality.clearcoat ? 0.3 : 0,
         clearcoatRoughness: 0.3,
         envMap,
-        envMapIntensity: currentQuality.envMapIntensity * 0.8
+        envMapIntensity: 0.8 // relative weight — preset enters at resolution
     });
 }
 
@@ -638,7 +665,7 @@ export function createFloorMaterial(options = {}) {
         clearcoatRoughness: 0.05,
         reflectivity,
         envMap,
-        envMapIntensity: currentQuality.envMapIntensity * 0.8
+        envMapIntensity: 0.8 // relative weight — preset enters at resolution
     });
     
     if (normalMap) {
@@ -755,7 +782,7 @@ export function createMarbleMaterial(options = {}) {
         clearcoat: currentQuality.clearcoat ? 0.5 : 0,
         clearcoatRoughness: 0.1,
         envMap,
-        envMapIntensity: currentQuality.envMapIntensity * 0.5
+        envMapIntensity: 0.5 // relative weight — preset enters at resolution
     });
 }
 

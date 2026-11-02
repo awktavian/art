@@ -14,6 +14,7 @@
  */
 
 import * as THREE from 'three';
+import { setEnvIntensity, getEnvPresetScale, LOD_ENV_SCALE } from './env-intensity.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -507,32 +508,22 @@ export class CullingManager {
         artwork.userData._lastLodLevel = lodLevel;
 
         // Apply material simplification based on LOD
+        //
+        // V5-1102: this used to snapshot into `mat.userData.originalEnvMapIntensity`
+        // with `a || b` and then write ABSOLUTE values (0.3 / 0). Two failures:
+        // the snapshot captured whatever the last degradation had written (an
+        // authored 0 re-read as `0 || 0.3` = 0.3, so 'high' restored a number
+        // the material never had), and `main.js:513` applies the scene-wide
+        // environment map BEFORE `main.js:535` builds this system, so the very
+        // first snapshot was already the flattened preset value. The base now
+        // lives in lib/env-intensity.js — captured at first touch, immune to
+        // later writes — and LOD is a multiplier on it.
+        const multiplier = getEnvPresetScale() * (LOD_ENV_SCALE[lodLevel] ?? 1.0);
+
         artwork.traverse(child => {
             if (child.isMesh && child.material) {
-                const mat = child.material;
-                
-                switch (lodLevel) {
-                    case 'high':
-                        // Full quality
-                        if (mat.userData.originalEnvMapIntensity !== undefined) {
-                            mat.envMapIntensity = mat.userData.originalEnvMapIntensity;
-                        }
-                        break;
-                    case 'medium':
-                        // Reduced env map
-                        if (mat.envMapIntensity !== undefined) {
-                            mat.userData.originalEnvMapIntensity = mat.userData.originalEnvMapIntensity || mat.envMapIntensity;
-                            mat.envMapIntensity = 0.3;
-                        }
-                        break;
-                    case 'low':
-                        // No env map
-                        if (mat.envMapIntensity !== undefined) {
-                            mat.userData.originalEnvMapIntensity = mat.userData.originalEnvMapIntensity || mat.envMapIntensity;
-                            mat.envMapIntensity = 0;
-                        }
-                        break;
-                }
+                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                mats.forEach(mat => setEnvIntensity(mat, multiplier));
             }
         });
     }
