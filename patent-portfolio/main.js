@@ -599,14 +599,12 @@ class PatentMuseum {
         }
     }
     
-    hideLoadingScreen() {
-        const loadingScreen = document.getElementById('loading-screen');
-        const constellation = document.getElementById('colony-reveal');
-        const minimapEl = document.getElementById('minimap');
-        
-        if (!loadingScreen) return;
-        
-        // Clean up loading animations immediately
+    // The loading screen's own animations run outside the Three.js render loop, so
+    // every path that tears the screen down has to stop them — the success path AND
+    // the WebGL-refusal path. showWebGLError() used to only hide the screen behind an
+    // opaque overlay, leaving the 100-particle constellation (and its poem interval)
+    // running forever for the one class of visitor who never sees the museum.
+    _stopLoadingAnimations() {
         if (this._loadingAnimFrame) {
             cancelAnimationFrame(this._loadingAnimFrame);
             this._loadingAnimFrame = null;
@@ -615,6 +613,21 @@ class PatentMuseum {
             clearInterval(this._poemInterval);
             this._poemInterval = null;
         }
+        if (this._loadingResizeHandler) {
+            window.removeEventListener('resize', this._loadingResizeHandler);
+            this._loadingResizeHandler = null;
+        }
+    }
+
+    hideLoadingScreen() {
+        const loadingScreen = document.getElementById('loading-screen');
+        const constellation = document.getElementById('colony-reveal');
+        const minimapEl = document.getElementById('minimap');
+
+        if (!loadingScreen) return;
+
+        // Clean up loading animations immediately
+        this._stopLoadingAnimations();
         
         // Morph constellation to minimap
         if (constellation) {
@@ -745,7 +758,9 @@ class PatentMuseum {
         `;
         document.body.appendChild(errorDiv);
         
-        // Hide loading screen
+        // Hide loading screen — and stop its animations, which nothing else on this
+        // path will ever cancel again (see _stopLoadingAnimations).
+        this._stopLoadingAnimations();
         const loadingScreen = document.getElementById('loading-screen');
         if (loadingScreen) {
             loadingScreen.classList.add('hidden');
@@ -2176,6 +2191,20 @@ class PatentMuseum {
         // Clamp delta to prevent huge jumps
         const clampedDelta = Math.min(delta, 0.05); // Max 50ms frame
         this.time += clampedDelta;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // REDUCED MOTION — the canvas answers too, not just the DOM
+        // ═══════════════════════════════════════════════════════════════════════
+        // index.html's @media guard and the injected body.reduced-motion rules can
+        // only still CSS animation. The museum's actual movement — dust drift, the
+        // Fano constellation's rotation and breathing, the wing pulses — is drawn
+        // below, and nothing outside lib/accessibility.js ever READ that setting:
+        // a visitor who asked for stillness still got the full-speed 3D scene.
+        // What stays live is what the visitor drives: locomotion (navigation.update),
+        // the lighting that follows them between zones, the gallery stream,
+        // wayfinding, proximity triggers, hover, and the post-processing colour
+        // blend. Those are interaction, not motion.
+        const still = this.accessibility?.settings?.reducedMotion === true;
         
         // ═══════════════════════════════════════════════════════════════════════
         // DEBUG & SETTINGS SYSTEM UPDATE (throttled)
@@ -2257,15 +2286,25 @@ class PatentMuseum {
                 if (this.turrellLighting && this.debug?.systems?.lighting?.enabled !== false) {
                     this.turrellLighting.update(clampedDelta * 6, this.camera?.position);
                 }
-                if (this.atmosphere) {
+                // Dust motes drift on Date.now() inside atmosphere.update(), so the
+                // only way to hold them is not to step them.
+                if (this.atmosphere && !still) {
                     this.atmosphere.update(clampedDelta);
                 }
                 break;
-                
+
             case 1:
                 // Central sculptures
                 if (this.fanoSculpture) {
-                    animateFanoSculpture(this.fanoSculpture, this.time, delta, this.camera?.position);
+                    // The FIRST call is what constructs sculpture.userData._animator,
+                    // and the voice/AI action surface reaches the museum through that
+                    // object (main.js highlightColonyBeam / triggerNexusConsensus /
+                    // triggerCelebration). So stillness settles the animator once and
+                    // then holds its pose — skipping outright would silently take three
+                    // sensorimotor tools away from reduced-motion visitors.
+                    if (!still || !this.fanoSculpture.userData._animator) {
+                        animateFanoSculpture(this.fanoSculpture, this.time, delta, this.camera?.position);
+                    }
                 }
                 break;
                 
@@ -2282,7 +2321,10 @@ class PatentMuseum {
                 
             case 3:
                 // Wing enhancements (only if enabled)
-                if (this.wingEnhancements && this.debug?.systems?.wingEnhancements?.enabled !== false) {
+                // These are emissive pulses on Math.sin(this.time * k) — self-motion,
+                // and the enhancements themselves are built in the constructor, so
+                // holding the step costs nothing but the flicker.
+                if (this.wingEnhancements && !still && this.debug?.systems?.wingEnhancements?.enabled !== false) {
                     this.wingEnhancements.update(clampedDelta * 6, this.camera.position);
                 }
                 break;
@@ -2397,14 +2439,28 @@ class PatentMuseum {
         const canvas = document.getElementById('loading-particles');
         if (canvas) {
             const ctx = canvas.getContext('2d');
-            const dpr = window.devicePixelRatio || 1;
-            
-            // High-DPI canvas for crisp rendering
-            canvas.width = window.innerWidth * dpr;
-            canvas.height = window.innerHeight * dpr;
-            canvas.style.width = window.innerWidth + 'px';
-            canvas.style.height = window.innerHeight + 'px';
-            ctx.scale(dpr, dpr);
+            // Clamped to 2, the estate idiom (this file:705, museum/architecture.js:425,
+            // artworks/p2-artworks.js:37, xr/xr-manager.js:464). The constellation is a
+            // soft glow field — a 3× backing store bought no visible crispness and cost
+            // 2.25× the rasterisation on the one screen every visitor waits on.
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+            // High-DPI canvas for crisp rendering. setTransform (not scale) so a re-fit
+            // replaces the mapping instead of compounding it.
+            const fit = () => {
+                canvas.width = window.innerWidth * dpr;
+                canvas.height = window.innerHeight * dpr;
+                canvas.style.width = window.innerWidth + 'px';
+                canvas.style.height = window.innerHeight + 'px';
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            };
+            fit();
+
+            // The canvas element is CSS-sized 100%/100% while the backing store was
+            // fixed here at init; a rotate mid-load stretched every glow into an
+            // ellipse and mis-scaled the clearRect. Re-fit on resize instead.
+            this._loadingResizeHandler = () => fit();
+            window.addEventListener('resize', this._loadingResizeHandler);
 
             const particles = [];
             const COLONY_HEX = [
@@ -2426,17 +2482,22 @@ class PatentMuseum {
                 });
             }
 
+            const LINK_RADIUS = 150;
+            const LINK_RADIUS_SQ = LINK_RADIUS * LINK_RADIUS;
+
             const drawParticles = () => {
                 ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
-                // Draw glowing connections
+                // Draw glowing connections — gate on squared distance so the 4,950
+                // pairs only pay Math.sqrt when they are actually linked.
                 for (let i = 0; i < particles.length; i++) {
                     for (let j = i + 1; j < particles.length; j++) {
                         const dx = particles[i].x - particles[j].x;
                         const dy = particles[i].y - particles[j].y;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        if (dist < 150) {
-                            const alpha = 0.15 * (1 - dist / 150);
+                        const distSq = dx * dx + dy * dy;
+                        if (distSq < LINK_RADIUS_SQ) {
+                            const dist = Math.sqrt(distSq);
+                            const alpha = 0.15 * (1 - dist / LINK_RADIUS);
                             ctx.beginPath();
                             ctx.moveTo(particles[i].x, particles[i].y);
                             ctx.lineTo(particles[j].x, particles[j].y);
@@ -2458,25 +2519,40 @@ class PatentMuseum {
                     // Pulsing glow
                     const pulse = 0.8 + 0.2 * Math.sin(time * 2 + p.pulse);
                     const glowRadius = p.r * 3;
-                    
-                    // Outer glow
-                    const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowRadius);
-                    gradient.addColorStop(0, p.color);
-                    gradient.addColorStop(0.4, p.color + '80');
-                    gradient.addColorStop(1, p.color + '00');
-                    
+
+                    // Outer glow. The gradient is built ONCE in the particle's local
+                    // space (p.r and p.color never change) and translated into place at
+                    // paint time — canvas gradients resolve their coordinates through the
+                    // CTM in effect when they are used, so translate(p.x, p.y) maps an
+                    // origin-centred ramp onto the particle identically to the old
+                    // per-frame createRadialGradient(p.x, p.y, ...). That per-frame call
+                    // was 100 CanvasGradient objects plus 300 colour strings every frame,
+                    // on the loading screen that runs while the museum is already busy.
+                    if (!p.glow) {
+                        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, glowRadius);
+                        gradient.addColorStop(0, p.color);
+                        gradient.addColorStop(0.4, p.color + '80');
+                        gradient.addColorStop(1, p.color + '00');
+                        p.glow = gradient;
+                    }
+
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+
                     ctx.beginPath();
-                    ctx.arc(p.x, p.y, glowRadius, 0, Math.PI * 2);
-                    ctx.fillStyle = gradient;
+                    ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = p.glow;
                     ctx.globalAlpha = p.alpha * pulse * 0.5;
                     ctx.fill();
-                    
+
                     // Core particle
                     ctx.beginPath();
-                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.arc(0, 0, p.r, 0, Math.PI * 2);
                     ctx.fillStyle = p.color;
                     ctx.globalAlpha = p.alpha * pulse;
                     ctx.fill();
+
+                    ctx.restore();
                     ctx.globalAlpha = 1;
                 }
 
