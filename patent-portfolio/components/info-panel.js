@@ -698,7 +698,14 @@ export class InfoPanel {
             <div class="glossary-tooltip" style="display:none" role="tooltip"></div>
         `;
         
-        // Add styles
+        // Add styles.
+        // The reading text below takes the museum's own --font-size-* scale rather
+        // than the px literals it used to carry (24/16/14/12/11 mapped 1:1 onto
+        // xl/md/base/sm/xs, so nothing moves at the default --type-scale: 1). That
+        // is what makes index.html's Large-Text lever reach this panel at all —
+        // it is the museum's primary reading surface, and it had forked the type
+        // scale the shell already owns. 10px and 13px stay absolute: no token
+        // exists at those sizes and inventing one here would widen the fork.
         const style = document.createElement('style');
         style.textContent = `
             .info-panel {
@@ -734,7 +741,7 @@ export class InfoPanel {
                 border: 1px solid rgba(103, 212, 228, 0.3);
                 border-radius: 50%;
                 color: #9E9994;
-                font-size: 24px;
+                font-size: var(--font-size-xl);
                 cursor: pointer;
                 transition: all 0.144s ease;
             }
@@ -769,7 +776,7 @@ export class InfoPanel {
                 padding: 4px 12px;
                 border-radius: 4px;
                 font-family: 'IBM Plex Mono', monospace;
-                font-size: 12px;
+                font-size: var(--font-size-sm);
                 font-weight: 600;
             }
             
@@ -793,13 +800,13 @@ export class InfoPanel {
             
             .patent-category {
                 color: #9E9994;
-                font-size: 12px;
+                font-size: var(--font-size-sm);
                 padding: 4px 0;
             }
             
             .patent-title {
                 font-family: 'Orbitron', sans-serif;
-                font-size: 24px;
+                font-size: var(--font-size-xl);
                 font-weight: 600;
                 color: #F5F0E8;
                 margin-bottom: 16px;
@@ -808,7 +815,7 @@ export class InfoPanel {
             
             .patent-description {
                 color: #C4BFBA;
-                font-size: 16px;
+                font-size: var(--font-size-md);
                 line-height: 1.6;
                 margin-bottom: 24px;
             }
@@ -829,7 +836,7 @@ export class InfoPanel {
             
             .meta-label {
                 display: block;
-                font-size: 11px;
+                font-size: var(--font-size-xs);
                 color: #8A8580;
                 text-transform: uppercase;
                 letter-spacing: 0.1em;
@@ -838,7 +845,7 @@ export class InfoPanel {
             
             .meta-value {
                 font-family: 'IBM Plex Mono', monospace;
-                font-size: 14px;
+                font-size: var(--font-size-base);
                 color: #F5F0E8;
             }
             
@@ -847,7 +854,7 @@ export class InfoPanel {
             }
             
             .patent-features h3 {
-                font-size: 14px;
+                font-size: var(--font-size-base);
                 color: #67D4E4;
                 margin-bottom: 12px;
                 text-transform: uppercase;
@@ -864,7 +871,7 @@ export class InfoPanel {
                 position: relative;
                 padding: 8px 0 8px 24px;
                 color: #C4BFBA;
-                font-size: 14px;
+                font-size: var(--font-size-base);
                 border-bottom: 1px solid rgba(103, 212, 228, 0.1);
             }
             
@@ -897,7 +904,7 @@ export class InfoPanel {
             
             .edu-what-text, .edu-analogy-text {
                 color: #C4BFBA;
-                font-size: 14px;
+                font-size: var(--font-size-base);
                 line-height: 1.6;
             }
             
@@ -910,7 +917,7 @@ export class InfoPanel {
             .edu-try-list li {
                 padding: 6px 0 6px 24px;
                 color: #F5F0E8;
-                font-size: 14px;
+                font-size: var(--font-size-base);
                 position: relative;
             }
             
@@ -919,7 +926,7 @@ export class InfoPanel {
                 position: absolute;
                 left: 4px;
                 color: #F59E0B;
-                font-size: 12px;
+                font-size: var(--font-size-sm);
             }
             
             .edu-deeper, .edu-factcheck {
@@ -932,7 +939,7 @@ export class InfoPanel {
             .edu-deeper summary, .edu-factcheck summary {
                 padding: 10px 16px;
                 font-family: 'IBM Plex Mono', monospace;
-                font-size: 12px;
+                font-size: var(--font-size-sm);
                 color: #9E9994;
                 cursor: pointer;
                 letter-spacing: 0.05em;
@@ -964,7 +971,7 @@ export class InfoPanel {
                 border-radius: 8px;
                 color: #67D4E4;
                 font-family: 'IBM Plex Mono', monospace;
-                font-size: 12px;
+                font-size: var(--font-size-sm);
                 cursor: pointer;
                 transition: all 0.144s ease;
             }
@@ -996,7 +1003,7 @@ export class InfoPanel {
                 border-radius: 12px;
                 color: #67D4E4;
                 font-family: 'IBM Plex Mono', monospace;
-                font-size: 11px;
+                font-size: var(--font-size-xs);
                 cursor: pointer;
                 transition: all 0.144s ease;
             }
@@ -1019,7 +1026,7 @@ export class InfoPanel {
                 margin-bottom: 24px;
             }
             .real-world-example h3 {
-                font-size: 12px;
+                font-size: var(--font-size-sm);
                 color: #4CFF4C;
                 text-transform: uppercase;
                 letter-spacing: 0.1em;
@@ -1027,7 +1034,7 @@ export class InfoPanel {
             }
             .real-world-example .example-text {
                 color: #C4BFBA;
-                font-size: 14px;
+                font-size: var(--font-size-base);
                 line-height: 1.6;
                 margin: 0;
             }
@@ -1053,7 +1060,7 @@ export class InfoPanel {
                 color: #67D4E4;
                 font-family: 'IBM Plex Mono', monospace;
                 font-weight: 600;
-                font-size: 12px;
+                font-size: var(--font-size-sm);
                 display: block;
                 margin-bottom: 4px;
             }
@@ -1079,7 +1086,7 @@ export class InfoPanel {
                 border: 1px solid rgba(103, 212, 228, 0.1);
             }
             .cross-references h3 {
-                font-size: 12px;
+                font-size: var(--font-size-sm);
                 color: #67D4E4;
                 text-transform: uppercase;
                 letter-spacing: 0.1em;
@@ -1108,7 +1115,7 @@ export class InfoPanel {
             }
             .cross-ref-wing {
                 color: #8A8580;
-                font-size: 11px;
+                font-size: var(--font-size-xs);
                 font-family: 'IBM Plex Mono', monospace;
             }
             .action-btn-secondary {

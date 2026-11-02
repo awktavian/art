@@ -81,17 +81,10 @@
             --spacing-3xl: 40px;
             --spacing-4xl: 64px;
             
-            /* Typography scale */
-            --font-size-xs: 11px;
-            --font-size-sm: 12px;
-            --font-size-base: 14px;
-            --font-size-md: 16px;
-            --font-size-lg: 20px;
-            --font-size-xl: 24px;
-            --font-size-2xl: 28px;
-            --font-size-3xl: 48px;
-            --font-size-4xl: 80px;
-            
+            /* Typography scale — see the `:root, body.large-text` rule below:
+               the sizes live there so --type-scale can re-derive them on <body>. */
+            --type-scale: 1;
+
             /* Line heights */
             --line-height-tight: 1.2;
             --line-height-normal: 1.4;
@@ -129,7 +122,42 @@
             --shadow-glow-strong: 0 0 40px rgba(103, 212, 228, 0.5);
             --shadow-panel: 0 8px 32px rgba(0, 0, 0, 0.5);
         }
-        
+
+        /* ═══════════════════════════════════════════════════════════════════
+           TYPE SCALE — the one lever Large Text pulls
+           ═══════════════════════════════════════════════════════════════════
+           lib/accessibility.js stamps body.large-text when a visitor turns the
+           setting on. Its own rule for it was a 120% font-size !important on
+           body, which is INERT on this surface: 22 of the 30 font-size
+           declarations in this shell — and all 25 in components/info-panel.js
+           before the 1102 pass — set an absolute px size on the element
+           itself, so an inherited percentage was overridden everywhere text
+           actually is. The toggles announced "Large text enabled" and changed
+           nothing.
+
+           This block is matched to body.large-text rather than left on :root
+           alone because a custom property's var() reference resolves in the
+           context of the element that DECLARES it: overriding --type-scale on
+           <body> would not re-derive tokens already computed on :root — they
+           would simply inherit at 1x. Matching here re-derives them on <body>,
+           and every consumer in the museum sits inside <body>.
+
+           At --type-scale: 1 every value below computes to exactly the px it
+           did before, so nothing moves until the setting is on.
+           ═══════════════════════════════════════════════════════════════════ */
+        :root,
+        body.large-text {
+            --font-size-xs: calc(11px * var(--type-scale));
+            --font-size-sm: calc(12px * var(--type-scale));
+            --font-size-base: calc(14px * var(--type-scale));
+            --font-size-md: calc(16px * var(--type-scale));
+            --font-size-lg: calc(20px * var(--type-scale));
+            --font-size-xl: calc(24px * var(--type-scale));
+            --font-size-2xl: calc(28px * var(--type-scale));
+            --font-size-3xl: calc(48px * var(--type-scale));
+            --font-size-4xl: calc(80px * var(--type-scale));
+        }
+
         html, body {
             width: 100%;
             height: 100%;

@@ -789,16 +789,22 @@ export function injectAccessibilityStyles() {
             transition-duration: 0.01ms !important;
         }
         
-        /* Large Text */
+        /* Large Text
+           The old rule here was a 120% font-size !important on body, plus a 1.2em
+           on .plaque and .info-panel. None of it reached any text the visitor reads:
+           this museum sizes its type in absolute px on the elements themselves (22
+           of 30 declarations in the shell, and all 25 in components/info-panel.js),
+           so an inherited percentage was overridden on every one of them — and .plaque
+           is not a DOM class at all, a plaque is a Three.js mesh whose text is baked
+           into a canvas texture (components/plaque.js:172), so CSS cannot size it.
+           The switch saved to localStorage, announced itself, and changed nothing.
+           The multiplier now feeds the shell's own --font-size-* scale; see the
+           type-scale block in index.html for why it lands on body.large-text rather
+           than only on :root. */
         body.large-text {
-            font-size: 120% !important;
+            --type-scale: 1.2;
         }
-        
-        body.large-text .plaque,
-        body.large-text .info-panel {
-            font-size: 1.2em !important;
-        }
-        
+
         /* Screen Reader Mode - Enhanced focus indicators */
         body.screen-reader-mode *:focus {
             outline: 3px solid #FFFF00 !important;
@@ -813,9 +819,15 @@ export function injectAccessibilityStyles() {
         :focus:not(:focus-visible) {
             outline: none;
         }
-        
+
         :focus-visible {
-            outline: 2px solid #67D4E4;
+            /* Was #67D4E4 — the pre-refinement crystal cyan, which appears nowhere
+               in index.html. This museum's own rings (.xr-button, .wing-button,
+               #help-button) all take var(--colony-crystal) = #5BC4D4 and outspecify
+               this bare pseudo-class selector, so the surface ended up with two
+               focus-ring colours: the refined one on the three buttons this rule
+               loses to, and the drifted one on everything else. */
+            outline: 2px solid var(--colony-crystal, #5BC4D4);
             outline-offset: 2px;
         }
     `;
