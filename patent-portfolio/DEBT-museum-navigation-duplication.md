@@ -567,6 +567,15 @@ by, declared rather than consolidated. Leg **R10** checks that the census's two 
 two published anchors have not collapsed into one another, which is the condition under which
 this section's premise would stop being true.
 
+**One gate had to be un-written before it could gate.** The first draft of the generator stamped
+`basis.art_head` with the HEAD it was reading, which made `--check` self-defeating: the register is
+committed *into* the commit that value names, so the file was stale the instant it landed (found by
+re-running `--check` after the first commit — rc 1 on an untouched tree, the gate refusing its own
+bytes). Art pins are now blob/sha256 of the tree, re-measured by R2 on every run, and no art commit
+sha appears in the register at all; the ref belongs in a commit message or a lane envelope, never in
+generated data. The mirror tip stays recorded as a sha because it is genuinely external — and that is
+the leg `--check` is supposed to go red on when the other repo moves.
+
 **Why navigation.js's bytes are not in this change.** Residual 1 stays open, and this lane
 declines it for the reason the 2026-10-30 section gives: refreshing that header moves four
 files across two repos with no truthful intermediate state. It adds one argument to that

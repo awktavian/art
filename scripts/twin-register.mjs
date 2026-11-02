@@ -364,7 +364,6 @@ function censusLegs(mirrorRef) {
 }
 
 function build() {
-  const artTip = git(ROOT, ["rev-parse", "HEAD"]);
   const mirror = liveTip(MIRROR_REPO);
   const mirrorRef = mirror ? mirror.sha : null;
 
@@ -380,7 +379,7 @@ function build() {
         ...fileStats(artText),
         header_markers: headerMarkers(artText),
         measured_from:
-          `this art tree at ${artTip} (uncommitted edits included — the register commits beside these bytes, and the tripwire re-verifies them on every run)`,
+          "the art working tree this register is committed beside — measured as bytes, so no art commit sha appears here (see basis.art_pin_channel: a register naming the commit that would carry it is stale the instant it lands)", 
       },
       patents:
         patText === null
@@ -471,7 +470,8 @@ function build() {
       lane: "RSIPIPE2-01-NAV-TWIN-1102",
       campaign: "RSI-PIPE2-1102",
       art_repo: "github.com:awktavian/art (patent-portfolio/)",
-      art_head: artTip,
+      art_pin_channel:
+        "blob + sha256 of the tree bytes, per pair row. No art commit sha is recorded: the register is committed INTO the commit its own HEAD value would name, so that value could only ever be stale — and the art side does not need it, because R2 re-measures these bytes against the checkout on every run. Cite the ref in a commit message or the lane envelope, never here.",
       patents_repo: MIRROR_REPO,
       patents_tip: mirrorRef,
       patents_tip_source: mirror ? mirror.source : "unavailable on this host",
