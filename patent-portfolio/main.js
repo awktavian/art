@@ -132,6 +132,12 @@ class PatentMuseum {
         this._locationIndicatorEl = null;
         this._interactables = [];
         this._interactablesOctree = null;
+        // Bookkeeping for the incremental streaming append (_extendInteractables): the membership
+        // mirror of _interactables, the meshes already handed to the octree, and the interactable
+        // count last seen inside galleryLoader.artworkGroup (seeded by the first streamed walk).
+        this._interactableSet = null;
+        this._octreeMeshSet = null;
+        this._groupInteractableCount = undefined;
         this._warpActive = false;
         this._pointerClientX = 0;
         this._pointerClientY = 0;
@@ -1473,8 +1479,28 @@ class PatentMuseum {
         document.addEventListener('settings-preset-change', (e) => {
             const preset = e.detail?.preset;
             if (preset && this.performanceManager) {
-                this.performanceManager.applyPreset(preset);
-                
+                // Two quality controllers can drive the same preset: PerformanceManager.adaptQuality()
+                // applies a preset itself, and SettingsMenu (syncWithPerformanceManager/adaptQuality)
+                // dispatches that name here afterwards. applyPreset() re-runs unconditionally, and its
+                // cost is all in applyRendererSettings(): renderer.setPixelRatio() reallocates the
+                // drawing buffer with no equality check of its own, and the shadowMap toggle
+                // invalidates every material program so they re-link. Measured on the shipped path in
+                // the adaptive window (49 frames): performanceManager.applyPreset 3 calls / 2328.3 ms
+                // — 2327.9 ms of it inside perf.applyRendererSettings (776.1 ms/call, max 2328.0 ms),
+                // with the window's whole real GL work at 13.9 ms and 2.46 MB of uniform/program-setup
+                // allocation behind it (cloneUniforms 1415.4 K + parseUniform 371.4 K +
+                // createBindingState 325.6 K + setup 225.5 K + saveCache 120.8 K).
+                // So: when the requested preset is already the applied one, the re-application is
+                // redundant work and is skipped. getPresetName() is the authoritative applied value
+                // (set inside applyPreset, and by autoDetectPreset at init), and an unknown preset
+                // name never becomes currentPreset, so unknown names still fall through to applyPreset
+                // and keep their existing warn-and-return behaviour. The draw-distance sync below is
+                // idempotent and cheap, so it still runs either way.
+                const applied = typeof this.performanceManager.getPresetName === 'function'
+                    ? this.performanceManager.getPresetName()
+                    : this.performanceManager.currentPreset;
+                if (applied !== preset) this.performanceManager.applyPreset(preset);
+
                 // Update culling draw distance
                 if (this.cullingManager) {
                     const presetData = this.performanceManager.getPreset();
@@ -1646,10 +1672,15 @@ class PatentMuseum {
         return null;
     }
     
+    _isInteractable(obj) {
+        return !!(obj.userData && (obj.userData.interactive || obj.userData.type === 'fano-node'
+            || obj.userData.type === 'fano-sculpture' || obj.userData.artwork));
+    }
+
     _rebuildInteractables() {
         this._interactables = [];
         this.scene.traverse((obj) => {
-            if (obj.userData?.interactive || obj.userData?.type === 'fano-node' || obj.userData?.type === 'fano-sculpture' || obj.userData?.artwork) {
+            if (this._isInteractable(obj)) {
                 this._interactables.push(obj);
             }
         });
@@ -1667,6 +1698,74 @@ class PatentMuseum {
         this._interactablesOctree = new SimpleOctree(rootBounds, 5, 8);
         this.scene.updateMatrixWorld(true);
         meshes.forEach((m) => this._interactablesOctree.insert(m));
+        // A full rebuild is the scene truth, so re-derive the incremental bookkeeping from it and
+        // let the next streamed walk re-seed the group count.
+        this._interactableSet = new Set(this._interactables);
+        this._octreeMeshSet = new Set(meshes);
+        this._groupInteractableCount = undefined;
+    }
+
+    /**
+     * Incremental append for streamed artwork.
+     *
+     * galleryLoader.update() reports `artworksAdded`, and the shipped answer was a full
+     * _rebuildInteractables(): a whole-scene traverse (9,773 nodes at the measured WALK context),
+     * a brand-new octree, and a re-insert of every interactable mesh. Measured cost of one wing
+     * entry: main._rebuildInteractables 3 calls / 130.1 ms (43.4 ms/call, max 49.8 ms) — the largest
+     * non-renderer JS line of the WALK window — plus the window's fifth and sixth largest
+     * allocators, insert @lib/culling-system.js:590 at 823.3 K and subdivide @lib/culling-system.js:628
+     * at 328.6 K, because insert clones geometry.boundingBox and applies the world matrix per mesh,
+     * so every re-inserted mesh pays it again.
+     *
+     * Here only the streamed group is walked, world matrices are updated on the new roots instead of
+     * the whole scene, and meshes already handed to the octree are never re-inserted. SimpleOctree
+     * has no remove/clear, so a shrinking group count forces the full rebuild. Two bounds, stated
+     * honestly: an artwork root swapped out and back within one tick is not detected by the count
+     * (the streaming path never does it — it removes a non-interactable loading slot and adds a new
+     * artwork root), and interactables outside `group` are only re-derived by the full path, which
+     * still runs at init and on context restore. A mesh under two matching roots (an artwork that
+     * also carries a fano-node child) is handed to the octree once here; the full rebuild has always
+     * inserted it once per matching root, which is a duplication the octree tolerates.
+     */
+    _extendInteractables(group) {
+        if (!group || !this._interactablesOctree || !this._interactableSet || !this._octreeMeshSet) {
+            this._rebuildInteractables();
+            return;
+        }
+
+        const found = [];
+        group.traverse((obj) => {
+            if (this._isInteractable(obj)) found.push(obj);
+        });
+
+        if (this._groupInteractableCount === undefined) {
+            this._groupInteractableCount = found.length;
+        } else if (found.length < this._groupInteractableCount) {
+            this._rebuildInteractables();   // content left the group — no removal in the octree
+            return;
+        }
+        this._groupInteractableCount = found.length;
+
+        const added = found.filter((obj) => !this._interactableSet.has(obj));
+        if (added.length === 0) return;
+
+        const meshes = [];
+        const seen = new Set();
+        added.forEach((root) => {
+            this._interactableSet.add(root);
+            this._interactables.push(root);
+            root.updateMatrixWorld(true);   // the new subtree only, not the whole scene
+            root.traverse((child) => {
+                if (child.isMesh && child.geometry && !this._octreeMeshSet.has(child) && !seen.has(child)) {
+                    seen.add(child);
+                    meshes.push(child);
+                }
+            });
+        });
+        meshes.forEach((m) => {
+            this._octreeMeshSet.add(m);
+            this._interactablesOctree.insert(m);
+        });
     }
 
     _openGalleryMenu(menu) {
@@ -2315,7 +2414,7 @@ class PatentMuseum {
                 }
                 if (this.galleryLoader) {
                     const { artworksAdded } = this.galleryLoader.update(clampedDelta * 6, this.camera);
-                    if (artworksAdded) this._rebuildInteractables();
+                    if (artworksAdded) this._extendInteractables(this.galleryLoader.artworkGroup);
                 }
                 break;
                 
