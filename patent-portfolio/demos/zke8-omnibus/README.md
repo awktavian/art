@@ -68,7 +68,8 @@ Run from this directory. The rc column is what was measured on 2026-11-02.
 
 | command | rc | what it proves |
 |---|---|---|
-| `for f in js/*.js tools/*.mjs; do node --check "$f" \|\| echo "FAIL $f"; done` | 0 | all **ten** shipped modules parse (`ls js/*.js tools/*.mjs \| wc -l` → 10: six in `js/`, four in `tools/`). Use the loop, not `node --check a.js b.js`: **measured on this host, `--check` inspects only its first file argument and ignores the rest** (a broken second file still returned rc=0), so the glob form is a false green. And even the loop cannot see the *content* of the GLSL template literals — see the shader-digest row. |
+| `npm run test:unit` (from the repo root) | 0 | 70 tests, 70 pass, 0 fail — **8 of them are `tests/unit/zke8-omnibus-determinism.test.mjs`**, which puts this directory's determinism law inside CI's own gate: the shipped pin re-hashes green in a throwaway copy that is *not* a git work tree (so no estate checkout, no torch, no `git`), a GLSL-only comparison change goes red on the shader digest while `node --check` stays green, a stray delimiter in a shader literal goes red, a tampered frame digest goes red, an **absent** pin file goes red rather than reporting `compared=0` as a pass, and the `node --check` arity trap is re-measured every run and printed as a NOTE. |
+| `for f in js/*.js tools/*.mjs; do node --check "$f" \|\| echo "FAIL $f"; done` | 0 | all **ten** shipped modules parse (`ls js/*.js tools/*.mjs \| wc -l` → 10: six in `js/`, four in `tools/`; the unit test asserts that enumeration against the tree, so the list cannot silently lose a file). Use the loop, not `node --check a.js b.js`: **measured on this host, `--check` inspects only its first file argument and ignores the rest** (a broken second file still returned rc=0), so the glob form is a false green. And even the loop cannot see the *content* of the GLSL template literals — see the shader-digest row. |
 | `node tools/determinism-harness.mjs --check tools/pin.json` | 0 | 34 assertions: the canonical frames re-hashed against a pin written by a previous **process**, two independently imported module instances agreeing in one process, the seed-law vectors against the estate's bytes, SHA-256 itself against `node:crypto` over 501 inputs, the root-label closed form against the 240-row table over 202,551 samples, and the GLSL source digests. |
 | `node tools/browser-check.mjs` (`--root` to halve it) | 0 | headless Chromium: no uncaught error, no console error, the in-browser falsifier, the law the URL asked for, the in-browser SHA-256 equal to node's pin, GPU-vs-reference disagreement under 1% of pixels, and the float32 mirror reproducing the GPU's bytes. |
 | `node tools/estate-parity.mjs` | 0 | 18 claims against `tools/estate-e8.json` — the estate's own torch `nearest_e8`, level counts, half-step codes, reconstruction and `root_index`, elementwise. |
@@ -94,6 +95,10 @@ residual-ladder/    root-shell/    index.html
 tools/              the four checkers above (harness, browser, parity, triage),
                     two fixture generators, the frozen
                     fixtures, and pin.json
+../../tests/unit/zke8-omnibus-determinism.test.mjs
+                    the CI leg: it runs the harness and the parity checker
+                    offline, and mutation-tests the pin and the shader digest
+                    against throwaway copies
 ```
 
 ## Determinism, and the three things it does not mean
