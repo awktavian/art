@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Path-traced WebGL2 atlas of the finite simple groups, drawn from the CFSG Lean formalization's own tables — 16 Lie-type order polynomials, 26 sporadic orders, E8's 240 roots.">
+<meta property="og:title" content="The CFSG Group Atlas — path-traced classification">
+<meta property="og:description" content="A shader path-tracer over the classification of the finite simple groups, with every datum cited to a line of Lean source.">
+<meta name="theme-color" content="#07060B">
+<link rel="icon" href="../../../favicon.svg" type="image/svg+xml">
+<!-- Three levels up is the repo root, where favicon.svg lives (the museum page
+     at patent-portfolio/index.html reaches the same file with ../favicon.svg). -->
+<title>The CFSG Group Atlas — path-traced classification | Kagami</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Void, ice, gold — the house palette, and nothing else. The traced image is
+     the only thing on this page allowed to be bright. */
+  :root {
+    --void: #07060b;
+    --void-2: #0d0c14;
+    --ink: #14121d;
+    --edge: #262235;
+    --text: #e8e6f2;
+    --text-dim: #9d97b5;
+    --ice: #00ced1;
+    --gold: #c9a227;
+    --rose: #dc143c;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+  body {
+    margin: 0;
+    background: radial-gradient(circle at 50% 0%, #121021 0%, var(--void) 62%);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  .skip {
+    position: absolute; left: -9999px; top: 0;
+    background: var(--ice); color: #04121b; padding: 10px 16px; z-index: 10;
+  }
+  .skip:focus { left: 8px; }
+  header.site {
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+    padding: 18px 24px 10px;
+    border-bottom: 1px solid var(--edge);
+  }
+  header.site .mark { font-family: var(--mono); color: var(--ice); letter-spacing: 0.18em; font-size: 12px; text-transform: uppercase; }
+  header.site a { color: var(--text-dim); text-decoration: none; font-size: 13px; }
+  header.site a:hover, header.site a:focus-visible { color: var(--gold); text-decoration: underline; }
+  main { max-width: 1680px; margin: 0 auto; padding: 0 16px 56px; }
+
+  /* ---- the mounted atlas (see modules/ui.js for the structure) ---- */
+  .atlas-head { padding: 26px 0 6px; }
+  .atlas-title {
+    margin: 0; font-size: clamp(28px, 4.2vw, 46px); font-weight: 600; letter-spacing: -0.02em;
+    background: linear-gradient(96deg, var(--ice), #cfe9ff 42%, var(--gold));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .atlas-sub { margin: 8px 0 0; color: var(--text-dim); max-width: 74ch; }
+  .atlas-note {
+    border: 1px solid var(--rose); background: #1a0d12; color: #ffd7de;
+    padding: 12px 14px; margin: 14px 0; font-family: var(--mono); font-size: 13px;
+  }
+  .atlas-grid {
+    display: grid; gap: 18px; margin-top: 18px;
+    grid-template-columns: minmax(280px, 340px) minmax(0, 1fr) minmax(300px, 380px);
+    align-items: start;
+  }
+  @media (max-width: 1280px) {
+    .atlas-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+  .atlas-col { min-width: 0; display: grid; gap: 16px; align-content: start; }
+  .atlas-col h2 {
+    margin: 0 0 8px; font-size: 12px; font-family: var(--mono); letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--ice); font-weight: 500;
+  }
+  .atlas-legend, .atlas-arms, .atlas-facts, .atlas-checks, .atlas-info, .atlas-list {
+    border: 1px solid var(--edge); background: var(--void-2); padding: 14px 16px;
+  }
+  .atlas-facts { display: grid; grid-template-columns: auto auto; gap: 4px 12px; margin: 0; }
+  .atlas-facts dt { color: var(--text-dim); font-size: 13px; }
+  .atlas-facts dd { margin: 0; font-family: var(--mono); font-size: 13px; color: var(--gold); text-align: right; }
+  .atlas-legend ul, .atlas-arms ol, .atlas-list, .atlas-checks ul { margin: 0; padding-left: 1.1em; }
+  .atlas-legend li { margin: 0 0 7px; font-size: 13.5px; color: var(--text-dim); }
+  .atlas-legend b { color: var(--text); }
+  .atlas-arms ol { list-style: none; padding: 0; }
+  .atlas-arms li { display: grid; gap: 2px; padding: 7px 0; border-bottom: 1px dashed var(--edge); }
+  .atlas-arms li:last-child { border-bottom: 0; }
+  .arm-name { color: var(--text); font-weight: 500; }
+  .arm-mem { color: var(--text-dim); font-size: 13px; }
+  .arm-cite { color: var(--ice); font-family: var(--mono); font-size: 11.5px; }
+  .atlas-checks summary { cursor: pointer; color: var(--text-dim); font-size: 13px; }
+  .atlas-checks li { font-family: var(--mono); font-size: 12.5px; color: var(--text-dim); }
+  .check.pass { color: var(--ice); }
+  .check.fail { color: var(--rose); }
+
+  /* ---- stage ---- */
+  .atlas-stage { position: relative; border: 1px solid var(--edge); background: #000; }
+  #atlas-canvas { display: block; width: 100%; aspect-ratio: 16 / 9; cursor: grab; touch-action: none; }
+  #atlas-canvas:active { cursor: grabbing; }
+  .atlas-canvas-note {
+    position: absolute; inset: auto 12px 12px 12px; margin: 0;
+    font-family: var(--mono); font-size: 11px; color: #6b6482;
+  }
+  .atlas-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+  .atlas-controls button, .atlas-listitem {
+    font: inherit; font-size: 12.5px; color: var(--text); background: var(--ink);
+    border: 1px solid var(--edge); padding: 7px 11px; cursor: pointer;
+  }
+  .atlas-controls button:hover, .atlas-listitem:hover { border-color: var(--ice); color: var(--ice); }
+  .atlas-controls button:focus-visible, .atlas-listitem:focus-visible, .skip:focus-visible {
+    outline: 2px solid var(--gold); outline-offset: 2px;
+  }
+  .atlas-hud {
+    display: flex; gap: 6px 16px; flex-wrap: wrap;
+    font-family: var(--mono); font-size: 11.5px; color: var(--text-dim);
+    border: 1px solid var(--edge); background: var(--void-2); padding: 9px 12px;
+  }
+  .atlas-hud span { white-space: nowrap; }
+  .hud-buffer, .hud-adapt { color: var(--ice); }
+
+  /* ---- info panel + list ---- */
+  .info-title { margin: 0 0 4px; font-size: 20px; font-weight: 600; color: var(--text); }
+  .info-kicker { margin: 0 0 12px; font-family: var(--mono); font-size: 12px; color: var(--gold); }
+  .info-rows { margin: 0; display: grid; gap: 9px; }
+  .info-rows dt { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); }
+  .info-rows dd { margin: 1px 0 0; display: grid; gap: 3px; }
+  .row-value { font-family: var(--mono); font-size: 13px; color: var(--text); overflow-wrap: anywhere; }
+  .row.absent .row-value { color: var(--text-dim); font-style: italic; }
+  .row.accent .row-value { color: var(--gold); }
+  .row-cite { font-family: var(--mono); font-size: 11px; color: var(--ice); }
+  .row-attr { font-size: 11px; color: #6b6482; }
+  .info-pointer { margin: 14px 0 0; font-family: var(--mono); font-size: 11px; color: #6b6482; }
+  .list-head { margin-top: 4px; }
+  .atlas-list { list-style: none; margin: 0; padding: 0; max-height: 46vh; overflow: auto; }
+  .atlas-list li { margin: 0; }
+  .atlas-listitem { display: block; width: 100%; text-align: left; border-width: 0 0 1px; font-family: var(--mono); }
+  .atlas-listitem.active { color: var(--gold); background: #171325; border-left: 2px solid var(--gold); }
+
+  footer.site {
+    border-top: 1px solid var(--edge); margin-top: 34px; padding: 16px 24px 30px;
+    color: var(--text-dim); font-size: 12.5px;
+  }
+  footer.site code { font-family: var(--mono); color: var(--ice); }
+</style>
+</head>
+<body>
+<a class="skip" href="#atlas-canvas">Skip to the traced atlas</a>
+<header class="site">
+  <span class="mark">Kagami · demos</span>
+  <a href="../../index.html">Patent museum</a>
+  <span>·</span>
+  <a href="../../../index.html">Portfolio</a>
+</header>
+<main id="top">
+  <div id="atlas-root" aria-live="polite" aria-busy="true">
+    <noscript><p class="atlas-note">This atlas is a WebGL2 path tracer. Without script it cannot draw; the underlying data is <a href="./data/cfsg-families.json">cfsg-families.json</a>, and every number in it carries a <a href="./data/provenance.json">provenance pointer</a> to a line of Lean source.</p></noscript>
+  </div>
+</main>
+<footer class="site">
+  <p>Data generated from the CFSG Lean formalization at commit <code>b6d71a60cab7c769333bd121c741a60862f9a2f1</code>
+  by <code>tools/extract_cfsg_families.py</code>; each datum cites <code>file:line</code> in
+  <code>data/provenance.json</code>. Rendered by hand-written GLSL ES 3.00 — no Three.js, no new dependencies.
+  Determinism is checked by <code>tools/determinism.mjs</code> (GPU, seeded) and
+  <code>tools/reference-raster.mjs</code> (pure CPU, no GPU at all).</p>
+</footer>
+<script type="module" src="./modules/atlas.js"></script>
+</body>
+</html>
