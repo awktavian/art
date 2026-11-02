@@ -106,15 +106,7 @@ export class Minimap {
         this.canvas.style.cssText = `width: 100%; height: 100%;`;
         
         this.element.appendChild(this.canvas);
-        // willReadFrequently: this surface is read back with getImageData() (drawStaticElements,
-        // ~line 320) and re-blitted with putImageData() on every minimap update (update(), ~line 335).
-        // That is exactly the pattern Chrome names in its own console warning, and the readback is
-        // the largest GL-side line in the whole boot profile: c2d.getImageData 917.4 ms over 3 calls
-        // (max 866.4 ms) out of 997.2 ms of total boot GL time measured at this commit — a GPU-backed
-        // readback forces a full pipeline flush behind the first 3D frame queue, corroborated by the
-        // two "GPU stall due to ReadPixels" driver messages in the page log. Asking for a CPU-backed
-        // surface removes the flush; the drawn pixels are unchanged.
-        this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
+        this.ctx = this.canvas.getContext('2d');
         
         // Click-to-teleport handler
         this.canvas.style.cursor = 'pointer';
