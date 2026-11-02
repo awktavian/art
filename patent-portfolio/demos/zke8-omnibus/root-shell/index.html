@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E8 Root Shell — 240 direction codes, two families, one closed form</title>
+<meta name="description" content="Demoscene render of the 240 E8 roots as a direction code, with an analytic closed form for the argmax index proven equal to the estate's 240-row table, and hash-pinned deterministic frames.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #04050a; --void-2: #0a0d16; --ink: #dfe9ec; --ink-dim: #93a4ad;
+    --ice: #00ced1; --gold: #c9a227; --line: #1c2431;
+    --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--void); color: var(--ink); }
+  body { font-family: var(--font-sans); line-height: 1.5; }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 0 18px 64px; }
+  header { padding: 26px 0 14px; border-bottom: 1px solid var(--line); }
+  .kicker { font: 500 11px/1 var(--font-mono); letter-spacing: .22em; text-transform: uppercase; color: var(--gold); margin: 0 0 8px; }
+  h1 { font: 600 clamp(22px, 3.4vw, 34px)/1.1 var(--font-sans); margin: 0 0 6px; letter-spacing: -.01em; }
+  h1 em { font-style: normal; color: var(--ice); }
+  .crumbs { font: 400 12px/1 var(--font-mono); color: var(--ink-dim); margin: 0; }
+  .crumbs a { color: var(--ice); text-decoration: none; border-bottom: 1px solid rgba(0,206,209,.3); }
+  .stage-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; margin-top: 18px; align-items: start; }
+  @media (max-width: 900px) { .stage-grid { grid-template-columns: 1fr; } }
+  .screen { position: relative; border: 1px solid var(--line); background: #000; overflow: hidden; }
+  .screen canvas#stage { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; }
+  .screen.refused canvas#stage { outline: 1px dashed var(--gold); outline-offset: -3px; }
+  .screen::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background:
+      repeating-linear-gradient(0deg, rgba(0,0,0,.30) 0 1px, transparent 1px 3px),
+      radial-gradient(130% 100% at 50% 50%, transparent 55%, rgba(0,0,0,.72) 100%),
+      linear-gradient(90deg, rgba(201,162,39,.05), transparent 12%, transparent 88%, rgba(0,206,209,.05));
+    mix-blend-mode: screen;
+  }
+  .side { display: flex; flex-direction: column; gap: 14px; }
+  .panel { border: 1px solid var(--line); background: var(--void-2); padding: 12px 13px 14px; }
+  .panel h2 { font: 500 10.5px/1 var(--font-mono); letter-spacing: .2em; text-transform: uppercase; color: var(--gold); margin: 0 0 9px; }
+  canvas#cert { display: block; width: 100%; height: auto; image-rendering: pixelated; background: #000; border: 1px solid var(--line); }
+  .cert-cap { font: 400 11px/1.45 var(--font-mono); color: var(--ink-dim); margin: 8px 0 0; }
+  .controls { display: grid; gap: 10px; }
+  .row { display: grid; grid-template-columns: 92px 1fr auto; gap: 8px; align-items: center; }
+  label { font: 400 11px/1.2 var(--font-mono); color: var(--ink-dim); letter-spacing: .04em; }
+  input[type=text], input[type=number] {
+    font: 400 12px/1 var(--font-mono); color: var(--ink); background: #070a12;
+    border: 1px solid var(--line); padding: 6px 7px; min-width: 0; width: 100%;
+  }
+  output { font: 400 11px/1 var(--font-mono); color: var(--ice); min-width: 34px; text-align: right; }
+  input:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }
+  .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  button {
+    font: 500 11px/1 var(--font-mono); letter-spacing: .12em; text-transform: uppercase;
+    background: var(--ice); color: #04070a; border: 1px solid var(--ice); padding: 10px 13px; cursor: pointer;
+  }
+  button.ghost { background: transparent; color: var(--gold); border-color: var(--gold); }
+  button:hover { filter: brightness(1.12); }
+  pre#readout {
+    font: 400 12px/1.62 var(--font-mono); color: var(--ink); background: #06080f;
+    border: 1px solid var(--line); border-left: 2px solid var(--gold);
+    padding: 13px 14px; margin: 16px 0 0; white-space: pre-wrap; word-break: break-word;
+    max-height: 340px; overflow: auto;
+  }
+  .legend { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .legend li { display: grid; grid-template-columns: 12px 1fr; gap: 9px; font: 400 12px/1.45 var(--font-mono); color: var(--ink-dim); }
+  .swatch { width: 12px; height: 12px; margin-top: 3px; }
+  .legend b { color: var(--ink); font-weight: 500; }
+  h3 { font: 500 11px/1 var(--font-mono); letter-spacing: .18em; text-transform: uppercase; color: var(--gold); margin: 34px 0 10px; }
+  p { max-width: 88ch; font-size: 15px; color: var(--ink-dim); }
+  p b, li b { color: var(--ink); }
+  code { font: 400 12.5px/1.4 var(--font-mono); color: var(--ice); background: rgba(0,206,209,.07); padding: 1px 5px; }
+  a { color: var(--ice); }
+  .cite { font: 400 12px/1.6 var(--font-mono); color: var(--ink-dim); border-left: 1px solid var(--line); padding-left: 12px; }
+  footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); font: 400 12px/1.6 var(--font-mono); color: var(--ink-dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="kicker">Technique 2 · the 240 roots · root_index in closed form</p>
+    <h1>Root <em>Shell</em></h1>
+    <p class="crumbs"><a href="../index.html">← E8 Omnibus</a> · <a href="../residual-ladder/index.html">Residual ladder →</a> · every pixel is a function of the hash</p>
+  </header>
+
+  <main>
+    <div class="stage-grid">
+      <div class="screen" id="screen">
+        <canvas id="stage" role="img"
+          aria-label="Live WebGL2 render of the E8 root system as a direction field: 240 hue bands from the root index, bright gold seams where the two root families tie, and ice-coloured Weyl chamber walls where the argmax pair changes hands."></canvas>
+      </div>
+
+      <div class="side">
+        <div class="panel">
+          <h2>Certificate · CPU reference</h2>
+          <canvas id="cert" width="128" height="128" role="img"
+            aria-label="The 128 by 128 canonical frame rendered by the float64 CPU reference renderer. This is the byte string the SHA-256 pin describes."></canvas>
+          <p class="cert-cap">
+            float64 · 128×128 · <b>canonical</b> — the string <code>tools/pin.json</code> hashes. The
+            canvas above is the same closed form in float32.
+          </p>
+        </div>
+
+        <div class="panel">
+          <h2>Controls</h2>
+          <div class="controls">
+            <div class="row">
+              <label for="seed">seed</label>
+              <input id="seed" type="text" value="e8-omnibus-1102" spellcheck="false" autocomplete="off">
+              <output></output>
+            </div>
+            <div class="row">
+              <label for="law">seed law</label>
+              <select id="law">
+                <option value="house" selected>house — Xorshift128+ over FNV-1a</option>
+                <option value="estate">estate — kagami core/omni/prng.py</option>
+              </select>
+              <output></output>
+            </div>
+            <div class="row">
+              <label for="frame">frame</label>
+              <input id="frame" type="number" min="0" step="1" value="0">
+              <output></output>
+            </div>
+            <div class="row">
+              <label for="amplitude">amplitude</label>
+              <input id="amplitude" type="number" min="0.25" step="0.05" value="1.5">
+              <output></output>
+            </div>
+          </div>
+          <p class="cert-cap">
+            The shell has no codec knobs: its picture is the carrier field and the argmax over the 240
+            roots. Amplitude moves the field's <b>reach</b>, so it changes which family wins, which is
+            why it is a control.
+          </p>
+          <p class="cert-cap">
+            <b>Seed law.</b> <i>house</i> is this repo's convention: Xorshift128+ over an FNV-1a hash of
+            the seed string. <i>estate</i> is <code>js/seed-stream.js</code>, a bit-exact port of Kagami's
+            own stream — SHA-256 in counter mode over a canonical seed prefix, big-endian 64-bit words,
+            53-bit draws (<code>packages/kagami/core/omni/prng.py</code>). Both laws fill the SAME eight
+            carrier lanes from the same mapping, so the law is the only thing that changes when you switch
+            it. The estate law is graded, not asserted: <code>tools/gen-estate-seed-vectors.py</code> runs
+            the real Python module, <code>tools/determinism-harness.mjs</code> compares this browser port to
+            its bytes, and <code>tools/browser-check.mjs</code> re-grades the estate frame in Chromium
+            against its own row in <code>tools/pin.json</code>.
+          </p>
+          <div class="buttons">
+            <button id="play" type="button" aria-pressed="false">PLAY</button>
+            <button id="copy-url" class="ghost" type="button">COPY URL</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>What the pixels mean</h2>
+          <ul class="legend">
+            <li><span class="swatch" style="background:conic-gradient(from 0deg,#c9a227,#00ced1,#7a4fd0,#dc143c,#c9a227)"></span><span><b>Hue</b> — the estate's root index <code>0..239</code> over 240 bands. The colour wheel IS the code, not a palette.</span></li>
+            <li><span class="swatch" style="background:linear-gradient(180deg,#fff,#222)"></span><span><b>Value</b> — <code>max over the shell / its largest possible value</code> (<code>A·sqrt(2)</code> for the half-shell, <code>2A</code> for the integer shell).</span></li>
+            <li><span class="swatch" style="background:#ffe6a3"></span><span><b>Gold seam</b> — the two <b>families</b> tie: <code>(±1,±1,0⁶)</code> (112 rows) against <code>(±½)⁸</code> with an even minus count (128 rows).</span></li>
+            <li><span class="swatch" style="background:#a7f0f2"></span><span><b>Ice wall</b> — the two largest lanes nearly tie, so the argmax <b>pair</b> changes hands: a Weyl chamber wall.</span></li>
+            <li><span class="swatch" style="background:#ff00ff"></span><span><b>Magenta</b> — an <b>undeclared</b> class: impossible here by construction, so if it ever appears it is a real defect, loud.</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <pre id="readout" role="status" aria-live="polite">booting…</pre>
+
+    <h3>The port's one genuinely new leg: a closed form for <code>root_index</code></h3>
+    <p>
+      The estate's <code>root_index</code> is an argmax over 240 rows with a first-occurrence tie rule
+      (<code>e8_period_codec.py:696-719</code>, order fixed by <code>dimensions.py:233-291</code>). That is
+      ~1920 fused multiply-adds per pixel — fine on a CPU, ruinous per fragment. The port replaces the
+      scan with arithmetic: the maximiser of <code>⟨root, v⟩</code> is determined by the two largest
+      magnitudes (family 1, 112 rows) or by the parity-corrected sum of magnitudes (family 2, 128 rows),
+      and the <b>index</b> then follows from two integer ranks — <code>pairRank</code> over the 28
+      lexicographic pairs and <code>rankEvenPopcount</code> over the 128 even-popcount sign patterns.
+      Ties are resolved by the minimum integer candidate, which reproduces the table's
+      first-occurrence rule rather than approximating it.
+    </p>
+    <p>
+      The claim is checked, not asserted: the harness requires the analytic index to equal the table
+      index over the estate's own vectors, 200k random vectors, dense tie grids, all 240 roots and their
+      negations, and dyadic probes — <b>202,551 samples, 0 mismatches, 226 of them exact shell ties</b>.
+      The browser re-runs an independent 20,000-vector version of that falsifier at load and prints the
+      count.
+    </p>
+    <p class="cite">
+      Cited in the shipped source: root generation order <code>kagami_math/dimensions.py:233-291</code>;
+      table build <code>e8_period_codec.py:610-613</code>; <code>root_index</code> and its tie rule
+      <code>:688-694, 696-719</code>; exact-coordinate guard <code>:186</code>; covering radius
+      <code>:189</code>; the alphabet's class counts <code>e8_alphabet.py:105-121</code>.
+    </p>
+
+    <h3>Why the demoscene form, and what it is not</h3>
+    <p>
+      A root system is a tessellation, and tessellations are the natural subject of a realtime frame:
+      the walls are lines, the chambers are plates, and the code changes hue exactly where the lattice
+      changes its mind. Nothing here is a JIT: the estate's <b>JIT</b> legs compile the CPU decoder to a
+      dylib (<code>e8_jit.py</code>) and to wasm32 (<code>e8_wasm.py</code>), and its shader machinery
+      (<code>core/code_intel/shader_declarations.py</code>) <b>parses</b> WGSL and Metal declarations. There
+      is no compile-to-GLSL path in the estate to port, so this page transcribes the math by hand and
+      keeps every citation in the source it came from.
+    </p>
+  </main>
+
+  <footer>
+    E8 Omnibus · RSI40-1102 lane V7 · no dependencies · CPU reference canonical, WebGL2 measured ·
+    pins: <code>tools/pin.json</code> · source: <code>js/e8-core.js</code>, <code>js/ref-render.js</code>,
+    <code>js/gl-render.js</code>, <code>js/shell.js</code>
+  </footer>
+</div>
+
+<script type="module">
+import { start } from '../js/shell.js';
+await start({ kind: 'root', pinPath: '../tools/pin.json', maxDpr: 2 });
+</script>
+<noscript><p style="font-family:monospace;color:#c9a227">This page needs scripting. The canonical frames are reproducible without it: <code>node tools/determinism-harness.mjs --check tools/pin.json</code>.</p></noscript>
+</body>
+</html>
