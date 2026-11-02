@@ -1723,7 +1723,9 @@ class PatentMuseum {
      * honestly: an artwork root swapped out and back within one tick is not detected by the count
      * (the streaming path never does it — it removes a non-interactable loading slot and adds a new
      * artwork root), and interactables outside `group` are only re-derived by the full path, which
-     * still runs at init and on context restore.
+     * still runs at init and on context restore. A mesh under two matching roots (an artwork that
+     * also carries a fano-node child) is handed to the octree once here; the full rebuild has always
+     * inserted it once per matching root, which is a duplication the octree tolerates.
      */
     _extendInteractables(group) {
         if (!group || !this._interactablesOctree || !this._interactableSet || !this._octreeMeshSet) {
@@ -1748,12 +1750,14 @@ class PatentMuseum {
         if (added.length === 0) return;
 
         const meshes = [];
+        const seen = new Set();
         added.forEach((root) => {
             this._interactableSet.add(root);
             this._interactables.push(root);
             root.updateMatrixWorld(true);   // the new subtree only, not the whole scene
             root.traverse((child) => {
-                if (child.isMesh && child.geometry && !this._octreeMeshSet.has(child)) {
+                if (child.isMesh && child.geometry && !this._octreeMeshSet.has(child) && !seen.has(child)) {
+                    seen.add(child);
                     meshes.push(child);
                 }
             });
