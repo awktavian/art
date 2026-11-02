@@ -14,6 +14,7 @@
 
 import * as THREE from 'three';
 import { createProceduralNormalMap, createConcreteMaterial, createConcretePolishedMaterial, createBrushedSteelMaterial, createCrystalMaterial, createFlowPoolMaterial } from '../lib/materials.js';
+import { clampStep, damp, rateFromStepFraction } from '../lib/motion.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // COLONY DATA
@@ -1349,6 +1350,15 @@ export function createMuseum() {
 // FANO CONSTELLATION ANIMATOR — The beating heart of the museum
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Smoothing rates for the visitor response, DERIVED from the museum's own
+// per-step fractions (V5-1102). Written as fractions of a step they were only
+// correct at one frame rate; rateFromStepFraction recovers the time constant
+// they encode so the tuned feel survives at 120 Hz and the duration stops
+// depending on the visitor's hardware. Derived, not typed, so a retune of the
+// fraction cannot leave a stale constant behind.
+const RING_RATE = rateFromStepFraction(0.05, 60);
+const TILT_RATE = rateFromStepFraction(0.02, 60);
+
 export class FanoConstellationAnimator {
     constructor(sculpture) {
         this.sculpture = sculpture;
@@ -1361,6 +1371,18 @@ export class FanoConstellationAnimator {
         this.consensusTimer = 0;
         this.nearestVisitor = null;
         this.visitedWings = new Set();
+
+        // Scratch objects for the per-frame writes below — reused every step,
+        // zero allocs in update(). This is the museum's own convention, not a
+        // new one: museum/lighting.js:60-66 caches `_currentFogColor`,
+        // `_tmpColor` and `_tmpColor2` for exactly this reason. The Fano
+        // animator had not adopted it, so a single step allocated 15 Vector3s
+        // in the colony loop plus one Color per dust particle during an aurora
+        // (dustCount = 600 at museum/architecture.js:499).
+        this._scratchWorld = new THREE.Vector3();
+        this._scratchCrystalWorld = new THREE.Vector3();
+        this._scratchArcMid = new THREE.Vector3();
+        this._scratchColor = new THREE.Color();
     }
     
     update(time, deltaTime, playerPosition) {
@@ -1376,7 +1398,7 @@ export class FanoConstellationAnimator {
         this._animateNexus(time, deltaTime);
         this._runConsensusHeartbeat(time, deltaTime);
         this._animateMessageParticles(time, deltaTime);
-        this._respondToVisitor(playerPosition);
+        this._respondToVisitor(playerPosition, deltaTime);
         this._checkAurora(time, deltaTime);
         this._animateFloorProjection(time);
     }
@@ -1554,7 +1576,14 @@ export class FanoConstellationAnimator {
             
             if (from && to) {
                 // Arc through center
-                const mid = from.clone().add(to).multiplyScalar(0.3);
+                // V5-1102: pooled. `from.clone().add(to)` allocated one Vector3
+                // per message particle per step; the scratch is written and
+                // read to three scalars inside this same block, so nothing
+                // retains it across iterations.
+                const mid = this._scratchArcMid
+                    .copy(from)
+                    .add(to)
+                    .multiplyScalar(0.3);
                 mid.y += 0.5;
                 
                 const t = p;
@@ -1574,52 +1603,64 @@ export class FanoConstellationAnimator {
         });
     }
     
-    _respondToVisitor(playerPosition) {
+    _respondToVisitor(playerPosition, dt = 0) {
         if (!playerPosition) return;
-        
+
         // Find nearest colony crystal and brighten it
         let minDist = Infinity;
         let nearestColony = null;
-        
+
         // We need sculpture's world position
-        const sculptureWorldPos = new THREE.Vector3();
+        // V5-1102: pooled scratch, and the smoothing below is `damp(…, dt)`
+        // instead of a fixed fraction per step — the step fraction made the
+        // ring-widen and the tilt take as long as the visitor's frame rate
+        // lets them. `_scratchCrystalWorld` is reused inside a forEach that
+        // reads it to a scalar (`dist`) before the next iteration, so no
+        // value escapes the loop.
+        const sculptureWorldPos = this._scratchWorld;
         this.sculpture.getWorldPosition(sculptureWorldPos);
-        
+        const step = clampStep(dt);
+
         COLONY_ORDER.forEach((colony, i) => {
             const crystal = this.sculpture.getObjectByName(`crystal-${colony}`);
             if (!crystal) return;
-            
-            const crystalWorld = new THREE.Vector3();
+
+            const crystalWorld = this._scratchCrystalWorld;
             crystal.getWorldPosition(crystalWorld);
             const dist = playerPosition.distanceTo(crystalWorld);
-            
+
             if (dist < minDist) {
                 minDist = dist;
                 nearestColony = colony;
             }
-            
+
             // Proximity brightness (stronger response)
             const brightness = Math.max(0, 1 - dist / 15);
             if (crystal.material) {
                 crystal.material.emissiveIntensity = Math.max(crystal.material.emissiveIntensity, 0.5 + brightness * 0.8);
             }
-            
+
             // Widen orbital ring on proximity
             const ring = this.sculpture.getObjectByName(`orbital-ring-${colony}`);
             if (ring) {
                 const targetScale = 1 + brightness * 0.15;
-                ring.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.05);
+                // The 0.05-per-step constant, carried over by derivation:
+                // 0.05 at 60 steps/s == rate 3.0776 s^-1, same feel at 60 fps,
+                // correct duration at every other one.
+                const s = damp(ring.scale.x, targetScale, RING_RATE, step);
+                ring.scale.setScalar(s);
             }
         });
-        
+
         // Tilt toward visitor (stronger acknowledgment)
         if (minDist < 20) {
             const dx = playerPosition.x - sculptureWorldPos.x;
             const dz = playerPosition.z - sculptureWorldPos.z;
-            const targetTiltX = Math.atan2(dz, Math.sqrt(dx * dx + dz * dz)) * 0.06;
-            const targetTiltZ = Math.atan2(-dx, Math.sqrt(dx * dx + dz * dz)) * 0.06;
-            this.sculpture.rotation.x += (targetTiltX - this.sculpture.rotation.x) * 0.02;
-            this.sculpture.rotation.z += (targetTiltZ - this.sculpture.rotation.z) * 0.02;
+            const planar = Math.sqrt(dx * dx + dz * dz);
+            const targetTiltX = Math.atan2(dz, planar) * 0.06;
+            const targetTiltZ = Math.atan2(-dx, planar) * 0.06;
+            this.sculpture.rotation.x = damp(this.sculpture.rotation.x, targetTiltX, TILT_RATE, step);
+            this.sculpture.rotation.z = damp(this.sculpture.rotation.z, targetTiltZ, TILT_RATE, step);
         }
     }
     
@@ -1649,7 +1690,11 @@ export class FanoConstellationAnimator {
                     if (phase > 0.001) {
                         const wave = Math.sin(i * 0.03 + time * 2) * 0.5 + 0.5;
                         const hue = (i / colors.count + time * 0.1) % 1;
-                        const col = new THREE.Color().setHSL(hue, 0.8, 0.5 + wave * 0.3);
+                        // V5-1102: one pooled Color instead of 600 per step
+                        // (dustCount at museum/architecture.js:499) for the
+                        // whole aurora window. r/g/b are read to scalars in the
+                        // setXYZ call immediately below, so the pool is safe.
+                        const col = this._scratchColor.setHSL(hue, 0.8, 0.5 + wave * 0.3);
                         // Blend from original colors (not current — prevents drift)
                         colors.setXYZ(i,
                             or * (1 - phase * 0.5) + col.r * phase * 0.5,
@@ -1736,13 +1781,21 @@ export class FanoConstellationAnimator {
 
 export function animateFanoSculpture(sculpture, time, deltaTime, playerPosition) {
     if (!sculpture) return;
-    
+
     // Initialize animator on first call
     if (!sculpture.userData._animator) {
         sculpture.userData._animator = new FanoConstellationAnimator(sculpture);
     }
-    
-    sculpture.userData._animator.update(time, deltaTime || 0.016, playerPosition);
+
+    // V5-1102: the render loop clamps its OWN delta to 50 ms
+    // (main.js `Math.min(delta, 0.05)`) and passes the RAW `delta` here, while
+    // every neighbouring subsystem receives the clamped one. The animator
+    // accumulates this value into phase, orbit angle and message progress, so
+    // returning to a backgrounded tab integrated the whole hidden interval in
+    // a single step — tens of radians of snap and consensus phases skipped.
+    // Clamping at the consumer keeps the law with the code that depends on it
+    // and leaves main.js for the perf lane (V9).
+    sculpture.userData._animator.update(time, clampStep(deltaTime), playerPosition);
 
     const skyDisc = sculpture.parent && sculpture.parent.getObjectByName
         ? sculpture.parent.getObjectByName('sky-disc')

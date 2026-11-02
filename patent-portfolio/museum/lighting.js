@@ -9,6 +9,27 @@
 import * as THREE from 'three';
 import { COLONY_DATA, COLONY_ORDER, DIMENSIONS } from './architecture.js';
 import { COLONY_COLORS as DESIGN_COLONY_COLORS } from '../../lib/design-tokens.js';
+import { damp, smoothstep, clampStep, rateFromStepFraction } from '../lib/motion.js';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SMOOTHING RATES (V5-1102)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Every smoother in this file used to be a fixed FRACTION PER STEP
+// (`intensity += (target - intensity) * 0.05`). This subsystem is stepped once
+// every 6 frames and handed `clampedDelta * 6` (main.js:2280-2286), so the
+// number of steps per second WAS the frame rate divided by 6 — a zone change
+// took ~2 s on a 60 fps machine and ~4 s on a 30 fps one.
+//
+// `rateFromStepFraction` recovers the time constant each legacy fraction
+// encodes, evaluated at the stagger's own 10 steps/s (60 fps / 6). The tuned
+// feel at 60 fps is therefore unchanged and the duration stops depending on
+// the visitor's hardware.
+const MUSEUM_STEP_HZ = 10;
+const WING_BASE_RATE = rateFromStepFraction(0.05, MUSEUM_STEP_HZ);
+const ZONE_COLOUR_RATE = rateFromStepFraction(0.15, MUSEUM_STEP_HZ);
+const GANZFELD_DENSITY_RATE = rateFromStepFraction(0.02, MUSEUM_STEP_HZ);
+const GANZFELD_COLOUR_RATE = rateFromStepFraction(0.005, MUSEUM_STEP_HZ);
 
 // DERIVED from art/lib/design-tokens.js (single waddle mirror) —
 // identity-coherence.test.mjs bans re-inlined colony hexes here (DICT-B 2026-09-29).
@@ -64,6 +85,12 @@ export class TurrellLighting {
         this._targetHemiColor = new THREE.Color(kelvinToHex(3400));
         this._tmpColor = new THREE.Color();
         this._tmpColor2 = new THREE.Color();
+
+        // Eased per-colony light state (V5-1102, L1). Keyed by colony; seeded
+        // from the constructor's authored intensity on the first update so the
+        // easing continues the authored value instead of jumping to it.
+        this._wingBase = {};
+        this._wingHemiBase = {};
 
         this.init();
     }
@@ -216,58 +243,94 @@ export class TurrellLighting {
     update(delta, playerPosition) {
         this._time += delta;
 
+        // NOTE on `delta` (V5-1102): main.js steps this subsystem once every
+        // 6 frames and hands it `clampedDelta * 6` (main.js:2289-2292), so
+        // `delta` here is ALREADY an accumulated span in seconds. That makes
+        // it the correct argument for a time-based smoother — and it is why
+        // the fixed fractions below (`* 0.05`, `* 0.15`, `* 0.02`, `* 0.005`)
+        // were never going to be frame-rate independent: they ignored `delta`
+        // entirely while the 6-frame stagger only rescaled `_time`.
+        const dt = clampStep(delta);
+
         // Smooth zone transition (lerp over ~3 seconds)
         if (this._zoneTransition < 1) {
             this._zoneTransition = Math.min(1, this._zoneTransition + delta * 0.35);
             const t = this._zoneTransition;
-            const eased = t * t * (3 - 2 * t); // smoothstep
+            const eased = smoothstep(t);
 
-            this._currentFogColor.lerp(this._targetFogColor, eased * 0.15);
-            this._currentHemiColor.lerp(this._targetHemiColor, eased * 0.15);
+            // V5-1102: `lerp(target, eased * 0.15)` multiplied the step
+            // fraction by the ramp, so the colour approach was a fraction per
+            // STEP times a ramp — it sped up as it went instead of easing, and
+            // its duration was the frame rate. Now a time constant, with the
+            // ramp kept as the deliberate part: the approach still accelerates
+            // into the eased window but at 30 fps covers the same seconds.
+            const colourRate = ZONE_COLOUR_RATE * (0.25 + 0.75 * eased);
+            this._currentFogColor.r = damp(this._currentFogColor.r, this._targetFogColor.r, colourRate, dt);
+            this._currentFogColor.g = damp(this._currentFogColor.g, this._targetFogColor.g, colourRate, dt);
+            this._currentFogColor.b = damp(this._currentFogColor.b, this._targetFogColor.b, colourRate, dt);
+            this._currentHemiColor.r = damp(this._currentHemiColor.r, this._targetHemiColor.r, colourRate, dt);
+            this._currentHemiColor.g = damp(this._currentHemiColor.g, this._targetHemiColor.g, colourRate, dt);
+            this._currentHemiColor.b = damp(this._currentHemiColor.b, this._targetHemiColor.b, colourRate, dt);
 
             this.scene.fog.color.copy(this._currentFogColor);
             this.hemisphere.color.copy(this._currentHemiColor);
 
             if (t >= 1) this.currentZone = this._targetZone;
-
-            // Adjust wing spotlight intensities during transition
-            COLONY_ORDER.forEach(colony => {
-                const entry = this.wingLights[colony];
-                if (!entry?.spotlight) return;
-                const base = colony === this._targetZone ? 1.2 : 0.6;
-                entry.spotlight.intensity += (base - entry.spotlight.intensity) * 0.05;
-                const hemiBase = colony === this._targetZone ? 0.25 : 0.1;
-                entry.hemi.intensity += (hemiBase - entry.hemi.intensity) * 0.05;
-            });
         }
 
-        // Wing profile cycling
+        // Wing profile cycling.
+        //
+        // V5-1102 — this is the L1 defect: the zone-transition block above
+        // eased `spotlight.intensity` toward 1.2 / 0.6 with a `* 0.05` step,
+        // and then THIS unconditional assignment overwrote the result one
+        // frame later with `base * mult`, base taken straight from
+        // `_targetZone`. So the easing never ran: `_targetZone` flips
+        // instantly in setZone(), and the light stepped 0.6 -> 1.2 in a single
+        // frame at the 6-frame stagger. The eased value is now the state and
+        // the cycling multiplies it, so the two legs cooperate instead of
+        // fighting over one property.
         COLONY_ORDER.forEach(colony => {
             const entry = this.wingLights[colony];
             if (!entry?.spotlight) return;
             const { spotlight, profile } = entry;
+            if (!Number.isFinite(this._wingBase[colony])) {
+                // Seed from the authored constructor value, not from 0, so the
+                // first eased step is a continuation rather than a jump.
+                this._wingBase[colony] = spotlight.intensity;
+            }
+            const target = colony === this._targetZone ? 1.2 : 0.6;
+            this._wingBase[colony] = damp(this._wingBase[colony], target, WING_BASE_RATE, dt);
+            if (this._zoneTransition < 1) {
+                const hemiBase = colony === this._targetZone ? 0.25 : 0.1;
+                if (!Number.isFinite(this._wingHemiBase[colony])) {
+                    this._wingHemiBase[colony] = entry.hemi?.intensity ?? hemiBase;
+                }
+                this._wingHemiBase[colony] = damp(this._wingHemiBase[colony], hemiBase, WING_BASE_RATE, dt);
+                if (entry.hemi) entry.hemi.intensity = this._wingHemiBase[colony];
+            }
             const period = profile.cycleSec;
             const phase = (this._time / period) * Math.PI * 2;
             const mult = 1 + Math.sin(phase) * profile.amount;
-            const base = colony === this._targetZone ? 1.2 : 0.6;
-            spotlight.intensity = Math.max(0.2, base * mult);
+            spotlight.intensity = Math.max(0.2, this._wingBase[colony] * mult);
         });
 
-        this.updateGanzfeldEffect(playerPosition);
+        this.updateGanzfeldEffect(playerPosition, dt);
         this.updateGodRays();
     }
 
-    updateGanzfeldEffect(playerPosition) {
+    updateGanzfeldEffect(playerPosition, dt = 0) {
         if (!playerPosition || !this.scene.fog) return;
         const isColony = COLONY_ORDER.includes(this._targetZone);
         const targetDensity = isColony ? 0.006 : 0.004;
-        this.scene.fog.density += (targetDensity - this.scene.fog.density) * 0.02;
+        this.scene.fog.density = damp(this.scene.fog.density, targetDensity, GANZFELD_DENSITY_RATE, dt);
 
         if (isColony) {
             const colonyHex = COLONY_COLORS[this._targetZone];
             if (colonyHex) {
                 this._tmpColor.setHex(colonyHex);
-                this._currentFogColor.lerp(this._tmpColor, 0.005);
+                this._currentFogColor.r = damp(this._currentFogColor.r, this._tmpColor.r, GANZFELD_COLOUR_RATE, dt);
+                this._currentFogColor.g = damp(this._currentFogColor.g, this._tmpColor.g, GANZFELD_COLOUR_RATE, dt);
+                this._currentFogColor.b = damp(this._currentFogColor.b, this._tmpColor.b, GANZFELD_COLOUR_RATE, dt);
                 this.scene.fog.color.copy(this._currentFogColor);
             }
         }
@@ -281,10 +344,46 @@ export class TurrellLighting {
         this.sunlight.position.x = DIMENSIONS.rotunda.apertureOffset + drift;
     }
 
+    /**
+     * Shadow configuration for the aperture sun.
+     *
+     * V5-1102 — two changes, both measured defects rather than taste:
+     *
+     * 1. `normalBias` was absent from the entire repository (zero occurrences
+     *    repo-wide; only `shadow.bias = -0.0001` at :357 and
+     *    lib/performance.js:433). A depth bias alone cannot fix acne on a
+     *    surface that is nearly parallel to the light, which is exactly the
+     *    museum's shadow receivers — `floor.receiveShadow = true` at
+     *    artworks/p1-fano-consensus.js:147, p1-efe-cbf.js:236,
+     *    p1-s15-hopf.js:387. The remedy is a bias along the surface NORMAL,
+     *    scaled to the shadow texel so it is not a magic number: this frustum
+     *    spans 100 m across `mapSize` texels, so one texel is 100/mapSize m.
+     *    Acne is a sub-texel artefact; a normal offset of one texel removes it
+     *    without the peter-panning a multi-texel value would cause at this
+     *    resolution.
+     *
+     * 2. `shadow.radius = 2` had no effect. `radius` is honoured only by
+     *    THREE.BasicShadowMap/PCFShadowMap (and VSM); the renderer sets
+     *    PCFSoftShadowMap (main.js:727 and lib/performance.js:371), whose
+     *    kernel is fixed. It was kept as a documented no-op rather than
+     *    deleted, and rather than switched on by changing the shadow type —
+     *    changing the filter is a restyle of every shadow edge in the museum,
+     *    which is a lighting-owned decision, not a defect cure.
+     *
+     * NOT fixed here, reported instead: the frustum spans +-50 m while the
+     * museum reaches +-101 m (DIMENSIONS: rotunda.radius 20 + wing.length 45
+     * + vestibuleDepth 6 + gallery.depth 30/2), so the gallery tier — where the
+     * patented artworks sit, and where p1-fano-consensus.js:242 sets
+     * `platform.castShadow = true` — is outside the shadow volume entirely.
+     * Widening the frustum to cover it would halve the rotunda's shadow
+     * resolution to buy shadows that were never authored to appear, so it is a
+     * coverage decision for the lighting owner, not a bug this lane can settle.
+     */
     enableShadows(mapSize = 1024) {
         if (this.sunlight) {
+            const size = Number.isFinite(mapSize) && mapSize > 0 ? mapSize : 1024;
             this.sunlight.castShadow = true;
-            this.sunlight.shadow.mapSize.set(mapSize, mapSize);
+            this.sunlight.shadow.mapSize.set(size, size);
             this.sunlight.shadow.camera.near = 1;
             this.sunlight.shadow.camera.far = 100;
             this.sunlight.shadow.camera.left = -50;
@@ -292,7 +391,10 @@ export class TurrellLighting {
             this.sunlight.shadow.camera.top = 50;
             this.sunlight.shadow.camera.bottom = -50;
             this.sunlight.shadow.bias = -0.0001;
-            this.sunlight.shadow.radius = 2;
+            // One shadow texel, in world metres: the frustum is 100 m wide.
+            this.sunlight.shadow.normalBias = (100 / size);
+            this.sunlight.shadow.radius = 2; // no-op under PCFSoftShadowMap — see above
+            this.sunlight.shadow.camera.updateProjectionMatrix();
         }
     }
 
