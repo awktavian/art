@@ -17,6 +17,19 @@
  *      (zke8/scripts/e8_jit.py:12-13) applied to source text.
  *   3. A pin file that is absent, or whose rows no frame matches, must be a
  *      FAILURE rather than a quiet "nothing to compare".
+ *   4. The browser leg reads a CANDIDATES list for playwright-core, so on a host
+ *      where none resolves it exits 0 having graded NOTHING. That is the one
+ *      legitimately-vacuous rc in this family, and it is only honest if it says
+ *      so — the last leg below forces that branch and requires the typed
+ *      refusal, the enumerated candidates, and zero PASS lines together.
+ *   5. `disagreement-triage.mjs` reads its GPU dump by FILE NAME. Its only
+ *      cross-check was the law inside the file, so a dump renamed across KINDS
+ *      was graded: 48 ladder pixels "explained" against root's carrier, rc=0.
+ *      Both axes are now refused, and the directory is overridable so the
+ *      refusal is graded in CI instead of asserted in a comment.
+ *
+ * Every leg here is offline: no estate checkout, no torch, no network, and (for
+ * the copy-based legs) no `git`. 10 legs, enumerated below.
  *
  * Mutation legs run against a THROWAWAY COPY of the directory, never the
  * shipped tree, and the copy is asserted not to be inside a git work tree —
@@ -43,8 +56,12 @@ function copyDemo(label) {
   return dst;
 }
 
-function node(args, cwd) {
-  return spawnSync(process.execPath, args, { cwd, encoding: "utf8" });
+function node(args, cwd, env) {
+  return spawnSync(process.execPath, args, {
+    cwd,
+    encoding: "utf8",
+    env: env ? { ...process.env, ...env } : process.env,
+  });
 }
 
 const shipped = (rel) => join(DEMO, rel);
@@ -196,4 +213,94 @@ test("the pin's GLSL digests are the digests the harness computes from the shipp
     assert.match(res.stdout, new RegExp(`${kind}:.*sha256=${digest.slice(0, 16)}`),
       `the ${kind} digest the pin names is not the one the harness computed from js/gl-render.js`);
   }
+});
+
+test("disagreement-triage refuses a mislabelled dump on either identity axis and names an absent input", () => {
+  // The triage tool's only input is a per-pixel GPU dump that no CPU process can
+  // produce — it exists only because Chromium wrote it. So the file at that path
+  // IS the claim, and a file moved there by hand is the failure mode: this leg
+  // points V7_GPU_DETAIL_DIR at a directory the test owns and writes three
+  // mis-labelled dumps and one correct one. Measured before the kind guard
+  // existed (2026-11-02, this lane): a LADDER/house dump renamed to
+  // v7-gpu-detail-root-house.json was ACCEPTED, graded 48 ladder pixels against
+  // root's carrier, printed `0/48 reproduced EXACTLY ... 48 UNEXPLAINED` — and
+  // exited rc=0. Refusing is now the tested behaviour on both axes.
+  const dir = mkdtempSync(join(tmpdir(), "zke8-detail-"));
+  const env = { V7_GPU_DETAIL_DIR: dir };
+  const triage = (kind, law) => node(["tools/disagreement-triage.mjs", kind, law], DEMO, env);
+  const writeDump = (name, o) => writeFileSync(join(dir, name), JSON.stringify(o));
+
+  const gone = triage("ladder", "house");
+  assert.equal(gone.status, 2, `an absent dump must be a typed refusal, not a green: ${gone.stdout}`);
+  assert.match(gone.stdout, /triage: no detail file at/);
+  assert.match(gone.stdout, /dumps present: none/);
+
+  writeDump("v7-gpu-detail-ladder-house.json", { kind: "ladder", law: "estate", size: 128, detail: [] });
+  const wrongLaw = triage("ladder", "house");
+  assert.equal(wrongLaw.status, 2, wrongLaw.stdout);
+  assert.match(wrongLaw.stdout, /was written under law="estate" but was asked for "house"/);
+  assert.match(wrongLaw.stdout, /renamed, not re-rendered/);
+
+  writeDump("v7-gpu-detail-root-house.json", { kind: "ladder", law: "house", size: 128, detail: [] });
+  const wrongKind = triage("root", "house");
+  assert.equal(wrongKind.status, 2, `a renamed KIND must not be graded: ${wrongKind.stdout}`);
+  assert.match(wrongKind.stdout, /holds a dump of kind="ladder" but was asked for "root"/);
+  assert.match(wrongKind.stdout, /renamed, not re-rendered/);
+
+  // The kind is REQUIRED, not compared-if-present: a dump that never named one is
+  // either hand-made or older than this guard, and neither is evidence about the
+  // frame asked about.
+  writeDump("v7-gpu-detail-ladder-house.json", { law: "house", size: 128, detail: [] });
+  const unlabeled = triage("ladder", "house");
+  assert.equal(unlabeled.status, 2, `an unlabelled dump must not be graded: ${unlabeled.stdout}`);
+  assert.match(unlabeled.stdout, /kind=null but was asked for "ladder"/);
+  assert.match(unlabeled.stdout, /never named its kind/);
+
+  // Positive control on the guards: a dump labelled honestly is accepted and
+  // reaches the triage logic, which then reports the empty disagreement set as
+  // an absence. Without this leg the three refusals above would prove nothing
+  // beyond "the file never parses".
+  writeDump("v7-gpu-detail-ladder-house.json",
+    { kind: "ladder", law: "house", size: 128, frame: 0, seed: "e8-omnibus-1102", detail: [] });
+  const honest = triage("ladder", "house");
+  assert.equal(honest.status, 0, honest.stdout + honest.stderr);
+  assert.match(honest.stdout, /^triage ladder · seed=e8-omnibus-1102 · law=house/m);
+  assert.match(honest.stdout, /nothing to triage/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("an unreachable playwright is a typed SKIPPED that names every candidate, not a green", () => {
+  // The browser leg is the only checker here that can pass vacuously: it reads
+  // a CANDIDATES list, and a host with no reachable playwright would otherwise
+  // look like "the GPU leg ran and agreed". This leg forces that branch on a
+  // throwaway copy — both absolute paths swapped for an unreachable one and the
+  // env override pointed at nothing — and requires three things at once: rc=0,
+  // because "not installed" is not a rendering failure; ZERO page loads graded,
+  // so the rc cannot be mistaken for a pass; and a refusal that enumerates
+  // every candidate it tried, bare specifiers included.
+  const copy = copyDemo("no-playwright");
+  const checker = inCopy(copy, "tools/browser-check.mjs");
+  const before = readFileSync(checker, "utf8");
+  assert.match(before, /\/Users\/schizodactyl\/projects\/art\/node_modules\/playwright-core/,
+    "the shipped candidate list changed shape; this leg must be re-read, not re-templated");
+  swapFile(checker, "/Users/schizodactyl/projects/art/node_modules/playwright-core",
+    "/nonexistent/v7-unit-a/playwright-core");
+  swapFile(checker, "/Users/schizodactyl/projects/awkronos-waddle/node_modules/playwright-core",
+    "/nonexistent/v7-unit-b/playwright-core");
+
+  const res = node(["tools/browser-check.mjs"], copy, { PLAYWRIGHT_CORE_PATH: "/nonexistent/v7-unit-env" });
+  assert.equal(res.status, 0, `unreachable playwright must exit 0: ${res.stdout}${res.stderr}`);
+  assert.match(res.stdout, /^browser-check: SKIPPED/m);
+  assert.match(res.stdout, /not reachable/);
+  assert.match(res.stdout, /\/nonexistent\/v7-unit-env \((?:MODULE_NOT_FOUND|ERR_MODULE_NOT_FOUND)\)/);
+  assert.match(res.stdout, /\bplaywright-core \((?:MODULE_NOT_FOUND|ERR_MODULE_NOT_FOUND)\)/);
+  assert.match(res.stdout, /@playwright\/test \((?:MODULE_NOT_FOUND|ERR_MODULE_NOT_FOUND)\)/);
+  assert.match(res.stdout, /\/nonexistent\/v7-unit-a\/playwright-core/);
+  assert.match(res.stdout, /\/nonexistent\/v7-unit-b\/playwright-core/);
+  // The rc is honest precisely because nothing was graded.
+  assert.equal(res.stdout.split("\n").filter((l) => /^PASS/.test(l)).length, 0,
+    "a skipped browser leg must report no PASS lines: " + res.stdout);
+  assert.doesNotMatch(res.stdout, /--- .\/index\.html/);
+  assert.match(res.stdout, /not a rendering failure/);
+  rmSync(join(copy, ".."), { recursive: true, force: true });
 });

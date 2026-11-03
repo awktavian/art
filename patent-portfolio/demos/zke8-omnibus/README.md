@@ -2,10 +2,17 @@
 
 Two demoscene pages and one index, built from techniques that already run inside
 Kagami: the residual E8 lattice quantizer, the codec's 240-root `root_index`, and
-`core/omni/prng.py`'s seeded word stream. Vanilla ES modules, **no build step, no
-new dependencies** — the only non-shipped requirement is `playwright-core`, which
-is already a devDependency of this repo and is needed only for the browser leg of
-the battery.
+`core/omni/prng.py`'s seeded word stream. Vanilla ES modules, **no build step and
+no dependency added by this directory** — the only non-shipped requirement is
+`playwright-core`, needed solely for the browser leg of the battery. Measured
+provenance: `package.json` at the repo root declares exactly one devDependency,
+`@playwright/test@1.61.1`, and `playwright-core` reaches it transitively (measured
+chain: `@playwright/test` 1.61.1 → `playwright` 1.61.1 → `playwright-core` 1.61.1),
+so `npm ci` in a clone supplies it; `tools/browser-check.mjs` resolves it from
+whatever install is reachable and **never installs anything** — it tries
+`PLAYWRIGHT_CORE_PATH`, then the bare specifiers `playwright-core` and
+`@playwright/test`, then two host absolute paths, and prints `SKIPPED` with each
+candidate's failure code, exiting 0, if none resolve.
 
 Written against a live read of two other trees, both **read-only** from here:
 
@@ -68,12 +75,12 @@ Run from this directory. The rc column is what was measured on 2026-11-02.
 
 | command | rc | what it proves |
 |---|---|---|
-| `npm run test:unit` (from the repo root) | 0 | 70 tests, 70 pass, 0 fail — **8 of them are `tests/unit/zke8-omnibus-determinism.test.mjs`**, which puts this directory's determinism law inside CI's own gate: the shipped pin re-hashes green in a throwaway copy that is *not* a git work tree (so no estate checkout, no torch, no `git`), a GLSL-only comparison change goes red on the shader digest while `node --check` stays green, a stray delimiter in a shader literal goes red, a tampered frame digest goes red, an **absent** pin file goes red rather than reporting `compared=0` as a pass, and the `node --check` arity trap is re-measured every run and printed as a NOTE. |
+| `npm run test:unit` (from the repo root) | 0 | 72 tests, 72 pass, 0 fail, 0 skipped — **10 of them are `tests/unit/zke8-omnibus-determinism.test.mjs`**, which puts this directory's determinism law inside CI's own gate: the shipped pin re-hashes green in a throwaway copy that is *not* a git work tree (so no estate checkout, no torch, no `git`), a GLSL-only comparison change goes red on the shader digest while `node --check` stays green, a stray delimiter in a shader literal goes red, a tampered frame digest goes red, an **absent** pin file goes red rather than reporting `compared=0` as a pass, the triage tool's two dump-identity guards (renamed law, renamed or unlabelled kind) are refused against a dump directory the test owns, the browser leg's unreachable-playwright branch is forced and required to print a typed `SKIPPED` naming every candidate **and zero PASS lines**, and the `node --check` arity trap is re-measured every run and printed as a NOTE. |
 | `for f in js/*.js tools/*.mjs; do node --check "$f" \|\| echo "FAIL $f"; done` | 0 | all **ten** shipped modules parse (`ls js/*.js tools/*.mjs \| wc -l` → 10: six in `js/`, four in `tools/`; the unit test asserts that enumeration against the tree, so the list cannot silently lose a file). Use the loop, not `node --check a.js b.js`: **measured on this host, `--check` inspects only its first file argument and ignores the rest** (a broken second file still returned rc=0), so the glob form is a false green. And even the loop cannot see the *content* of the GLSL template literals — see the shader-digest row. |
 | `node tools/determinism-harness.mjs --check tools/pin.json` | 0 | 34 assertions: the canonical frames re-hashed against a pin written by a previous **process**, two independently imported module instances agreeing in one process, the seed-law vectors against the estate's bytes, SHA-256 itself against `node:crypto` over 501 inputs, the root-label closed form against the 240-row table over 202,551 samples, and the GLSL source digests. |
-| `node tools/browser-check.mjs` (`--root` to halve it) | 0 | headless Chromium: no uncaught error, no console error, the in-browser falsifier, the law the URL asked for, the in-browser SHA-256 equal to node's pin, GPU-vs-reference disagreement under 1% of pixels, and the float32 mirror reproducing the GPU's bytes. |
+| `node tools/browser-check.mjs` (`--root` to halve it) | 0 | headless Chromium: no uncaught error, no console error, the in-browser falsifier, the law the URL asked for, the in-browser SHA-256 equal to node's pin, GPU-vs-reference disagreement under 1% of pixels, and the float32 mirror reproducing the GPU's bytes. 42 PASS / 0 FAIL / 2 SKIPPED over 5 page loads. It resolves playwright from `PLAYWRIGHT_CORE_PATH`, then the bare specifiers, then two absolute host paths, and if none resolve it prints `SKIPPED` naming every candidate with its error code and exits **0 having graded nothing** — that rc is a typed absence, not a pass, and the unit gate now mutates the candidate list to force the branch and assert both halves of that sentence. |
 | `node tools/estate-parity.mjs` | 0 | 18 claims against `tools/estate-e8.json` — the estate's own torch `nearest_e8`, level counts, half-step codes, reconstruction and `root_index`, elementwise. |
-| `node tools/disagreement-triage.mjs [ladder\|root] [house\|estate]` | 0 ×4 | names a mechanism for every pixel the GPU moved by more than 8 levels, or writes it down as UNNAMED. 48/48 and 25/25 explained; the two zero-disagreement frames print a typed absence rather than a vacuous green. |
+| `node tools/disagreement-triage.mjs [ladder\|root] [house\|estate]` | 0 ×4 | names a mechanism for every pixel the GPU moved by more than 8 levels, or writes it down as UNEXPLAINED. 48/48 (ladder/house) and 25/25 (ladder/estate) explained, 0 unexplained; root/house and root/estate hold 0 disagreeing pixels and print `nothing to triage` instead of a vacuous green. **rc=0 here means the triage RAN, not that the pixels were explained** — read the tally line. Its only input is the per-pixel GPU dump `browser-check` writes, and both identity axes of that dump are now required to match the frame asked for: a dump renamed across LAWS and a dump renamed (or unlabelled) across KINDS are each refused with rc=2. Three traps on this row, all measured here: the dumps sit at `${V7_GPU_DETAIL_DIR:-/tmp}/v7-gpu-detail-<kind>-<law>.json`, so a stale file from an earlier frame silently grades as a fresh one (before the kind guard shipped, a ladder/house dump renamed to `root-house.json` was ACCEPTED — `0/48 explained, 48 UNEXPLAINED, rc=0`); and the four legs must be invoked with **two separate argv words**, because in zsh `for a in "ladder house"; do … $a` passes ONE argument, `argv.includes('root')` is false for every iteration, and the same ladder/house leg reports `0 ×4` — the header line names the kind it actually graded, so read it. |
 
 `node tools/determinism-harness.mjs --write tools/pin.json` regenerates the pin
 file; it is how `tools/pin.json` was written, and the frames came back identical.

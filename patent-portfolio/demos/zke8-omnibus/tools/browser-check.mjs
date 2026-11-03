@@ -39,6 +39,13 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const ROOT = join(HERE, '..');
+// The per-pixel GPU dumps are the ONLY input tools/disagreement-triage.mjs can
+// have — they cannot be produced anywhere but in a real browser. /tmp is the
+// default so the hand-run loop is unchanged, but the directory is overridable
+// for two reasons: /tmp is shared with every other lane on this host, and the
+// triage tool's identity guards (renamed law, renamed kind) are graded in CI
+// against a directory the test owns rather than against the real one.
+const DETAIL_DIR = process.env.V7_GPU_DETAIL_DIR || '/tmp';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -50,8 +57,17 @@ const MIME = {
 };
 
 // Resolved from an existing install if one is reachable; never installed here.
+// The bare specifiers come FIRST because they are what a fresh clone of this
+// repo actually has: `playwright-core` is hoisted into node_modules by npm as a
+// transitive dependency of the declared devDependency `@playwright/test`. The
+// absolute paths are host conveniences for a seat with no node_modules of its
+// own, and an env override wins over all of them. If none resolves the leg
+// prints SKIPPED with every candidate and its error code, and exits 0 —
+// "not installed" is not a rendering failure.
 const CANDIDATES = [
   process.env.PLAYWRIGHT_CORE_PATH,
+  'playwright-core',
+  '@playwright/test',
   '/Users/schizodactyl/projects/art/node_modules/playwright-core',
   '/Users/schizodactyl/projects/awkronos-waddle/node_modules/playwright-core',
 ].filter(Boolean);
@@ -273,8 +289,8 @@ try {
       // The law is in the FILE NAME. Two runs per kind (house, estate) writing one
       // path would leave the triage tool explaining whichever frame happened to land
       // last, with no way to tell which law produced the pixels.
-      await writeFile(`/tmp/v7-gpu-detail-${page.kind}-${dump.law}.json`, JSON.stringify(dump));
-      console.log(`  dumped ${dump.detail.length} disagreeing pixels -> /tmp/v7-gpu-detail-${page.kind}-${dump.law}.json`);
+      await writeFile(join(DETAIL_DIR, `v7-gpu-detail-${page.kind}-${dump.law}.json`), JSON.stringify(dump));
+      console.log(`  dumped ${dump.detail.length} disagreeing pixels -> ${join(DETAIL_DIR, `v7-gpu-detail-${page.kind}-${dump.law}.json`)}`);
       note('GPU digest is reported as its own number, never as the pin', !!m.gpuHex && m.gpuHex !== digest,
         `gpu=${String(m.gpuHex).slice(0, 12)}… cpu=${String(digest).slice(0, 12)}…`);
     } else {

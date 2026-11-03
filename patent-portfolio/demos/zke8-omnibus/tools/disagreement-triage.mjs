@@ -47,16 +47,21 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
 const which = argv.includes('root') ? 'root' : 'ladder';
 const law = argv.includes('estate') ? 'estate' : 'house';
-const path = `/tmp/v7-gpu-detail-${which}-${law}.json`;
+// The dump directory is overridable so CI can grade the two identity guards
+// below against a directory it owns. /tmp is shared with every other lane on
+// this host, and this file's only input is whatever sits at that path — a
+// default that a test has to write into is a test that races the fleet.
+const DETAIL_DIR = process.env.V7_GPU_DETAIL_DIR || '/tmp';
+const path = join(DETAIL_DIR, `v7-gpu-detail-${which}-${law}.json`);
 
 if (!existsSync(path)) {
   let seen = [];
   try {
-    seen = readdirSync('/tmp').filter((f) => f.startsWith('v7-gpu-detail-'));
-  } catch { /* a /tmp we cannot list is not a rendering failure; say so by absence */ }
+    seen = readdirSync(DETAIL_DIR).filter((f) => f.startsWith('v7-gpu-detail-'));
+  } catch { /* a directory we cannot list is not a rendering failure; say so by absence */ }
   console.log(`triage: no detail file at ${path}. Run \`node tools/browser-check.mjs\` first —`
     + ` the per-pixel GPU bytes can only come from a real browser, not from here.`
-    + (seen.length ? `\n  dumps present: ${seen.join(', ')}` : '\n  dumps present: none in /tmp'));
+    + (seen.length ? `\n  dumps present: ${seen.join(', ')}` : `\n  dumps present: none in ${DETAIL_DIR}`));
   process.exit(2);
 }
 
@@ -64,6 +69,20 @@ const dump = JSON.parse(readFileSync(path, 'utf8'));
 if ((dump.law ?? 'house') !== law) {
   console.log(`triage: ${path} was written under law=${JSON.stringify(dump.law)} but was asked for ${JSON.stringify(law)} --`
     + ` the file was renamed, not re-rendered. Refusing to explain one law's pixels with another law's coefficients.`);
+  process.exit(2);
+}
+// The law guard alone was not enough, and this was measured, not assumed: with
+// the LADDER/house dump renamed to v7-gpu-detail-root-house.json, this tool
+// accepted it and "explained" 48 ladder pixels against root's carrier — 0/48
+// reproduced, 48 UNEXPLAINED, rc=0. A file whose own `kind` field disagrees
+// with the kind asked for is the same defect as a renamed law, so it is refused
+// in the same place, before any scene is built. The field is REQUIRED rather
+// than compared-if-present: `tools/browser-check.mjs` has always written it, so
+// a dump without one is either hand-made or from a build older than this guard,
+// and neither is evidence about the frame being asked about.
+if ((dump.kind ?? null) !== which) {
+  console.log(`triage: ${path} holds a dump of kind=${JSON.stringify(dump.kind ?? null)} but was asked for ${JSON.stringify(which)} --`
+    + ` the file was renamed, not re-rendered, or it never named its kind. Refusing to explain one kind's pixels with another kind's carrier.`);
   process.exit(2);
 }
 const rows = dump.detail || [];
