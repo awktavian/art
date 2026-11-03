@@ -97,12 +97,19 @@ test("the determinism harness re-hashes the shipped pin, offline and git-free", 
 });
 
 test("estate parity grades the committed fixture, offline and git-free", () => {
-  const copy = copyDemo("parity");
+  // Spaces exercise file-URL decoding as well as independence from the author's host.
+  const copy = copyDemo("parity with spaces");
   const res = node(["tools/estate-parity.mjs"], copy);
   assert.equal(res.status, 0, res.stdout + res.stderr);
   assert.match(res.stdout, /PARITY: all assertions hold/);
   const fails = res.stdout.split("\n").filter((l) => l.startsWith("FAIL"));
   assert.equal(fails.length, 0, "FAIL lines: " + fails.join(" | "));
+  // A copied checker must use its copied subject, never an absolute author-seat import.
+  rmSync(inCopy(copy, "js/e8-core.js"));
+  const missing = node(["tools/estate-parity.mjs"], copy);
+  assert.notEqual(missing.status, 0, "missing copied core must refuse, not grade another checkout");
+  assert.match(missing.stderr, /ERR_MODULE_NOT_FOUND/);
+  assert.match(missing.stderr, /e8-core\.js/);
   rmSync(join(copy, ".."), { recursive: true, force: true });
 });
 
