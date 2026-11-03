@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Residual E8 Ladder — nested Voronoi cells at sqrt(240)</title>
+<meta name="description" content="Demoscene render of residual E8 lattice vector quantization: the estate's own codec, drawn level by level, with hash-pinned deterministic frames and a measured CPU-vs-GPU delta.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #04050a; --void-2: #0a0d16; --ink: #dfe9ec; --ink-dim: #93a4ad;
+    --ice: #00ced1; --gold: #c9a227; --line: #1c2431;
+    --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--void); color: var(--ink); }
+  body { font-family: var(--font-sans); line-height: 1.5; }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 0 18px 64px; }
+  header { padding: 26px 0 14px; border-bottom: 1px solid var(--line); }
+  .kicker { font: 500 11px/1 var(--font-mono); letter-spacing: .22em; text-transform: uppercase; color: var(--gold); margin: 0 0 8px; }
+  h1 { font: 600 clamp(22px, 3.4vw, 34px)/1.1 var(--font-sans); margin: 0 0 6px; letter-spacing: -.01em; }
+  h1 em { font-style: normal; color: var(--ice); }
+  .crumbs { font: 400 12px/1 var(--font-mono); color: var(--ink-dim); margin: 0; }
+  .crumbs a { color: var(--ice); text-decoration: none; border-bottom: 1px solid rgba(0,206,209,.3); }
+  .stage-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; margin-top: 18px; align-items: start; }
+  @media (max-width: 900px) { .stage-grid { grid-template-columns: 1fr; } }
+  .screen { position: relative; border: 1px solid var(--line); background: #000; overflow: hidden; }
+  .screen canvas#stage { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; }
+  .screen.refused canvas#stage { outline: 1px dashed var(--gold); outline-offset: -3px; }
+  /* Post, deliberately OUTSIDE the compared bytes: the pin describes the canvas
+     framebuffer only, so CRT dressing can never enter a digest. */
+  .screen::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background:
+      repeating-linear-gradient(0deg, rgba(0,0,0,.30) 0 1px, transparent 1px 3px),
+      radial-gradient(130% 100% at 50% 50%, transparent 55%, rgba(0,0,0,.72) 100%),
+      linear-gradient(90deg, rgba(0,206,209,.05), transparent 12%, transparent 88%, rgba(201,162,39,.05));
+    mix-blend-mode: screen;
+  }
+  .side { display: flex; flex-direction: column; gap: 14px; }
+  .panel { border: 1px solid var(--line); background: var(--void-2); padding: 12px 13px 14px; }
+  .panel h2 { font: 500 10.5px/1 var(--font-mono); letter-spacing: .2em; text-transform: uppercase; color: var(--gold); margin: 0 0 9px; }
+  canvas#cert { display: block; width: 100%; height: auto; image-rendering: pixelated; background: #000; border: 1px solid var(--line); }
+  .cert-cap { font: 400 11px/1.45 var(--font-mono); color: var(--ink-dim); margin: 8px 0 0; }
+  .controls { display: grid; gap: 10px; }
+  .row { display: grid; grid-template-columns: 92px 1fr auto; gap: 8px; align-items: center; }
+  label { font: 400 11px/1.2 var(--font-mono); color: var(--ink-dim); letter-spacing: .04em; }
+  input[type=text], input[type=number], select {
+    font: 400 12px/1 var(--font-mono); color: var(--ink); background: #070a12;
+    border: 1px solid var(--line); padding: 6px 7px; min-width: 0; width: 100%;
+  }
+  input[type=range] { width: 100%; accent-color: var(--ice); }
+  output { font: 400 11px/1 var(--font-mono); color: var(--ice); min-width: 34px; text-align: right; }
+  input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible {
+    outline: 2px solid var(--ice); outline-offset: 2px;
+  }
+  .buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+  button {
+    font: 500 11px/1 var(--font-mono); letter-spacing: .12em; text-transform: uppercase;
+    background: var(--gold); color: #0a0a0a; border: 1px solid var(--gold); padding: 10px 13px; cursor: pointer;
+  }
+  button.ghost { background: transparent; color: var(--ice); border-color: var(--ice); }
+  button:hover { filter: brightness(1.12); }
+  pre#readout {
+    font: 400 12px/1.62 var(--font-mono); color: var(--ink); background: #06080f;
+    border: 1px solid var(--line); border-left: 2px solid var(--ice);
+    padding: 13px 14px; margin: 16px 0 0; white-space: pre-wrap; word-break: break-word;
+    max-height: 340px; overflow: auto;
+  }
+  .legend { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .legend li { display: grid; grid-template-columns: 12px 1fr; gap: 9px; font: 400 12px/1.45 var(--font-mono); color: var(--ink-dim); }
+  .swatch { width: 12px; height: 12px; margin-top: 3px; }
+  .legend b { color: var(--ink); font-weight: 500; }
+  h3 { font: 500 11px/1 var(--font-mono); letter-spacing: .18em; text-transform: uppercase; color: var(--gold); margin: 34px 0 10px; }
+  p { max-width: 88ch; font-size: 15px; color: var(--ink-dim); }
+  p b, li b { color: var(--ink); }
+  code { font: 400 12.5px/1.4 var(--font-mono); color: var(--ice); background: rgba(0,206,209,.07); padding: 1px 5px; }
+  a { color: var(--ice); }
+  .cite { font: 400 12px/1.6 var(--font-mono); color: var(--ink-dim); border-left: 1px solid var(--line); padding-left: 12px; }
+  footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); font: 400 12px/1.6 var(--font-mono); color: var(--ink-dim); }
+  @media (prefers-reduced-motion: reduce) { .screen::after { animation: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="kicker">Technique 1 · residual E8 quantization · e8_lattice_protocol.py</p>
+    <h1>Residual <em>E8</em> Ladder</h1>
+    <p class="crumbs"><a href="../index.html">← E8 Omnibus</a> · <a href="../root-shell/index.html">Root shell →</a> · every pixel is a function of the hash</p>
+  </header>
+
+  <main>
+    <div class="stage-grid">
+      <div class="screen" id="screen">
+        <canvas id="stage" role="img"
+          aria-label="Live WebGL2 render of the residual E8 lattice quantizer driving an eight-lane triangle-wave carrier field. Nested Voronoi cells appear as coloured plates; a gold filament traces the neighbourhood of the coset-boundary set the estate's conservative kernel refuses."></canvas>
+      </div>
+
+      <div class="side">
+        <div class="panel">
+          <h2>Certificate · CPU reference</h2>
+          <canvas id="cert" width="128" height="128" role="img"
+            aria-label="The 128 by 128 canonical frame rendered by the float64 CPU reference renderer. This is the byte string the SHA-256 pin describes."></canvas>
+          <p class="cert-cap">
+            float64 · 128×128 · <b>canonical</b>. Upscaled with <code>image-rendering: pixelated</code>.
+            This inset is what <code>tools/pin.json</code> hashes — the live canvas above is the same
+            formula in float32.
+          </p>
+        </div>
+
+        <div class="panel">
+          <h2>Controls</h2>
+          <div class="controls">
+            <div class="row">
+              <label for="seed">seed</label>
+              <input id="seed" type="text" value="e8-omnibus-1102" spellcheck="false" autocomplete="off">
+              <output></output>
+            </div>
+            <div class="row">
+              <label for="law">seed law</label>
+              <select id="law">
+                <option value="house" selected>house — Xorshift128+ over FNV-1a</option>
+                <option value="estate">estate — kagami core/omni/prng.py</option>
+              </select>
+              <output></output>
+            </div>
+            <div class="row">
+              <label for="frame">frame</label>
+              <input id="frame" type="number" min="0" step="1" value="0">
+              <output></output>
+            </div>
+            <div class="row">
+              <label for="levels">levels</label>
+              <input id="levels" type="range" min="1" max="16" step="1" value="4"
+                aria-describedby="levels-hint">
+              <output id="levels-out">4</output>
+            </div>
+            <div class="row">
+              <label for="threshold">threshold</label>
+              <select id="threshold">
+                <option value="0">0 (never stop early)</option>
+                <option value="0.0001">1e-4</option>
+                <option value="0.001" selected>1e-3 (estate default)</option>
+                <option value="0.01">1e-2</option>
+                <option value="0.1">1e-1</option>
+              </select>
+              <output></output>
+            </div>
+            <div class="row">
+              <label for="epsdraw">filament ±</label>
+              <input id="epsdraw" type="number" min="0.000001" step="0.005" value="0.02">
+              <output></output>
+            </div>
+            <div class="row">
+              <label for="amplitude">amplitude</label>
+              <input id="amplitude" type="number" min="0.25" step="0.05" value="1.5">
+              <output></output>
+            </div>
+          </div>
+          <p class="cert-cap" id="levels-hint">
+            <b>Subordinate knob.</b> The codec stops once <code>‖r‖² &lt; threshold²·8</code>, so extra
+            levels do nothing for a vector that already converged. Set threshold to <code>0</code> to make
+            depth own the picture.
+          </p>
+          <p class="cert-cap">
+            <b>Seed law.</b> <i>house</i> is this repo's convention: Xorshift128+ over an FNV-1a hash of
+            the seed string. <i>estate</i> is <code>js/seed-stream.js</code>, a bit-exact port of Kagami's
+            own stream — SHA-256 in counter mode over a canonical seed prefix, big-endian 64-bit words,
+            53-bit draws (<code>packages/kagami/core/omni/prng.py</code>). Both laws fill the SAME eight
+            carrier lanes from the same mapping, so the law is the only thing that changes when you switch
+            it. The estate law is graded, not asserted: <code>tools/gen-estate-seed-vectors.py</code> runs
+            the real Python module, <code>tools/determinism-harness.mjs</code> compares this browser port to
+            its bytes, and <code>tools/browser-check.mjs</code> re-grades the estate frame in Chromium
+            against its own row in <code>tools/pin.json</code>.
+          </p>
+          <div class="buttons" style="margin-top:10px">
+            <button id="play" type="button" aria-pressed="false">PLAY</button>
+            <button id="copy-url" class="ghost" type="button">COPY URL</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>What the pixels mean</h2>
+          <ul class="legend">
+            <li><span class="swatch" style="background:#e8a83c"></span><span><b>Gold plate</b> — the level-0 codeword is a <b>root class</b> (q=1): 120 of the 256 classes in <code>E8/2E8</code>.</span></li>
+            <li><span class="swatch" style="background:#3f9bd6"></span><span><b>Blue plate</b> — a <b>singular class</b> (q=0, non-zero): 135 of 256.</span></li>
+            <li><span class="swatch" style="background:#8f9aa6"></span><span><b>Pale plate</b> — the <b>zero class</b>: the carrier landed in the cell whose codeword is 0.</span></li>
+            <li><span class="swatch" style="background:#ff00ff"></span><span><b>Magenta</b> — <b>UNDECLARED</b>: Σw² not divisible by 8, so the point is not in the lattice. Never a palette accident, never folded into the zero class.</span></li>
+            <li><span class="swatch" style="background:linear-gradient(180deg,#fff,#333)"></span><span><b>Brightness</b> — depth inside the cell, against the covering radius <code>sqrt(2)</code>.</span></li>
+            <li><span class="swatch" style="background:#c9a227;border-radius:50%"></span><span><b>Filament</b> — <code>|advantage|</code> below the drawn radius: the neighbourhood of the set the kernel <b>refuses</b> at 1e-4.</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <pre id="readout" role="status" aria-live="polite">booting…</pre>
+
+    <h3>Why this is the estate's codec, not a lattice-flavoured shader</h3>
+    <p>
+      Every pixel samples an eight-lane carrier field
+      <code>v_k(u,v,t) = A · tri(fx_k·u + fy_k·v + phi_k + t·omega_k)</code>, whose coefficients come
+      from the seed through the house PRNG (Xorshift128+ on an FNV-1a hash, the same lane as
+      <code>gen/</code>). That vector is then quantized by the <b>residual E8 ladder</b> exactly as
+      <code>ResidualE8LatticeVQ.forward</code> does: divide the residual by the level scale, find the
+      nearest lattice point, subtract, repeat. Level scales are <code>float32(2.0 / sqrt(240)^i)</code>
+      — <b>15.491933384829668</b> per level — clamped at <code>1e-6</code> at the use site, with the first
+      clamped index measured at 6. The reconstruction is <code>Σ codes[i]/2 · s_i</code>.
+    </p>
+    <p class="cite">
+      Cited in the shipped source: level scales <code>e8_lattice_protocol.py:220-228</code>; forward
+      loop <code>:285-315</code>; stop test <code>:310-315</code>; clamp <code>:286</code>; decode
+      <code>:349-359</code>; config <code>E8LatticeResidualConfig :175-207</code>; covering radius and the
+      root table <code>e8_period_codec.py:189, 610-613</code>; the coset-tie refusal
+      <code>examples/raw-nearest-e8.e8:73-78</code>; the <code>f2_8</code> class counts
+      <code>e8_alphabet.py:105-121</code>.
+    </p>
+
+    <h3>What the two paths disagree about, measured</h3>
+    <p>
+      The reference is float64; the shader is float32 from the uniform upload to the fragment's last
+      multiply. Both implement the same expressions — the shader carries the protocol's stop test,
+      the per-level weights, the class hues, the uv law (with the GL Y-flip) and the filament ramp, and
+      it reads its level scales from <code>uScales</code> so the GPU cannot invent a decay. The readout
+      above therefore prints a <b>mean and max per-byte delta and the two digests</b> at load, on this
+      device, instead of asserting the frames match. Where a difference is large enough to see, the
+      worst pixel is named with its coordinates.
+    </p>
+    <p>
+      The filament radius deserves the same honesty: at the kernel's own <code>1e-4</code> the refusal set
+      is <b>2 of 16384</b> pixels in the canonical frame (0.01%, min observed <code>|advantage|</code>
+      3.457e-5). The gold lines draw that set's <b>neighbourhood</b>, and the radius is a named control,
+      not an implied claim.
+    </p>
+  </main>
+
+  <footer>
+    E8 Omnibus · RSI40-1102 lane V7 · no dependencies · CPU reference canonical, WebGL2 measured ·
+    pins: <code>tools/pin.json</code> · source: <code>js/e8-core.js</code>, <code>js/ref-render.js</code>,
+    <code>js/gl-render.js</code>, <code>js/shell.js</code>
+  </footer>
+</div>
+
+<script type="module">
+import { start } from '../js/shell.js';
+await start({ kind: 'ladder', pinPath: '../tools/pin.json', maxDpr: 2 });
+</script>
+<noscript><p style="font-family:monospace;color:#c9a227">This page needs scripting. The canonical frames are reproducible without it: <code>node tools/determinism-harness.mjs --check tools/pin.json</code>.</p></noscript>
+</body>
+</html>

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E8 Omnibus — two generative lattice techniques, demoscened</title>
+<meta name="description" content="Residual E8 lattice quantization and the 240-root direction code, ported from the Kagami estate's zke8 codec to browser GLSL/JS with hash-pinned deterministic frames.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #05060b;
+    --void-2: #0a0d16;
+    --ink: #dfe9ec;
+    --ink-dim: #93a4ad;
+    --ice: #00ced1;
+    --gold: #c9a227;
+    --line: #1c2431;
+    --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--void); color: var(--ink); }
+  body { font-family: var(--font-sans); line-height: 1.55; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px 72px; }
+  header.hero { position: relative; padding: 72px 0 40px; border-bottom: 1px solid var(--line); overflow: hidden; }
+  header.hero::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background:
+      repeating-linear-gradient(180deg, rgba(255,255,255,.026) 0 1px, transparent 1px 3px),
+      radial-gradient(120% 80% at 50% -10%, rgba(0,206,209,.16), transparent 60%),
+      radial-gradient(90% 70% at 50% 130%, rgba(201,162,39,.14), transparent 62%);
+  }
+  .kicker { font: 500 12px/1 var(--font-mono); letter-spacing: .22em; text-transform: uppercase; color: var(--gold); }
+  h1 { font: 600 clamp(30px, 5.4vw, 56px)/1.06 var(--font-sans); margin: 14px 0 10px; letter-spacing: -.02em; }
+  h1 em { font-style: normal; color: var(--ice); }
+  .sub { max-width: 74ch; color: var(--ink-dim); font-size: 17px; margin: 0 0 8px; }
+  .sub b { color: var(--ink); font-weight: 600; }
+  h2 { font: 500 13px/1 var(--font-mono); letter-spacing: .18em; text-transform: uppercase; color: var(--gold); margin: 44px 0 16px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; margin: 0; padding: 0; list-style: none; }
+  .card { border: 1px solid var(--line); background: linear-gradient(180deg, var(--void-2), var(--void)); display: flex; flex-direction: column; }
+  .card canvas { display: block; width: 100%; height: 264px; background: var(--void); }
+  .card .body { padding: 16px 18px 20px; }
+  .card h3 { margin: 0 0 6px; font: 600 21px/1.2 var(--font-sans); }
+  .card p { margin: 0 0 12px; color: var(--ink-dim); font-size: 14.5px; }
+  .card a.cta {
+    display: inline-block; font: 500 13px/1 var(--font-mono); letter-spacing: .1em;
+    text-transform: uppercase; color: var(--void); background: var(--ice);
+    padding: 11px 16px; text-decoration: none; border: 1px solid var(--ice);
+  }
+  .card a.cta.gold { background: var(--gold); border-color: var(--gold); }
+  .card a.cta:hover, .card a.cta:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  table { width: 100%; border-collapse: collapse; font: 400 12.5px/1.5 var(--font-mono); }
+  caption { text-align: left; color: var(--ink-dim); font-size: 13px; padding-bottom: 8px; }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--gold); font-weight: 500; letter-spacing: .08em; text-transform: uppercase; font-size: 11px; }
+  td.hash { word-break: break-all; color: var(--ice); }
+  .note { font: 400 13px/1.6 var(--font-mono); color: var(--ink-dim); background: var(--void-2); border-left: 2px solid var(--gold); padding: 14px 16px; }
+  .note b { color: var(--gold); }
+  code { font: 400 13px/1.4 var(--font-mono); color: var(--ice); background: rgba(0,206,209,.07); padding: 1px 5px; }
+  a { color: var(--ice); }
+  footer { margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--ink-dim); font-size: 13px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  @media (prefers-reduced-motion: no-preference) {
+    .card canvas { transition: filter 610ms cubic-bezier(.2,.7,.2,1); }
+    .card:hover canvas { filter: saturate(1.18) brightness(1.06); }
+  }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <p class="kicker">Kagami estate · zke8 codec · lane V7</p>
+    <h1>The <em>E8</em> Omnibus: two lattice techniques, rendered as demoscene</h1>
+    <p class="sub">
+      The estate already generates an eight-dimensional carrier field and quantizes it with the
+      <b>residual E8 lattice vector quantizer</b>, then labels each vector by one of the
+      <b>240 roots</b> of the lattice. Those two mechanisms are the whole show here: ported to
+      browser GLSL and JavaScript, with <b>no new dependencies</b>, and with every frame
+      reproducible from a URL.
+    </p>
+    <p class="sub">
+      Nothing in the estate compiles to a shader — the JIT legs produce a <b>dylib</b> and a
+      <b>wasm32</b> module, and the shader machinery is a <b>parser</b>, not a generator. So the
+      port is honest transcription: the shader computes the same formula as the CPU reference,
+      the two paths are <b>measured against each other</b> in the browser, and the reference
+      bytes are what a <b>SHA-256 pin</b> describes.
+    </p>
+  </header>
+
+  <main>
+    <h2>Two techniques</h2>
+    <ul class="cards">
+      <li class="card">
+        <canvas id="prev-ladder" width="480" height="264" role="img"
+          aria-label="Preview of the residual E8 lattice ladder demo: nested Voronoi cells at square-root-240 spacing ratios, with a gold filament along the boundary set the estate's kernel refuses."></canvas>
+        <div class="body">
+          <h3>1 · Residual ladder</h3>
+          <p>
+            Nested E8 Voronoi cells, each level <code>sqrt(240) ≈ 15.492×</code> finer than the
+            last. Hue is the lattice's own <code>f2_8</code> quotient (1 zero class, 120 root
+            classes, 135 singular classes); brightness is depth inside the cell against the
+            covering radius <code>sqrt(2)</code>; the gold filament traces the neighbourhood of
+            the exact-boundary set that the estate's conservative CPU kernel <b>refuses</b>.
+          </p>
+          <p><a class="cta" href="residual-ladder/index.html">Open the ladder</a></p>
+        </div>
+      </li>
+      <li class="card">
+        <canvas id="prev-root" width="480" height="264" role="img"
+          aria-label="Preview of the E8 root shell demo: 240 direction codes painted as hue bands, with bright gold seams where the two root families tie and ice walls where the Weyl chamber walls sit."></canvas>
+        <div class="body">
+          <h3>2 · Root shell</h3>
+          <p>
+            The 240 roots as a direction code, indexed by an <b>analytic closed form</b>
+            (one 8-lane pass plus 28 integer candidates, instead of 240 dot products) that is
+            proven equal to the estate's 240-row table. Hue is the root index
+            <code>0..239</code>; gold is where the <code>(±1,±1,0⁶)</code> and
+            <code>(±½)⁸</code> families tie; ice is a Weyl chamber wall.
+          </p>
+          <p><a class="cta gold" href="root-shell/index.html">Open the shell</a></p>
+        </div>
+      </li>
+    </ul>
+
+    <h2>Same seed, same pixels</h2>
+    <p class="note">
+      <b>The claim.</b> A URL carries the seed and the frame number; the CPU reference renders
+      them with operations ECMA-262 specifies <i>exactly</i> — a triangle-wave carrier instead of
+      <code>Math.sin</code> (which the standard leaves implementation-approximated), and a frozen
+      float32 scale table built by multiplication instead of <code>Math.pow</code>. The digest
+      below is <b>SHA-256 over the raw RGBA bytes</b> of a 128×128 canonical frame, so it is a
+      property of the seed, not of the machine.
+    </p>
+    <p class="note" style="margin-top:12px">
+      <b>The disclosure.</b> The CPU reference is canonical and is what the pin describes. The
+      live canvas is WebGL2 and therefore <b>float32 end to end</b>; both demos measure the
+      per-byte GPU-vs-reference delta at load and print it, per device, rather than claiming the
+      two are bit-identical. The estate's own E8 decoder certificate is <b>EXPIRED (2026-10-01)</b>
+      and its codec docstring claims <b>no IEEE-level bit identity</b> — this port inherits that
+      honesty.
+    </p>
+
+    <div style="margin-top:22px">
+      <table id="pin-table">
+        <caption>Determinism pins — <code>node tools/determinism-harness.mjs --check tools/pin.json</code> compares these against a render from a fresh process. The two hub previews above run the <b>house</b> law; the rows below pin both laws, which is why the same seed and frame appear twice with different digests.</caption>
+        <thead>
+          <tr><th scope="col">technique</th><th scope="col">seed</th><th scope="col">frame</th><th scope="col">levels</th><th scope="col">seed law</th><th scope="col">sha256 of RGBA bytes</th></tr>
+        </thead>
+        <tbody id="pin-rows">
+          <tr><td colspan="6">loading <code>tools/pin.json</code>…</td></tr>
+        </tbody>
+        <tfoot id="pin-foot"></tfoot>
+      </table>
+    </div>
+
+    <h2>Controls, both pages</h2>
+    <p class="sub">
+      Seed · frame · ladder depth · residual threshold · filament radius · carrier amplitude. Each
+      control rewrites the hash, so <b>Copy URL</b> is the reproduction recipe. The frame slider
+      and <b>Play</b> drive the animation; <code>prefers-reduced-motion: reduce</code> starts every
+      page paused on the pinned frame. The readout under the canvas is an <code>aria-live</code>
+      region carrying the measured numbers in text.
+    </p>
+    <p class="note" style="margin-top:12px">
+      <b>One honest caveat about the depth slider.</b> The estate's quantizer stops as soon as the
+      residual converges (<code>‖r‖² &lt; threshold²·8</code>), so asking for more levels than the
+      vector needs does nothing — the harness proves the knob is wired by testing at
+      <code>threshold = 0</code>, where every requested level is emitted and the digest changes.
+      A slider that the shipped config can override is disclosed, not hidden.
+    </p>
+  </main>
+
+  <footer>
+    <p>
+      Ported read-only from the Kagami checkout:
+      <code>packages/kagami/core/digest/e8_period_codec.py</code>,
+      <code>packages/kagami/core/omni/prng.py</code>,
+      <code>packages/kagami_math/e8_core.py</code>, <code>e8_lattice_protocol.py</code>,
+      <code>e8_lattice_quantizer.py</code>, <code>e8_alphabet.py</code>,
+      <code>dimensions.py</code>; and from the zke8 checkout,
+      <code>examples/raw-nearest-e8.e8</code>, <code>scripts/e8_jit.py</code>,
+      <code>scripts/e8_wasm.py</code>. Every line citation is in the shipped
+      <code>js/e8-core.js</code> header and in <code>README.md</code>.
+    </p>
+    <p>No new dependencies: vanilla ES modules, WebGL2, one Google Fonts link (the same one
+      <code>patent-portfolio/index.html</code> already uses), no build step.</p>
+  </footer>
+</div>
+
+<script type="module">
+// Hub previews. Two live canvases, the same shaders the demo pages use, running
+// at a Fibonacci-stepped frame counter. If WebGL2 is refused we say WHICH code
+// refused, per the estate's absence law — an empty box is not evidence of a
+// quiet machine.
+import { createRenderer } from './js/gl-render.js';
+import { fieldCoefficients } from './js/e8-core.js';
+
+const FIB = [89, 144, 233, 377, 610, 987];
+const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function preview(id, kind, seed, statusId) {
+  const canvas = document.getElementById(id);
+  const r = createRenderer(canvas, kind);
+  if (!r.ok) {
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0a0d16'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#c9a227'; ctx.font = '13px "IBM Plex Mono", monospace';
+    ctx.fillText('WebGL2 refused: ' + r.refusal, 16, canvas.height / 2);
+    const el = document.getElementById(statusId);
+    if (el) el.textContent = r.refusal;
+    return null;
+  }
+  const coef = fieldCoefficients(seed);
+  canvas.width = canvas.clientWidth || canvas.width;
+  canvas.height = canvas.clientHeight || canvas.height;
+  r.resize(canvas.width, canvas.height, 1);
+  r.draw(coef, FIB[kind === 'ladder' ? 1 : 3], { levels: 4 });
+  return r;
+}
+
+const a = preview('prev-ladder', 'ladder', 'e8-omnibus-1102');
+const b = preview('prev-root', 'root', 'butterfly');
+
+if (!reduce) {
+  let i = 0, acc = 0, last = performance.now();
+  const step = (now) => {
+    const dt = now - last; last = now; acc += dt;
+    if (acc > FIB[i % FIB.length]) {
+      acc = 0; i += 1;
+      if (a) { a.resize(a.size().w, a.size().h, 1); a.draw(fieldCoefficients('e8-omnibus-1102'), i, { levels: 4 }); }
+      if (b) { b.resize(b.size().w, b.size().h, 1); b.draw(fieldCoefficients('butterfly'), i, {}); }
+    }
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+// The pin table is read from the committed pin file rather than pasted, so a
+// re-run of the harness cannot leave this page quoting stale digests.
+const rows = document.getElementById('pin-rows');
+const foot = document.getElementById('pin-foot');
+try {
+  const res = await fetch('tools/pin.json', { cache: 'no-store' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const pin = await res.json();
+  rows.replaceChildren(...pin.frames.map((f) => {
+    const tr = document.createElement('tr');
+    const cells = [f.kind === 'ladder' ? 'Residual ladder' : 'Root shell', f.seed, 'f' + f.frame, String(f.levels ?? '—'), f.law ?? 'house', f.sha256];
+    cells.forEach((text, i) => {
+      const td = document.createElement('td');
+      if (i === 5) td.className = 'hash';
+      td.textContent = text;
+      tr.appendChild(td);
+    });
+    return tr;
+  }));
+  // The pin file describes two things: what the CPU path drew, and what the
+  // browser will be told to draw. Both are hashed and both are shown, because a
+  // reader who assumed only the first was pinned would be wrong about what
+  // travels to another machine.
+  if (pin.shaders) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 5;
+    td.textContent = 'GLSL source digest (assembled per kind, before the driver sees it) — '
+      + Object.entries(pin.shaders).map(([k, v]) => `${k} ${String(v).slice(0, 16)}…`).join(' · ');
+    const when = document.createElement('td');
+    when.textContent = pin.node ? `${pin.node} · ${String(pin.written_at).slice(0, 10)}` : '';
+    tr.append(td, when);
+    foot.replaceChildren(tr);
+  }
+} catch (err) {
+  rows.innerHTML = '';
+  const tr = document.createElement('tr');
+  const td = document.createElement('td');
+  td.colSpan = 6;
+  td.textContent = `pin file unavailable here (${err.name}: ${err.message}). Serve the directory over http:// and reload; the digests live in tools/pin.json.`;
+  tr.appendChild(td); rows.appendChild(tr);
+}
+</script>
+<noscript><p style="font-family:monospace;color:#c9a227">These demos need scripting: the pin table and both renderers are ES modules. With scripting off, the canonical frames are still reproducible by <code>node tools/determinism-harness.mjs</code>.</p></noscript>
+</body>
+</html>
