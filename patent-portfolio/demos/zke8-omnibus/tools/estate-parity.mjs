@@ -29,7 +29,7 @@ import {
   pairRank,
   rankEvenPopcount,
   popcountEven,
-} from '/Users/schizodactyl/seats/rsi40/V7/patent-portfolio/demos/zke8-omnibus/js/e8-core.js';
+} from '../js/e8-core.js';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const data = JSON.parse(readFileSync(path.join(HERE, 'estate-e8.json'), 'utf8'));
