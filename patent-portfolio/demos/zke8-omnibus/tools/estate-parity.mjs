@@ -11,7 +11,6 @@
  * Prints counts, never a bare pass.
  */
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import {
   buildE8Roots,
   rootIndex,
@@ -29,10 +28,9 @@ import {
   pairRank,
   rankEvenPopcount,
   popcountEven,
-} from '/Users/schizodactyl/seats/rsi40/V7/patent-portfolio/demos/zke8-omnibus/js/e8-core.js';
+} from '../js/e8-core.js';
 
-const HERE = path.dirname(new URL(import.meta.url).pathname);
-const data = JSON.parse(readFileSync(path.join(HERE, 'estate-e8.json'), 'utf8'));
+const data = JSON.parse(readFileSync(new URL('./estate-e8.json', import.meta.url), 'utf8'));
 
 const fails = [];
 const note = (label, pass, detail) => {
