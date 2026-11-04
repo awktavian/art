@@ -30,7 +30,7 @@ test("directory is keyboard-operable and exposes named controls", async ({ page 
   const assertRuntimeClean = monitorRuntime(page);
   await page.goto("/art/", { waitUntil: "load" });
 
-  await expect(page).toHaveTitle(/The Art Directory/);
+  await expect(page).toHaveTitle(/Art for humans · awkronos/);
   await expect(page.locator("html")).toHaveAttribute("lang", /.+/);
   await expect(page.getByRole("link", { name: "Skip to apps" })).toHaveAttribute("href", /.+/);
   await expect(page.getByRole("main")).toBeVisible();
