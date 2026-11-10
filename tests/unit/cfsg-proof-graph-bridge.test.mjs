@@ -15,23 +15,30 @@
  *      refused rather than mounted, a relation to something outside the corpus is
  *      refused rather than invented, and an edge kind the layout cannot position
  *      is refused rather than relabelled.
- *   3. CONSUMABILITY. The triple (receipt, graph, layout) must pass the 12 refusal
- *      legs of the gate the Hub's own read runs — ported here as
- *      `assertHubReceiptConsistent`, with negative controls that prove the gate
- *      FIRES. A green gate with no negative control is not a verified gate; it is
- *      an unexercised branch. (This is the exact class of hole recorded in
- *      `apps/hub/lib/proof-artifacts-cache.ts:196-203`: the hub carried its own
- *      literal `schemaVersion !== 2`, the generator bumped to v3, and no test
- *      pinned the copy, so the break surfaced only at runtime.)
+ *   3. CONSUMABILITY. The triple (receipt, graph, layout) must pass every refusal
+ *      leg of the two gates the Hub's own read runs — `assertHubReceiptConsistent`
+ *      (15 throw sites) and `assertHubMountable` (10) — with a negative control
+ *      that proves each leg FIRES. A green gate with no negative control is not a
+ *      verified gate; it is an unexercised branch. (This is the exact class of
+ *      hole recorded in `apps/hub/lib/proof-artifacts-cache.ts:196-203`: the hub
+ *      carried its own literal `schemaVersion !== 2`, the generator bumped to v3,
+ *      and no test pinned the copy, so the break surfaced only at runtime.) The
+ *      leg list is not kept by hand: `refusalLegs()` counts it out of the bridge
+ *      source at test time, so a guard added without a control fails the suite.
  *
- * The census fixture below is a verbatim recording of
- * `~/.kagami/solver-certs/GR-FULLSEND-1027-CFSG-AXIOM-CENSUS.json`
- * (sha256 68f0a35d44fbb136713c1adafd8f08c74c12dd6a742e3d815884ab916a27a6e8,
- * read 2026-11-02), inlined rather than read at test time so the suite stays
- * offline and host-independent, exactly like `tests/unit/corpus-stats.test.mjs`
- * keeps its inputs in-process.
+ * The census fixture below reproduces, byte for byte, every field of
+ * `~/.kagami/solver-certs/GR-FULLSEND-1027-CFSG-AXIOM-CENSUS.json` (sha256
+ * 68f0a35d44fbb136713c1adafd8f08c74c12dd6a742e3d815884ab916a27a6e8) that it
+ * carries — including all 13 `exec_leg.sample` rows — and drops the fields the
+ * mount does not read (the `denominators` census arithmetic, `blob_census`,
+ * `hits`, `cone_receipt`, `wall_s`, and the null `output_head`/`reason` keys on
+ * the control rows). It is a projection, not a dump. It is inlined rather than
+ * read at test time so the suite stays offline and host-independent — the
+ * artifact lives on the MacBook, not on the host that runs this suite — exactly
+ * like `tests/unit/corpus-stats.test.mjs` keeps its inputs in-process.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -45,17 +52,20 @@ import {
   assertHubMountable,
   assertHubReceiptConsistent,
   buildCertificateGraph,
+  buildCompletionReceipt,
   computeFoundationalPageRank,
   encodeIdentityComponent,
   layoutHierarchical,
   nodeIdentityBase,
   normalizeEdgeKind,
+  normalizeSourceFile,
   planNodeIds,
   serializeCertificateGraph,
 } from "../../patent-portfolio/lib/cfsg-proof-graph-bridge.mjs";
 
-/** Twelve of the artifact's 13 sample rows; the 13th (a duplicate of row 1's
- *  identity) is appended only by the collision test. */
+/** All 13 of the artifact's `exec_leg.sample` rows, verbatim. The collision test
+ *  appends a 14th row of its own — a duplicate of row 1's identity — which is not
+ *  in the artifact. */
 const MEMBERS = {
   axioms: ["propext", "Quot.sound"],
   blob: "574ce88589a14c14a93cf33759802dfc36228795",
@@ -522,7 +532,7 @@ test("the hub receipt gate accepts the emitted triple", () => {
   assert.equal(assertHubReceiptConsistent(out.receipt, graph, parsedLayout, { graphSha256: out.graphSha256, layoutSha256: out.layoutSha256 }), true);
 });
 
-test("the receipt gate FIRES on every one of the four ways a triple can disagree", () => {
+test("the receipt gate FIRES on each of the five historical ways a triple can disagree", () => {
   const { graph, layout } = mounted();
   const out = serializeCertificateGraph(graph, layout);
   const parsedLayout = JSON.parse(out.layoutText);
@@ -596,4 +606,425 @@ test("planNodeIds is reusable and reports its own fallback count", () => {
   assert.equal(plan.lineFallbacks, 0);
   assert.throws(() => planNodeIds([{ waddle: "cfsg", file: "/abs/B.lean", fqn: "A.b", line: 0 }]), /escapes the project root|project-relative/);
   assert.throws(() => planNodeIds([{ waddle: "", file: "B.lean", fqn: "A.b", line: 0 }]), /no waddle identity/);
+});
+
+/* --------------------------------------------------------------------------
+ * ONE ISOLATED CONTROL PER REFUSAL LEG
+ *
+ * The controls above were chosen by hand, and a hand-chosen set is only as strong
+ * as the last leg someone remembered. Measured on 2026-11-10 by neutralising one
+ * guard condition at a time inside the two gates of a scratch copy of the bridge
+ * and re-running this file (unmodified source: 18 pass, 0 fail): 12 of the 26
+ * guards turned the suite red, and 14 could be deleted with the suite still
+ * green — every count, payload-hash, receipt-status, node-id, layout-check and
+ * layout-cover leg of `assertHubReceiptConsistent`, plus the missing-edge-array,
+ * duplicate-id and missing-waddle legs of `assertHubMountable`.
+ *
+ * The tables below close that, and `refusalLegs()` keeps them honest: the leg
+ * list is counted out of the bridge source at test time, so a guard added without
+ * a control — or a control left naming a guard that is gone — fails the suite
+ * instead of going quietly green.
+ *
+ * Each control perturbs EXACTLY ONE field and is asserted against the WHOLE
+ * message, not a substring. Both halves matter. The pre-existing timestamp
+ * control moved `graph.generatedAt`, which trips the two layout conjuncts of the
+ * same leg as well, so deleting the receipt-vs-graph conjunct left the suite green
+ * (measured: `pass 18 fail 0`). Isolation is what makes a control a proof.
+ * -------------------------------------------------------------------------- */
+
+/** The bridge's own text, read once through `import.meta.url` so this works from
+ *  any cwd and never leaves the repo. */
+const BRIDGE_SOURCE = readFileSync(
+  new URL("../../patent-portfolio/lib/cfsg-proof-graph-bridge.mjs", import.meta.url),
+  "utf8",
+);
+
+/** Stand-in inside a leg string for a `${...}` interpolation in the source. */
+const ANY = "*";
+
+/** Every `throw new Error(...)` inside one gate function, each `${...}` replaced
+ *  by `ANY`, whitespace collapsed. Sites, not distinct messages: two guards can
+ *  share a sentence and still be two guards. */
+function refusalLegs(fnName) {
+  const start = BRIDGE_SOURCE.indexOf(`export function ${fnName}(`);
+  assert.notEqual(start, -1, `${fnName} is no longer in the bridge source`);
+  const body = BRIDGE_SOURCE.slice(start, BRIDGE_SOURCE.indexOf("\n}", start));
+  const legs = [];
+  for (const match of body.matchAll(/throw new Error\(\s*(?:`([^`]*)`|"([^"]*)"|'([^']*)')/g)) {
+    legs.push((match[1] ?? match[2] ?? match[3]).replace(/\$\{[^}]*\}/g, ANY).replace(/\s+/g, " ").trim());
+  }
+  return legs;
+}
+
+const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Assert that `run` is refused by exactly this leg. A control that trips a
+ *  different leg proves nothing about the leg it names. */
+function assertRefusedBy(run, leg, label) {
+  const pattern = new RegExp(`^${leg.split(ANY).map(escapeRe).join("[\\s\\S]*?")}$`);
+  let seen = "<did not throw>";
+  try {
+    run();
+  } catch (error) {
+    seen = error instanceof Error ? error.message : String(error);
+  }
+  assert.match(seen, pattern, `${label}\n  expected leg: ${leg}`);
+}
+
+/** The in-memory pair a consumer would hand the Hub's mount gate. */
+const mountCase = () => mounted();
+
+/** The published triple, as the Hub reads it: receipt, graph, layout bytes, ctx. */
+const receiptCase = () => {
+  const { graph, layout } = mounted();
+  const out = serializeCertificateGraph(graph, layout);
+  return {
+    receipt: out.receipt,
+    graph,
+    layout: JSON.parse(out.layoutText),
+    ctx: { graphSha256: out.graphSha256, layoutSha256: out.layoutSha256 },
+  };
+};
+
+const withoutKey = (record, key) =>
+  Object.fromEntries(Object.entries(record).filter(([name]) => name !== key));
+const patchedAt = (items, index, patch) =>
+  items.map((item, i) => (i === index ? { ...item, ...patch } : item));
+const graphWith = (graph, patch) => ({ ...graph, ...patch });
+const integrityOf = (graph, identity, checks) => ({
+  ...graph,
+  integrity: {
+    ...graph.integrity,
+    identity: { ...graph.integrity.identity, ...identity },
+    checks: { ...graph.integrity.checks, ...checks },
+  },
+});
+const receiptWith = (t, patch) => ({ ...t.receipt, ...patch });
+const receiptGraphWith = (t, patch) => receiptWith(t, { graph: { ...t.receipt.graph, ...patch } });
+const receiptLayoutWith = (t, patch) => receiptWith(t, { layout: { ...t.receipt.layout, ...patch } });
+
+/** The mount gate's legs. `args` returns `[graph, layout]`. */
+const MOUNT_CONTROLS = [
+  {
+    leg: "refusing to lay out an empty proof graph",
+    why: "a graph with no nodes is a refusal, not a page of nothing",
+    args: () => [{ nodes: [], edges: [] }, { positions: {}, pagerank: {} }],
+  },
+  {
+    leg: "proof graph has no edge array",
+    why: "a missing edge list is a different claim from an empty one",
+    args: ({ graph, layout }) => [graphWith(graph, { edges: undefined }), layout],
+  },
+  {
+    leg: "proof graph is missing successful merge-integrity checks",
+    why: "identity leg: the graph no longer asserts its own ids are unique",
+    args: ({ graph, layout }) => [integrityOf(graph, { uniqueNodeIds: false }, {}), layout],
+  },
+  {
+    leg: "proof graph is missing successful merge-integrity checks",
+    why: "the same guard, its endpoint conjunct",
+    args: ({ graph, layout }) => [integrityOf(graph, {}, { resolvedEdgeEndpointsExist: false }), layout],
+  },
+  {
+    leg: "proof graph is missing successful merge-integrity checks",
+    why: "the same guard, its total conjunct",
+    args: ({ graph, layout }) => [integrityOf(graph, {}, { totalsMatchNodes: false }), layout],
+  },
+  {
+    leg: "proof graph declaration total does not match node count",
+    why: "a declared total that is not the node count, with the stored flag still true",
+    args: ({ graph, layout }) => [graphWith(graph, { totals: { ...graph.totals, decls: 9999 } }), layout],
+  },
+  {
+    leg: "proof graph contains duplicate node IDs",
+    why: "two rows minting one id — the thing the identity law exists to prevent",
+    args: ({ graph, layout }) => [
+      graphWith(graph, { nodes: patchedAt(graph.nodes, 1, { id: graph.nodes[0].id }) }),
+      layout,
+    ],
+  },
+  {
+    leg: `proof graph node ${ANY} has no waddle`,
+    why: "an unattributed node cannot fold into a hub graph keyed on waddle",
+    args: ({ graph, layout }) => [
+      graphWith(graph, { nodes: patchedAt(graph.nodes, 0, { waddle: "" }) }),
+      layout,
+    ],
+  },
+  {
+    leg: `resolved edge ${ANY} references a missing node ID`,
+    why: "a dangling endpoint",
+    args: ({ graph, layout }) => [
+      graphWith(graph, { edges: patchedAt(graph.edges, 0, { to: "ghost::ghost::ghost" }) }),
+      layout,
+    ],
+  },
+  {
+    leg: `resolved edge ${ANY} has unsupported kind ${ANY}`,
+    why: "`imports` is emittable by the producer but unpositionable by the layout",
+    args: ({ graph, layout }) => [
+      graphWith(graph, { edges: patchedAt(graph.edges, 0, { kind: "imports" }) }),
+      layout,
+    ],
+  },
+  {
+    leg: "layout position keys do not exactly match graph node IDs",
+    why: "a node the renderer would silently drop",
+    args: ({ graph, layout }) => [graph, { ...layout, positions: withoutKey(layout.positions, graph.nodes[0].id) }],
+  },
+  {
+    leg: "layout PageRank keys do not exactly match graph node IDs",
+    why: "a rank for a node that is not in the graph",
+    args: ({ graph, layout }) => [graph, { ...layout, pagerank: { ...layout.pagerank, "not-a-node": 0.5 } }],
+  },
+];
+
+/** The receipt gate's legs. `args` returns the four gate arguments. */
+const RECEIPT_CONTROLS = [
+  {
+    leg: `proof graph receipt has an unsupported evidence contract: schemaVersion ${ANY} != ${ANY}`,
+    why: "the 2026-10-22 incident: a consumer left pinned at v2 while the generator bumped",
+    args: (t) => [receiptWith(t, { schemaVersion: RECEIPT_SCHEMA_VERSION - 1 }), t.graph, t.layout, t.ctx],
+  },
+  {
+    leg: `proof graph receipt has an unsupported evidence contract: status ${ANY} != ${ANY}`,
+    why: "a receipt that renames its own evidence tier",
+    args: (t) => [receiptWith(t, { status: "kernel-verified" }), t.graph, t.layout, t.ctx],
+  },
+  {
+    leg: `proof graph receipt has an unsupported evidence contract: kernelVerified ${ANY} != false`,
+    why: "a receipt that promotes itself to a kernel claim",
+    args: (t) => [receiptWith(t, { kernelVerified: true }), t.graph, t.layout, t.ctx],
+  },
+  {
+    leg: "proof graph payload has an unsupported evidence contract",
+    why: "a graph whose evidence class was rewritten, not one that is kernel-verified",
+    args: (t) => [t.receipt, graphWith(t.graph, { evidenceClass: "kernel-verified" }), t.layout, t.ctx],
+  },
+  {
+    leg: "proof graph hash does not match its completion receipt",
+    why: "a receipt digest that does not describe these graph bytes",
+    args: (t) => [receiptGraphWith(t, { sha256: "0".repeat(64) }), t.graph, t.layout, t.ctx],
+  },
+  {
+    leg: "proof layout hash does not match its completion receipt",
+    why: "the same lie on the layout side — a separate field, a separate leg",
+    args: (t) => [receiptLayoutWith(t, { sha256: "1".repeat(64) }), t.graph, t.layout, t.ctx],
+  },
+  {
+    leg: "proof payload hashes do not match the completion receipt",
+    why: "the payloads map disagrees with the digests the gate was handed",
+    args: (t) => [
+      receiptWith(t, { payloads: { ...t.receipt.payloads, "proofs-layout.json": "2".repeat(64) } }),
+      t.graph,
+      t.layout,
+      t.ctx,
+    ],
+  },
+  {
+    leg: "proof layout was not derived from the completed graph",
+    why: "the layout payload claims a different parent graph",
+    args: (t) => [t.receipt, t.graph, { ...t.layout, sourceGraphSha256: "3".repeat(64) }, t.ctx],
+  },
+  {
+    leg: "proof layout was not derived from the completed graph",
+    why: "the receipt's copy of that claim disagrees with the layout's",
+    args: (t) => [receiptLayoutWith(t, { sourceGraphSha256: "4".repeat(64) }), t.graph, t.layout, t.ctx],
+  },
+  {
+    leg: "proof graph nodes do not have unique stable IDs",
+    why: "ids the hub could not address, checked by recomputation not by the stored flag",
+    args: (t) => [
+      t.receipt,
+      graphWith(t.graph, { nodes: patchedAt(t.graph.nodes, 1, { id: t.graph.nodes[0].id }) }),
+      t.layout,
+      t.ctx,
+    ],
+  },
+  {
+    leg: "proof artifact counts do not match the completion receipt",
+    why: "a receipt that counts 999 nodes",
+    args: (t) => [receiptGraphWith(t, { nodes: 999 }), t.graph, t.layout, t.ctx],
+  },
+  {
+    leg: "proof artifact counts do not match the completion receipt",
+    why: "the same guard on the layout payload's own nodeCount, which is a second copy",
+    args: (t) => [t.receipt, t.graph, { ...t.layout, nodeCount: 999 }, t.ctx],
+  },
+  {
+    leg: "proof artifact counts do not match the completion receipt",
+    why: "and on the receipt's layout.nodes",
+    args: (t) => [receiptLayoutWith(t, { nodes: 999 }), t.graph, t.layout, t.ctx],
+  },
+  {
+    leg: "proof layout resolved-edge count does not match the completed graph",
+    why: "a receipt that reports zero resolved edges for a graph with one",
+    args: (t) => [receiptLayoutWith(t, { resolvedEdges: 0 }), t.graph, t.layout, t.ctx],
+  },
+  {
+    leg: "proof artifact generation timestamps do not agree",
+    why: "RECEIPT-side drift only — graph and layout still agree with each other, so this is the leg that makes the receipt a statement about THIS graph",
+    args: (t) => [receiptWith(t, { generatedAt: "2020-01-01T00:00:00Z" }), t.graph, t.layout, t.ctx],
+  },
+  {
+    leg: "proof artifact generation timestamps do not agree",
+    why: "layout-side drift only — a layout computed at a different moment than the graph",
+    args: (t) => [t.receipt, t.graph, { ...t.layout, computedAt: "2020-01-01T00:00:00Z" }, t.ctx],
+  },
+  {
+    leg: "proof layout integrity checks are not affirmative",
+    why: "a layout whose stored self-report was flipped",
+    args: (t) => [
+      t.receipt,
+      t.graph,
+      { ...t.layout, checks: { ...t.layout.checks, pagerankKeysMatchNodeIds: false } },
+      t.ctx,
+    ],
+  },
+  {
+    leg: "proof layout does not cover exactly the completed graph node IDs",
+    why: "a position missing while `checks` still says true — the gate recomputes it",
+    args: (t) => [
+      t.receipt,
+      t.graph,
+      { ...t.layout, positions: withoutKey(t.layout.positions, t.graph.nodes[0].id) },
+      t.ctx,
+    ],
+  },
+  {
+    leg: "proof layout does not cover exactly the completed graph node IDs",
+    why: "the same sentence from the PageRank side, a separate guard",
+    args: (t) => [
+      t.receipt,
+      t.graph,
+      { ...t.layout, pagerank: withoutKey(t.layout.pagerank, t.graph.nodes[0].id) },
+      t.ctx,
+    ],
+  },
+];
+
+test("mount gate: every refusal leg has an isolated negative control that fires", () => {
+  const base = mountCase();
+  for (const control of MOUNT_CONTROLS) {
+    assertRefusedBy(() => assertHubMountable(...control.args(base)), control.leg, `mount gate — ${control.why}`);
+  }
+});
+
+test("receipt gate: every refusal leg has an isolated negative control that fires", () => {
+  const base = receiptCase();
+  for (const control of RECEIPT_CONTROLS) {
+    assertRefusedBy(
+      () => assertHubReceiptConsistent(...control.args(base)),
+      control.leg,
+      `receipt gate — ${control.why}`,
+    );
+  }
+});
+
+test("the control tables cover the gates' real legs, and name no leg that is gone", () => {
+  const mount = refusalLegs("assertHubMountable");
+  const receipt = refusalLegs("assertHubReceiptConsistent");
+  // Site counts, measured from the source on 2026-11-10. A new guard with a new
+  // sentence is caught by the set checks below; a new guard that REUSES an
+  // existing sentence is caught only here, which is why the counts are pinned.
+  assert.equal(mount.length, 10, "assertHubMountable throw sites");
+  assert.equal(receipt.length, 15, "assertHubReceiptConsistent throw sites");
+  for (const [name, legs, controls] of [
+    ["assertHubMountable", mount, MOUNT_CONTROLS],
+    ["assertHubReceiptConsistent", receipt, RECEIPT_CONTROLS],
+  ]) {
+    const real = new Set(legs);
+    const covered = new Set(controls.map((control) => control.leg));
+    assert.deepEqual(
+      [...real].filter((leg) => !covered.has(leg)),
+      [],
+      `${name}: refusal legs with no negative control`,
+    );
+    assert.deepEqual(
+      [...covered].filter((leg) => !real.has(leg)),
+      [],
+      `${name}: controls naming a leg the source no longer has`,
+    );
+  }
+});
+
+test("the gates also refuse nothing: an unresolved edge is skipped, not laundered", () => {
+  const { graph, layout } = mounted();
+  const ghost = {
+    from: "ghost::ghost::ghost",
+    to: "ghost::ghost::ghost",
+    kind: "imports",
+    resolution: "unresolved",
+  };
+  const withGhost = graphWith(graph, { edges: [...graph.edges, ghost] });
+  // The mount gate validates RESOLVED edges only. An unresolved one is a real hub
+  // state — the producer records refs it has not resolved yet — so refusing it
+  // here would be the opposite error from mounting it as resolved.
+  assert.equal(assertHubMountable(withGhost, layout), true);
+  // And the resolved-edge count is that filter, not `edges.length`: the receipt
+  // says one edge was resolved while two were emitted.
+  const out = serializeCertificateGraph(withGhost, layout);
+  assert.equal(out.receipt.graph.edges, 2);
+  assert.equal(out.receipt.layout.resolvedEdges, 1);
+  const parsed = JSON.parse(out.layoutText);
+  assert.equal(parsed.resolvedEdgeCount, 1);
+  assert.equal(
+    assertHubReceiptConsistent(out.receipt, withGhost, parsed, {
+      graphSha256: out.graphSha256,
+      layoutSha256: out.layoutSha256,
+    }),
+    true,
+  );
+});
+
+test("normalizeSourceFile: each shape that would mount a wrong path is refused by name", () => {
+  // The accept side — spellings the hub's own normaliser collapses.
+  assert.equal(normalizeSourceFile("./A/B.lean"), "A/B.lean");
+  assert.equal(normalizeSourceFile("A/./B.lean"), "A/B.lean");
+  assert.equal(normalizeSourceFile("A//B.lean"), "A/B.lean");
+  assert.equal(normalizeSourceFile("A\\B.lean"), "A/B.lean");
+  assert.equal(normalizeSourceFile("  A/B.lean  "), "A/B.lean");
+  // The refusal side. `/abs/A/B.lean` is the one that matters: a `split("/")`
+  // loop drops the leading slash and mounts `/abs/A/B.lean` as `abs/A/B.lean`,
+  // which is a DIFFERENT FILE CLAIM, accepted silently.
+  for (const bad of ["", "   ", ".", "..", "../A/B.lean", "/abs/A/B.lean", "A/../../B.lean"]) {
+    assert.throws(
+      () => normalizeSourceFile(bad),
+      /no stable project-relative source file/,
+      `normalizeSourceFile must refuse ${JSON.stringify(bad)}`,
+    );
+  }
+  assert.throws(() => normalizeSourceFile(undefined), /no stable project-relative source file/);
+  assert.throws(() => normalizeSourceFile(null), /no stable project-relative source file/);
+  // The identity law's own two name guards, which are not path legs.
+  assert.throws(() => nodeIdentityBase({ waddle: "cfsg", file: "A/B.lean", fqn: "  " }), /no FQN identity/);
+  assert.throws(() => nodeIdentityBase({ waddle: " ", file: "A/B.lean", fqn: "A.b" }), /no waddle identity/);
+});
+
+test("the receipt is built by buildCompletionReceipt, and names the commit it was read at", () => {
+  const { graph, layout } = mounted();
+  const out = serializeCertificateGraph(graph, layout);
+  assert.equal(out.receipt.repositoryCommit, CENSUS.denominators.commit);
+  assert.equal(out.receipt.generatedAt, CENSUS.generated_at);
+  assert.deepEqual(out.receipt.producer, {
+    name: "cfsg-proof-graph-bridge",
+    producerFiles: ["patent-portfolio/lib/cfsg-proof-graph-bridge.mjs"],
+  });
+  const overridden = serializeCertificateGraph(graph, layout, {
+    producer: { name: "lane", producerFiles: ["tests/unit/cfsg-proof-graph-bridge.test.mjs"] },
+  });
+  assert.deepEqual(overridden.receipt.producer, {
+    name: "lane",
+    producerFiles: ["tests/unit/cfsg-proof-graph-bridge.test.mjs"],
+  });
+  // serializeCertificateGraph delegates: the exported builder, handed the same
+  // digests, must produce an identical receipt. If the two ever diverge, a caller
+  // that builds the receipt directly would pass a gate the publisher's own
+  // receipt fails.
+  const direct = buildCompletionReceipt(
+    graph,
+    { ...layout, sourceGraphSha256: out.graphSha256 },
+    { graphSha256: out.graphSha256, layoutSha256: out.layoutSha256 },
+  );
+  assert.deepEqual(direct, out.receipt);
 });
