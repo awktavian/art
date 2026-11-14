@@ -122,7 +122,7 @@ test("twins register: each art-side pin equals this tree, blob for blob", () => 
  * drift, and the recorded consequence in this family is a guard matching a dead hex. This leg
  * makes the two agree or goes red, so the copies cannot diverge silently.
  */
-test("navigation.js: the register and museum-navigation-mirror.test.mjs pin the same bytes", () => {
+test("navigation.js: the register and museum-navigation-mirror.test.mjs pin the same bytes", (t) => {
   const src = readText(join(REPO, "tests", "unit", "museum-navigation-mirror.test.mjs"));
   const lit = (name) => {
     const m = new RegExp(`const ${name} =\\s*\\n?\\s*"([0-9a-f]+)"`).exec(src) ||
@@ -148,17 +148,60 @@ test("navigation.js: the register and museum-navigation-mirror.test.mjs pin the 
   const treeBody = sliceStats(bodyOf(readText(artPathOf(nav)), nav.body_identity.recipe));
   assert.deepEqual(treeBody, nav.body_identity.art, "register's body stats are not this tree's body stats");
 
-  // navigation.js is the file the census keeps naming, so state what this lane did to it:
-  // nothing. The register pins this tree's bytes AND art's published tip; if those two ever
-  // name different blobs, navigation.js moved and the four-file fold (DEBT residual 1) would be
-  // half-landed, with the patents guard leg still matching the old whole-file sha.
+  // navigation.js is the file the census keeps naming, so the register, this tree and art's
+  // published tip have to be the same statement. This leg USED to compare the register's
+  // recorded published blob against the tree, which no seat could pass while folding residual 1:
+  // a recorded tip value is stale the instant the fold lands, and the leg could not tell "a lane
+  // edited navigation.js" from "this checkout is parked" — both read the same red, so the red
+  // carried no information. Both facts are measured live now. R2 above already forces
+  // register == tree; below, tree == the tip this host can see, and when they differ git proves
+  // the checkout is not on that tip (merge-base --is-ancestor is the only thing that
+  // distinguishes in-flight from behind — a range count is identical under fork and fast-forward).
   const pub = REGISTER.census_provenance.row_identities_and_what_they_are.art_leg.published;
   assert.equal(pub.state, "MEASURED", "art's published anchor is UNMEASURED on the host that wrote the register — regenerate where origin/main resolves");
-  assert.equal(
-    nav.art.blob,
-    pub.blob,
-    `${nav.id}: the register pins this tree's bytes but art's published tip carries ${pub.blob} — navigation.js was edited, or the register was generated against a different base`,
-  );
+  assert.match(pub.blob, /^[0-9a-f]{40}$/u, `${pub.ref}: the register recorded a published blob that is not 40 hex`);
+  const PUB_REF = "refs/remotes/origin/main";
+  const atTip = (() => {
+    try {
+      return execFileSync("git", ["-C", REPO, "show", `${PUB_REF}:${nav.art.path}`], {
+        encoding: "utf8",
+        maxBuffer: 64 * 1024 * 1024,
+      });
+    } catch {
+      return null;
+    }
+  })();
+  if (atTip === null) {
+    t.skip(`${REPO} resolves no ${PUB_REF} — art's published surface is UNMEASURED here, not agreed`);
+  } else {
+    const liveBlob = fileStats(atTip).blob;
+    if (liveBlob !== nav.art.blob) {
+      // The difference has to be explained by work in flight, and there are exactly two ways
+      // that is true: this checkout carries an uncommitted edit to the path, or HEAD is not on
+      // the tip (a lane branch ahead of main). Anything else — clean tree, HEAD on the tip, and
+      // the register still naming different bytes — means main moved and nobody re-measured.
+      let dirty = false;
+      try {
+        dirty = execFileSync("git", ["-C", REPO, "status", "--porcelain", "--", nav.art.path], { encoding: "utf8" }).trim().length > 0;
+      } catch {
+        dirty = false;
+      }
+      let headOnTip = null;
+      try {
+        execFileSync("git", ["-C", REPO, "merge-base", "--is-ancestor", "HEAD", PUB_REF], { encoding: "utf8" });
+        headOnTip = true;
+      } catch (err) {
+        headOnTip = typeof err?.status === "number" ? err.status === 0 : null;
+      }
+      assert.ok(
+        dirty || headOnTip === false,
+        `art's ${PUB_REF} carries ${liveBlob} for ${nav.art.path} but the register — pinned to this tree, which R2 confirms — carries ${nav.art.blob}, with a CLEAN worktree for that path and HEAD an ancestor of ${PUB_REF}. Nothing is in flight, so this is drift: main moved past a register nobody re-measured. Re-run node scripts/twin-register.mjs --write. (A fold in a seat passes this leg because either the file is dirty or the lane branch is ahead of main — the two states that explain a difference.)`
+      );
+      t.diagnostic(
+        `in-flight: ${PUB_REF} (${liveBlob.slice(0, 12)}…) is not this checkout (${nav.art.blob.slice(0, 12)}…) — ${dirty ? "uncommitted edit to this path" : "HEAD is not on that tip"}; disclosed by git, not believed from a recorded value`
+      );
+    }
+  }
 });
 
 // ── R4: a deleted or added header marker is a declaration change, not a typo ─
@@ -334,4 +377,110 @@ test("census_provenance: the generation read real bytes, and both of its legs we
     REGISTER.census_provenance.spec_pin_delta.filter((r) => r.differs).length,
     "spec_pin_delta_summary.differing disagrees with its own rows",
   );
+});
+
+// ── R11: every live-surface claim is recomputed, in this file and in the prose ─
+/**
+ * Residual 1 was one instance of a defect that had two more copies in the register itself: a
+ * claim about a MOVING surface, written into committed data as prose and then believed. (a) The
+ * old residuals row asserted where this host's two checkouts sat relative to their tips ('7
+ * behind', '2 behind' — both false the day they were written, and unfalsifiable afterwards).
+ * (b) The old gallery-loader note asserted that the digests patents' mirror pins were "still
+ * live at art d2ce9a4", quoting an art blob, an art sha256 and an art commit that nothing here
+ * re-read. Both are gone from the prose: (a) is measured on every run below and printed, (b) is
+ * parsed out of the mirror's own bytes by scripts/twin-register.mjs and compared with this tree.
+ * A hand-edited hex in either direction, or a re-pasted count, reddens a leg here.
+ *
+ * Falsifiers run before commit: with the register's mirror_declaration_check.art_tree.blob
+ * changed by one character, assert 3 names both hexes; with a 40-hex pasted back into patents'
+ * mirror header, assert 5 names it; with a residual re-worded to '3 behind', assert 4 reddens.
+ */
+test("live-surface claims are recomputed: checkout positions measured, mirror declarations re-read, no count restated in prose", (t) => {
+  const HEX = /\b[0-9a-f]{40}\b|\b[0-9a-f]{64}\b/gu;
+  const behind = (repo, ref) => {
+    try {
+      return Number(execFileSync("git", ["-C", repo, "rev-list", "--count", `HEAD..${ref}`], { encoding: "utf8" }).trim());
+    } catch {
+      return null;
+    }
+  };
+
+  // 1. Where the two checkouts actually sit. The register states no number for this on purpose:
+  //    a committed working-tree position goes false at the next fetch or push. This is the one
+  //    place the figure exists, and it is produced per run.
+  const rows = [
+    ["art", REPO],
+    ["patents", MIRROR_REPO],
+  ].map(([name, repo]) => [name, behind(repo, "refs/remotes/origin/main")]);
+  for (const [name, n] of rows) {
+    assert.ok(
+      n === null || (Number.isInteger(n) && n >= 0),
+      `${name}: git rev-list --count HEAD..refs/remotes/origin/main did not produce a non-negative integer (${n})`
+    );
+  }
+  t.diagnostic(
+    `checkout positions measured live (deliberately NOT recorded in the register): ${rows.map(([n, b]) => `${n} ${b === null ? "UNMEASURED" : `${b} behind`}`).join(", ")} — a parked checkout is why a closed twin pair keeps re-serving as copy debt, and fast-forwarding one belongs to whoever owns it, not to a lane`
+  );
+
+  // 2. The register's own disclosure that its published rows are dated observations, not pins.
+  const pub = REGISTER.census_provenance.row_identities_and_what_they_are.art_leg.published;
+  assert.match(
+    pub.nature ?? "",
+    /build-time observation/iu,
+    "art_leg.published lost the disclosure that it is a dated reading, not a pin — R3 refuses to compare it with a later tip, and a reader needs to know why"
+  );
+
+  // 3. The mirror's art-digest declaration, re-read and re-measured rather than re-believed.
+  const gl = REGISTER.pairs.find((p) => p.id === "museum.gallery-loader.js");
+  assert.ok(gl, "register lost the gallery-loader pair");
+  const chk = gl.mirror_declaration_check;
+  if (!chk || chk.state !== "MEASURED") {
+    t.skip(`mirror_declaration_check is ${chk ? chk.state : "absent"} — the mirror's declaration is UNMEASURED on this host, not true`);
+  } else {
+    const now = fileStats(readText(join(REPO, gl.art.path)));
+    assert.equal(chk.art_tree.blob.measured, now.blob, `the register's mirror-check row says art's ${gl.art.path} is ${chk.art_tree.blob.measured} but this tree says ${now.blob} — hand-edited JSON?`);
+    assert.equal(chk.art_tree.sha256.measured, now.sha256, `the register's mirror-check row does not carry this tree's sha256 for ${gl.art.path} — hand-edited JSON?`);
+    assert.equal(
+      chk.declaration_is_true_of_this_tree,
+      true,
+      `patents' museum/gallery-loader.js PROVENANCE pins art at blob ${chk.asserted.blob} / sha256 ${chk.asserted.sha256} (@ art ${chk.asserted.art_ref}), and art's tree carries ${now.blob} / ${now.sha256} — the mirror's declaration has gone false; move the mirror header (a patents-bound edit) or the pair moved and this row must follow it`
+    );
+  }
+
+  // 4. No prose row may restate a checkout count or an identity digest that a leg does not
+  //    recompute. This is the shape-law of the fold: prose points, numbers live in the register.
+  const proseRows = [
+    ...REGISTER.residuals.map((r, i) => [`residuals[${i}]`, r]),
+    ...REGISTER.pairs.map((p) => [`pair ${p.id} note`, p.note]),
+  ];
+  for (const [where, text] of proseRows) {
+    assert.doesNotMatch(
+      text,
+      /\b\d+ behind\b/u,
+      `${where} states a checkout behind-count in prose — that figure is host state; R11 measures it and the row must name the command instead`
+    );
+  }
+
+  // 5. Patents' navigation mirror header: pointer in, digests out. The one hex allowed to remain
+  //    is this file's own pre-port recovery anchor, and it is allowed only because R10 re-reads
+  //    it from patents' object db — the register does not take its word either.
+  const navMirror = mirrorAtTip("museum/navigation.js");
+  if (navMirror === null) {
+    t.skip(`patents' museum/navigation.js unreadable at ${MIRROR_TIP} — the mirror header's shape is UNMEASURED here`);
+  } else {
+    const close = navMirror.split("\n").findIndex((l) => l.includes("*/"));
+    const head = navMirror.split("\n").slice(0, close + 1).join("\n");
+    assert.match(
+      head,
+      /NEAR-DUPLICATE-TWINS\.json id "museum\.navigation\.js"/u,
+      "patents' mirror header lost its pointer into this register — the pair's numbers would again have no home either side can read"
+    );
+    const recoveryAnchor = REGISTER.census_provenance.row_identities_and_what_they_are.patents_leg.recorded_by_generation;
+    const strays = (head.match(HEX) || []).filter((h) => h !== recoveryAnchor);
+    assert.deepEqual(
+      strays,
+      [],
+      `patents' mirror header restates ${strays.join(", ")} — an art-side identity written a second time is the fork residual 1 closed; only this file's own dated recovery anchor ${recoveryAnchor.slice(0, 12)}… may appear, and R10 re-reads even that from the object db`
+    );
+  }
 });

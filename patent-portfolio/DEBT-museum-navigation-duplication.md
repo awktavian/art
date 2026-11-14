@@ -16,17 +16,28 @@ The write-authority sentence that produced the old "NOT APPLIED" line was true o
 lane and is now historical: closing the row needed no authority in `art`, only a lane bound
 to the `patents` tree. What follows is the 2026-10-26 measurement, kept as the record of
 *why* `art` was chosen canonical; where it speaks of the fork in the present tense it means
-the pre-port bytes, recoverable at blob `d20f2aa3d96e8d7496df53dd63aac9ac5105ff8a`
-(1129 lines / 45083 B). Two residuals stay open and are recorded at the foot of this note:
-the `art` canonical header is one port behind its own file, and the guard protecting the
-receipt is shipped but wired to nothing.
+the pre-port bytes. Two residuals were recorded here — the
+`art` canonical header being one port behind its own file, and the guard protecting the receipt
+being shipped but wired to nothing. Both are closed: the second by lane `MUSEUM-NAVJS-1030` on
+2026-10-30, the first by lane `RST-TWINFOLD-1114` on 2026-11-14.
+
+> **Read the digests in this note as dated, not live (law added 2026-11-14 by lane
+> `RST-TWINFOLD-1114`).** Every hex, line count and delta figure below is a reading taken on
+> the date its section names — 2026-10-26, -10-28 or -10-30 — and several of them have since
+> been superseded by this note's own subject: the fold of residual 1 moved `art`'s canonical
+> file, which is exactly how a copied figure goes quietly false. The live values for this pair
+> are in one place: `patent-portfolio/NEAR-DUPLICATE-TWINS.json` id `"museum.navigation.js"`,
+> re-measured from both trees on every run by `scripts/twin-register.mjs` and gated red by
+> `tests/unit/museum-twin-register.test.mjs` (R2/R3/R11). Nothing in either module header
+> quotes a figure any more; this note is history, and history is allowed to be dated.
 
 > **Both halves of that sentence are the 2026-10-28 state. Re-measured 2026-10-30 by lane
 > `MUSEUM-NAVJS-1030`: the second is CLOSED** — the guard is now wired to a tracked
 > `.githooks/pre-commit` on `patents origin/main` (see the STATUS block under residual 2) —
-> **and the first stands**, but it is not a docs edit: taking it moves four files across two
-> repos and no ordering of the two pushes leaves the guard truthful in the interval (see the
-> STATUS block under residual 1 and the section at the foot of this note).
+> **and the first stands** as of that reading, but it is not a docs edit: taking it moves four
+> files across two repos and no ordering of the two pushes leaves the guard truthful in the
+> interval. **CLOSED 2026-11-14 by lane `RST-TWINFOLD-1114`, which took all four files in one
+> sweep** — see the STATUS block under residual 1.
 
 Census row: `projects/art/patent-portfolio/museum/navigation.js` near_duplicate of a
 museum-side copy. **The census pointer was wrong** — `/Users/schizodactyl/museum`
@@ -249,6 +260,26 @@ either lane.
 ## Residuals this close leaves open (recorded, not fixed — out of scope)
 
 ### 1. The `art` canonical header is one port behind
+
+> **STATUS 2026-11-14 (lane `RST-TWINFOLD-1114`): CLOSED, as the four-file two-repo fold this
+> row always said it was.** One sweep moved `patent-portfolio/museum/navigation.js` (art's
+> canonical header: the present-tense fork narrative and every digest it quoted are gone, and the
+> block now names the register row instead), `museum/navigation.js` in `patents` (same treatment;
+> its one remaining hex — this file's own pre-port recovery anchor — is now *checked* against
+> `72faa42^:museum/navigation.js` rather than believed), the receipt
+> `tests/CENSUS-museum-navigation-mirror.md` (re-measured, with art's identity no longer copied
+> into it — and the fold found that its body-digest row had carried a 60-character sha256 the old
+> presence check could not catch, because the correct hex sat beside it in the row above), and
+> that receipt's guard legs 3 and 4, which now recompute from this repository's own bytes. The
+> interval that no push ordering could make truthful is closed from the other side: the ordering
+> was patents-first, and the two guards no longer read each other's digests at all, so neither
+> can be left holding a hex the other moved. What keeps it shut is data, not prose — art's
+> `museum-navigation-mirror.test.mjs` T3 (the header's pointer resolves to a real row, the header
+> restates no digest and no count, and the register's row agrees with the bytes on disk) and
+> `museum-twin-register.test.mjs` R2/R3/R11. Falsifiers, run in-lane: flipping a blob inside the
+> register reddened four legs, each naming both hexes; pasting a 40-hex back into either module
+> header reddened the guard that owns that file; re-wording a behind-count into the register's
+> prose reddened R11.
 
 > **STATUS 2026-10-30 (lane MUSEUM-NAVJS-1030): still open, re-measured, and NOT a docs edit —
 > see the foot of this note.** A lane bound to `patent-portfolio/museum/navigation.js` on the

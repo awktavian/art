@@ -92,7 +92,7 @@ const PAIRS = [
         "patents: tests/CENSUS-museum-navigation-mirror.check.mjs, 6 legs, wired to a tracked .githooks/pre-commit (per-clone core.hooksPath)",
       ],
       note:
-        "The bodies below the two doc headers are byte-identical, so this pair has no content drift to consolidate. What it does have is residual 1 of patent-portfolio/DEBT-museum-navigation-duplication.md: art's own header block still narrates the PRE-PORT fork in the present tense ('231 lines behind', 'still carries two defects'), and those claims are false at these bytes. Not fixed here, on purpose — refreshing them moves four files across two repos (art header, patents header, the patents receipt, and receipt-guard leg 4, which greps art's whole-file sha) and no ordering of the two pushes leaves the other side's guard truthful in the interval. museum-navigation-mirror.test.mjs T3 keeps the false prose PINNED so it cannot be half-edited by accident. A lane that takes residual 1 takes all four files or none.",
+        "The bodies below the two doc headers are byte-identical, so this pair has no content drift to consolidate. What it had was drift in the DECLARATION, and residual 1 of patent-portfolio/DEBT-museum-navigation-duplication.md is closed by lane RST-TWINFOLD-1114 (2026-11-14) as the four-file, two-repo fold it always was: art's header narrated the pre-port fork in the present tense and pinned its own blobs, patents' mirror header pinned art's digest, the patents receipt restated both, and art's old T3 asserted those sentences were still PRESENT — a guard that could only redden by re-pasting the rot. Both module headers now state no digest, no line count and no delta arithmetic and point at this row instead; the patents receipt is dated and its guard legs recompute. Every figure describing this pair is produced from the two trees into this file, and museum-navigation-mirror.test.mjs T3 + this register's R2/R3 are what keep a re-pasted number from landing silently again.",
     },
   },
   {
@@ -116,16 +116,20 @@ const PAIRS = [
     art: "patent-portfolio/museum/gallery-loader.js",
     patents: "museum/gallery-loader.js",
     recipe: "whole",
+    mirror_pins: {
+      re: /art copy sha256[\s/]*([0-9a-f]{64}),[\s/]*git blob[\s/]*([0-9a-f]{40})[\s/]*@[\s/]*art[\s/]*([0-9a-f]{7,40})/,
+      fields: ["sha256", "blob", "art_ref"],
+    },
     prose: {
       canonical: "art",
       disposition:
         "declared-divergent-not-portable — the patents copy cannot run art's version; leave both, keep the declaration",
       guards: [
         "patents: museum/gallery-loader.js lines 1-10 PROVENANCE block (names art as canonical, pins art's blob + sha256 + tip)",
-        "art: tests/unit/museum-twin-register.test.mjs pins this file's bytes",
+        "art: tests/unit/museum-twin-register.test.mjs pins this file's bytes AND re-measures the mirror's pin (this row's mirror_declaration_check)",
       ],
       note:
-        "The only sibling pair with a declaration, and it is on the mirror side: patents declares itself 'the P2-generation copy' and says art is canonical, because art's loader imports three modules that do not exist in the patents tree (measured: artworks/p3-artworks.js, lib/instanced-elements.js, lib/visitor-identity.js — absent from patents, present in art). Art's own copy carries no header marker. The patents block pins art's blob e1128da0 @ art da9931d; both are still live at art d2ce9a4, so the declaration is true today — this register is what keeps it verifiable from the art side too.",
+        "The only sibling pair whose MIRROR side carries a declaration, and that declaration names art's digests. This register therefore does not restate them: the hexes in this row's mirror_declaration_check.asserted are PARSED out of the mirror's own header bytes at basis.patents_tip, and its agrees booleans compare them with the art bytes measured on the same run — so the liveness claim is recomputed, not re-believed. It used to be prose here ('both are still live at art d2ce9a4, so the declaration is true today') with hand-quoted hexes and a hand-quoted commit, which is residual 1's defect one row over. Why the pair is not portable: art's loader imports three modules that do not exist in the patents tree (artworks/p3-artworks.js, lib/instanced-elements.js, lib/visitor-identity.js — absent from patents, present in art). Art's own copy carries no header marker. The recovery anchor the mirror names for its OWN pre-fold bytes is a dated fact about patents' history and stays in that header.",
     },
   },
   {
@@ -363,6 +367,61 @@ function censusLegs(mirrorRef) {
   };
 }
 
+/**
+ * A mirror-side PROVENANCE block that names art's blob or sha256 is a claim about the ART tree,
+ * so it is only worth its re-measurement. The old register note asserted that claim in prose
+ * ("both are still live at art d2ce9a4, so the declaration is true today") with hand-quoted
+ * hexes and a hand-quoted commit — the same protected-by-prose failure residual 1 describes,
+ * one row over. Here the asserted hexes are PARSED out of the mirror's own bytes (authored
+ * regex, no authored digest) and compared with what this tree carries right now, so the row
+ * flips by itself the first time art moves and nothing has to be re-believed.
+ */
+function mirrorDeclarationCheck(p, artText, patText) {
+  if (!p.mirror_pins || patText === null) return null;
+  const m = p.mirror_pins.re.exec(patText);
+  if (m === null) {
+    return {
+      state: "DECLARATION_ABSENT",
+      reason: `the mirror header no longer matches the pattern this row checks (${p.mirror_pins.re}) — either the mirror stopped declaring art canonical, or the wording moved and this row must follow it`,
+    };
+  }
+  const fields = {};
+  p.mirror_pins.fields.forEach((name, i) => {
+    fields[name] = m[i + 1];
+  });
+  const now = fileStats(artText);
+  const art = {
+    blob: { asserted: fields.blob ?? null, measured: now.blob, agrees: fields.blob ? fields.blob === now.blob : null },
+    sha256: {
+      asserted: fields.sha256 ?? null,
+      measured: now.sha256,
+      agrees: fields.sha256 ? fields.sha256 === now.sha256 : null,
+    },
+  };
+  // The ref the mirror names (an abbreviated art commit): does it still exist here, and does it
+  // carry the asserted blob? rc 0 on rev-parse --verify is the whole of the "still live" claim.
+  const ref = fields.art_ref ?? null;
+  const refResolves = ref !== null && gitRc(ROOT, ["rev-parse", "--verify", "--quiet", ref]) === 0;
+  const atRef = refResolves ? show(ROOT, ref, p.art) : null;
+  return {
+    state: "MEASURED",
+    read_from: `the mirror's own header bytes at basis.patents_tip (not authored here)`,
+    asserted: fields,
+    art_tree: art,
+    asserted_art_ref: {
+      ref,
+      resolves: refResolves,
+      blob_at_ref: atRef === null ? null : fileStats(atRef).blob,
+      agrees_with_asserted_blob: atRef === null ? null : fileStats(atRef).blob === (fields.blob ?? null),
+      command: `git -C <art repo> show ${ref}:${p.art} | git hash-object --stdin`,
+    },
+    /** The load-bearing boolean: what the mirror asserts about art is what art's tree carries. */
+    declaration_is_true_of_this_tree:
+      (art.blob.agrees === null || art.blob.agrees === true) &&
+      (art.sha256.agrees === null || art.sha256.agrees === true),
+  };
+}
+
 function build() {
   const mirror = liveTip(MIRROR_REPO);
   const mirrorRef = mirror ? mirror.sha : null;
@@ -424,6 +483,7 @@ function build() {
       guards: p.prose.guards,
       disposition: p.prose.disposition,
       note: p.prose.note,
+      mirror_declaration_check: mirrorDeclarationCheck(p, artText, patText),
     };
     if (patText !== null) row.divergence = divergence(artText, patText, p.id);
     pairs.push(row);
@@ -475,7 +535,7 @@ function build() {
       patents_repo: MIRROR_REPO,
       patents_tip: mirrorRef,
       patents_tip_source: mirror ? mirror.source : "unavailable on this host",
-      census_generation: "ccc6b10cf4e942b58e445dc57655dbc2",
+      census_generation: CENSUS_ROW.generation,
     },
     geometry_agreement: {
       why:
@@ -520,6 +580,8 @@ function build() {
             command: `git -C <art repo> show refs/remotes/origin/main:${NAV.art}`,
             blob: legs.art_published ? legs.art_published.blob : null,
             state: legs.art_published ? "MEASURED" : "UNMEASURED",
+            nature:
+              "A build-time observation on the generating host, not a pin. refs/remotes/origin/main moves under the checkout and a register cannot name the commit that would carry it (basis.art_pin_channel), so this value may only be read beside recorded_by_generation — both dated. The live question ('do these bytes match what the tip carries now?') is measured by tests/unit/museum-twin-register.test.mjs R3, which re-reads the ref and, when the two differ, proves with merge-base --is-ancestor whether this checkout is on that tip at all.",
           },
         },
         patents_leg: {
@@ -557,11 +619,11 @@ function build() {
       },
     },
     residuals: [
-      "Residual 1 of DEBT-museum-navigation-duplication.md — art's canonical header still narrates the pre-port fork in the present tense. Still open; it is a four-file, two-repo coordinated fold, and this register deliberately does not start it. Do not 'fix the prose' in one repo.",
-      "Patents' four spec PROVENANCE headers still claim the pair is '(byte-identical as of 2026-08-18)' as whole files. Art's four now say identical-below-header. The mirror-side wording is a one-line-per-file edit in the patents tree — named for a patents-bound lane, not edited from here.",
+      "CLOSED 2026-11-14 by lane RST-TWINFOLD-1114 — residual 1 of DEBT-museum-navigation-duplication.md (art's canonical header narrating the pre-port fork in the present tense). Folded as the four-file, two-repo sweep it required: art's patent-portfolio/museum/navigation.js header, patents' museum/navigation.js mirror header, the patents receipt tests/CENSUS-museum-navigation-mirror.md and its guard legs. No module header in either repo now states a digest, a line count or delta arithmetic for this pair; each points at this register row, and the numbers are produced from the two trees. Held by museum-navigation-mirror.test.mjs T3 (pointer resolves, header restates nothing, register agrees with these bytes) and by this file's R2/R3.",
+      "CLOSED 2026-11-14 by the same sweep — patents' four spec PROVENANCE headers claimed the pair was '(byte-identical as of 2026-08-18)' as WHOLE files, which the register's own measurement never supported: the twins are identical below the header and differ by it by design, and art's four had already been reworded to say exactly that. Patents' headers now carry the recipe-scoped claim and a pointer to this register's row id; R5 and R7 keep the recipe claim true, so the wording cannot rot back into a whole-file lie.",
       "The five undeclared sibling pairs (architecture, lighting, wayfinding, wing-enhancements, museum.spec) are pinned by this register from the art side, but nothing on the patents side references it. A mirror-side register, or a patents test that reads this one through a declared path override, is the matching half.",
       "museum.spec.js: patents' copy is missing 89 lines of coverage art has (wing teleport indicators + rotunda return). A coverage gap to port downward, not a duplicate to delete.",
-      "This host's shared art checkout is parked at 054c275, 7 behind origin/main, and the patents checkout at 1921ef6, 2 behind its main. Both are working-tree conditions, not published surfaces — and both are why a census that indexes working trees keeps re-serving a closed row. Fast-forwarding them belongs to whoever owns those checkouts, not to a lane.",
+      "The census reads whatever tree a host happens to have checked out, which is why a pair closed in 2026-10-26 keeps re-serving as live copy debt. This host's shared art checkout and its patents counterpart are therefore NOT necessarily at their published tips — and no position is recorded in this file, because a committed working-tree count goes false on the next fetch or push and would be the same rot wearing a smaller hat. tests/unit/museum-twin-register.test.mjs R11 measures it on every run instead, with `git -C <repo> rev-list --count HEAD..refs/remotes/origin/main` in both repos, and prints the two counts as a diagnostic. Fast-forwarding a checkout belongs to whoever owns it, not to a lane.",
     ],
   };
 }

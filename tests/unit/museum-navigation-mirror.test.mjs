@@ -7,13 +7,14 @@
  * measured quantity. The seed paired
  *   projects/art/patent-portfolio/museum/navigation.js  (blob bd836bd95975…)
  *   projects/awkronos/patents/museum/navigation.js      (blob d20f2aa3d96e…)
- * Both pinned identities are stale against the published tips re-measured here:
- * art's main moved to blob 6567e4f71f87… at tip bb0f227 (PR #16, lane
- * MUSEUM-NAVJS-1030) and patents' main moved to blob 66dd3d5da57a… at tip
- * c7b7ac1 (port 72faa42 + the RSI-PATENTS-PORTFOLD-1028 / PATENTS-GUARD-WIRE-1028
- * chain). See patent-portfolio/DEBT-museum-navigation-duplication.md for the
- * full history — this row is a declared canonical↔mirror pair with zero content
- * drift below the two doc headers, not actionable copy debt.
+ * Both pinned identities are stale against the published tips: the generation scored art's
+ * parked checkout and a banked pre-port `wip` commit in patents, not either published surface.
+ * That census reading, with every hex it names, lives in
+ * patent-portfolio/NEAR-DUPLICATE-TWINS.json under `census_provenance` — re-measured from both
+ * object databases on every run, so it is not restated here. See
+ * patent-portfolio/DEBT-museum-navigation-duplication.md for the full history — the pair is a
+ * declared canonical↔mirror pair with zero content drift below the two doc headers, not
+ * actionable copy debt.
  *
  * Producer action, converted in-lane: "RECORD similarity-scored class (SimHash
  * Hamming) for inspection" — computed live from the published bytes on this host
@@ -60,6 +61,8 @@ import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { readRegister } from "./twin-measure.mjs";
+
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const CANONICAL = join(REPO, "patent-portfolio", "museum", "navigation.js");
 
@@ -67,34 +70,27 @@ const MIRROR =
   process.env.ARTNAV_MIRROR_PATH ||
   "/Users/schizodactyl/projects/awkronos/patents/museum/navigation.js";
 
-// Measured 2026-11-02 at art origin/main bb0f227693e97f6b4dd83dcd079c33501b0441e3.
-// Every figure below is a measurement, taken with the exact code in this file,
-// not lifted from the DEBT note.
-const EXPECTED_CANONICAL_BLOB = "6567e4f71f87d6dc72b5840bd89354f5abc9b752";
+// Whole-file identity of the canonical copy, measured 2026-11-14 by lane RST-TWINFOLD-1114 at
+// these bytes. The identity moved when DEBT-museum-navigation-duplication.md residual 1 was
+// folded: the header's pre-port narrative and the digests it restated were removed, the module
+// body was not touched, which is why the three body pins below are the 2026-11-02 figures
+// unchanged. These two literals are NOT the only copy of this fact and must never become one
+// again — tests/unit/museum-twin-register.test.mjs R2 re-measures them against the working tree
+// and R3 requires the register's row, these literals and the tree to name identical bytes. To
+// move them: re-measure with `git hash-object` / `shasum -a 256` on the file, then regenerate
+// the register with `node scripts/twin-register.mjs --write`, in the same commit.
+const EXPECTED_CANONICAL_BLOB = "23e82b62e0abe42deaa3d348584ac1de50106aae";
 const EXPECTED_CANONICAL_SHA256 =
-  "aba48a95050f8d94a1f20c40688243d9834a8424c9c00b62ebe74280fb02f9e9";
+  "eb4b3f8dd4d85a95d6004d2c68b8c2560d2d4951944515ce7f397593c7c8adb6";
 const EXPECTED_BODY_SHA256 =
   "1e2054a6b765ab682868986813090b392ab191ae01cdfd8a31c37c6130d64c7c";
 const EXPECTED_BODY_LINES = 1234;
 const EXPECTED_BODY_BYTES = 49768;
 
-// Sentinel lines from art's own NEAR-DUPLICATE DECLARATION block (see residual 1
-// of DEBT-museum-navigation-duplication.md). These three sentences describe the
-// fork in the PRESENT TENSE with numbers that were true pre-port and are false
-// at today's published bytes — recorded here on purpose, not fixed here. This
-// test does not assert the prose is TRUE; it asserts the prose is UNCHANGED, so
-// no future edit lands silently. Editing this block is the four-file, two-repo
-// coordinated fold residual 1 describes (art's navigation.js, the patents
-// mirror's own header, tests/CENSUS-museum-navigation-mirror.md's receipt, and
-// leg 4 of tests/CENSUS-museum-navigation-mirror.check.mjs, which hardcodes
-// these same art-side literals). One repo moving alone makes the other's guard
-// read a row it has just made false. A red on this leg means: go read residual
-// 1 and do the whole fold, not just the file that tripped.
-const DECLARATION_SENTINELS = [
-  " * A second copy of this module lives in another repository and is now 231 lines",
-  " *   Delta: 117 insertions / 231 deletions across 19 hunks",
-  " * RULE — never edit both copies. Change navigation HERE, then port it whole to the",
-];
+// The register row this file's canonical copy points at. T3 reads the pointer out of the
+// header, resolves it here, and checks the register's numbers against these bytes.
+const REGISTER_ID = "museum.navigation.js";
+const POINTER_RE = /NEAR-DUPLICATE-TWINS\.json id "([^"]+)"/;
 
 function readRepoFile(rel) {
   return readFileSync(rel, "utf8");
@@ -190,17 +186,82 @@ test("navigation.js body-below-doc-header is the same bytes the patents receipt 
   );
 });
 
-// ── T3: the canonical declaration prose does not rot silently ───────────────
-test("navigation.js NEAR-DUPLICATE DECLARATION block is unchanged, not merely present", () => {
+// ── T3: the canonical header points at the register and restates no figure ───
+/**
+ * This leg used to be its opposite. Old T3 asserted that three sentences of the pre-port
+ * narrative were still present — a guard that could only redden by re-pasting the rot, and
+ * which therefore certified false prose as green. Residual 1 is now folded: every number that
+ * describes this pair (blobs, sizes, line counts, the delta, the census legs) is produced by
+ * scripts/twin-register.mjs into patent-portfolio/NEAR-DUPLICATE-TWINS.json, and the header
+ * names none of them. What is checked here is therefore the shape that keeps it true: the
+ * pointer resolves to a real row, the register's row agrees with these bytes, and no digest or
+ * delta figure has crept back into the header.
+ *
+ * Falsifiers, both run before this was committed: editing the register's art blob for this row
+ * reddens assert 3 naming both hexes; re-pasting a 40-hex into the header reddens assert 2 on
+ * the offending line. Neither needs a second edit to this file.
+ */
+function docHeaderOf(text) {
+  const lines = text.split("\n");
+  const end = lines.findIndex((l) => l.includes("*/"));
+  assert.ok(end >= 0, "navigation.js has no doc-header close token");
+  return lines.slice(0, end + 1).join("\n");
+}
+
+test("navigation.js declaration points into the register, restates no figure, and the register agrees with these bytes", () => {
   const text = readRepoFile(CANONICAL);
-  for (const sentinel of DECLARATION_SENTINELS) {
-    assert.ok(
-      text.includes(sentinel),
-      `declaration sentinel vanished from navigation.js's header: ${JSON.stringify(
-        sentinel
-      )} — refreshing this prose is residual 1 of patent-portfolio/DEBT-museum-navigation-duplication.md: a four-file, two-repo coordinated fold, not a single-file edit. A red here means the fold was started in only one repo.`
-    );
-  }
+  const header = docHeaderOf(text);
+
+  // 1. the pointer is present and names THIS pair's row id.
+  const pointer = POINTER_RE.exec(header);
+  assert.ok(
+    pointer,
+    `navigation.js's header lost its pointer to the register (expected the form NEAR-DUPLICATE-TWINS.json id "${REGISTER_ID}") — prose without a pointer is how a figure becomes unwritable-and-uncheckable`
+  );
+  assert.equal(
+    pointer[1],
+    REGISTER_ID,
+    `navigation.js's header points at register row "${pointer[1]}", not "${REGISTER_ID}"`
+  );
+
+  // 2. the header states no digest and no delta arithmetic — a second copy of a number here is
+  //    a fork of the register, which is the failure that rotted once already.
+  const restated = [
+    [/\b[0-9a-f]{40}\b/gu, "a 40-hex git blob"],
+    [/\b[0-9a-f]{64}\b/gu, "a 64-hex sha256"],
+    [/\b\d+\s+(?:lines|insertions|deletions)\b/giu, "a line/delta count"],
+    [/\bhunks?\b/giu, "a diff-hunk count"],
+  ].flatMap(([re, what]) => (header.match(re) || []).map((m) => `${what} "${m}"`));
+  assert.deepEqual(
+    restated,
+    [],
+    `navigation.js's header restates ${restated.join(", ")} — numbers live in patent-portfolio/NEAR-DUPLICATE-TWINS.json id "${REGISTER_ID}"; pointing is allowed, restating is the fork that made the old prose silently false. Re-measured by museum-twin-register.test.mjs R2/R3.`
+  );
+
+  // 3. the register still describes THIS tree. Flip either side and this names both hexes.
+  const register = readRegister(REPO);
+  const row = register.pairs.find((p) => p.id === REGISTER_ID);
+  assert.ok(row, `the register has no row "${REGISTER_ID}" that navigation.js can point at`);
+  assert.equal(
+    row.art.blob,
+    gitBlobSha1(text),
+    `register row "${REGISTER_ID}" pins art blob ${row.art.blob} but these bytes are ${gitBlobSha1(text)} — regenerate (node scripts/twin-register.mjs --write) or the pointer is folklore`
+  );
+  assert.equal(
+    row.art.sha256,
+    sha256(text),
+    `register row "${REGISTER_ID}" pins art sha256 ${row.art.sha256} but these bytes hash to ${sha256(text)}`
+  );
+  assert.equal(
+    row.body_identity.art.sha256,
+    EXPECTED_BODY_SHA256,
+    `register row "${REGISTER_ID}" and this file's body pin disagree — one of the two carriers of the body identity moved alone`
+  );
+  assert.equal(
+    row.declaration.canonical_side,
+    "art",
+    `the register no longer declares art canonical, but navigation.js's header still says "this copy is CANONICAL"`
+  );
 });
 
 // ── T4: the named exports and their one consumer site ────────────────────────
