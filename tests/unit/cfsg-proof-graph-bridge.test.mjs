@@ -25,6 +25,14 @@
  *      and no test pinned the copy, so the break surfaced only at runtime.) The
  *      leg list is not kept by hand: `refusalLegs()` counts it out of the bridge
  *      source at test time, so a guard added without a control fails the suite.
+ *   4. DRIFT. The port claims fidelity to files that live in another repo. Those
+ *      claims were prose: measured 2026-11-14, the five upstream digests appear
+ *      ONLY in comment lines and no code recomputed them, so the header's
+ *      "drift is detectable, not silent" described an intention rather than a
+ *      mechanism. `UPSTREAM_PINS` now carries them as data and the last three
+ *      legs below re-derive them, the published node id, the edge/declaration
+ *      vocabularies, the `def` floor and the live artifact mount from the real
+ *      tree whenever it is on the host — skipping by name when it is not.
  *
  * The census fixture below reproduces, byte for byte, every field of
  * `~/.kagami/solver-certs/GR-FULLSEND-1027-CFSG-AXIOM-CENSUS.json` (sha256
@@ -38,7 +46,8 @@
  * like `tests/unit/corpus-stats.test.mjs` keeps its inputs in-process.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -49,6 +58,7 @@ import {
   PRODUCER_EDGE_KINDS,
   RECEIPT_SCHEMA_VERSION,
   EVIDENCE_STATUS,
+  UPSTREAM_PINS,
   assertHubMountable,
   assertHubReceiptConsistent,
   buildCertificateGraph,
@@ -430,7 +440,7 @@ test("an all-refused census throws instead of publishing an empty graph", () => 
   const failed = structuredClone(CENSUS);
   failed.exec_leg.sample = failed.exec_leg.sample.map((row) => ({ ...row, rc: 1 }));
   assert.throws(() => buildCertificateGraph(failed, { ledger: LEDGER }), /refusing to build an empty certificate graph/);
-  // The Hub's own layout guard refuses the same thing (graph-layout/src/index.ts:126).
+  // The Hub's own layout guard refuses the same thing (graph-layout/src/index.ts:124-126).
   assert.throws(() => assertHubMountable({ nodes: [], edges: [] }, { positions: {}, pagerank: {} }), /empty proof graph/);
 });
 
@@ -1028,3 +1038,457 @@ test("the receipt is built by buildCompletionReceipt, and names the commit it wa
   );
   assert.deepEqual(direct, out.receipt);
 });
+
+/* --------------------------------------------------------------------------
+ * THE PORT'S OWN DRIFT PIN — six claims moved from prose into a check
+ *
+ * Every leg above this line measures the bridge against fixtures that live IN
+ * this file. That is deliberate — the suite runs offline, on a host with no
+ * Kagami checkout — and it is why the fixture census reproduces all 13
+ * `exec_leg.sample` rows of the artifact. But the same inlining quietly left the
+ * six facts about the world OUTSIDE the repo asserted by comment text only.
+ * Measured on 2026-11-14 with
+ * `grep -n "e7cf806c\|6ac4e113\|fe852457\|2e906b28\|68f0a35d" <bridge> <test>`:
+ * all five digests occur ONLY inside `*` comment lines — no code in this repo
+ * recomputed any of them — and the published node id (below, line 229 before
+ * this block) and the published key set (line 272) are string literals
+ * transcribed by hand on 2026-11-02. So the header's promise "Drift is
+ * therefore detectable, not silent" described an intention, not a mechanism: if
+ * the Hub had moved, this file would still have printed 24 pass 0 fail, and the
+ * integration it certifies would have broken at runtime. That is the same hole
+ * the header itself documents at `proof-artifacts-cache.ts:196-203` — a literal
+ * `schemaVersion !== 2` copied into a generator, nothing pinning the copy.
+ *
+ * These legs are the mechanism. Where the producer tree and the census artifact
+ * exist, they recompute from the live bytes: the four ported-source digests
+ * against the producer receipt AND the files, the receipt's own evidence
+ * constants against `EVIDENCE_STATUS`/`RECEIPT_SCHEMA_VERSION`, the layout
+ * guard's edge-kind set against `LAYOUT_EDGE_KINDS`, the harvest's edge-kind
+ * union against `PRODUCER_EDGE_KINDS`, the `def` floor that `certificate` is
+ * claimed to take, the REQUIRED fields of `DeclRecord` against a mounted node,
+ * the identity law applied to the graph's OWN node 0 rather than a copied
+ * string, and the mount of the real artifact rather than its projection.
+ *
+ * Absence is not drift, and is not allowed to pass as a check: when the
+ * authority is not on this host the leg reports itself SKIPPED with the reason,
+ * the convention `tests/unit/identity-coherence.test.mjs:53-58` already uses.
+ *
+ * `upstreamDrift()` is pure — it takes its inputs, so the control in the last
+ * leg below can hand it one doctored digest and prove the disagreement comes
+ * back named. A pin that cannot fail is a comment with a call in front of it.
+ * -------------------------------------------------------------------------- */
+
+/** Producer-tree authority, overridable for sandboxed or known-positive runs. */
+const WADDLE_REPO =
+  process.env.WADDLE_REPO || "/Users/schizodactyl/projects/awkronos-waddle";
+const CENSUS_ARTIFACT_PATH =
+  process.env.CFSG_CENSUS_ARTIFACT ||
+  "/Users/schizodactyl/.kagami/solver-certs/GR-FULLSEND-1027-CFSG-AXIOM-CENSUS.json";
+
+const HEX64 = /^[0-9a-f]{64}$/;
+const digestFile = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
+
+/** Members of a `const NAME = new Set<…["kind"]>([ "a", "b" ]);` literal. */
+function setOfKinds(source, name) {
+  const block = source.match(
+    new RegExp(String.raw`const ${name} = new Set<\w+\["kind"\]>\(\[([\s\S]*?)\]\);`),
+  );
+  if (!block) return null;
+  return [...block[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+}
+
+/** Members of the harvest's `kind: "uses" | "imports" | …;` union. */
+function producerEdgeKinds(source) {
+  const union = source.match(/kind:\s*("uses"(?:\s*\|\s*"[^"]+")+);/);
+  if (!union) return null;
+  return [...union[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+}
+
+/** Fields of `export interface DeclRecord { … }` with no `?` — what a consumer
+ *  actually requires. `influence` is optional today; if it ever becomes required,
+ *  every mounted node is missing it, and that belongs in this file's red. */
+function requiredDeclRecordFields(source) {
+  const iface = source.match(/export interface DeclRecord \{([\s\S]*?)\n\}/);
+  if (!iface) return null;
+  return [...iface[1].matchAll(/^ {2}(\w+)(\?)?:/gm)]
+    .filter((match) => !match[2])
+    .map((match) => match[1]);
+}
+
+/** Same-members comparison that refuses to be vacuous: an unparsed shape on
+ *  either side is reported, never treated as agreement. */
+function sameSet(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  const na = [...new Set(a)].sort();
+  const nb = [...new Set(b)].sort();
+  return na.length === nb.length && na.every((value, index) => value === nb[index]);
+}
+
+/**
+ * @returns {string[]} one line per claim the live surface no longer supports.
+ *   Empty means the port's documented assumptions still hold.
+ */
+function upstreamDrift({ pins, sourceDigests, receipt, layoutSource, harvestSource, hubGraph, census, censusDigest, mounted }) {
+  const drift = [];
+
+  for (const [path, pin] of Object.entries(pins.sources)) {
+    if (!HEX64.test(pin)) drift.push(`pin for ${path} is not a sha256: ${JSON.stringify(pin)}`);
+    const live = sourceDigests[path];
+    if (live === undefined) {
+      drift.push(`no live digest for ${path} — the port claims to read it`);
+    } else if (live !== pin) {
+      drift.push(`ported source moved: ${path} is ${live} on disk, the bridge pins ${pin}`);
+    }
+    const recorded = receipt?.implementation?.[path];
+    if (recorded === undefined) {
+      drift.push(`producer receipt names no ${path} — the pin lost its authority`);
+    } else if (recorded !== pin) {
+      drift.push(`pin disagrees with the producer receipt: ${path} pins ${pin}, receipt says ${recorded}`);
+    }
+  }
+
+  const pinnedCensus = Object.entries(pins.artifacts);
+  if (pinnedCensus.length !== 1) drift.push(`expected exactly one pinned artifact, found ${pinnedCensus.length}`);
+  for (const [, pin] of pinnedCensus) {
+    if (censusDigest !== pin) {
+      drift.push(`census artifact moved: ${censusDigest} on disk, the bridge pins ${pin}`);
+    }
+  }
+
+  // The two constants the Hub's gate compares against, bound to the live gate.
+  if (receipt?.schemaVersion !== RECEIPT_SCHEMA_VERSION) {
+    drift.push(`receipt schemaVersion ${JSON.stringify(receipt?.schemaVersion)} != ${RECEIPT_SCHEMA_VERSION}`);
+  }
+  if (receipt?.status !== EVIDENCE_STATUS) {
+    drift.push(`receipt status ${JSON.stringify(receipt?.status)} != ${JSON.stringify(EVIDENCE_STATUS)}`);
+  }
+
+  // Edge vocabularies: what the layout can position, and what the producer emits.
+  if (!sameSet(setOfKinds(layoutSource, "EDGE_KINDS"), LAYOUT_EDGE_KINDS)) {
+    drift.push(
+      `layout EDGE_KINDS ${JSON.stringify(setOfKinds(layoutSource, "EDGE_KINDS"))} != LAYOUT_EDGE_KINDS ${JSON.stringify(LAYOUT_EDGE_KINDS)}`,
+    );
+  }
+  if (!sameSet(producerEdgeKinds(harvestSource), PRODUCER_EDGE_KINDS)) {
+    drift.push(
+      `harvest Edge kind union ${JSON.stringify(producerEdgeKinds(harvestSource))} != PRODUCER_EDGE_KINDS ${JSON.stringify(PRODUCER_EDGE_KINDS)}`,
+    );
+  }
+
+  // The floor `certificate` is claimed to take: an unknown kind must land on
+  // "def", and "certificate" must still be unknown. Either half breaking changes
+  // how the hub paints these nodes.
+  if (!/:\s*"def";/.test(layoutSource)) {
+    drift.push("layout no longer floors an unknown declaration kind at \"def\"");
+  }
+  const declKinds = setOfKinds(layoutSource, "DECL_KINDS");
+  if (!Array.isArray(declKinds)) {
+    drift.push("could not parse layout DECL_KINDS — the eight-kind claim is unmeasured");
+  } else if (declKinds.includes(CERTIFICATE_NODE_KIND)) {
+    drift.push(`harvest now publishes kind ${CERTIFICATE_NODE_KIND} — the node is no longer a floor case`);
+  }
+
+  // Consumability of a mounted node against the CURRENT required field set.
+  const required = requiredDeclRecordFields(harvestSource);
+  if (!Array.isArray(required) || required.length === 0) {
+    drift.push("could not parse required fields of DeclRecord — consumability is unmeasured");
+  } else {
+    const nodes = mounted?.graph?.nodes ?? [];
+    for (const field of required) {
+      const missing = nodes.filter((node) => !node || !(field in node));
+      if (missing.length > 0) {
+        drift.push(
+          `${missing.length}/${nodes.length} mounted nodes lack now-required DeclRecord field ${field} (e.g. ${missing[0]?.fqn})`,
+        );
+      }
+    }
+  }
+
+  // The published graph: identity law re-derived from its own row 0, not copied.
+  const first = hubGraph?.nodes?.[0];
+  if (!first) {
+    drift.push("hub graph has no node 0 to check the identity law against");
+  } else {
+    const recomputed = nodeIdentityBase({ waddle: first.waddle, file: first.file, fqn: first.fqn });
+    if (recomputed !== first.id) {
+      drift.push(`identity law no longer reproduces the published id: got ${JSON.stringify(recomputed)} want ${JSON.stringify(first.id)}`);
+    }
+  }
+  const counts = [
+    ["totals.decls vs node count", hubGraph?.totals?.decls === hubGraph?.nodes?.length],
+    ["receipt nodes vs node count", receipt?.graph?.nodes === hubGraph?.nodes?.length],
+    ["receipt edges vs edge count", receipt?.graph?.edges === hubGraph?.edges?.length],
+  ];
+  for (const [label, ok] of counts) if (!ok) drift.push(`hub graph count check failed: ${label}`);
+  const edgeKinds = new Set((hubGraph?.edges ?? []).map((edge) => edge.kind));
+  if (edgeKinds.size !== 1 || !edgeKinds.has("uses")) {
+    drift.push(`published graph edge kinds are ${JSON.stringify([...edgeKinds])}, not the single "uses"`);
+  }
+  if ((hubGraph?.waddles ?? []).includes("cfsg")) {
+    drift.push("the hub graph now carries a cfsg waddle — surface (1) is no longer missing CFSG declarations");
+  }
+
+  // The real artifact, mounted through the bridge itself.
+  if (census?.schema !== CENSUS_SCHEMA) {
+    drift.push(`live census schema ${JSON.stringify(census?.schema)} != ${CENSUS_SCHEMA}`);
+  }
+  if (!sameSet(census?.verdict_words?.row_verdicts, CENSUS_VERDICTS)) {
+    drift.push(
+      `census verdict vocabulary ${JSON.stringify(census?.verdict_words?.row_verdicts)} != CENSUS_VERDICTS ${JSON.stringify(CENSUS_VERDICTS)}`,
+    );
+  }
+  if (typeof census?.tier_law !== "string" || !/no CFSG statement is machine-checked/.test(census.tier_law)) {
+    drift.push("census tier_law no longer states the limit the bridge carries verbatim");
+  }
+  if (!Array.isArray(census?.exec_leg?.sample)) {
+    drift.push("live census has no exec_leg.sample array — the mount input moved");
+  } else if (mounted?.graph?.nodes?.length !== 11 || mounted?.refusals?.length !== 2) {
+    drift.push(
+      `the live artifact no longer mounts to 11 nodes and 2 refusals: got ${mounted?.graph?.nodes?.length} nodes, ${mounted?.refusals?.length} refusals`,
+    );
+  } else if (!mounted.refusals.every((r) => r.code === "probe_rc_nonzero")) {
+    drift.push(`live artifact refusals are ${JSON.stringify(mounted.refusals.map((r) => r.code))}, expected all probe_rc_nonzero`);
+  }
+
+  return drift;
+}
+
+/** A whole surface, read once, in the shapes `upstreamDrift` expects. */
+function readUpstreamSurface() {
+  const sourceDigests = {};
+  for (const path of Object.keys(UPSTREAM_PINS.sources)) {
+    sourceDigests[path] = digestFile(`${WADDLE_REPO}/${path}`);
+  }
+  const receipt = JSON.parse(readFileSync(`${WADDLE_REPO}/apps/hub/data/proof-graph-build-receipt.json`, "utf8"));
+  const census = JSON.parse(readFileSync(CENSUS_ARTIFACT_PATH, "utf8"));
+  return {
+    pins: UPSTREAM_PINS,
+    sourceDigests,
+    receipt,
+    layoutSource: readFileSync(`${WADDLE_REPO}/tools/graph-layout/src/index.ts`, "utf8"),
+    harvestSource: readFileSync(`${WADDLE_REPO}/packages/lean-build-graph/src/index.ts`, "utf8"),
+    hubGraph: JSON.parse(readFileSync(`${WADDLE_REPO}/apps/hub/data/proofs-graph.json`, "utf8")),
+    census,
+    censusDigest: digestFile(CENSUS_ARTIFACT_PATH),
+    mounted: buildCertificateGraph(census, { ledger: [] }),
+  };
+}
+
+test("the bridge publishes its upstream pins as data, not as prose", () => {
+  // This half needs no authority and is the falsifier: at base the export does
+  // not exist, so the digests the header cites had no referent anywhere in code.
+  assert.equal(typeof UPSTREAM_PINS, "object", "UPSTREAM_PINS must be exported by the bridge");
+  assert.deepEqual(
+    Object.keys(UPSTREAM_PINS.sources).sort(),
+    [
+      "packages/graph-engine/src/layout.ts",
+      "packages/graph-engine/src/pagerank.ts",
+      "tools/graph-layout/src/index.ts",
+      "tools/graph-merge/src/index.ts",
+    ],
+    "the pin table must cover exactly the four sources the port claims",
+  );
+  for (const [path, digest] of Object.entries(UPSTREAM_PINS.sources)) {
+    assert.match(digest, HEX64, `${path} must be pinned by a full sha256, not an 8-char prefix`);
+  }
+  const artifacts = Object.entries(UPSTREAM_PINS.artifacts);
+  assert.equal(artifacts.length, 1);
+  assert.match(artifacts[0][1], HEX64);
+});
+
+test("the drift check fires: one doctored digest comes back named", () => {
+  // The negative control for a pin that would otherwise be unfalsifiable. Same
+  // inputs the live leg uses would need the authority, so this builds the
+  // smallest surface that is INTERNALLY consistent — every claim true — and then
+  // breaks one thing at a time. Each row must produce exactly the one line.
+  const base = {
+    pins: {
+      sources: {
+        "tools/graph-merge/src/index.ts": "a".repeat(64),
+        "tools/graph-layout/src/index.ts": "b".repeat(64),
+        "packages/graph-engine/src/layout.ts": "c".repeat(64),
+        "packages/graph-engine/src/pagerank.ts": "d".repeat(64),
+      },
+      artifacts: { "GR-FULLSEND-1027-CFSG-AXIOM-CENSUS.json": "e".repeat(64) },
+    },
+    sourceDigests: {
+      "tools/graph-merge/src/index.ts": "a".repeat(64),
+      "tools/graph-layout/src/index.ts": "b".repeat(64),
+      "packages/graph-engine/src/layout.ts": "c".repeat(64),
+      "packages/graph-engine/src/pagerank.ts": "d".repeat(64),
+    },
+    receipt: {
+      schemaVersion: RECEIPT_SCHEMA_VERSION,
+      status: EVIDENCE_STATUS,
+      implementation: {
+        "tools/graph-merge/src/index.ts": "a".repeat(64),
+        "tools/graph-layout/src/index.ts": "b".repeat(64),
+        "packages/graph-engine/src/layout.ts": "c".repeat(64),
+        "packages/graph-engine/src/pagerank.ts": "d".repeat(64),
+      },
+      graph: { nodes: 19916, edges: 45339 },
+    },
+    layoutSource:
+      'const EDGE_KINDS = new Set<GraphEdge["kind"]>([\n  "uses",\n  "instance_of",\n  "extends",\n  "proves",\n]);\n' +
+      'const DECL_KINDS = new Set<GraphNode["kind"]>([\n  "theorem",\n  "lemma",\n  "def",\n  "structure",\n  "instance",\n  "inductive",\n  "abbrev",\n  "axiom",\n]);\n' +
+      'function normalizeKind(kind) { return kind ? kind : "def"; }',
+    harvestSource:
+      'kind: "uses" | "imports" | "instance_of" | "extends" | "proves";\n' +
+      "export interface DeclRecord {\n  fqn: string;\n  id?: string;\n}\n",
+    hubGraph: {
+      totals: { decls: 19916 },
+      waddles: ["audrey"],
+      nodes: [{ id: "audrey::A.lean::A.b", waddle: "audrey", file: "A/B.lean", fqn: "A.b" }],
+      edges: [{ kind: "uses" }],
+    },
+    census: {
+      schema: CENSUS_SCHEMA,
+      tier_law: "no CFSG statement is machine-checked by this artifact",
+      verdict_words: { row_verdicts: [...CENSUS_VERDICTS] },
+      exec_leg: { sample: [{}, {}, {}] },
+    },
+    censusDigest: "e".repeat(64),
+    mounted: { graph: { nodes: [] }, refusals: [] },
+  };
+  // Hand the consistency checks a surface that is INTERNALLY true: the node 0 id
+  // must actually be what the law produces, and every mounted node must carry the
+  // required fields, or the doctored rows below report two lines instead of one.
+  base.hubGraph.nodes[0].id = nodeIdentityBase({
+    waddle: "audrey",
+    file: "A/B.lean",
+    fqn: "A.b",
+  });
+  base.mounted.graph.nodes = Array.from({ length: 11 }, (_, index) => ({
+    ...Object.fromEntries(requiredDeclRecordFields(base.harvestSource).map((field) => [field, 1])),
+    fqn: `A.b${index}`,
+  }));
+  base.mounted.refusals = [
+    { code: "probe_rc_nonzero" },
+    { code: "probe_rc_nonzero" },
+  ];
+  base.hubGraph.totals.decls = base.hubGraph.nodes.length;
+  base.receipt.graph.nodes = base.hubGraph.nodes.length;
+  base.receipt.graph.edges = base.hubGraph.edges.length;
+
+  assert.deepEqual(upstreamDrift(structuredClone(base)), [], "the control surface must be internally consistent");
+
+  const controls = [
+    {
+      label: "a ported source moved on disk",
+      patch: (s) => { s.sourceDigests["tools/graph-merge/src/index.ts"] = "f".repeat(64); },
+      expect: /ported source moved: tools\/graph-merge/,
+    },
+    {
+      label: "the bridge pin disagrees with the producer receipt",
+      patch: (s) => { s.receipt.implementation["packages/graph-engine/src/pagerank.ts"] = "0".repeat(64); },
+      expect: /pin disagrees with the producer receipt: packages\/graph-engine\/src\/pagerank\.ts/,
+    },
+    {
+      label: "the census artifact moved",
+      patch: (s) => { s.censusDigest = "1".repeat(64); },
+      expect: /census artifact moved/,
+    },
+    {
+      label: "the hub bumped its receipt schemaVersion",
+      patch: (s) => { s.receipt.schemaVersion = RECEIPT_SCHEMA_VERSION + 1; },
+      expect: /receipt schemaVersion .*!= 3/,
+    },
+    {
+      label: "the layout guard gained an edge kind the mount would refuse",
+      patch: (s) => { s.layoutSource = s.layoutSource.replace('"proves",', '"proves",\n  "imports",'); },
+      expect: /layout EDGE_KINDS/,
+    },
+    {
+      label: "the harvest dropped a kind from its union",
+      patch: (s) => { s.harvestSource = s.harvestSource.replace(' | "extends"', ""); },
+      expect: /harvest Edge kind union/,
+    },
+    {
+      label: "an unknown declaration kind no longer floors at def",
+      patch: (s) => { s.layoutSource = s.layoutSource.replace(': "def";', ': "theorem";'); },
+      expect: /no longer floors an unknown declaration kind/,
+    },
+    {
+      label: "the harvest started publishing kind certificate",
+      patch: (s) => { s.layoutSource = s.layoutSource.replace('"axiom",', '"axiom",\n  "certificate",'); },
+      expect: /no longer a floor case/,
+    },
+    {
+      label: "DeclRecord made a field this bridge does not carry required",
+      patch: (s) => { s.harvestSource = s.harvestSource.replace("  fqn: string;", "  fqn: string;\n  influence: number;"); },
+      expect: /lack now-required DeclRecord field influence/,
+    },
+    {
+      label: "the identity law stopped reproducing the published id",
+      patch: (s) => { s.hubGraph.nodes[0].file = "A/C.lean"; },
+      expect: /identity law no longer reproduces the published id/,
+    },
+    {
+      label: "the published graph edge kinds diversified",
+      patch: (s) => { s.hubGraph.edges[0].kind = "proves"; },
+      expect: /not the single "uses"/,
+    },
+    {
+      label: "the hub graph gained a cfsg waddle",
+      patch: (s) => { s.hubGraph.waddles.push("cfsg"); },
+      expect: /no longer missing CFSG declarations/,
+    },
+    {
+      label: "the census verdict vocabulary changed",
+      patch: (s) => { s.census.verdict_words.row_verdicts = ["AXIOM_FREE"]; },
+      expect: /census verdict vocabulary/,
+    },
+    {
+      label: "the live artifact no longer mounts to 11 nodes and 2 refusals",
+      patch: (s) => { s.mounted.refusals.length = 1; },
+      expect: /no longer mounts to 11 nodes and 2 refusals/,
+    },
+    {
+      label: "the shape the check parses disappeared",
+      patch: (s) => {
+        s.harvestSource = s.harvestSource.replace(
+          /export interface DeclRecord \{[\s\S]*?\n\}/,
+          "export interface DeclarationRecord {}",
+        );
+      },
+      expect: /could not parse required fields of DeclRecord/,
+    },
+  ];
+
+  for (const control of controls) {
+    const doctored = structuredClone(base);
+    control.patch(doctored);
+    const drift = upstreamDrift(doctored);
+    assert.equal(drift.length, 1, `${control.label}: expected exactly one drift line, got ${JSON.stringify(drift)}`);
+    assert.match(drift[0], control.expect, `${control.label}: wrong line reported`);
+  }
+});
+
+/** Every path the live leg reads. Absence of any one of them is UNMEASURED. */
+function authorityPaths() {
+  return [
+    ...Object.keys(UPSTREAM_PINS.sources).map((path) => `${WADDLE_REPO}/${path}`),
+    `${WADDLE_REPO}/packages/lean-build-graph/src/index.ts`,
+    `${WADDLE_REPO}/apps/hub/data/proof-graph-build-receipt.json`,
+    `${WADDLE_REPO}/apps/hub/data/proofs-graph.json`,
+    CENSUS_ARTIFACT_PATH,
+  ];
+}
+
+test("the live proof-graph surface still matches what this bridge claims", (t) => {
+  const absent = authorityPaths().filter((path) => !existsSync(path));
+  if (absent.length > 0) {
+    t.skip(`authority absent: ${absent.join(", ")} — UNMEASURED, not drift`);
+    return;
+  }
+  const surface = readUpstreamSurface();
+  const drift = upstreamDrift(surface);
+  assert.deepEqual(drift, [], "the bridge's documented upstream surface has moved:\n  " + drift.join("\n  "));
+  // Measured receipts, printed so a green run says what it actually checked.
+  t.diagnostic(
+    `live surface: ${surface.hubGraph.nodes.length} nodes / ${surface.hubGraph.edges.length} edges, ` +
+      `node0 ${surface.hubGraph.nodes[0].id}, ` +
+      `census mounts ${surface.mounted.graph.nodes.length} nodes + ${surface.mounted.refusals.length} refusals`,
+  );
+});
+

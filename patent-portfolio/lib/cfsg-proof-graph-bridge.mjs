@@ -63,7 +63,11 @@
  * completion receipt (`proof-graph-build-receipt.json → implementation`), which
  * this lane re-measured against the live files and found unchanged:
  * graph-merge `e7cf806c…`, graph-layout `6ac4e113…`, layout.ts `fe852457…`,
- * pagerank.ts `2e906b28…`. Drift is therefore detectable, not silent.
+ * pagerank.ts `2e906b28…`. Those digests are recorded in `UPSTREAM_PINS` below —
+ * as data a check can read, not as prose a reader must trust — and
+ * `tests/unit/cfsg-proof-graph-bridge.test.mjs` recomputes them from the live
+ * producer tree and the live census artifact whenever that authority is on the
+ * host. Drift is therefore detectable, not silent.
  *
  * @module
  */
@@ -73,6 +77,41 @@ import { posix } from "node:path";
 
 /** The census artifact schema this bridge reads (verified against the file above). */
 export const CENSUS_SCHEMA = "kagami.cfsg-axiom-census.v1";
+
+/**
+ * What this bridge claims about the surface outside the repo, as data.
+ *
+ * The module ports code it does not own and reads an artifact it does not write.
+ * Recording that as a sentence makes the claim unfalsifiable: the upstream can
+ * move and the sentence keeps saying it has not. These are the SHA-256 digests of
+ * the exact bytes the port was made against, taken from the producer's own
+ * completion receipt (`apps/hub/data/proof-graph-build-receipt.json →
+ * implementation`) and from the census artifact it read. A test can recompute
+ * them; that is the difference between a pin and a note.
+ *
+ * Paths are producer-relative, so the checker resolves them against whichever
+ * checkout it is pointed at. This module does no I/O and checks nothing itself —
+ * it publishes the claim so that `tests/unit/cfsg-proof-graph-bridge.test.mjs`
+ * can hold it to the live tree.
+ */
+export const UPSTREAM_PINS = Object.freeze({
+  /** Files in the producer tree whose behaviour this module ports. */
+  sources: Object.freeze({
+    "tools/graph-merge/src/index.ts":
+      "e7cf806c7d366bbbff15dbe4e9b3d2acd87981dab9b61475fba31db9ae898448",
+    "tools/graph-layout/src/index.ts":
+      "6ac4e1131e78d682d2d328d9c1b3e188fdb2890ce08413bc2dbd75157edcdd1c",
+    "packages/graph-engine/src/layout.ts":
+      "fe852457754f678b60fd1e79977826a736e07f30b7f886c58c0a59c3ebe56dd1",
+    "packages/graph-engine/src/pagerank.ts":
+      "2e906b2836c07b368907a830c4284a7e1369ef6c5a1c2a8ee1ed57b15c4b3ba3",
+  }),
+  /** The census artifact `CENSUS_SCHEMA` was verified against. */
+  artifacts: Object.freeze({
+    "GR-FULLSEND-1027-CFSG-AXIOM-CENSUS.json":
+      "68f0a35d44fbb136713c1adafd8f08c74c12dd6a742e3d815884ab916a27a6e8",
+  }),
+});
 
 /**
  * The Hub's node-identity law, ported from
@@ -485,7 +524,7 @@ export function buildCertificateGraph(census, options = {}) {
     if (!LAYOUT_EDGE_KINDS.includes(kind)) {
       refuse(
         "edge_kind_not_positionable",
-        `the Hub's layout guard (tools/graph-layout/src/index.ts:165) throws on kind ${JSON.stringify(kind)} even though the producer type allows it; refused here rather than mislabelled as "uses"`,
+        `the Hub's layout guard (tools/graph-layout/src/index.ts:166) throws on kind ${JSON.stringify(kind)} even though the producer type allows it; refused here rather than mislabelled as "uses"`,
         `${ref.from} -> ${ref.to}`,
       );
       continue;
