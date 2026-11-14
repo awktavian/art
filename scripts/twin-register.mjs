@@ -577,11 +577,12 @@ function build() {
           },
           published: {
             ref: "refs/remotes/origin/main",
-            command: `git -C <art repo> show refs/remotes/origin/main:${NAV.art}`,
-            blob: legs.art_published ? legs.art_published.blob : null,
-            state: legs.art_published ? "MEASURED" : "UNMEASURED",
+            command: `git -C <art repo> show refs/remotes/origin/main:${NAV.art} | git hash-object --stdin`,
+            measured_by: "tests/unit/museum-twin-register.test.mjs R3, on every run, against the live ref",
+            digest_recorded: false,
+            state: legs.art_published ? "MEASURABLE_ON_THIS_HOST" : "UNMEASURABLE_ON_THIS_HOST",
             nature:
-              "A build-time observation on the generating host, not a pin. refs/remotes/origin/main moves under the checkout and a register cannot name the commit that would carry it (basis.art_pin_channel), so this value may only be read beside recorded_by_generation — both dated. The live question ('do these bytes match what the tip carries now?') is measured by tests/unit/museum-twin-register.test.mjs R3, which re-reads the ref and, when the two differ, proves with merge-base --is-ancestor whether this checkout is on that tip at all.",
+              "No digest is recorded in this leg, deliberately. refs/remotes/origin/main is THIS repo's own moving tip, and the register is committed into the very commits that move it, so there is no commit this file could name that would make a recorded value true (basis.art_pin_channel states that law; this leg used to break it). What breaking it cost: the row recorded the blob the tip carried at generation, so it went false the moment the fold that changed these bytes landed, `node scripts/twin-register.mjs --check` could no longer be satisfied on trunk, and the register was naming a digest none of its own tests could recompute — residual 1's defect one field over, wearing a smaller hat. The live question ('do these bytes match what the tip carries now?') is measured, not recorded: R3 re-reads the ref on every run and, when the two differ, proves with merge-base --is-ancestor whether this checkout is ahead of that tip at all.",
           },
         },
         patents_leg: {
@@ -598,14 +599,23 @@ function build() {
           },
           published: {
             ref: `the tip named by basis.patents_tip`,
-            command: `git -C <patents repo> show <basis.patents_tip>:${NAV.patents}`,
+            command: `git -C <patents repo> show <basis.patents_tip>:${NAV.patents} | git hash-object --stdin`,
+            digest_recorded: true,
+            /**
+             * The difference from the art leg, and why this one keeps its hex: patents is NOT the
+             * repo this file is committed into, so its tip CAN be named here. basis.patents_tip is
+             * recorded in this file, which makes this blob permanently re-readable from patents' own
+             * object database — R11 assert 3b re-reads it on every run. An art-tip digest could never
+             * be re-readable that way, because naming the commit that carries it is self-referential.
+             */
+            re_readable_at: "basis.patents_tip",
             blob: legs.patents_published ? legs.patents_published.blob : null,
             state: legs.patents_published ? "MEASURED" : "UNMEASURED",
           },
         },
       },
       reading:
-        "Both 're_measured_here.blob' rows reproduce the hex the generation pinned, so the generation is not wrong about the bytes it read — it read a parked checkout on one side and a banked wip commit on the other. The published rows are different hexes on both sides, and the ancestor rc names whether that banked commit ever landed.",
+        "Both 're_measured_here.blob' rows reproduce the hex the generation pinned, so the generation is not wrong about the bytes it read — it read a parked checkout on one side and a banked wip commit on the other. Patents' published row is a different hex from its generation leg and is re-readable at basis.patents_tip; art's published row records no hex at all, because the ref it would quote is this repo's own tip (see that leg's nature). Either way the census was scored on non-published trees, and the live comparison is R3's job on every run rather than a value stored here.",
       consequence:
         "At the published tips the pair's bodies are cmp-identical (re-measured by the tripwire, leg R5), so there is nothing to consolidate. A future row on this path should expect the same two stale legs until the census reads published tips rather than parked checkouts; that is a code-map producer question, not an art-tree question.",
       spec_legs_also_stale: `The same generation's spec rows pair art's current blobs with patents' ${CENSUS_ROW.patents.indexed_at} blobs; spec_pin_delta below is that pair, row by row, measured once.`,
@@ -623,7 +633,7 @@ function build() {
       "CLOSED 2026-11-14 by the same sweep — patents' four spec PROVENANCE headers claimed the pair was '(byte-identical as of 2026-08-18)' as WHOLE files, which the register's own measurement never supported: the twins are identical below the header and differ by it by design, and art's four had already been reworded to say exactly that. Patents' headers now carry the recipe-scoped claim and a pointer to this register's row id; R5 and R7 keep the recipe claim true, so the wording cannot rot back into a whole-file lie.",
       "The five undeclared sibling pairs (architecture, lighting, wayfinding, wing-enhancements, museum.spec) are pinned by this register from the art side, but nothing on the patents side references it. A mirror-side register, or a patents test that reads this one through a declared path override, is the matching half.",
       "museum.spec.js: patents' copy is missing 89 lines of coverage art has (wing teleport indicators + rotunda return). A coverage gap to port downward, not a duplicate to delete.",
-      "The census reads whatever tree a host happens to have checked out, which is why a pair closed in 2026-10-26 keeps re-serving as live copy debt. This host's shared art checkout and its patents counterpart are therefore NOT necessarily at their published tips — and no position is recorded in this file, because a committed working-tree count goes false on the next fetch or push and would be the same rot wearing a smaller hat. tests/unit/museum-twin-register.test.mjs R11 measures it on every run instead, with `git -C <repo> rev-list --count HEAD..refs/remotes/origin/main` in both repos, and prints the two counts as a diagnostic. Fast-forwarding a checkout belongs to whoever owns it, not to a lane.",
+      "The census reads whatever tree a host happens to have checked out, which is why a pair closed in 2026-10-26 keeps re-serving as live copy debt. This host's shared art checkout and its patents counterpart are therefore NOT necessarily at their published tips — and no position is recorded in this file, because a committed working-tree count goes false on the next fetch or push and would be the same rot wearing a smaller hat. tests/unit/museum-twin-register.test.mjs R11 measures it on every run instead, with `git -C <repo> rev-list --count HEAD..refs/remotes/origin/main` in both repos, and prints the two counts as a diagnostic. Fast-forwarding a checkout belongs to whoever owns it, not to a lane. The same law caught one more value at the landing of residual 1: this row's own art_leg.published used to store the blob refs/remotes/origin/main carried for navigation.js at generation, which went false the instant the fold landed (measured: `--check` rc=1 on trunk with exactly one differing leaf, that one) — a register cannot name the commit that would make it true, because it is committed into those commits. It stores no digest now and R3 measures the ref live; patents_leg.published keeps its hex because patents is not this repo and basis.patents_tip names the commit to re-read it at, which R10 and R11 assert.",
     ],
   };
 }

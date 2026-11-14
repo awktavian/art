@@ -158,8 +158,25 @@ test("navigation.js: the register and museum-navigation-mirror.test.mjs pin the 
   // the checkout is not on that tip (merge-base --is-ancestor is the only thing that
   // distinguishes in-flight from behind — a range count is identical under fork and fast-forward).
   const pub = REGISTER.census_provenance.row_identities_and_what_they_are.art_leg.published;
-  assert.equal(pub.state, "MEASURED", "art's published anchor is UNMEASURED on the host that wrote the register — regenerate where origin/main resolves");
-  assert.match(pub.blob, /^[0-9a-f]{40}$/u, `${pub.ref}: the register recorded a published blob that is not 40 hex`);
+  assert.equal(
+    pub.state,
+    "MEASURABLE_ON_THIS_HOST",
+    "art's published leg is UNMEASURABLE on the host that wrote the register — regenerate where origin/main resolves",
+  );
+  // This leg must hold NO digest. refs/remotes/origin/main is this repo's own tip, and the register
+  // is committed into the commits that move it, so a recorded published-tip value is false as soon
+  // as the fold that changed these bytes lands: `--check` cannot be satisfied on trunk and the
+  // register names a hex its tests cannot recompute. Measured below instead, live, every run.
+  assert.equal(
+    pub.digest_recorded,
+    false,
+    `art_leg.published.digest_recorded is ${pub.digest_recorded} — a published-tip digest belongs to a moving ref this file is committed into, so it goes false on the next landing of these bytes. The live value is measured by this leg, not stored.`,
+  );
+  assert.doesNotMatch(
+    JSON.stringify(pub),
+    /\b[0-9a-f]{40}\b|\b[0-9a-f]{64}\b/u,
+    "art_leg.published carries an identity digest again — no test can recompute it after the next push; R3 measures it live (see this leg's nature)",
+  );
   const PUB_REF = "refs/remotes/origin/main";
   const atTip = (() => {
     try {
@@ -345,11 +362,15 @@ test("census_provenance: the generation read real bytes, and both of its legs we
     );
   }
 
-  // Both published anchors are measured hexes, distinct from the census legs. That the two
-  // differ IS the finding; if they ever collapse, the row is no longer a stale-tree artifact.
-  assert.equal(art.published.state, "MEASURED");
-  assert.match(art.published.blob, HEX40);
-  assert.notEqual(art.recorded_by_generation, art.published.blob, "art's census and published anchors collapsed — re-read the finding");
+  // The census legs and the published surface are different bytes. That the two differ IS the
+  // finding; if they ever collapse, the row is no longer a stale-tree artifact. Art's side of the
+  // comparison is its own TREE (this file's pair row, re-measured by R2 every run) and not a stored
+  // tip digest — see art_leg.published.nature for why a stored one could never stay true.
+  assert.equal(art.published.state, "MEASURABLE_ON_THIS_HOST");
+  const artTreeBlob = REGISTER.pairs.find((p) => p.id === "museum.navigation.js").art.blob;
+  assert.match(artTreeBlob, HEX40);
+  assert.notEqual(art.recorded_by_generation, artTreeBlob, "art's census anchor and its own tree collapsed — re-read the finding");
+  assert.match(pat.published.blob, HEX40, "patents' published anchor is not a hex — it is recorded because patents is not this repo, and its tip is named in basis.patents_tip");
   assert.notEqual(pat.recorded_by_generation, pat.published.blob, "patents' census and published anchors collapsed — re-read the finding");
 
   if (mirrorAtTip("museum/navigation.js") !== null) {
@@ -389,7 +410,12 @@ test("census_provenance: the generation read real bytes, and both of its legs we
  * live at art d2ce9a4", quoting an art blob, an art sha256 and an art commit that nothing here
  * re-read. Both are gone from the prose: (a) is measured on every run below and printed, (b) is
  * parsed out of the mirror's own bytes by scripts/twin-register.mjs and compared with this tree.
- * A hand-edited hex in either direction, or a re-pasted count, reddens a leg here.
+ * A hand-edited hex in either direction, or a re-pasted count, reddens a leg here. (c) found at
+ * the landing of residual 1, not before it: art_leg.published stored the blob this repo's own
+ * origin/main carried at generation, so it was false the moment the fold landed and --check could
+ * not be satisfied on trunk. That leg now stores no digest (R3 proves it stores none, and measures
+ * the ref live); patents' published leg keeps its digest because patents is not this repo and the
+ * commit it was read at is named in the file, which R10 and R11 assert by re-reading it.
  *
  * Falsifiers run before commit: with the register's mirror_declaration_check.art_tree.blob
  * changed by one character, assert 3 names both hexes; with a 40-hex pasted back into patents'
@@ -422,13 +448,47 @@ test("live-surface claims are recomputed: checkout positions measured, mirror de
     `checkout positions measured live (deliberately NOT recorded in the register): ${rows.map(([n, b]) => `${n} ${b === null ? "UNMEASURED" : `${b} behind`}`).join(", ")} — a parked checkout is why a closed twin pair keeps re-serving as copy debt, and fast-forwarding one belongs to whoever owns it, not to a lane`
   );
 
-  // 2. The register's own disclosure that its published rows are dated observations, not pins.
+  // 2. The register's own disclosure of which published leg stores a hex and which measures one.
+  //    The rule the two legs differ by: a digest about a repo OTHER than this one may be recorded,
+  //    because the commit it was read at is recorded with it and that repo's object db keeps
+  //    answering for it. A digest about THIS repo's tip may not, because the register would have to
+  //    name its own future to stay true.
   const pub = REGISTER.census_provenance.row_identities_and_what_they_are.art_leg.published;
   assert.match(
     pub.nature ?? "",
-    /build-time observation/iu,
-    "art_leg.published lost the disclosure that it is a dated reading, not a pin — R3 refuses to compare it with a later tip, and a reader needs to know why"
+    /no digest is recorded/iu,
+    "art_leg.published lost the disclosure that it stores no hex — a reader who finds no blob here needs to know the value is measured by R3, not missing"
   );
+  assert.match(
+    pub.measured_by ?? "",
+    /museum-twin-register\.test\.mjs R3/u,
+    "art_leg.published no longer names the leg that measures it live, so the absence of a hex here reads as an omission"
+  );
+
+  // 2b. Patents' published leg DOES store a hex, so prove it re-reads from the commit the file
+  //     names. That is the whole difference between protected-by-data and folklore.
+  const patPub = REGISTER.census_provenance.row_identities_and_what_they_are.patents_leg.published;
+  assert.equal(
+    patPub.digest_recorded,
+    true,
+    "patents_leg.published stopped recording its digest — patents is not this repo, so its tip CAN be named here and the hex stays re-readable; dropping it would lose the finding, not the rot"
+  );
+  assert.equal(
+    patPub.re_readable_at,
+    "basis.patents_tip",
+    `patents_leg.published claims to be re-readable at "${patPub.re_readable_at}", which is not the commit the register records`
+  );
+  const patNavAtRecordedTip = mirrorAtTip("museum/navigation.js");
+  if (patNavAtRecordedTip === null) {
+    t.skip(`patents' museum/navigation.js unreadable at basis.patents_tip (${MIRROR_TIP}) — that leg's hex is UNVERIFIED on this host, not correct`);
+  } else {
+    const reRead = fileStats(patNavAtRecordedTip).blob;
+    assert.equal(
+      reRead,
+      patPub.blob,
+      `the register records patents' published navigation.js blob as ${patPub.blob} but patents' own object db says ${MIRROR_TIP} carries ${reRead} — a stored digest that does not re-read is the rot residual 1 closed, one row over`
+    );
+  }
 
   // 3. The mirror's art-digest declaration, re-read and re-measured rather than re-believed.
   const gl = REGISTER.pairs.find((p) => p.id === "museum.gallery-loader.js");
@@ -458,6 +518,15 @@ test("live-surface claims are recomputed: checkout positions measured, mirror de
       text,
       /\b\d+ behind\b/u,
       `${where} states a checkout behind-count in prose — that figure is host state; R11 measures it and the row must name the command instead`
+    );
+    // The same law one type over: a hex written into prose is a second copy of a number with no
+    // leg to recompute it, which is exactly how residual 1's header prose went false while staying
+    // green. Measured across this register's prose rows before the law was written: zero digests,
+    // so the law costs nothing today and catches the first one that appears.
+    assert.doesNotMatch(
+      text,
+      HEX,
+      `${where} restates an identity digest in prose — point at the row that measures it (pairs[i].art.blob, census_provenance…); a hex in prose is residual 1's defect with one fewer leg`
     );
   }
 

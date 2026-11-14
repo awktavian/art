@@ -279,7 +279,26 @@ either lane.
 > `museum-twin-register.test.mjs` R2/R3/R11. Falsifiers, run in-lane: flipping a blob inside the
 > register reddened four legs, each naming both hexes; pasting a 40-hex back into either module
 > header reddened the guard that owns that file; re-wording a behind-count into the register's
-> prose reddened R11.
+> prose reddened R11; pasting a 40-hex into a register prose row reddened R11; and storing a
+> digest back into `art_leg.published` reddened R3 on two counts.
+
+> **One more row of the same defect turned up at the landing itself, not before it.** The art seat
+> landed as `33de975`, and on the trunk commit that followed it, `node scripts/twin-register.mjs
+> --check` returned rc=1 with exactly one differing leaf: `census_provenance.art_leg.published`
+> recorded the blob `refs/remotes/origin/main` carried for this file at generation. That is
+> residual 1's own failure mode inside the file that is supposed to be the SSOT: a value describing
+> a moving ref, committed. It cannot be fixed by re-running `--write` after a push, because the
+> same lag reappears on the next fold of these bytes — the register is committed *into* the commits
+> that move that ref, so no commit it could name makes the stored value true. The fix is to store
+> nothing: `art_leg.published` now records the ref, the command, and the leg that measures it live
+> (R3, on every run), plus `digest_recorded: false`, which R3 asserts along with a scan that
+> reddens if a hex ever reappears in that leg. `patents_leg.published` keeps its hex, and that
+> asymmetry is the rule: patents is not this repository, and `basis.patents_tip` names the commit
+> the value was read at, so R10 and R11 re-read it from patents' own object database on every run.
+> Verified after the fix: `--check` rc=0 on the landed trunk, and still rc=0 when `origin/main` is
+> moved to a commit that carries different bytes for this file (a throwaway `commit-tree` probe,
+> ref restored after) — while R3 correctly reddens in the genuinely different case, a checkout left
+> behind a tip that changed these bytes, naming both hexes.
 
 > **STATUS 2026-10-30 (lane MUSEUM-NAVJS-1030): still open, re-measured, and NOT a docs edit —
 > see the foot of this note.** A lane bound to `patent-portfolio/museum/navigation.js` on the
