@@ -70,6 +70,98 @@ function show(repo, ref, path) {
   }
 }
 
+/** Does the named ref carry this path? true/false measured, null when the question is unaskable. */
+function treePresence(repo, ref, path) {
+  if (!ref) return null;
+  try {
+    const out = execFileSync("git", ["-C", repo, "ls-tree", "--name-only", ref, "--", path], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return out.trim().length > 0;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Guard legs, measured. A `guards` entry is a claim that an INSTRUMENT EXISTS, which is a
+ * different kind of statement from the rest of this row and was, until now, only authored. The
+ * claim aged silently: `tests/CENSUS-museum-navigation-mirror.check.mjs` and the
+ * `.githooks/pre-commit` it was wired to are not on patents' published tip, so the row named a
+ * mirror-side gate that nothing on that surface runs, while the register's whole law is that a
+ * live surface is measured or typed UNMEASURED, never believed. Each entry is therefore emitted
+ * as an object: the authored claim is kept verbatim as `claim` (it is the thing under test, and a
+ * reader needs to see what was once asserted), and the verdict comes from this host's plumbing —
+ * `git ls-tree --name-only <ref> -- <path>` on the named side's ref, `existsSync` on this tree.
+ * tests/unit/museum-twin-register.test.mjs R13 re-runs exactly that and refuses a `state` that no
+ * longer matches, which is what makes the word regenerate instead of rot: if a lane restores the
+ * mirror guard, `--write` flips it to PRESENT with no prose edit, and a hand-edited PRESENT goes
+ * red on the run that made the edit.
+ */
+function guardLegs(p, mirrorRef, artText, patText) {
+  return p.prose.guards.map((claim) => {
+    const leg = /^(art|patents):\s+(\S+)/u.exec(claim);
+    if (!leg) {
+      return {
+        claim,
+        side: null,
+        path: null,
+        state: "UNPARSEABLE",
+        measured_by:
+          "nothing — this guard names no `side: path` carrier, so no instrument can check it; rewrite it in that form",
+      };
+    }
+    const [, side, rawPath] = leg;
+    const path = rawPath.replace(/[,.;]$/u, "");
+    const present = side === "art" ? existsSync(join(ROOT, path)) : treePresence(MIRROR_REPO, mirrorRef, path);
+    const row = {
+      claim,
+      side,
+      path,
+      state: present === true ? "PRESENT" : present === false ? "ABSENT" : "UNMEASURED",
+      measured_by:
+        side === "art"
+          ? `existsSync(<this checkout>/${path}) — art's published tip is not quotable here (basis.art_pin_channel), and a guard file's presence is not a digest`
+          : present === null
+            ? `no patents live tip resolvable on this host — UNMEASURED, which is never PRESENT`
+            : `git -C ${MIRROR_REPO} ls-tree --name-only <basis.patents_tip> -- ${path}`,
+    };
+    if (/\.githooks\/pre-commit/u.test(claim)) {
+      const hook = treePresence(MIRROR_REPO, mirrorRef, ".githooks/pre-commit");
+      let hooksPath = null;
+      try {
+        hooksPath = git(MIRROR_REPO, ["config", "--get", "core.hooksPath"]) || "unset";
+      } catch {
+        hooksPath = "unset";
+      }
+      row.hook_plumbing = {
+        githooks_pre_commit_at_tip: hook === true ? "PRESENT" : hook === false ? "ABSENT" : "UNMEASURED",
+        core_hooks_path: mirrorRef ? hooksPath : "UNMEASURED",
+        note:
+          "The authored claim wired this guard to a tracked pre-commit. Both halves of that wiring are measured: the hook file at the tip this row reads, and this clone's core.hooksPath (a per-clone setting, so it describes the checkout on this host, not the repo).",
+      };
+    }
+    /**
+     * A file being on the surface is not the claimed instrument being IN it. Two of this
+     * family's guard claims are about a PROVENANCE declaration inside a mirror file, and one of
+     * them is now false: patents' museum/gallery-loader.js still exists at the measured tip, but
+     * its doc header is a plain module comment that names art nowhere, so the row that announced
+     * "lines 1-10 PROVENANCE block (names art as canonical, pins art's blob + sha256 + tip)"
+     * describes a block this surface does not carry. The recipe is headerMarkers — the same one
+     * the pair rows' header_markers use and the same one R13 re-runs — so the register's word and
+     * the tripwire's word cannot drift apart.
+     */
+    if (side === "patents" && /PROVENANCE|declaration/iu.test(claim)) {
+      const declares = patText === null ? null : headerMarkers(patText).some((m) => m.marker === "PROVENANCE");
+      row.claimed_block = declares === true ? "PRESENT" : declares === false ? "ABSENT" : "UNMEASURED";
+      if (row.claimed_block !== "PRESENT") row.state = row.claimed_block;
+      row.measured_by += `; claimed block via headerMarkers(show(<basis.patents_tip>, ${path})) -> ${row.claimed_block}`;
+    }
+    return row;
+  });
+}
+
 /**
  * The family. `art`/`patents` are repo-relative paths; `recipe` is the body-identity claim
  * the pair actually supports; `prose` is authored here and is the only place it is written.
@@ -89,7 +181,7 @@ const PAIRS = [
       guards: [
         "art: tests/unit/museum-navigation-mirror.test.mjs T1-T5 (npm run test:unit)",
         "art: tests/unit/museum-twin-register.test.mjs (this register)",
-        "patents: tests/CENSUS-museum-navigation-mirror.check.mjs, 6 legs, wired to a tracked .githooks/pre-commit (per-clone core.hooksPath)",
+        "patents: tests/CENSUS-museum-navigation-mirror.check.mjs — the 6-leg guard, with tests/CENSUS-museum-navigation-mirror.md the receipt it checked — shipped by the 2026-10-28 closure fold and wired to a tracked .githooks/pre-commit (per-clone core.hooksPath). Whether either half of that is on the surface this register measures is the `state` and `hook_plumbing` legs of this row, not this sentence.",
       ],
       note:
         "The bodies below the two doc headers are byte-identical, so this pair has no content drift to consolidate. What it had was drift in the DECLARATION, and residual 1 of patent-portfolio/DEBT-museum-navigation-duplication.md is closed by lane RST-TWINFOLD-1114 (2026-11-14) as the four-file, two-repo fold it always was: art's header narrated the pre-port fork in the present tense and pinned its own blobs, patents' mirror header pinned art's digest, the patents receipt restated both, and art's old T3 asserted those sentences were still PRESENT — a guard that could only redden by re-pasting the rot. Both module headers now state no digest, no line count and no delta arithmetic and point at this row instead; the patents receipt is dated and its guard legs recompute. Every figure describing this pair is produced from the two trees into this file, and museum-navigation-mirror.test.mjs T3 + this register's R2/R3 are what keep a re-pasted number from landing silently again.",
@@ -129,7 +221,7 @@ const PAIRS = [
         "art: tests/unit/museum-twin-register.test.mjs pins this file's bytes AND re-measures the mirror's pin (this row's mirror_declaration_check)",
       ],
       note:
-        "The only sibling pair whose MIRROR side carries a declaration, and that declaration names art's digests. This register therefore does not restate them: the hexes in this row's mirror_declaration_check.asserted are PARSED out of the mirror's own header bytes at basis.patents_tip, and its agrees booleans compare them with the art bytes measured on the same run — so the liveness claim is recomputed, not re-believed. It used to be prose here ('both are still live at art d2ce9a4, so the declaration is true today') with hand-quoted hexes and a hand-quoted commit, which is residual 1's defect one row over. Why the pair is not portable: art's loader imports three modules that do not exist in the patents tree (artworks/p3-artworks.js, lib/instanced-elements.js, lib/visitor-identity.js — absent from patents, present in art). Art's own copy carries no header marker. The recovery anchor the mirror names for its OWN pre-fold bytes is a dated fact about patents' history and stays in that header.",
+        "The sibling pair whose MIRROR side was authored as carrying a declaration that names art's digests — and that claim is a measured leg now, not a sentence: this row's guards[] carries claimed_block (headerMarkers over the mirror bytes at the tip basis.patents_tip names), and mirror_declaration_check carries either MEASURED with the hexes parsed out of the mirror's own header plus the agrees booleans against art's tree, or DECLARATION_ABSENT with the pattern that failed to match. Both are recomputed on every run, so the liveness of the mirror's declaration is not re-believed in either direction. Why the pair is not portable: art's loader imports three modules that do not exist in the patents tree (artworks/p3-artworks.js, lib/instanced-elements.js, lib/visitor-identity.js — absent from patents, present in art). Art's own copy carries no header marker. The recovery anchor the mirror names for its OWN pre-fold bytes, when that header is present, is a dated fact about patents' history and stays in that header.",
     },
   },
   {
@@ -258,12 +350,12 @@ const NOT_TWINS = [
   {
     path: "tests/CENSUS-museum-navigation-mirror.md",
     side: "patents-only",
-    note: "The patents receipt for the navigation pair. Art has no copy — this register is the art-side one.",
+    note: "The patents receipt for the navigation pair, shipped by the 2026-10-28 closure fold. Art has no copy — this register is the art-side one. Its pins measure whether the object is still on patents' published tip; see the pair's guards row.",
   },
   {
     path: "tests/CENSUS-museum-navigation-mirror.check.mjs",
     side: "patents-only",
-    note: "The 6-leg guard for the navigation pair, wired to patents' .githooks/pre-commit.",
+    note: "The 6-leg guard for the navigation pair, wired to patents' .githooks/pre-commit. Both halves are dated facts about a commit this bank's lineage no longer publishes; the pair's live gate is art's T1-T5 plus this register's R-legs.",
   },
 ];
 
@@ -480,7 +572,7 @@ function build() {
           patents_markers: patMarkers === null ? "UNMEASURED" : patMarkers.map((m) => m.marker),
         };
       })(),
-      guards: p.prose.guards,
+      guards: guardLegs(p, mirrorRef, artText, patText),
       disposition: p.prose.disposition,
       note: p.prose.note,
       mirror_declaration_check: mirrorDeclarationCheck(p, artText, patText),
@@ -525,6 +617,8 @@ function build() {
         "SimHash/hamming scores classify; they do not prove identity and they do not license a merge or a deletion. Only sha256 over the declared recipe pins bytes. A code_map_rsi_targets rankScore is band order, not a measured quantity.",
       byte_identity_is_recipe_scoped:
         "'Identical' always names the recipe it was measured under — doc-header, comment-header or whole — because every pair in this family that looks identical as a body is different as a whole file, by header design.",
+      guards_are_measured_not_authored:
+        "A guards row names an INSTRUMENT and carries the state of that instrument as measured on this host (PRESENT / ABSENT / UNMEASURED, by guardLegs()). The sentence alone is not evidence that a gate exists: patents' 6-leg census guard and the pre-commit it was wired to had been deleted from the surviving lineage while the row still announced them, which is why R13 re-runs the same ls-tree on every run and why an ABSENT word here is a fact about a published surface, not a defect to be re-worded away.",
     },
     basis: {
       lane: "RSIPIPE2-01-NAV-TWIN-1102",
@@ -588,7 +682,15 @@ function build() {
         patents_leg: {
           recorded_by_generation: CENSUS_ROW.patents.blob,
           recorded_sha256_by_generation: CENSUS_ROW.patents.sha256,
-          what: `museum/navigation.js at ${CENSUS_ROW.patents.indexed_at} 'wip: banked before fleet git-sync' (2026-08-29) — the head the generation recorded as patents refs/remotes/origin/main, i.e. a banked pre-port tree, not a published surface`,
+          /**
+           * Whether the indexed commit is ON main's history is a measurement, so this sentence is
+           * derived from it rather than asserting one answer. It has to be: at the tip this row was
+           * first written (60bf2e08, the ported lineage) 58ef646 was not an ancestor of main, and
+           * after lane IDLE-ART-1120's 2026-11-20 re-port onto this bank's surviving lineage
+           * (e66c6af) it is — while in BOTH states the navigation.js bytes the census scored are
+           * not the bytes the published tip carries. Lineage is what moved; the finding did not.
+           */
+          what: `museum/navigation.js at ${CENSUS_ROW.patents.indexed_at} 'wip: banked before fleet git-sync' (2026-08-29) — the head the generation recorded as patents refs/remotes/origin/main. Whether that commit sits on live main's history is measured below (merge_base_is_ancestor_rc: ${legs.patents_indexed_is_ancestor_of_main === null ? "UNMEASURED on this host" : legs.patents_indexed_is_ancestor_of_main === 0 ? "0 — it IS an ancestor, so the generation's ref was honest about lineage and only about content wrong" : "non-zero — it is NOT an ancestor, so the generation indexed a tree off main's line entirely"}); either way the published tip carries a different navigation.js blob than the one this leg names, and THAT is the finding — a census row scored on bytes no published surface holds`,
           re_measured_here: {
             command: `git -C <patents repo> show ${CENSUS_ROW.patents.indexed_at}:${NAV.patents} | git hash-object --stdin`,
             blob: legs.patents_parked ? legs.patents_parked.blob : null,
@@ -629,6 +731,8 @@ function build() {
       },
     },
     residuals: [
+      "OPEN 2026-11-20 by lane IDLE-ART-1120 — patents' museum/gallery-loader.js no longer declares art canonical on the surface this register measures. The file is PRESENT at the tip basis.patents_tip names (git ls-tree --name-only answers for it), but its doc header is a plain module comment: headerMarkers finds no PROVENANCE marker in those bytes, mirror_declaration_check therefore reports DECLARATION_ABSENT, and R11's mirror-declaration legs skip honestly instead of checking. The pair is guarded from art's side only. Closing it is a patents-side edit — re-add the declaration header naming art's current blob/sha256 for that path — which belongs to a lane bound to that tree; art's own law forbids hand-copying a digest into prose, so the header must be written from a measurement, exactly as the navigation mirror header was ported whole on the same day. The guard claim this row used to author (\"patents: museum/gallery-loader.js lines 1-10 PROVENANCE block\") is now the measured claimed_block leg of that guards entry, so the word changes with the surface instead of with a sentence.",
+      "OPEN 2026-11-20 by lane IDLE-ART-1120 — the navigation pair's MIRROR side has no live instrument. Measured at the patents tip named by basis.patents_tip: `git ls-tree --name-only <that tip> -- tests/CENSUS-museum-navigation-mirror.check.mjs`, the same call for `tests/CENSUS-museum-navigation-mirror.md`, and the same for `.githooks/pre-commit` each print nothing, and the bank checkout sets no `core.hooksPath`. So the 6-leg guard this register used to announce in the present tense ships nothing on the surviving lineage, and art's T1-T5 plus this file's R-legs are the entire gate on the pair. The state is now measured rather than narrated (the pair's guards rows plus museum-twin-register.test.mjs R13), so the word regenerates on `--write` and cannot rot back in either direction. Closing the gap itself is a patents-side job: reinstate the receipt and guard on that lineage, or give that repo a register that reads this one through ART_TWIN_MIRROR_REPO — either needs a lane bound to that tree, and it is the same missing half the undeclared-sibling-pairs residual below has always named.",
       "CLOSED 2026-11-14 by lane RST-TWINFOLD-1114 — residual 1 of DEBT-museum-navigation-duplication.md (art's canonical header narrating the pre-port fork in the present tense). Folded as the four-file, two-repo sweep it required: art's patent-portfolio/museum/navigation.js header, patents' museum/navigation.js mirror header, the patents receipt tests/CENSUS-museum-navigation-mirror.md and its guard legs. No module header in either repo now states a digest, a line count or delta arithmetic for this pair; each points at this register row, and the numbers are produced from the two trees. Held by museum-navigation-mirror.test.mjs T3 (pointer resolves, header restates nothing, register agrees with these bytes) and by this file's R2/R3.",
       "CLOSED 2026-11-14 by the same sweep — patents' four spec PROVENANCE headers claimed the pair was '(byte-identical as of 2026-08-18)' as WHOLE files, which the register's own measurement never supported: the twins are identical below the header and differ by it by design, and art's four had already been reworded to say exactly that. Patents' headers now carry the recipe-scoped claim and a pointer to this register's row id; R5 and R7 keep the recipe claim true, so the wording cannot rot back into a whole-file lie.",
       "The five undeclared sibling pairs (architecture, lighting, wayfinding, wing-enhancements, museum.spec) are pinned by this register from the art side, but nothing on the patents side references it. A mirror-side register, or a patents test that reads this one through a declared path override, is the matching half.",

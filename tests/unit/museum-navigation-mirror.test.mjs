@@ -38,6 +38,15 @@
  * canonical declaration is the copy that can rot silently. This file is the
  * art-side tripwire for that.
  *
+ * Dated, and now measured (2026-11-20, lane IDLE-ART-1120): that last sentence was written
+ * against a patents tree this bank no longer publishes. Neither the 6-leg guard nor the
+ * .githooks/pre-commit is on patents' live main, and the clone sets no core.hooksPath — so the
+ * asymmetry this file was built to close now runs the other way, and THIS file plus
+ * museum-twin-register.test.mjs are the only live gate on the pair. The word is no longer
+ * folklore: scripts/twin-register.mjs measures each guard carrier and
+ * museum-twin-register.test.mjs R13 re-measures the register's word, so a restored mirror guard
+ * flips the record by itself and a re-worded one goes red.
+ *
  * Positive controls (why an identity check that cannot go red proves nothing):
  * three were run before this file was committed. (1) In a scratch copy of a
  * minimal fake repo: appending one token to the module body turned T1 and T2
