@@ -814,25 +814,32 @@ function initFontToggle() {
     const btn = document.getElementById('font-toggle-btn');
     if (!btn) return;
 
-    // Check for existing large text setting
-    const isLarge = localStorage.getItem('kagami_large_text') === 'true';
-    if (isLarge) {
-        document.body.classList.add('large-text');
+    // The setting is not this page's to keep. ../accessibility.js is loaded one
+    // line above main.js in index.html and owns the kagami_large_text setting
+    // plus the two classes ../accessibility.css keys its type scale on —
+    // html.large-text AND body.large-text, because the module stamps <html> before <body>
+    // exists to avoid a flash of small text. This function used to maintain its
+    // own copy of that logic and stamp <body> only: a visitor who arrived with
+    // large text on and clicked this button got `kagami_large_text=false`, an
+    // "off" button and a "Normal text size" announcement, while <html> kept
+    // `large-text` and the stylesheet's `font-size: 22px !important` kept the
+    // page large with no control that could turn it back (a reload was the only
+    // cure). `git grep -n documentElement <tip> -- mesh-dry` returned nothing.
+    // AGENTS.md §When Creating New Art Projects, "Use shared libs — never
+    // duplicate", is the rule this obeys; the pin is
+    // tests/unit/large-text-contract.test.mjs.
+    const a11y = window.kagamiAccessibility;
+    if (!a11y) return; // no shared module, no shared setting: stay inert rather than fork it
+
+    if (a11y.isLargeText()) {
         btn.classList.add('active');
     }
 
     btn.addEventListener('click', () => {
-        document.body.classList.toggle('large-text');
-        const isNowLarge = document.body.classList.contains('large-text');
-        localStorage.setItem('kagami_large_text', isNowLarge);
-
-        if (isNowLarge) {
-            btn.classList.add('active');
-            announce('Large text enabled');
-        } else {
-            btn.classList.remove('active');
-            announce('Normal text size');
-        }
+        a11y.toggle();
+        const isNowLarge = a11y.isLargeText();
+        btn.classList.toggle('active', isNowLarge);
+        announce(isNowLarge ? 'Large text enabled' : 'Normal text size');
 
         Haptics.light();
         SoundSystem.blip();
