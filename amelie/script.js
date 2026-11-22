@@ -41,16 +41,60 @@ function initializeGallery() {
 }
 
 // === Product Rendering ===
+
+// The category list is the content source's, not this file's.
+// data/gallery.json carries `categories` (written by the curation pipeline,
+// amelie/scripts/curate_amelie.py) and index.html declares one
+// .products-grid per category. Until AMELIE-CATEGORY-SOURCE-1122
+// renderProducts() carried a fourth copy of that list as a literal, so a
+// category added to the data — or even one added to the page markup —
+// rendered zero products and said nothing at all. Pinned by
+// tests/unit/amelie-category-source.test.mjs.
+function gridsByCategory() {
+    return Array.from(document.querySelectorAll('.products-grid[data-category]'))
+        .map(grid => grid.dataset && grid.dataset.category)
+        .filter(Boolean);
+}
+
+function galleryCategories() {
+    // The content source's order is authoritative; the page's own grids are
+    // the fallback for a category the source does not list.
+    const declared = Array.isArray(galleryData && galleryData.categories)
+        ? galleryData.categories
+        : [];
+
+    const ordered = [];
+    const seen = new Set();
+    declared.concat(gridsByCategory()).forEach(category => {
+        if (seen.has(category)) return;
+        seen.add(category);
+        ordered.push(category);
+    });
+    return ordered;
+}
+
 function renderProducts() {
-    const categories = ['les-pantalons', 'le-style-parisien', 'lartisanat-japonais', 'les-accessoires'];
-    
-    categories.forEach(category => {
+    const products = (galleryData && galleryData.products) || [];
+
+    galleryCategories().forEach(category => {
         const grid = document.querySelector(`.products-grid[data-category="${category}"]`);
         if (!grid) return;
-        
-        const products = galleryData.products.filter(p => p.category === category);
-        grid.innerHTML = products.map(product => createProductCard(product)).join('');
+
+        const inCategory = products.filter(p => p.category === category);
+        grid.innerHTML = inCategory.map(product => createProductCard(product)).join('');
     });
+
+    // A product whose category has no grid cannot reach the page. The old
+    // silent drop is the failure this replaces: say which pieces are stranded
+    // instead of showing fewer garments than the collection holds.
+    const gridCensus = new Set(gridsByCategory());
+    const stranded = products.filter(p => !gridCensus.has(p.category));
+    if (stranded.length) {
+        console.warn(
+            `amelie: ${stranded.length} of ${products.length} pieces have no category grid on the page and are not shown: ` +
+            stranded.map(p => `${p.id} (${p.category})`).join(', ')
+        );
+    }
 }
 
 function createProductCard(product) {
