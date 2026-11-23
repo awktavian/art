@@ -546,21 +546,21 @@ for (const file of serviceWorkerFiles) {
 // open-goal counts while the native inventory resolves), the child prints
 // UNMEASURED, leaves that tile alone, and gates only the measured tiles — a
 // missing count never becomes a published NaN or a fabricated "0 sorry".
+//
+// The failure booked here is BUILT FROM THE CHILD'S OWN STATE LINE, not from a
+// sentence this file remembers: until 2026-11-23 any nonzero rc was reported as
+// "corpus statistics disagree with /tmp/proof-report.json (fix: node
+// scripts/sync-corpus-stats.mjs)", which claimed a comparison the child had
+// refused to run, named a path it had not read under a PROOF_REPORT_PATH
+// override, and prescribed a command that exits 1 on the same row. rc semantics
+// are unchanged — an unverified corpus still reddens this build — see
+// scripts/corpus-stats-state.mjs for the states and why each cure is honest.
 {
-  const { spawnSync } = await import("node:child_process");
-  const gate = spawnSync(
-    process.execPath,
-    [new URL("./sync-corpus-stats.mjs", import.meta.url).pathname, "--check"],
-    { encoding: "utf8" },
-  );
-  if (gate.stdout) process.stdout.write(gate.stdout);
-  if (gate.status !== 0) {
-    if (gate.stderr) process.stderr.write(gate.stderr);
-    failures.push(
-      "wiles/index.html: corpus statistics disagree with /tmp/proof-report.json " +
-        "(fix: node scripts/sync-corpus-stats.mjs)",
-    );
-  }
+  const { runCorpusGate } = await import("./corpus-stats-state.mjs");
+  const gate = runCorpusGate({
+    script: new URL("./sync-corpus-stats.mjs", import.meta.url).pathname,
+  });
+  if (gate.failure) failures.push(gate.failure);
 }
 
 const discoveryLine =
