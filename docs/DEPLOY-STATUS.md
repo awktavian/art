@@ -31,6 +31,17 @@ two PWA manifests, and the Exhale service worker.
 Every later `main` push must pass `Static site quality`, including the local
 `/art/` Chromium canary, before its deployment is treated as healthy.
 
+The tree shape this section depends on is machine-pinned, not prose:
+`scripts/pages-deploy-invariants.mjs` (run by
+`tests/unit/pages-deploy-invariants.test.mjs`, i.e. by the workflow's
+`npm run test:unit` step) asks git for the committed tree and refuses a
+`160000` gitlink, a gitlink with no `.gitmodules` entry, a missing `.nojekyll`,
+a tracked `CNAME`, and any embedded separate repository that `.gitignore` no
+longer covers. Run it directly with
+`node scripts/pages-deploy-invariants.mjs` (rc 0 clean, rc 1 with one line per
+violation). The fixture in that test file reproduces the outage shape below and
+releases on the remediation, so the clean verdict is earned.
+
 GitHub's legacy `GET /repos/awktavian/art/pages/builds/latest` record reported
 `errored` for the same SHA while the generated Actions deployment completed
 successfully and the live files matched that SHA. Treat the completed Actions
