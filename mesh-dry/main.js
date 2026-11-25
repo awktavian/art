@@ -419,6 +419,51 @@ function initHaptics() {
 }
 
 // ============================================================================
+// HINT TOAST — one node, one owner
+// ============================================================================
+
+// Every celebration on this page speaks through the SAME `.dry-hint-toast` node
+// that styles.css:475 keys on `.visible`, so this is the only place that looks
+// the node up, creates it, writes its markup and arms its hiding timer.
+//
+// The timer is cancelled on entry. Five messages share one node, so a timer left
+// over from an earlier message strips `.visible` off whatever is showing now —
+// which is how the page lost its own payoff. `discover()` shows the 8th
+// discovery's toast (3000 ms) and, 1000 ms later, the all-complete toast
+// (5000 ms) on that same node; the first message's stale timer hid the
+// celebration 2000 ms into the 5000 ms the page promises, mid-sentence, while
+// `SoundSystem.allComplete()` was still playing. Pinned by
+// tests/unit/mesh-dry-toast-owner.test.mjs.
+let toastHideTimer = null;
+
+function showDryToast(title, body, duration) {
+    if (toastHideTimer !== null) {
+        clearTimeout(toastHideTimer);
+        toastHideTimer = null;
+    }
+
+    let toast = document.querySelector('.dry-hint-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.className = 'dry-hint-toast';
+        document.body.appendChild(toast);
+    }
+
+    toast.innerHTML = `
+        <div class="hint-title">${title}</div>
+        <div class="hint-text">${body}</div>
+    `;
+
+    toast.classList.add('visible');
+    toastHideTimer = setTimeout(() => {
+        toast.classList.remove('visible');
+        toastHideTimer = null;
+    }, duration);
+
+    return toast;
+}
+
+// ============================================================================
 // DISCOVERY SYSTEM (DRY-Humor Easter Eggs)
 // ============================================================================
 
@@ -504,42 +549,18 @@ const DiscoverySystem = {
     },
 
     showDiscoveryToast(name) {
-        let toast = document.querySelector('.dry-hint-toast');
-        if (!toast) {
-            toast = document.createElement('div');
-            toast.className = 'dry-hint-toast';
-            document.body.appendChild(toast);
-        }
-
-        toast.innerHTML = `
-            <div class="hint-title">🔓 Discovery Unlocked!</div>
-            <div class="hint-text">${name}</div>
-        `;
-
-        toast.classList.add('visible');
-        setTimeout(() => toast.classList.remove('visible'), 3000);
+        showDryToast('🔓 Discovery Unlocked!', name, 3000);
 
         announce(`Discovery unlocked: ${name}`);
     },
 
     showAllCompleteToast() {
-        let toast = document.querySelector('.dry-hint-toast');
-        if (!toast) {
-            toast = document.createElement('div');
-            toast.className = 'dry-hint-toast';
-            document.body.appendChild(toast);
-        }
-
-        toast.innerHTML = `
-            <div class="hint-title">🏆 All Discoveries Complete!</div>
-            <div class="hint-text">
-                You've found all 8 easter eggs!<br>
-                <em>Don't Repeat Yourself... but DO explore everything.</em>
-            </div>
-        `;
-
-        toast.classList.add('visible');
-        setTimeout(() => toast.classList.remove('visible'), 5000);
+        showDryToast(
+            '🏆 All Discoveries Complete!',
+            `You've found all 8 easter eggs!<br>` +
+                `<em>Don't Repeat Yourself... but DO explore everything.</em>`,
+            5000
+        );
 
         announce('Congratulations! All 8 discoveries complete!');
     },
@@ -547,20 +568,7 @@ const DiscoverySystem = {
     showHint(id) {
         if (!this.discoveries[id] || this.discoveries[id].found) return;
 
-        let toast = document.querySelector('.dry-hint-toast');
-        if (!toast) {
-            toast = document.createElement('div');
-            toast.className = 'dry-hint-toast';
-            document.body.appendChild(toast);
-        }
-
-        toast.innerHTML = `
-            <div class="hint-title">💡 Hint</div>
-            <div class="hint-text">${this.discoveries[id].hint}</div>
-        `;
-
-        toast.classList.add('visible');
-        setTimeout(() => toast.classList.remove('visible'), 2500);
+        showDryToast('💡 Hint', this.discoveries[id].hint, 2500);
     }
 };
 
@@ -992,26 +1000,15 @@ function showScrollMilestoneReward() {
     createConfetti();
 
     // Show special message
-    let toast = document.querySelector('.dry-hint-toast');
-    if (!toast) {
-        toast = document.createElement('div');
-        toast.className = 'dry-hint-toast';
-        document.body.appendChild(toast);
-    }
+    showDryToast(
+        '🎉 You Made It!',
+        `You read the whole page.<br>` +
+            `<em>That's dedication. Unlike copy-paste, this was worth repeating.</em>`,
+        5000
+    );
 
-    toast.innerHTML = `
-        <div class="hint-title">🎉 You Made It!</div>
-        <div class="hint-text">
-            You read the whole page.<br>
-            <em>That's dedication. Unlike copy-paste, this was worth repeating.</em>
-        </div>
-    `;
-
-    toast.classList.add('visible');
     SoundSystem.allComplete();
     Haptics.success();
-
-    setTimeout(() => toast.classList.remove('visible'), 5000);
 
     announce('Congratulations! You reached the end of the page.');
 }
@@ -1097,22 +1094,8 @@ function showIdleHint() {
     // Pick a random undiscovered hint
     const [key, discovery] = undiscovered[Math.floor(Math.random() * undiscovered.length)];
 
-    let toast = document.querySelector('.dry-hint-toast');
-    if (!toast) {
-        toast = document.createElement('div');
-        toast.className = 'dry-hint-toast';
-        document.body.appendChild(toast);
-    }
-
-    toast.innerHTML = `
-        <div class="hint-title">💡 Psst...</div>
-        <div class="hint-text">${discovery.hint}</div>
-    `;
-
-    toast.classList.add('visible');
+    showDryToast('💡 Psst...', discovery.hint, 4000);
     SoundSystem.blip(330);
-
-    setTimeout(() => toast.classList.remove('visible'), 4000);
 }
 
 // ============================================================================
