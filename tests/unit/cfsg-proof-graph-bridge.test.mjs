@@ -423,6 +423,99 @@ test("identity collision goes loud: two rows, same file and fqn, no line to spli
   assert.ok(files.size < graph.nodes.length, "the fixture should contain several declarations per file");
 });
 
+test("a duplicated FQN is narrowed by its cite, and never by mount order", () => {
+  // THE LEGAL CASE. Same FQN, two files: the Hub's identity law allows it (the
+  // file is inside the id, so the two node ids differ), and the published graph
+  // carries eight of them (`proofs-graph.meta.json → integrity.identity.duplicateFqns: 8`,
+  // asserted by the live-surface test below). A census row carries no line, so
+  // nothing in the identity splits them — the only thing that can name which
+  // declaration made a reference is the cite.
+  //
+  // Measured on origin/main a1b56977 before this test existed: the mount kept one
+  // id per FQN (`Map<fqn, id>`), so a later row silently replaced an earlier one.
+  // A cite naming `CFSG/…/LQ4Fin.lean:79` mounted its edge on `…Legacy.lean`'s
+  // node — the graph stated a dependency of a declaration the ledger never cited,
+  // while `resolutionReason` printed the cite that said otherwise — and BOTH
+  // duplicates reported the same `deps` array, so the uncited one claimed a
+  // dependency it was not the source of. Refusing is not needed here; reading the
+  // cite is.
+  const LEGACY_PATH = "CFSG/CGT/PushingUpLit/A78/LQ4FinLegacy.lean";
+  const dupCensus = (legacyFirst) => {
+    const census = structuredClone(CENSUS);
+    const legacy = { ...MEMBERS, path: LEGACY_PATH };
+    if (legacyFirst) census.exec_leg.sample.unshift(legacy);
+    else census.exec_leg.sample.push(legacy);
+    return census;
+  };
+  const fileOf = (graph, id) => graph.nodes.find((node) => node.id === id)?.file;
+  // (fqn, file) is the node's own address — `MEMBERS.path` alone is not enough,
+  // because the real fixture puts two declarations in that one file.
+  const nodeOf = (graph, fqn, file) => {
+    const node = graph.nodes.find((n) => n.fqn === fqn && n.file === file);
+    assert.ok(node, `no node for ${fqn} at ${file} in ${graph.nodes.map((n) => `${n.fqn}@${n.file}`).join(", ")}`);
+    return node;
+  };
+  const depsOf = (graph, fqn, file) => nodeOf(graph, fqn, file).deps;
+  const citeOfMemMembers = [
+    { from: MEMBERS.decl, to: INVARIANT_B_IFF.decl, file: MEMBERS.path, line: 79 },
+  ];
+
+  for (const legacyFirst of [false, true]) {
+    const { graph, layout, refusals } = buildCertificateGraph(dupCensus(legacyFirst), {
+      ledger: citeOfMemMembers,
+    });
+    assert.equal(
+      graph.integrity.identity.duplicateFqns,
+      2,
+      `legacyFirst=${legacyFirst}: the fixture must carry the legal duplicate`,
+    );
+    assert.equal(graph.edges.length, 1, `legacyFirst=${legacyFirst}`);
+    assert.equal(
+      refusals.filter((refusal) => refusal.code === "ambiguous_fqn_reference").length,
+      0,
+      `legacyFirst=${legacyFirst}: a cite that names one file must mount, not refuse`,
+    );
+    const edge = graph.edges[0];
+    // The edge follows the CITE, whichever end of the sample the duplicate sits on.
+    assert.equal(fileOf(graph, edge.from), MEMBERS.path, `legacyFirst=${legacyFirst}: edge.from`);
+    assert.equal(fileOf(graph, edge.to), INVARIANT_B_IFF.path, `legacyFirst=${legacyFirst}: edge.to`);
+    // And the dependency is recorded on ONE node: the citing declaration. The
+    // same-FQN neighbour in the other file reports nothing.
+    assert.deepEqual(depsOf(graph, MEMBERS.decl, MEMBERS.path), [INVARIANT_B_IFF.decl], `legacyFirst=${legacyFirst}`);
+    assert.deepEqual(depsOf(graph, MEMBERS.decl, LEGACY_PATH), [], `legacyFirst=${legacyFirst}: the uncited duplicate must not inherit the deps array`);
+    // Legal in the Hub's law means mountable by the Hub's gate, duplicate and all.
+    assert.equal(assertHubMountable(graph, layout), true, `legacyFirst=${legacyFirst}`);
+  }
+
+  // The target side has no cite-leg that names it: a reference is found in the
+  // REFERENCING declaration's source, so `ref.file` says nothing about which file
+  // the duplicated target lives in. Guessing there would be the same wrong claim
+  // by a different route, so it is refused by name and no edge is mounted.
+  const ambiguousTarget = buildCertificateGraph(dupCensus(false), {
+    ledger: [{ from: INVARIANT_B_IFF.decl, to: MEMBERS.decl, file: INVARIANT_B_IFF.path, line: 79 }],
+  });
+  assert.equal(ambiguousTarget.graph.edges.length, 0);
+  const targetRefusal = ambiguousTarget.refusals.find((refusal) => refusal.code === "ambiguous_fqn_reference");
+  assert.ok(targetRefusal, `expected ambiguous_fqn_reference, got ${ambiguousTarget.refusals.map((r) => r.code).join(",")}`);
+  assert.equal(targetRefusal.subject, `${INVARIANT_B_IFF.decl} -> ${MEMBERS.decl}`);
+  // The reason names BOTH candidate files, so the reader can see what was ambiguous.
+  assert.match(targetRefusal.reason, /LQ4Fin\.lean/);
+  assert.match(targetRefusal.reason, /LQ4FinLegacy\.lean/);
+  assert.deepEqual(depsOf(ambiguousTarget.graph, INVARIANT_B_IFF.decl, INVARIANT_B_IFF.path), []);
+
+  // A from-side cite that matches NEITHER candidate is ambiguous too: the ledger
+  // named a file that does not hold the citing declaration, and mounting on a
+  // nearest guess would invent the attribution the cite failed to make.
+  const wrongCite = buildCertificateGraph(dupCensus(false), {
+    ledger: [{ from: MEMBERS.decl, to: INVARIANT_B_IFF.decl, file: "CFSG/Unrelated.lean", line: 1 }],
+  });
+  assert.equal(wrongCite.graph.edges.length, 0);
+  assert.ok(
+    wrongCite.refusals.some((refusal) => refusal.code === "ambiguous_fqn_reference"),
+    "a cite matching no candidate must be refused, not resolved by mount order",
+  );
+});
+
 test("a row with no decl name is refused rather than minted as an anonymous node", () => {
   const nameless = structuredClone(CENSUS);
   // The artifact's own controls.rows have exactly this shape: a verdict and an

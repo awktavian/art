@@ -451,8 +451,19 @@ export function buildCertificateGraph(census, options = {}) {
     throw new Error("refusing to build an empty certificate graph: no exec_leg row survived the mount gates");
   }
   const { ids, normalizedFiles, lineFallbacks } = planNodeIds(seeds);
-  const idByFqn = new Map();
-  seeds.forEach((seed, index) => idByFqn.set(seed.fqn, ids[index]));
+  // FQN -> the node indices that carry it, i.e. a CANDIDATE SET, never one winner.
+  // A repeated FQN across different files is legal in the Hub's identity law (the
+  // file is inside the id, so the ids differ; the published graph reports
+  // `duplicateFqns: 8`), and a census row carries no line to split it. An earlier
+  // `Map<fqn, id>` let a later row silently replace an earlier one, which mounted
+  // every reference to a duplicated FQN on the LAST declaration with that name —
+  // see `resolveEnd`.
+  const indicesByFqn = new Map();
+  seeds.forEach((seed, index) => {
+    const list = indicesByFqn.get(seed.fqn);
+    if (list) list.push(index);
+    else indicesByFqn.set(seed.fqn, [index]);
+  });
 
   const axiomsOf = (row) => (Array.isArray(row.axioms) ? [...row.axioms].sort() : []);
   const isSorry = (row) => row.verdict === "UNSOUND" || axiomsOf(row).includes("sorryAx");
@@ -502,13 +513,45 @@ export function buildCertificateGraph(census, options = {}) {
     };
   });
 
-  // ── edges: only cited, in-corpus declaration references ───────────────────
+  // ── edges: only a cited, in-corpus, UNAMBIGUOUS reference becomes an edge ──
   const edges = [];
-  const outgoing = new Map(nodes.map((n) => [n.fqn, []]));
+  // Keyed by node ID, not by FQN: two nodes sharing an FQN are two declarations,
+  // and one shared array made BOTH of them report a dependency only one of them
+  // was the source of (and aliased one node's `deps` object into the other's).
+  const outgoing = new Map(nodes.map((n) => [n.id, []]));
+
+  /** The cite's own file, normalised exactly as every mounted path is normalised.
+   *  A shape `normalizeSourceFile` refuses is not a narrowing leg: it returns null,
+   *  and the reference is then judged on its candidates alone. */
+  const citedFile = (ref) => {
+    try {
+      return normalizeSourceFile(ref.file);
+    } catch {
+      return null;
+    }
+  };
+
+  /** Narrow one end of a reference to exactly one node.
+   *
+   *  A unique FQN names itself. A duplicated FQN is a real corpus state, so the
+   *  question becomes *which file's declaration*: for the FROM end the ledger's own
+   *  cite answers it — a reference is found in the referencing declaration's
+   *  source, so `ref.file` is that file — and one surviving candidate is mounted
+   *  there. For the TO end the cite says nothing about which file the target lives
+   *  in, so `file` is passed as null and a duplicated target has no honest
+   *  resolution. Returning null means "this name does not select one declaration",
+   *  which is refused by name below rather than decided by iteration order. */
+  const resolveEnd = (candidates, file) => {
+    if (candidates.length === 1) return candidates[0];
+    if (file === null) return null;
+    const survivors = candidates.filter((index) => normalizedFiles[index] === file);
+    return survivors.length === 1 ? survivors[0] : null;
+  };
+
   for (const ref of ledger) {
-    const fromId = idByFqn.get(ref?.from);
-    const toId = idByFqn.get(ref?.to);
-    if (!fromId || !toId) {
+    const fromCandidates = indicesByFqn.get(ref?.from);
+    const toCandidates = indicesByFqn.get(ref?.to);
+    if (!fromCandidates || !toCandidates) {
       refuse(
         "target_outside_corpus",
         "the Hub records no node for a constant outside the harvested corpora, so a reference to one is not an edge; see scripts/proof-graph/generate.mts writeMergeInputs",
@@ -529,9 +572,25 @@ export function buildCertificateGraph(census, options = {}) {
       );
       continue;
     }
+    // The cite gate above already accepted `ref.file` as present and `ref.line` as
+    // positive; this leg asks the harder question — does that cite name ONE node?
+    const fromIndex = resolveEnd(fromCandidates, citedFile(ref));
+    const toIndex = resolveEnd(toCandidates, null);
+    if (fromIndex === null || toIndex === null) {
+      const end = fromIndex === null ? "from" : "to";
+      const candidates = fromIndex === null ? fromCandidates : toCandidates;
+      refuse(
+        "ambiguous_fqn_reference",
+        end === "from"
+          ? `the citing FQN ${JSON.stringify(ref.from)} is carried by ${candidates.length} declarations (${candidates.map((index) => normalizedFiles[index]).join(", ")}), and the cite ${ref.file}:${ref.line} selects none of them uniquely, so the mount cannot say which declaration made the reference`
+          : `the target FQN ${JSON.stringify(ref.to)} is carried by ${candidates.length} declarations (${candidates.map((index) => normalizedFiles[index]).join(", ")}); a cite locates the reference, not its target, so no ledger field selects one of them`,
+        `${ref.from} -> ${ref.to}`,
+      );
+      continue;
+    }
     edges.push({
-      from: fromId,
-      to: toId,
+      from: ids[fromIndex],
+      to: ids[toIndex],
       kind,
       resolution: "resolved",
       rawFrom: ref.from,
@@ -544,9 +603,9 @@ export function buildCertificateGraph(census, options = {}) {
       resolutionReason: `certificate ledger cite ${ref.file}:${ref.line}${ref.note ? ` (${ref.note})` : ""}`,
       evidence: [],
     });
-    outgoing.get(ref.from).push(ref.to);
+    outgoing.get(ids[fromIndex]).push(ref.to);
   }
-  for (const node of nodes) node.deps = outgoing.get(node.fqn) ?? [];
+  for (const node of nodes) node.deps = outgoing.get(node.id) ?? [];
 
   // ── ranks + layout, then the payload the Hub's own gates demand ───────────
   const ranks = computeFoundationalPageRank(nodes, edges);
@@ -582,6 +641,11 @@ export function buildCertificateGraph(census, options = {}) {
         // bridge's lineFallbacks is 0 by construction, because a census row
         // carries no line: a duplicate identity here cannot be repaired and
         // therefore throws rather than reporting a fallback count.
+        // So a non-zero count below is LEGAL, not a warning — and it is the case
+        // the ledger leg has to answer: with two nodes carrying one FQN, a cited
+        // reference is mounted on the node its cite names, and a reference the
+        // cite cannot name is refused as `ambiguous_fqn_reference`. It is never
+        // resolved by whichever row happened to be mounted last.
         duplicateFqns: countDuplicates(nodes.map((node) => node.fqn)),
         lineFallbacks,
       },
